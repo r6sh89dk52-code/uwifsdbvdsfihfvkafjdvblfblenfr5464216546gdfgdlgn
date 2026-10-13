@@ -2,7 +2,8 @@ import {useMemo,useState} from 'react';
 import {Check,ClipboardList,Package,Plus,Search,Trash2,X} from 'lucide-react';
 import {kardexCatalog,kardexMainCount,kardexDonatedCount} from './kardexCatalog';
 import {countPhysicalUnits,inventoryTotals,validateStockLot,type StockLot,type ContainerKind} from './inventoryRules';
-type Props={lots:StockLot[];onChange:(lots:StockLot[])=>void};
+import {type StockLedger} from './kardexMovements';import KardexMovementsPanel from './KardexMovementsPanel';
+type Props={ledger:StockLedger;onChange:(value:StockLedger)=>void};
 const options:{value:ContainerKind;label:string}[]=[
  {value:'unidad',label:'Unidad individual'},{value:'caja',label:'Caja'},
  {value:'frasco',label:'Frasco'},{value:'paquete',label:'Paquete'},
@@ -11,7 +12,8 @@ const options:{value:ContainerKind;label:string}[]=[
 const clean=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
 const safeNumber=(v:string)=>Number(v.replace(',','.'));
 const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).format(v);
-export default function KardexPanel({lots,onChange}:Props){
+export default function KardexPanel({ledger,onChange}:Props){
+ const lots=ledger.lots;
  const[search,setSearch]=useState('');
  const[filter,setFilter]=useState<'all'|'normal'|'donated'>('all');
  const[selectedId,setSelectedId]=useState('');
@@ -39,6 +41,7 @@ export default function KardexPanel({lots,onChange}:Props){
    setContainer('unidad');setUnit('UND');setCapacity('1');setSealed('0');setLoose('0');setOpened('0');setProblem('');
  }
  function startEdit(l:StockLot){
+   if(ledger.movements.some(x=>x.lotId===l.id)){setProblem('Este lote ya tiene movimientos. Usa Ajuste auditado en lugar de editar su saldo inicial.');return}
    setEditId(l.id);setSelectedId(l.code);setLot(l.lot);setExpires(l.expires);
    setContainer(l.container);setUnit(l.catalogUnit==='mL'?'mL':l.catalogUnit==='g'?'g':'UND');
    setCapacity(String(l.unitsPerContainer));setSealed(String(l.sealedContainers));
@@ -56,12 +59,14 @@ export default function KardexPanel({lots,onChange}:Props){
      const entry=validateStockLot(raw);
      if(lots.some(x=>x.id!==entry.id&&x.code===entry.code&&x.lot.toLowerCase()===entry.lot.toLowerCase()&&x.expires===entry.expires))
        throw Error('Este producto, lote y vencimiento ya están registrados. Edita ese registro para ajustar el recuento.');
-     onChange(editId?lots.map(x=>x.id===editId?entry:x):[...lots,entry]);reset();
+     if(editId&&ledger.movements.some(m=>m.lotId===editId))throw Error('Lote con movimientos: registra un ajuste auditado.');
+     onChange({...ledger,lots:editId?lots.map(x=>x.id===editId?entry:x):[...lots,entry]});reset();
    }catch(error){setProblem(error instanceof Error?error.message:'No fue posible validar el inventario.')}
  }
  function remove(l:StockLot){
+   if(ledger.movements.some(m=>m.lotId===l.id)){setProblem('No se puede eliminar un lote con movimientos auditados.');return}
    if(!window.confirm('¿Eliminar el registro ficticio de '+l.name+'?'))return;
-   onChange(lots.filter(x=>x.id!==l.id));
+   onChange({...ledger,lots:lots.filter(x=>x.id!==l.id)});
    if(editId===l.id)reset();
  }
  return <div className="kardexPage">
@@ -102,6 +107,7 @@ export default function KardexPanel({lots,onChange}:Props){
    {problem&&<p className="kardexError" role="alert">{problem}</p>}
    <div className="kardexActions"><button type="button" className="workerPrimary" onClick={save}><Check size={18}/>{editId?'Guardar cambio':'Agregar al inventario'}</button>{editId&&<button type="button" className="workerSecondary" onClick={reset}><X size={18}/>Cancelar</button>}</div>
   </section>
+  <KardexMovementsPanel ledger={ledger} onChange={onChange}/>
   <section className="panel">
    <h3><ClipboardList size={18}/>Inventario registrado</h3>
    <div className="kardexFilter"><label className="kardexSearch"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o lote…"/></label>
@@ -114,7 +120,7 @@ export default function KardexPanel({lots,onChange}:Props){
       <p>{l.lot?'Lote '+l.lot:'Sin lote registrado'} · {l.expires?'Vence '+l.expires:'Vencimiento pendiente'}</p>
       <strong className="kardexBalance">{fmt(countPhysicalUnits(l))} {l.catalogUnit}</strong>
       <p>{l.sealedContainers} cerrados · {l.looseUnits} sueltos · {l.openedRemaining} abiertos restantes · capacidad {l.unitsPerContainer}</p>
-      <div className="kardexActions"><button className="workerSecondary" onClick={()=>startEdit(l)}>Editar</button><button className="workerSecondary" onClick={()=>remove(l)}><Trash2 size={16}/>Eliminar</button></div>
+      <div className="kardexActions">{ledger.movements.some(m=>m.lotId===l.id)?<span className="hint">Saldo bloqueado: modificar mediante ajuste auditado</span>:<><button className="workerSecondary" onClick={()=>startEdit(l)}>Editar</button><button className="workerSecondary" onClick={()=>remove(l)}><Trash2 size={16}/>Eliminar</button></>}</div>
     </article>)}
    </div>}
   </section>
