@@ -155,3 +155,36 @@ html,body,#root{width:100%;min-width:0}
  .itemEdit .itemControls{grid-template-columns:54px minmax(0,1fr) 35px;gap:5px}
  .brandmark small{font-size:8px}
 }
+
+
+/* Etapa B0 v0.10: kardex físico, interfaz móvil y barra de navegación conservada. */
+.kardexPage,.kardexPage section,.kardexPage label,.kardexPage .fields{min-width:0;max-width:100%}
+.kardexIntro{display:flex;align-items:center;gap:14px;margin:0 0 18px}
+.kardexIntro>svg{flex:0 0 34px;color:#e3182d;width:34px;height:34px}
+.kardexIntro h2{margin:0;line-height:1.2}
+.kardexIntro p{margin:3px 0 0;color:var(--muted,#999);font-size:13px}
+.kardexStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:18px 0}
+.kardexStats>div{padding:15px 6px;border-radius:15px;background:var(--panel,#252529);text-align:center;min-width:0}
+.kardexStats strong{display:block;font-size:23px}
+.kardexStats span{display:block;margin-top:4px;font-size:11px;color:var(--muted,#aaa);line-height:1.3}
+.kardexPage .fields.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.kardexPage input,.kardexPage select{font-size:16px!important;width:100%;max-width:100%;min-width:0}
+.kardexPreview{padding:12px;margin:12px 0;border-radius:12px;background:rgba(227,24,45,.10);line-height:1.5}
+.kardexError{color:#ef4444;font-weight:650;line-height:1.4}
+.kardexActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.kardexActions button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:43px;padding:9px 14px;border-radius:11px;max-width:100%;white-space:normal;font-size:14px}
+.kardexFilter{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:10px;margin:10px 0}
+.kardexSearch{display:flex;align-items:center;gap:6px;min-width:0}
+.kardexSearch svg{flex:0 0 17px}
+.kardexSearch input{min-width:0;flex:1}
+.kardexFilter select{min-width:0;width:100%}
+.kardexLots{display:flex;flex-direction:column;gap:10px}
+.kardexLot{padding:14px;border:1px solid var(--border,#444);border-radius:14px;overflow-wrap:break-word}
+.kardexLotHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.kardexLotHeader strong{flex:1;min-width:0}
+.kardexLotHeader span{font-size:11px;white-space:nowrap;padding:5px 8px;border-radius:20px;background:rgba(227,24,45,.10);color:#e3182d}
+.kardexLot p{color:var(--muted,#a7a7aa);font-size:13px;line-height:1.45;margin:8px 0}
+.kardexBalance{font-size:20px;display:block}
+.kardexEmpty{padding:19px;text-align:center;color:var(--muted,#aaa);line-height:1.45}
+#kardex-entry{scroll-margin-top:calc(90px + env(safe-area-inset-top,0px))}
+@media(max-width:440px){.kardexPage .fields.two{grid-template-columns:minmax(0,1fr)}.kardexFilter{grid-template-columns:minmax(0,1fr)}.kardexActions button{flex:1}}
