@@ -57,8 +57,12 @@ export default function KardexDailyExport({ledger,responsible}:Props){
    </div>}
    <label>Filtrar vista previa por medicamento<input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Nombre del producto…"/></label>
    <p className="hint">D inicial + E extraordinario = F total; F − G consumo = H final. F/S queda vacío si no has contado físicamente el producto.</p>
-   <div className="dailyTableScroll"><table><thead><tr><th>Medicamento</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>F/S</th></tr></thead><tbody>
-    {rows.slice(0,25).map(r=><tr key={r.code}><td>{r.name}</td><td>{r.initial}</td><td>{r.extraordinary}</td><td>{r.total}</td><td>{r.consumed}</td><td>{r.final}</td><td>{r.fs===null?'—':r.fs}</td></tr>)}
+   <div className="dailyTableScroll"><table><thead><tr><th>Medicamento</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>Recuento físico</th><th>F/S</th></tr></thead><tbody>
+    {rows.slice(0,25).map(r=><tr key={r.code}><td>{r.name}</td><td>{r.initial}</td><td>{r.extraordinary}</td><td>{r.total}</td><td>{r.consumed}</td><td>{r.final}</td><td><input className="dailyPhysicalCount" type="number" inputMode="decimal" min="0" step="any" aria-label={'Recuento físico '+r.name}
+   value={counts[r.code]===undefined?'':counts[r.code]} onChange={e=>{
+    const raw=e.target.value;
+    setCounts(prev=>{const next={...prev};if(raw.trim()==='')delete next[r.code];else next[r.code]=Number(raw);return next})
+   }}/></td><td>{r.fs===null?'—':r.fs}</td></tr>)}
    </tbody></table></div>
    {rows.length>25&&<p className="hint">Vista previa de 25 de {rows.length} productos. El Excel contiene todos los productos.</p>}
   </>}
