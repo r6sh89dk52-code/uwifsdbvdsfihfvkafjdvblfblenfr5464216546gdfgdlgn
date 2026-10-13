@@ -6,16 +6,24 @@ import {exportAmbulatoryWorkbook} from './ambulatoryExcel';
 import {shareXlsx} from './shareKardexFile';
 import templateLayout from './ambulatoryTemplate.json';
 import {type CatalogMappingEvent,type DeliveryIncident} from './reconciliationRules';
+import AmbulatoryReconciliationPanel from './AmbulatoryReconciliationPanel';
+import {reconcileAmbulatoryReport,type ReconciliationEvent} from './ambulatoryReconciliation';
 const iso=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function weekStart(){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d)}
-type Props={attentions:ExportVisit[];ledger:StockLedger;mappings:CatalogMappingEvent[];incidents:DeliveryIncident[]};
-export default function AmbulatoryExportPanel({attentions,ledger,mappings,incidents}:Props){
+type Props={attentions:ExportVisit[];ledger:StockLedger;mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];reconciliation:ReconciliationEvent[];onReconciliation:(next:ReconciliationEvent[])=>void};
+export default function AmbulatoryExportPanel({attentions,ledger,mappings,incidents,reconciliation,onReconciliation}:Props){
  const[start,setStart]=useState(weekStart),[end,setEnd]=useState(()=>iso(new Date()));
  const[template,setTemplate]=useState<Uint8Array|null>(null),[templateName,setTemplateName]=useState('');
  const[busy,setBusy]=useState(false),[error,setError]=useState(''),[subdivision,setSubdivision]=useState(''),[done,setDone]=useState('');
  const selection=useRef(0),exporting=useRef(false);
+ const [reconciliationFault,setReconciliationFault]=useState('');
  const result=useMemo(()=>{try{return{data:buildAmbulatoryRows(attentions,ledger,start,end,{subdivision,mappings,incidents}),error:''}}
   catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo preparar la exportación.'}}},[attentions,ledger,start,end,subdivision,mappings,incidents]);
+ const material=useMemo(()=>{
+  if(!result.data||!subdivision)return null;
+  try{setReconciliationFault('');return reconcileAmbulatoryReport(result.data,reconciliation,subdivision)}
+  catch(e){setReconciliationFault(e instanceof Error?e.message:'No se pudo conciliar el período.');return null}
+ },[result.data,reconciliation,subdivision]);
  async function select(file?:File){
   const token=++selection.current;
   setError('');setDone('');setTemplate(null);setTemplateName('');
@@ -30,7 +38,8 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
   try{
    if(result.data.blockers.length)throw Error('Resuelve primero las entregas pendientes de conciliación.');
    await new Promise<void>(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
-   const bytes=exportAmbulatoryWorkbook(template,result.data);
+   if(subdivision&&!material)throw Error(reconciliationFault||'Conciliación pendiente o inválida.');
+   const bytes=exportAmbulatoryWorkbook(template,result.data,material||undefined);
    const name='DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+'.xlsx';
    await shareXlsx(name,bytes,'Indicador Ambulatorio DANPER');
    setDone('Excel preparado. Completa su guardado en la hoja de compartir o en Descargas.');
@@ -60,11 +69,14 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <ul>{result.data.blockers.slice(0,8).map((x,i)=><li key={i}>{x}</li>)}</ul>
    <p>La exportación queda bloqueada hasta verificar las cantidades. No se inventarán consumos.</p>
   </div>:null}
+  {material&&<p className="hint">Conciliación: {material.openingConfirmed}/432 saldos iniciales, {material.receiptsConfirmed} ingresos y {material.countConfirmed}/432 recuentos. Ingresos revisados: {material.reviewed?'sí':'no'}.</p>}
+  {reconciliationFault&&<p className="kardexError" role="alert">{reconciliationFault}</p>}
   {result.data?.warnings.length?<div className="hint" role="status"><ul>{result.data.warnings.map((x,i)=><li key={i}>{x}</li>)}</ul></div>:null}
   {(result.error||error)&&<p role="alert" className="kardexError">{result.error||error}</p>}
   <div className="kardexActions"><button type="button" className="workerPrimary"
-   disabled={!template||!result.data||result.data.blockers.length>0||busy}
+   disabled={!template||!result.data||result.data.blockers.length>0||busy||Boolean(reconciliationFault)}
    onClick={()=>{void exportBook()}}><Share2 size={18}/>{busy?'Preparando Excel…':'Exportar las 10 hojas y compartir'}</button></div>
+  {result.data&&<AmbulatoryReconciliationPanel plan={result.data} events={reconciliation} onChange={onReconciliation} subdivision={subdivision} start={start} end={end}/>}
   {done&&<p role="status" className="hint">{done}</p>}
   <p className="hint">El archivo conservará las diez hojas y los 432 materiales oficiales. Los saldos no conciliados permanecen vacíos y señalados como pendientes. No modifica el inventario ni crea nuevas entregas.</p>
  </section>;
