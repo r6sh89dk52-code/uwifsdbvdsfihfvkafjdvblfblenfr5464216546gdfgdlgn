@@ -228,3 +228,12 @@ html,body,#root{width:100%;min-width:0}
 .kardexDaily th:first-child,.kardexDaily td:first-child{text-align:left;min-width:195px}
 .kardexDaily thead{background:rgba(227,24,45,.12)}
 .kardexDaily .kardexError li{margin:6px 0;line-height:1.4}
+
+/* DANPER v0.15 mobile: export with native-sized controls */
+.ambulatoryExport{min-width:0;overflow-wrap:break-word}
+.ambulatoryExport fieldset{border:0;padding:0;margin:0;min-width:0}
+.ambulatoryExport input,.ambulatoryExport select{font-size:16px!important;max-width:100%;min-width:0}
+.ambulatoryExport .kardexError{line-height:1.45}
+.ambulatoryExport .kardexError li{margin-top:6px;font-size:13px}
+.ambulatoryExport .fields.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:430px){.ambulatoryExport .fields.two{grid-template-columns:1fr}}

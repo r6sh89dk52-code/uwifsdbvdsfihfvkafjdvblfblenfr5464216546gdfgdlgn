@@ -2,6 +2,14 @@ name: DANPER Salud Movil - IPA de pruebas
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'package*.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/**'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,7 +33,7 @@ jobs:
           if ! command -v pod >/dev/null 2>&1; then brew install cocoapods; fi
           pod --version
       - name: Instalar dependencias npm
-        run: npm install --no-fund
+        run: npm ci --no-fund
       - name: Pruebas de lógica
         run: npm run test:logic
       - name: Auditoría de dependencias
@@ -41,10 +49,12 @@ jobs:
           node scripts/install-ios-gesture.mjs
       - name: Generar IPA sin firmar
         run: bash scripts/build-ios-ipa.sh
+      - name: Verificar IPA y recursos
+        run: node scripts/verify-ios-ipa.mjs
       - name: Adjuntar IPA descargable
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER-Salud-Movil-iPhone-v0.14.1
+          name: DANPER-Salud-Movil-iPhone-v0.15
           path: |
             outputs/*.ipa
             outputs/*.sha256

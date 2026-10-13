@@ -1,39 +1,41 @@
 {
   "name": "danper-salud-movil-etapa-a",
   "private": true,
-  "version": "0.14.1",
+  "version": "0.15.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test:logic": "node scripts/test-logic.cjs && node scripts/test-draft-logic.cjs && node scripts/test-secure-store.cjs && node scripts/test-ios-gesture.cjs && node scripts/test-kardex.cjs && node scripts/test-kardex-movements.cjs && node scripts/test-attention-kardex.cjs && node scripts/test-reconciliation.cjs && node scripts/test-daily-kardex.cjs",
+    "test:logic": "node scripts/test-logic.cjs && node scripts/test-draft-logic.cjs && node scripts/test-secure-store.cjs && node scripts/test-ios-gesture.cjs && node scripts/test-kardex.cjs && node scripts/test-kardex-movements.cjs && node scripts/test-attention-kardex.cjs && node scripts/test-reconciliation.cjs && node scripts/test-daily-kardex.cjs && node scripts/test-ambulatory-rows.cjs && node scripts/test-ambulatory-source-catalog.cjs && node scripts/test-ambulatory-workbook.cjs",
     "ios:sync": "npx cap sync ios",
     "ios:open": "npx cap open ios",
     "ios:prepare": "npm run build && npx cap sync ios",
     "ios:project": "npm run build && npx cap add ios && npx cap sync ios",
     "ios:icon": "node scripts/apply-ios-icon.mjs",
-    "ios:check": "node scripts/check-ios-ready.mjs"
+    "ios:check": "node scripts/check-ios-ready.mjs",
+    "test:ambulatory": "node scripts/test-ambulatory-source-catalog.cjs && node scripts/test-ambulatory-rows.cjs && node scripts/test-ambulatory-workbook.cjs"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "lucide-react": "^0.468.0",
-    "@capacitor/core": "^7.0.0",
-    "@capacitor/local-notifications": "^7.0.0",
     "@aparajita/capacitor-secure-storage": "7.1.6",
-    "fflate": "^0.8.2",
+    "@capacitor/core": "^7.0.0",
     "@capacitor/filesystem": "^7.0.0",
-    "@capacitor/share": "^7.0.0"
+    "@capacitor/local-notifications": "^7.0.0",
+    "@capacitor/share": "^7.0.0",
+    "fflate": "^0.8.2",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "typescript": "^5.6.3",
     "@vitejs/plugin-react": "^6.1.2",
-    "vite": "^8.3.4",
-    "@capacitor/cli": "^7.0.0",
-    "@capacitor/ios": "^7.0.0"
+    "@xmldom/xmldom": "^0.9.12",
+    "typescript": "^5.6.3",
+    "vite": "^8.3.4"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
