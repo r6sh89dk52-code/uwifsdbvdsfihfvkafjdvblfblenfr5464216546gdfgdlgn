@@ -13,7 +13,7 @@ const makeLot=(id,expires='2027-10-13')=>inv.validateStockLot({
  id,code:'E-87',name:'ALCOHOL 120 ML',catalogUnit:'mL',lot:id,expires,container:'frasco',
  unitsPerContainer:120,sealedContainers:2,looseUnits:0,openedRemaining:0,updatedAt:at
 });
-const attention={id:'enc-1',status:'saved',items:[{id:'med-1',code:'16000002',name:'ALCOHOL - demo de atencion',quantity:1,unit:'UND'}]};
+const attention={id:'enc-1',status:'saved',items:[{id:'med-1',code:'16000025',name:'ALCOHOL MEDICO 96° X 120 ML',quantity:1,unit:'FCO'}]};
 const confirm={itemId:'med-1',lotId:'lot-1',physicalQuantity:10,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:true,timestamp:at};
 const seed={lots:[makeLot('lot-1'),makeLot('lot-2','2026-01-01')],movements:[]};
 assert.equal(delivery.availableLots(seed.lots,'E-87',at).length,1);
@@ -26,7 +26,7 @@ assert.equal(first.lots[0].openedRemaining,110);
 assert.equal(first.movements[0].excelQuantity,1);
 assert.equal(first.movements[0].dispenseRef.attentionId,'enc-1');
 assert.equal(first.movements[0].dispenseRef.itemId,'med-1');
-assert.equal(first.movements[0].dispenseRef.clinicalCode,'16000002');
+assert.equal(first.movements[0].dispenseRef.clinicalCode,'16000025');
 assert.equal(delivery.alreadyDispensed(first,'enc-1','med-1'),true);
 assert.throws(()=>delivery.postConfirmedAttentionDelivery(first,attention,confirm),/ya tiene una entrega/);
 const newAtt={id:'enc-2',status:'saved',items:[{...attention.items[0],id:'med-2'}]};
