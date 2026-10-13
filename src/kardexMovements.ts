@@ -5,18 +5,24 @@
 import {countPhysicalUnits,validateStockLot,validateStockLots,type StockLot} from './inventoryRules';
 
 export type MovementKind='extraordinary'|'use'|'adjustment';
+export type DispenseRef={
+ attentionId:string;itemId:string;clinicalCode:string;clinicalName:string;
+ clinicalUnit:string;clinicalQuantity:number;confirmedAt:number;
+};
 export type StockMovement={
  id:string;lotId:string;code:string;name:string;unit:string;at:number;
  kind:MovementKind;description:string;quantity:number;
  sealedAdded:number;looseAdded:number;openedNewContainer:boolean;
  excelQuantity:number;physicalChange:number;
  before:StockLot;after:StockLot;
+ dispenseRef?:DispenseRef;
 };
 export type StockLedger={lots:StockLot[];movements:StockMovement[]};
 export type StockCommand={
  id:string;lotId:string;at:number;description:string;kind:MovementKind;
  quantity?:number;sealedAdded?:number;looseAdded?:number;
  allowOpen?:boolean;newSealed?:number;newLoose?:number;newOpened?:number;
+ dispenseRef?:DispenseRef;
 };
 const round=(v:number)=>Math.round((v+Number.EPSILON)*1000)/1000;
 const maxMoves=1000;
@@ -26,15 +32,24 @@ function amount(value:unknown,label:string,integer=false,allowZero=false){
    throw Error(label+': cantidad inválida.');
  return value;
 }
+function validDispenseRef(ref:DispenseRef,id:string,kind:MovementKind,at:number){
+ if(kind!=='use'||id!=='ATT:'+ref.attentionId+':ITEM:'+ref.itemId||
+   ![ref.attentionId,ref.itemId,ref.clinicalCode,ref.clinicalName,ref.clinicalUnit].every(x=>typeof x==='string'&&x.trim().length>0)||
+   !Number.isInteger(ref.clinicalQuantity)||ref.clinicalQuantity<=0||
+   !Number.isSafeInteger(ref.confirmedAt)||ref.confirmedAt!==at)
+   throw Error('Vínculo de atención y Kardex inválido.');
+}
 function validCommand(c:StockCommand){
  if(!c.id?.trim()||!c.lotId?.trim()||!Number.isSafeInteger(c.at)||c.at<=0)throw Error('Movimiento sin identificador o fecha válidos.');
  if(!['extraordinary','use','adjustment'].includes(c.kind))throw Error('Tipo de movimiento inválido.');
+ if(c.dispenseRef)validDispenseRef(c.dispenseRef,c.id,c.kind,c.at);
  if(typeof c.description!=='string'||c.description.trim().length<3||c.description.length>250)
    throw Error('Indica un motivo de al menos 3 caracteres (máximo 250).');
 }
 export function validateStockMovements(v:unknown):StockMovement[]{
  if(!Array.isArray(v)||v.length>maxMoves)throw Error('Historial de movimientos incompatible o demasiado grande.');
  const ids=new Set<string>();
+ const links=new Set<string>();
  return v.map(raw=>{
   if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Movimiento inválido.');
   const m=raw as StockMovement;
@@ -44,6 +59,12 @@ export function validateStockMovements(v:unknown):StockMovement[]{
     typeof m.description!=='string'||m.description.length<3||m.description.length>250||
     !Number.isSafeInteger(m.at)||m.at<=0||typeof m.openedNewContainer!=='boolean')
     throw Error('Movimiento de Kardex inválido o duplicado.');
+  if(m.dispenseRef){
+    validDispenseRef(m.dispenseRef,m.id,m.kind,m.at);
+    const pair=JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]);
+    if(links.has(pair))throw Error('Dos movimientos vinculados al mismo producto de atención.');
+    links.add(pair);
+  }
   for(const key of ['quantity','sealedAdded','looseAdded','excelQuantity','physicalChange'] as const)
    if(typeof m[key]!=='number'||!Number.isFinite(m[key]))throw Error('Cantidad corrupta de un movimiento.');
   const before=validateStockLot(m.before),after=validateStockLot(m.after);
@@ -79,6 +100,7 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
  if(existing){
    if(existing.lotId!==command.lotId||existing.kind!==command.kind||existing.at!==command.at||
       existing.description!==command.description.trim()||
+      JSON.stringify(existing.dispenseRef??null)!==JSON.stringify(command.dispenseRef??null)||
       (command.kind==='use'&&existing.quantity!==command.quantity)||
       (command.kind==='extraordinary'&&(existing.sealedAdded!==(command.sealedAdded??0)||existing.looseAdded!==(command.looseAdded??0))))
      throw Error('Identificador de movimiento reutilizado con otros datos.');
@@ -143,7 +165,8 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
  const newMovement:StockMovement={
   id:command.id,lotId:before.id,code:before.code,name:before.name,unit:before.catalogUnit,at:command.at,
   kind:command.kind,description:command.description.trim(),quantity,
-  sealedAdded,looseAdded,openedNewContainer,excelQuantity,physicalChange:delta,before,after
+  sealedAdded,looseAdded,openedNewContainer,excelQuantity,physicalChange:delta,before,after,
+  ...(command.dispenseRef?{dispenseRef:command.dispenseRef}:{})
  };
  const next=[...lots];next[index]=after;
  return {lots:next,movements:[...movements,newMovement]};
