@@ -212,3 +212,8 @@ html,body,#root{width:100%;min-width:0}
 .attentionDelivery .kardexCheck{display:flex;align-items:flex-start;gap:10px;margin:12px 0;line-height:1.45}
 .attentionDelivery .kardexCheck input[type=checkbox]{flex:0 0 20px;width:20px;height:20px;margin-top:2px;accent-color:#e3182d}
 .attentionDelivery .kardexPreview{overflow-wrap:anywhere}
+
+/* v0.13: conciliación y devoluciones sin restock automático. */
+.reconciliationPanel{min-width:0;overflow-wrap:break-word}
+.reconciliationPanel select,.reconciliationPanel input{font-size:16px!important;min-width:0;max-width:100%}
+.reconciliationPanel .kardexHistory{margin-top:22px}
