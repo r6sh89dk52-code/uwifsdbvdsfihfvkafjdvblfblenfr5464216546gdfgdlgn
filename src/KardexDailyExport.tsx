@@ -18,7 +18,6 @@ export default function KardexDailyExport({ledger,responsible}:Props){
  const [filter,setFilter]=useState('');
  const result=useMemo(()=>{try{return {report:buildDailyReport(ledger,date,counts),error:''}}catch(e){return {report:null,error:e instanceof Error?e.message:'No se pudo generar el reporte.'}}},[ledger,date,counts]);
  const rows=result.report?.rows.filter(r=>r.name.toLowerCase().includes(filter.toLowerCase()))||[];
- const touched=ledger.lots.length>0;
  async function loadTemplate(file?:File){
   setError('');setTemplate(null);setTemplateName('');
   if(!file)return;
