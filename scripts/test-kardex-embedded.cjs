@@ -30,5 +30,5 @@ assert.equal(setup.getAttribute('paperSize'),'9');
 assert.equal(setup.getAttribute('scale'),'90');
 const crypto=require('node:crypto');
 const hash=crypto.createHash('sha256').update(source).digest('hex');
-assert.equal(hash,'cbad5eaead78da3f3a74a65b2f6297f87f4162f0f571cfff50ce854b1693b5b8');
+assert.equal(hash,'4e6948b331be7e2ef5f24a9d26d4fa76197db1701cdd47a858523d398d6ca07e');
 console.log('PASS: plantilla interna 98 filas, solo Enfermería, sin saldos históricos, A4 90%, SHA256.');
