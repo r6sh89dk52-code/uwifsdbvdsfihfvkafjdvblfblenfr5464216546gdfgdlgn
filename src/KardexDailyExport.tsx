@@ -53,6 +53,8 @@ export default function KardexDailyExport({ledger,responsible}:Props){
     <ul>{result.report.warnings.slice(0,12).map((w,i)=><li key={i}>{w}</li>)}</ul>
     {result.report.warnings.length>12&&<p>Hay {result.report.warnings.length-12} observaciones adicionales.</p>}
    </div>}
+   <details className="kardexPreviewDetails"><summary>Mostrar vista previa y recuento físico ({result.report.rows.length} productos)</summary>
+   <p className="hint">Los recuentos introducidos aquí son temporales; completa y exporta antes de cambiar de sección.</p>
    <label>Filtrar vista previa por medicamento<input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Nombre del producto…"/></label>
    <p className="hint">D inicial + E extraordinario = F total; F − G consumo = H final. F/S queda vacío si no has contado físicamente el producto.</p>
    <div className="dailyTableScroll"><table><thead><tr><th>Medicamento</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>Recuento físico</th><th>F/S</th></tr></thead><tbody>
@@ -63,6 +65,7 @@ export default function KardexDailyExport({ledger,responsible}:Props){
    }}/></td><td>{r.fs===null?'—':r.fs}</td></tr>)}
    </tbody></table></div>
    {rows.length>25&&<p className="hint">Vista previa de 25 de {rows.length} productos. El Excel contiene todos los productos.</p>}
+   </details>
   </>}
   {error&&<p className="kardexError" role="alert">{error}</p>}
   <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!result.report?.exportable||!template||!turn||busy} onClick={()=>void exportReport()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel y compartir'}</button></div>
