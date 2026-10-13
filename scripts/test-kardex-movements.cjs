@@ -57,6 +57,10 @@ assert.equal(x.movements[5].kind,'adjustment');
 assert.equal(x.movements[5].physicalChange,-122);
 assert.equal(x.lots[0].looseUnits,9);
 assert.equal(rules.validateStockMovements(x.movements).length,6);
+assert.equal(rules.validateStockLedger(x).movements.length,6);
+assert.throws(()=>rules.validateStockLedger({...x,lots:[{...x.lots[0],looseUnits:100}]}),/no coincide/,'corrupted stock cannot override audit trail');
+assert.throws(()=>rules.validateStockLedger({...x,movements:[x.movements[1],x.movements[0],...x.movements.slice(2)]}),/discontinuos/,'auditable chronological continuity');
+
 assert.throws(()=>rules.validateStockMovements([...x.movements,x.movements[5]]),/duplicado/);
 assert.throws(()=>rules.postStockMovement(x,cmd('m7','extraordinary',{sealedAdded:0,looseAdded:0})),/al menos/);
 assert.throws(()=>rules.postStockMovement(x,cmd('m8','adjustment',{newSealed:1,newLoose:9,newOpened:107})),/No existen diferencias/);
