@@ -5,10 +5,10 @@ const {DOMParser,XMLSerializer}=require('@xmldom/xmldom');
 const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const source=fs.readFileSync('src/kardexExcelTemplate.ts','utf8');
 const result=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}});
-const module={exports:{}};
+const exportedModule={exports:{}};
 new Function('require','module','exports','DOMParser','XMLSerializer',result.outputText)
-  (name=>name==='fflate'?require('fflate'):{},module,module.exports,DOMParser,XMLSerializer);
-const {exportOfficialKardex}=module.exports;
+  (name=>name==='fflate'?require('fflate'):{},exportedModule,exportedModule.exports,DOMParser,XMLSerializer);
+const {exportOfficialKardex}=exportedModule.exports;
 const wrap=(name,inside)=>'<'+name+' xmlns="'+NS+'">'+inside+'</'+name+'>';
 const mainRows='<row r="7"><c r="C7" t="s"><v>0</v></c></row><row r="104"><c r="C104" t="s"><v>1</v></c></row>';
 const sheet=wrap('worksheet','<dimension ref="A1:J109"/><sheetData>'+mainRows+'</sheetData><mergeCells count="1"><mergeCell ref="A1:J1"/></mergeCells><pageMargins left="0.19685039370078741" right="0" top="0.19685039370078741" bottom="0" header="0" footer="0"/><pageSetup paperSize="9" scale="90" orientation="portrait"/>');
