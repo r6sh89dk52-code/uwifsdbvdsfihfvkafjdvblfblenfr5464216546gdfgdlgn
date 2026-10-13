@@ -17,10 +17,12 @@ jobs:
         with:
           node-version: '22'
       - name: Dependencias
-        run: npm install --no-fund
+        run: npm ci --no-fund
       - name: Pruebas de logica
         run: npm run test:logic
       - name: Validacion TypeScript y Vite
         run: npm run build
       - name: Auditoria de dependencias
         run: npm audit --audit-level=high
+      - name: Comprobar preparación iOS
+        run: npm run ios:check
