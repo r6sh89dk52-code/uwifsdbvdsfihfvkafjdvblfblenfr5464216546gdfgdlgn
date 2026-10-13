@@ -3,6 +3,7 @@ const {load,visit,options}=require('./ambulatory-test-helpers.cjs');
 const rows=load('src/ambulatoryRows.ts'),movement=load('src/kardexMovements.ts'),delivery=load('src/attentionKardex.ts');
 const products=require('../src/products.json');
 const p=products.find(p=>p.code==='16000182');
+const boxed=products.find(p=>p.code==='16000013');
 const item={id:'i',...p,quantity:1,procedure:'TRATAMIENTO ORAL'};
 const at=Date.parse('2026-10-13T13:25:00Z');
 function state(pack=false,code=p.code){return{lots:[{id:'lot',code,name:p.name,catalogUnit:pack?'FCO':'UND',lot:'FICTICIO',expires:'2027-12-30',container:pack?'frasco':'unidad',unitsPerContainer:pack?100:1,sealedContainers:10,looseUnits:0,openedRemaining:0,updatedAt:at-1000}],movements:[]};}
@@ -21,7 +22,31 @@ test('invalid codes',()=>{for(const code of ['o1000243','o2001232','o2002298','o
 test('name and unit mismatch',()=>{assert.throws(()=>build([visit('a',[{...item,name:'OTRO'}])]),/verificados/);assert.throws(()=>build([visit('a',[{...item,unit:'FCO'}])]),/verificados/);});
 test('absent delivery',()=>{const a=build([visit('a',[item])]);assert.ok(a.blockers.length);assert.equal(a.lines[0].cells[17],'');});
 test('confirmed unit',()=>{const a=visit('a',[item]),s=deliver(state(),a);const before=JSON.stringify([a,s]);const r=build([a],s);assert.equal(r.lines[0].cells[17],1);assert.equal(r.blockers.length,0);assert.equal(JSON.stringify([a,s]),before);assert.deepEqual(r,build([a],s));});
-test('pack 1 then 0',()=>{const a=visit('a',[item]),b=visit('b',[{...item,id:'j'}]);let s=deliver(state(true),a,true);s=deliver(s,b,true);const r=build([b,a],s);assert.deepEqual(r.lines.map(x=>x.cells[17]),[1,0]);assert.equal(r.linkedDeliveries,2);});
+test('pack 1 then 0',()=>{
+ const needle={id:'i',...boxed,quantity:1,procedure:'CURACION'};
+ const a=visit('a',[needle]),b=visit('b',[{...needle,id:'j'}]);
+ let physical={lots:[{id:'lot',code:boxed.code,name:boxed.name,catalogUnit:'UND',lot:'FICTICIO',expires:'2027-12-30',container:'caja',unitsPerContainer:100,sealedContainers:2,looseUnits:0,openedRemaining:0,updatedAt:at-1000}],movements:[]};
+ for(const [v,open,time] of [[a,true,at],[b,false,at+1000]]){
+ physical=delivery.postConfirmedAttentionDelivery(physical,v,{itemId:v.items[0].id,lotId:'lot',physicalQuantity:1,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:open,timestamp:time});
+ }
+ const r=build([b,a],physical);
+ assert.deepEqual(r.lines.map(x=>x.cells[17]),[1,0]);
+ assert.equal(r.linkedDeliveries,2);
+});
+test('same worker first and second paracetamol doses never become zero',()=>{
+ const a=visit('dose-a',[item]),b=visit('dose-b',[{...item,id:'j',quantity:2}]);
+ let stock=state();
+ stock=delivery.postConfirmedAttentionDelivery(stock,a,{itemId:'i',lotId:'lot',physicalQuantity:1,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:false,timestamp:at});
+ stock=delivery.postConfirmedAttentionDelivery(stock,b,{itemId:'j',lotId:'lot',physicalQuantity:2,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:false,timestamp:at+1000});
+ const r=build([a,b],stock);
+ assert.deepEqual(r.lines.map(x=>x.cells[17]),[1,2]);
+ assert.deepEqual(r.lines.map(x=>x.cells[18]),['PRIMERA','SEGUNDA']);
+});
+test('individual paracetamol rejects bottle accounting and mismatched physical doses',()=>{
+ const a=visit('individual',[item]);
+ assert.throws(()=>deliver(state(true),a,true),/Unidad física incompatible/);
+ assert.throws(()=>delivery.postConfirmedAttentionDelivery(state(),a,{itemId:'i',lotId:'lot',physicalQuantity:2,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:false,timestamp:at}),/Cantidad física individual diferente/);
+});
 test('R tampering',()=>{const a=visit('a',[item]),s=deliver(state(),a);s.movements[0].excelQuantity=9;assert.throws(()=>build([a],s),/Cantidad R/);});
 test('stale clinical delivery',()=>{const a=visit('a',[item]),s=deliver(state(),a);assert.throws(()=>build([visit('a',[{...item,quantity:2}])],s),/modificada/);});
 test('wrong movement kind',()=>{const a=visit('a',[item]),s=deliver(state(),a);s.movements[0].kind='adjustment';assert.throws(()=>build([a],s),/inválido/);});

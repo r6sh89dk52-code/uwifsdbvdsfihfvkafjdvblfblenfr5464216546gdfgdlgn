@@ -83,11 +83,26 @@ test('no input XML content reaches output (10 sheets, caches and properties)',()
 test('table mismatch rejects',()=>assert.throws(()=>exportBook(patch('xl/tables/table3.xml',s=>s.replace('TB_CONSUMOS','UNKNOWN')),empty),/tablas/));
 test('plan tampering',()=>{assert.throws(()=>exportBook(fixture,{...one,lines:[one.lines[0],one.lines[0]]}),/duplicadas/);assert.throws(()=>exportBook(fixture,{...one,start:'2026-02-30'}),/Plan/);});
 test('verified material R=1 and R=0 in workbook',()=>{
- const {postConfirmedAttentionDelivery}=load('src/attentionKardex.ts');const p=products.find(p=>p.code==='16000182'),a=visit('a',[{...p,id:'i',quantity:1,procedure:'TRATAMIENTO ORAL'}]),b=visit('b',[{...p,id:'j',quantity:1,procedure:'TRATAMIENTO ORAL'}]);const at=Date.parse('2026-10-13T13:25:00Z');
- let ledger={lots:[{id:'lot',code:p.code,name:p.name,catalogUnit:p.unit,lot:'FICTICIO',expires:'2027-12-30',container:'frasco',unitsPerContainer:100,sealedContainers:2,looseUnits:0,openedRemaining:0,updatedAt:at-1000}],movements:[]};
+ const {postConfirmedAttentionDelivery}=load('src/attentionKardex.ts');const p=products.find(p=>p.code==='16000013'),a=visit('a',[{...p,id:'i',quantity:1,procedure:'TRATAMIENTO ORAL'}]),b=visit('b',[{...p,id:'j',quantity:1,procedure:'TRATAMIENTO ORAL'}]);const at=Date.parse('2026-10-13T13:25:00Z');
+ let ledger={lots:[{id:'lot',code:p.code,name:p.name,catalogUnit:p.unit,lot:'FICTICIO',expires:'2027-12-30',container:'caja',unitsPerContainer:100,sealedContainers:2,looseUnits:0,openedRemaining:0,updatedAt:at-1000}],movements:[]};
  for(const[v,itemId,open,stamp]of [[a,'i',true,at],[b,'j',false,at+1000]])ledger=postConfirmedAttentionDelivery(ledger,v,{itemId,lotId:'lot',physicalQuantity:10,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:open,timestamp:stamp});
  const demo=exportBook(fixture,build([a,b],ledger,'2026-10-13','2026-10-13',options)),parts=integrity(demo,2),d=doc(parts,'xl/worksheets/sheet5.xml');assert.equal(value(cell(d,'R2')),'1');assert.equal(value(cell(d,'R3')),'0');
  if(process.env.AMBULATORY_DEMO_OUTPUT)fs.writeFileSync(process.env.AMBULATORY_DEMO_OUTPUT,demo);
+});
+test('same worker paracetamol across two visits: R equals actual units',()=>{
+ const {postConfirmedAttentionDelivery}=load('src/attentionKardex.ts');
+ const p=products.find(p=>p.code==='16000182');
+ const a=visit('para-a',[{...p,id:'one',quantity:1,procedure:'TRATAMIENTO ORAL'}]);
+ const b=visit('para-b',[{...p,id:'two',quantity:2,procedure:'TRATAMIENTO ORAL'}]);
+ const at=Date.parse('2026-10-13T13:25:00Z');
+ let ledger={lots:[{id:'lot',code:p.code,name:p.name,catalogUnit:'UND',lot:'DEMO',expires:'2027-12-30',container:'unidad',unitsPerContainer:1,sealedContainers:10,looseUnits:0,openedRemaining:0,updatedAt:at-1000}],movements:[]};
+ ledger=postConfirmedAttentionDelivery(ledger,a,{itemId:'one',lotId:'lot',physicalQuantity:1,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:false,timestamp:at});
+ ledger=postConfirmedAttentionDelivery(ledger,b,{itemId:'two',lotId:'lot',physicalQuantity:2,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:false,timestamp:at+1000});
+ const plan=build([a,b],ledger,'2026-10-13','2026-10-13',options);
+ const parts=integrity(exportBook(fixture,plan),2),d=doc(parts,'xl/worksheets/sheet5.xml');
+ assert.equal(value(cell(d,'R2')),'1');
+ assert.equal(value(cell(d,'R3')),'2');
+ assert.equal(value(cell(d,'S3')),'SEGUNDA');
 });
 // Private-input audit is optional locally and never needed by CI or bundled in IPA.
 if(process.env.AMBULATORY_PRIVATE_SOURCE)test('actual original source',()=>{const raw=new Uint8Array(fs.readFileSync(process.env.AMBULATORY_PRIVATE_SOURCE));integrity(exportBook(raw,one),1);});

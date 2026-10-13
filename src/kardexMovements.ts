@@ -113,6 +113,20 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
  let after:StockLot={...before};
  let quantity=0,excelQuantity=0,sealedAdded=0,looseAdded=0,openedNewContainer=false;
  const pack=before.container!=='unidad'||before.unitsPerContainer!==1||before.catalogUnit!=='UND';
+ // The report's R column follows the OFFICIAL issue unit, not the number of
+ // visits and not blindly the packaging of a physical lot. E.g. tablets/UND
+ // must report each tablet even if kept in a box of 100; a CJA or FCO tracks
+ // the opening (1), with later withdrawals from the opened container (0).
+ const clinicalUnit=command.dispenseRef?.clinicalUnit.trim().toUpperCase();
+ const individuallyCounted=clinicalUnit==='UND'||clinicalUnit==='TBL'||clinicalUnit==='PAR';
+ if(command.kind==='use'&&individuallyCounted){
+  const stockUnit=before.catalogUnit.trim().toUpperCase();
+  const compatible=clinicalUnit==='PAR'?stockUnit==='PAR':
+   stockUnit==='UND'||stockUnit==='TBL';
+  if(!compatible)throw Error('Unidad física incompatible: medicamento individual requiere conteo en UND/TBL o PAR, no un frasco/caja contabilizado como envase.');
+  if(!Number.isInteger(command.quantity)||command.quantity!==command.dispenseRef!.clinicalQuantity)
+   throw Error('Cantidad física individual diferente de la cantidad entregada en la atención.');
+ }
  if(command.kind==='extraordinary'){
   sealedAdded=amount(command.sealedAdded??0,'Envases ingresados',true,true);
   looseAdded=amount(command.looseAdded??0,'Unidades ingresadas',false,true);
@@ -149,6 +163,10 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
   }else{
    throw Error('No hay contenido abierto suficiente ni envases cerrados disponibles.');
   }
+   // A box containing individual tablets is still dispensed by tablets.
+   // The R=1/0 rule applies only to materials whose official count is per
+   // container (CJA/FCO/PAQ), never to an individual tablet or pair.
+   if(individuallyCounted)excelQuantity=quantity;
  }else{
   after.sealedContainers=amount(command.newSealed,'Nuevo saldo cerrado',true,true);
   after.looseUnits=round(amount(command.newLoose,'Nuevo saldo suelto',false,true));
