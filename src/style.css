@@ -205,3 +205,10 @@ html,body,#root{width:100%;min-width:0}
 .kardexHistoryItem small,.kardexHistoryItem p{color:var(--muted,#a4a4ac);font-size:12px;line-height:1.5}
 .kardexHistoryItem p{margin:5px 0}
 @media(max-width:500px){.kardexActionKinds{grid-template-columns:minmax(0,1fr)}}
+
+/* v0.12: confirmación de entrega dentro de Kardex. */
+.attentionDelivery{min-width:0;overflow-wrap:break-word}
+.attentionDelivery select,.attentionDelivery input:not([type=checkbox]){font-size:16px!important;max-width:100%;min-width:0}
+.attentionDelivery .kardexCheck{display:flex;align-items:flex-start;gap:10px;margin:12px 0;line-height:1.45}
+.attentionDelivery .kardexCheck input[type=checkbox]{flex:0 0 20px;width:20px;height:20px;margin-top:2px;accent-color:#e3182d}
+.attentionDelivery .kardexPreview{overflow-wrap:anywhere}
