@@ -5,38 +5,39 @@ import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {type DailyReport} from './dailyKardex';
 const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 function nodeName(n:Element){return n.localName}
+function elements(node:Node):Element[]{return Array.from(node.childNodes).filter((x):x is Element=>x.nodeType===1)}
 function cell(root:Document,address:string){
  const ref=address.match(/^([A-Z]+)(\d+)$/);
  if(!ref)throw Error('Celda del formato no reconocida.');
  const data=root.getElementsByTagNameNS(NS,'sheetData')[0];
- const index=Number(ref[2]);let row=Array.from(data.children).find(x=>nodeName(x)==='row'&&Number(x.getAttribute('r'))===index);
- if(!row){row=root.createElementNS(NS,'row');row.setAttribute('r',String(index));data.append(row)}
- let c=Array.from(row.children).find(x=>nodeName(x)==='c'&&x.getAttribute('r')===address);
+ const index=Number(ref[2]);let row=elements(data).find(x=>nodeName(x)==='row'&&Number(x.getAttribute('r'))===index);
+ if(!row){row=root.createElementNS(NS,'row');row.setAttribute('r',String(index));data.appendChild(row)}
+ let c=elements(row).find(x=>nodeName(x)==='c'&&x.getAttribute('r')===address);
  if(!c){
   c=root.createElementNS(NS,'c');c.setAttribute('r',address);
   const colNum=(s:string)=>s.split('').reduce((n,k)=>n*26+k.charCodeAt(0)-64,0);
   const pos=colNum(ref[1]);
-  const next=Array.from(row.children).find(x=>{
+  const next=elements(row).find(x=>{
    const a=x.getAttribute('r')?.match(/^([A-Z]+)/);
    return a?colNum(a[1])>pos:false
   });
-  if(next)row.insertBefore(c,next);else row.append(c);
+  if(next)row.insertBefore(c,next);else row.appendChild(c);
  }
  return c;
 }
-function clear(cell:Element){for(const n of Array.from(cell.children))if(['v','f','is'].includes(nodeName(n)))n.remove();cell.removeAttribute('t')}
+function clear(cell:Element){for(const n of elements(cell))if(['v','f','is'].includes(nodeName(n)))n.parentNode?.removeChild(n);cell.removeAttribute('t')}
 function setNum(root:Document,addr:string,value:number|null,formula?:string){
  const c=cell(root,addr);clear(c);
  if(value===null)return;
  if(!Number.isFinite(value))throw Error('Cantidad inválida '+addr);
- if(formula){const f=root.createElementNS(NS,'f');f.textContent=formula;c.append(f)}
- const v=root.createElementNS(NS,'v');v.textContent=String(value);c.append(v);
+ if(formula){const f=root.createElementNS(NS,'f');f.textContent=formula;c.appendChild(f)}
+ const v=root.createElementNS(NS,'v');v.textContent=String(value);c.appendChild(v);
 }
 function setText(root:Document,addr:string,value:string){
  const c=cell(root,addr);clear(c);
  c.setAttribute('t','inlineStr');
  const is=root.createElementNS(NS,'is'),t=root.createElementNS(NS,'t');
- t.setAttribute('xml:space','preserve');t.textContent=value;is.append(t);c.append(is);
+ t.setAttribute('xml:space','preserve');t.textContent=value;is.appendChild(t);c.appendChild(is);
 }
 function decode(bytes:Uint8Array){return new DOMParser().parseFromString(strFromU8(bytes), 'application/xml')}
 function encode(doc:Document){return strToU8(new XMLSerializer().serializeToString(doc))}
@@ -100,7 +101,7 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
  }
  zip['xl/_rels/workbook.xml.rels']=encode(relationships);
  const types=decode(zip['[Content_Types].xml']);
- for(const node of Array.from(types.documentElement.children)){
+ for(const node of elements(types.documentElement)){
   if(node.getAttribute('PartName')==='/xl/worksheets/sheet1.xml')node.parentNode?.removeChild(node);
  }
  zip['[Content_Types].xml']=encode(types);
@@ -118,7 +119,7 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
  const retained=Array.from(used).sort((a,b)=>a-b);
  const sourceStrings=Array.from(strings.getElementsByTagNameNS(MAIN,'si'));
  const lookup=new Map(retained.map((value,index)=>[value,index]));
- for(const node of Array.from(strings.documentElement.children))if(node.localName==='si')strings.documentElement.removeChild(node);
+ for(const node of elements(strings.documentElement))if(node.localName==='si')strings.documentElement.removeChild(node);
  for(const originalIndex of retained){
   const token=sourceStrings[originalIndex];
   if(!token)throw Error('Índice de texto del Kardex fuera de rango.');
@@ -141,7 +142,7 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
   if(rel.getAttribute('Type')?.endsWith('/extended-properties'))rel.parentNode?.removeChild(rel);
  zip['_rels/.rels']=encode(rootRels);
  const allTypes=decode(zip['[Content_Types].xml']);
- for(const node of Array.from(allTypes.documentElement.children))
+ for(const node of elements(allTypes.documentElement))
   if(node.getAttribute('PartName')==='/docProps/app.xml')node.parentNode?.removeChild(node);
  zip['[Content_Types].xml']=encode(allTypes);
  // Force Excel to recalculate formulas while cached values remain available.
