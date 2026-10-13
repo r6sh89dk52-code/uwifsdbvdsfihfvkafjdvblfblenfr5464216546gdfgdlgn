@@ -83,7 +83,7 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
       throw Error('La atención fue modificada después de confirmar la entrega.');
      // The official Indicator code and the nursing Kardex stock code are
      // independent catalogs. Only explicit user-reviewed pairs are valid.
-     if(!isReviewedAssociation(item.code,m.code))
+     if(m.code!==item.code&&!isReviewedAssociation(item.code,m.code))
       blockers.push('Falta correspondencia aprobada entre el material y el lote: '+item.code);
      if(incidents.some(i=>i.movementId===m.id))blockers.push('Entrega con devolución o discrepancia pendiente de conciliación: '+item.code);
      quantity=auditedQuantity(m);linkedDeliveries++;
