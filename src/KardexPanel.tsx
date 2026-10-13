@@ -2,7 +2,7 @@ import {useMemo,useState} from 'react';
 import {Check,ClipboardList,Package,Plus,Search,Trash2,X} from 'lucide-react';
 import {kardexCatalog,kardexMainCount} from './kardexCatalog';
 import {countPhysicalUnits,inventoryTotals,validateStockLot,type StockLot,type ContainerKind} from './inventoryRules';
-import {type StockLedger} from './kardexMovements';import {type CatalogMappingEvent} from './reconciliationRules';import KardexMovementsPanel from './KardexMovementsPanel';import KardexDailyExport from './KardexDailyExport';
+import {type StockLedger} from './kardexMovements';import {type CatalogMappingEvent} from './reconciliationRules';import KardexProductSearch from './KardexProductSearch';
 type Props={ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(value:StockLedger)=>void;responsible:string};
 const options:{value:ContainerKind;label:string}[]=[
  {value:'unidad',label:'Unidad individual'},{value:'caja',label:'Caja'},
@@ -73,7 +73,7 @@ export default function KardexPanel({ledger,mappings,onChange,responsible}:Props
    <h2>Kardex de enfermería</h2>
    <p>Etapa B0 · Inventario inicial por lote</p>
   </div></div>
-  <div className="warning">SOLO DATOS FICTICIOS. Los saldos deben contarse físicamente; el Excel histórico no representa el stock actual. Aún no hay descuento por atenciones ni exportación del Kardex diario.</div>
+  <div className="warning">SOLO DATOS FICTICIOS. Registra el recuento físico actual; el Excel histórico no representa el saldo real. Las entregas requieren selección y confirmación de lote.</div>
   <div className="kardexStats">
    <div><strong>{kardexMainCount}</strong><span>Productos oficiales</span></div>
    <div><strong>{totals.lots}</strong><span>Lotes registrados</span></div>
@@ -81,14 +81,7 @@ export default function KardexPanel({ledger,mappings,onChange,responsible}:Props
   <section className="panel" id="kardex-entry">
    <h3><Plus size={18}/>{editId?'Modificar recuento':'Registrar inventario inicial'}</h3>
    <p className="hint">Los 98 materiales de Enfermería se conservan sin donados; el saldo inicial no informado queda pendiente.</p>
-   <label>Producto oficial
-    <select value={selectedId} onChange={e=>{setSelectedId(e.target.value);setProblem('')}} disabled={Boolean(editId)}>
-     <option value="">Seleccionar medicamento o insumo…</option>
-     {['TABLETAS','AMPOLLAS','JERINGAS','INSUMOS','DONADOS'].map(group=><optgroup label={group} key={group}>
-      {kardexCatalog.filter(p=>p.group===group).map(p=><option value={p.id} key={p.id}>{p.name}</option>)}
-     </optgroup>)}
-    </select>
-   </label>
+   <KardexProductSearch label="Producto oficial" value={selectedId} onChange={v=>{setSelectedId(v);setProblem('')}} products={kardexCatalog} disabled={Boolean(editId)}/>
    {selected&&<p className="hint">Formato oficial: {'KARDEX ENFERMERAS'} · fila {selected.sheetRow}. El número correlativo no es código de almacén.</p>}
    <div className="fields two">
     <label>Lote (opcional)<input value={lot} onChange={e=>setLot(e.target.value)} placeholder="Si no existe, dejar vacío" maxLength={48}/></label>
@@ -105,8 +98,6 @@ export default function KardexPanel({ledger,mappings,onChange,responsible}:Props
    {problem&&<p className="kardexError" role="alert">{problem}</p>}
    <div className="kardexActions"><button type="button" className="workerPrimary" onClick={save}><Check size={18}/>{editId?'Guardar cambio':'Agregar al inventario'}</button>{editId&&<button type="button" className="workerSecondary" onClick={reset}><X size={18}/>Cancelar</button>}</div>
   </section>
-  <KardexMovementsPanel ledger={ledger} mappings={mappings} onChange={onChange}/>
-  <KardexDailyExport ledger={ledger} responsible={responsible}/>
   <section className="panel">
    <h3><ClipboardList size={18}/>Inventario registrado</h3>
    <div className="kardexFilter"><label className="kardexSearch"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o lote…"/></label>
