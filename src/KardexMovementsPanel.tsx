@@ -22,7 +22,7 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
  const [reason,setReason]=useState('');
  const [error,setError]=useState('');
  const [historyLimit,setHistoryLimit]=useState(15);
- const available=useMemo(()=>Array.from(new Map(ledger.lots.map(x=>[x.code,x.name])).entries()).sort((a,b)=>a[1].localeCompare(b[1],'es')),[ledger.lots]);
+ const available=useMemo(()=>Array.from(new Map<string,string>(ledger.lots.map(x=>[x.code,x.name] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'es')),[ledger.lots]);
  const matching=useMemo(()=>ledger.lots.filter(x=>x.code===productCode).sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')),[ledger.lots,productCode]);
  const fefo=suggestFEFOLot(ledger.lots,productCode);
  const selected=ledger.lots.find(x=>x.id===lotId);
@@ -33,7 +33,7 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
  function chooseProduct(code:string){
   setProductCode(code);
   const suggested=suggestFEFOLot(ledger.lots,code);
-  setLotId(suggested?.id||ledger.lots.find(x=>x.code===code)?.id||'');
+  chooseLot(suggested?.id||ledger.lots.find(x=>x.code===code)?.id||'');
   setError('');setConfirmOpening(false);
  }
  function chooseLot(id:string){
@@ -41,7 +41,13 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
   const l=ledger.lots.find(x=>x.id===id);
   if(l){setNewSealed(String(l.sealedContainers));setNewLoose(String(l.looseUnits));setNewOpened(String(l.openedRemaining))}
  }
- function selectKind(next:MovementKind){setKind(next);setError('');setConfirmOpening(false)}
+ function selectKind(next:MovementKind){
+  setKind(next);setError('');setConfirmOpening(false);
+  const l=ledger.lots.find(x=>x.id===lotId);
+  if(l&&next==='adjustment'){
+    setNewSealed(String(l.sealedContainers));setNewLoose(String(l.looseUnits));setNewOpened(String(l.openedRemaining));
+  }
+}
  function apply(){
   if(!selected){setError('Selecciona primero un producto con inventario y su lote.');return}
   const cmd:StockCommand={
