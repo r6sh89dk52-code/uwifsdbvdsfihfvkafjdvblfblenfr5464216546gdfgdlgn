@@ -6,7 +6,7 @@ import {type SavedClinicalAttention} from './attentionKardex';
 import {recordDeliveryIncident,type CatalogMappingEvent,type DeliveryIncident,type IncidentKind} from './reconciliationRules';
 import {reviewedAssociationsFor,reviewedAssociations} from './reviewedKardexAssociations';
 type Props={attentions:SavedClinicalAttention[];ledger:StockLedger;mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];
- onIncidents:(next:DeliveryIncident[])=>void};
+ onMappings?:(next:CatalogMappingEvent[])=>void;onIncidents:(next:DeliveryIncident[])=>void};
 export default function ReconciliationPanel({attentions,ledger,mappings,incidents,onIncidents}:Props){
  const [attentionId,setAttentionId]=useState(''),[itemId,setItemId]=useState('');
  const [incidentId,setIncidentId]=useState(''),[incidentKind,setIncidentKind]=useState<IncidentKind>('returned');
