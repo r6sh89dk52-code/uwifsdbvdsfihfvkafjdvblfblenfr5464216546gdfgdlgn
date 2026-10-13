@@ -18,7 +18,7 @@ const tmp=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP||'/tmp','danper-ipa-'
 try{
  const local=path.join(tmp,'Info.plist');fs.writeFileSync(local,parts[prefix+'Info.plist']);
  const packed=JSON.parse(execFileSync('plutil',['-convert','json','-o','-',local],{encoding:'utf8'}));
- assert.equal(packed.CFBundleShortVersionString,version);assert.equal(packed.CFBundleVersion,'160');
+ assert.equal(packed.CFBundleShortVersionString,version);assert.equal(packed.CFBundleVersion,'161');
  assert.equal(packed.CFBundleIdentifier,'pe.danper.saludmovil.prototipo');
  const name=packed.CFBundleExecutable;
  assert.equal(typeof name,'string');assert(!name.includes('/')&&!name.includes('..'),'Nombre de ejecutable inválido');
@@ -31,4 +31,4 @@ try{
 assert(!Object.keys(parts).some(n=>/\.xlsx$|\.xls$|\.ipa$|upload\//i.test(n)),'Se incluyó un Excel o adjunto bruto');
 const js=Object.entries(parts).filter(([n])=>n.startsWith(prefix+'public/')&&n.endsWith('.js'));
 assert(js.some(([,b])=>strFromU8(b).includes('TB_CONSUMOS')),'Falta exportador ambulatorio');
-console.log(`PASS: IPA ${version}, build 160, ejecutable, exportador, ausencia de XLSX bruto y SHA256 ${hash}`);
+console.log(`PASS: IPA ${version}, build 161, ejecutable, exportador, ausencia de XLSX bruto y SHA256 ${hash}`);

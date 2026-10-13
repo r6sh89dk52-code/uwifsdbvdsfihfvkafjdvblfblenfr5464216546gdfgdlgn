@@ -1,9 +1,9 @@
 import {useMemo,useState} from 'react';
 import {Check,ClipboardList,Package,Plus,Search,Trash2,X} from 'lucide-react';
-import {kardexCatalog,kardexMainCount,kardexDonatedCount} from './kardexCatalog';
+import {kardexCatalog,kardexMainCount} from './kardexCatalog';
 import {countPhysicalUnits,inventoryTotals,validateStockLot,type StockLot,type ContainerKind} from './inventoryRules';
-import {type StockLedger} from './kardexMovements';import KardexMovementsPanel from './KardexMovementsPanel';import KardexDailyExport from './KardexDailyExport';
-type Props={ledger:StockLedger;onChange:(value:StockLedger)=>void;responsible:string};
+import {type StockLedger} from './kardexMovements';import {type CatalogMappingEvent} from './reconciliationRules';import KardexMovementsPanel from './KardexMovementsPanel';import KardexDailyExport from './KardexDailyExport';
+type Props={ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(value:StockLedger)=>void;responsible:string};
 const options:{value:ContainerKind;label:string}[]=[
  {value:'unidad',label:'Unidad individual'},{value:'caja',label:'Caja'},
  {value:'frasco',label:'Frasco'},{value:'paquete',label:'Paquete'},
@@ -12,10 +12,9 @@ const options:{value:ContainerKind;label:string}[]=[
 const clean=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
 const safeNumber=(v:string)=>Number(v.replace(',','.'));
 const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).format(v);
-export default function KardexPanel({ledger,onChange,responsible}:Props){
+export default function KardexPanel({ledger,mappings,onChange,responsible}:Props){
  const lots=ledger.lots;
  const[search,setSearch]=useState('');
- const[filter,setFilter]=useState<'all'|'normal'|'donated'>('all');
  const[selectedId,setSelectedId]=useState('');
  const[editId,setEditId]=useState<string|null>(null);
  const[lot,setLot]=useState('');
@@ -30,10 +29,10 @@ export default function KardexPanel({ledger,onChange,responsible}:Props){
  const selected=kardexCatalog.find(p=>p.id===selectedId);
  const listed=useMemo(()=>lots.filter(l=>{
    const p=kardexCatalog.find(x=>x.id===l.code);
-   return (filter==='all'||(filter==='donated'?p?.donated:!p?.donated)) &&
+   return Boolean(p) &&
      (!search||clean(l.name+' '+l.lot).includes(clean(search)));
- }).sort((a,b)=>a.name.localeCompare(b.name,'es')),[lots,search,filter]);
- const totals=inventoryTotals(lots);
+ }).sort((a,b)=>a.name.localeCompare(b.name,'es')),[lots,search]);
+ const totals=inventoryTotals(lots.filter(x=>kardexCatalog.some(p=>p.id===x.code)));
  const preview=Number.isFinite(safeNumber(capacity)*safeNumber(sealed)+safeNumber(loose)+safeNumber(opened))
    ?safeNumber(capacity)*safeNumber(sealed)+safeNumber(loose)+safeNumber(opened):null;
  function reset(){
@@ -77,12 +76,11 @@ export default function KardexPanel({ledger,onChange,responsible}:Props){
   <div className="warning">SOLO DATOS FICTICIOS. Los saldos deben contarse físicamente; el Excel histórico no representa el stock actual. Aún no hay descuento por atenciones ni exportación del Kardex diario.</div>
   <div className="kardexStats">
    <div><strong>{kardexMainCount}</strong><span>Productos oficiales</span></div>
-   <div><strong>{kardexDonatedCount}</strong><span>Donados</span></div>
    <div><strong>{totals.lots}</strong><span>Lotes registrados</span></div>
   </div>
   <section className="panel" id="kardex-entry">
    <h3><Plus size={18}/>{editId?'Modificar recuento':'Registrar inventario inicial'}</h3>
-   <p className="hint">Los 98 productos y los 6 donados proceden del formato de octubre de 2026. No se cargan cantidades automáticamente.</p>
+   <p className="hint">Los 98 materiales de Enfermería se conservan sin donados; el saldo inicial no informado queda pendiente.</p>
    <label>Producto oficial
     <select value={selectedId} onChange={e=>{setSelectedId(e.target.value);setProblem('')}} disabled={Boolean(editId)}>
      <option value="">Seleccionar medicamento o insumo…</option>
@@ -91,7 +89,7 @@ export default function KardexPanel({ledger,onChange,responsible}:Props){
      </optgroup>)}
     </select>
    </label>
-   {selected&&<p className="hint">Formato oficial: {selected.donated?'Donados, Hoja1':'KARDEX ENFERMERAS'} · fila {selected.sheetRow}. El número correlativo no es código de almacén.</p>}
+   {selected&&<p className="hint">Formato oficial: {'KARDEX ENFERMERAS'} · fila {selected.sheetRow}. El número correlativo no es código de almacén.</p>}
    <div className="fields two">
     <label>Lote (opcional)<input value={lot} onChange={e=>setLot(e.target.value)} placeholder="Si no existe, dejar vacío" maxLength={48}/></label>
     <label>Vencimiento (si corresponde)<input type="date" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
@@ -107,17 +105,16 @@ export default function KardexPanel({ledger,onChange,responsible}:Props){
    {problem&&<p className="kardexError" role="alert">{problem}</p>}
    <div className="kardexActions"><button type="button" className="workerPrimary" onClick={save}><Check size={18}/>{editId?'Guardar cambio':'Agregar al inventario'}</button>{editId&&<button type="button" className="workerSecondary" onClick={reset}><X size={18}/>Cancelar</button>}</div>
   </section>
-  <KardexMovementsPanel ledger={ledger} onChange={onChange}/>
+  <KardexMovementsPanel ledger={ledger} mappings={mappings} onChange={onChange}/>
   <KardexDailyExport ledger={ledger} responsible={responsible}/>
   <section className="panel">
    <h3><ClipboardList size={18}/>Inventario registrado</h3>
    <div className="kardexFilter"><label className="kardexSearch"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o lote…"/></label>
-    <select value={filter} onChange={e=>setFilter(e.target.value as typeof filter)} aria-label="Tipo de inventario"><option value="all">Todos</option><option value="normal">Kardex enfermeras</option><option value="donated">Donados</option></select>
    </div>
    <p className="hint">{listed.length} registros · {totals.products} productos con recuento · {totals.expiring} lotes vencidos o próximos a vencer.</p>
    {listed.length===0?<p className="kardexEmpty">Aún no hay lotes registrados que coincidan con la búsqueda.</p>:<div className="kardexLots">
     {listed.map(l=><article key={l.id} className="kardexLot">
-      <div className="kardexLotHeader"><strong>{l.name}</strong><span>{kardexCatalog.find(p=>p.id===l.code)?.donated?'Donado':'General'}</span></div>
+      <div className="kardexLotHeader"><strong>{l.name}</strong><span>{'Enfermería'}</span></div>
       <p>{l.lot?'Lote '+l.lot:'Sin lote registrado'} · {l.expires?'Vence '+l.expires:'Vencimiento pendiente'}</p>
       <strong className="kardexBalance">{fmt(countPhysicalUnits(l))} {l.catalogUnit}</strong>
       <p>{l.sealedContainers} cerrados · {l.looseUnits} sueltos · {l.openedRemaining} abiertos restantes · capacidad {l.unitsPerContainer}</p>

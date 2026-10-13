@@ -1,5 +1,5 @@
 /** Transcripción del Excel oficial KARDEX DE ENFERMERÍA ACTUALIZADO - OCTUBRE-2026.xlsx.
- * KARDEX ENFERMERAS C7:C104 (98) y Hoja1 A6:A11 (6 donados).
+ * KARDEX ENFERMERAS C7:C104 (98); la hoja de donados queda excluida.
  * El número 1..98 es orden en Kardex, NO código oficial del material.
  * No trasladar los saldos antiguos ni fechas defectuosas como inventario actual.
  */
@@ -17,7 +17,9 @@ export const kardexCatalog:KardexCatalogProduct[]=[
   mainIndex++;
   return{id:'E-'+mainIndex,name,group,sheetRow:mainIndex+6,donated:false};
  })),
- ...donated.map((name,i)=>({id:'D-'+(i+1),name,group:'DONADOS',sheetRow:i+6,donated:true}))
+
 ];
 export const kardexMainCount=98;
-export const kardexDonatedCount=6;
+/** Solo para validar equivalencias legadas en almacenamientos previos: NO operativo. */
+export const legacyDonatedCatalog=donated.map((name,i)=>({id:'D-'+(i+1),name,group:'LEGADO DONADOS',sheetRow:i+6,donated:true}));
+export const kardexDonatedCount=0;

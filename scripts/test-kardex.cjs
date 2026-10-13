@@ -8,12 +8,12 @@ function compile(path,imports={}){
 }
 const catalog=compile('src/kardexCatalog.ts');
 const rules=compile('src/inventoryRules.ts');
-assert.equal(catalog.kardexCatalog.length,104,'98 general + 6 donated from source workbook');
+assert.equal(catalog.kardexCatalog.length,98,'98 general only from source workbook');
 assert.equal(catalog.kardexCatalog.filter(p=>!p.donated).length,98);
-assert.equal(catalog.kardexCatalog.filter(p=>p.donated).length,6);
+assert.equal(catalog.kardexCatalog.filter(p=>p.donated).length,0);
 assert.equal(catalog.kardexCatalog[0].name,'AERO-OM GRAGEAS');
 assert.equal(catalog.kardexCatalog[97].name,'REPELENTE');
-assert.equal(catalog.kardexCatalog[98].name,'Azitral 200 15ml');
+assert.equal(catalog.legacyDonatedCatalog.length,6,'historical donor names kept only for legacy read compatibility');
 const l={id:'demo-1',code:'E-87',name:'ALCOHOL 120 ML',catalogUnit:'mL',lot:'FICTICIO-2026',expires:'2027-01-31',container:'frasco',unitsPerContainer:120,sealedContainers:2,looseUnits:0,openedRemaining:60,updatedAt:Date.now()};
 const saved=rules.validateStockLot(l);
 assert.equal(saved.updatedAt,l.updatedAt,'Date.now() must be valid, not treated as stock');
@@ -35,4 +35,4 @@ assert.throws(()=>rules.validateStockLots([l,{...l}]),/duplicado/);
 assert.equal(rules.inventoryTotals([l]).products,1);
 assert.equal(rules.inventoryTotals([l]).lots,1);
 assert.equal(rules.inventoryTotals([l]).opened,1);
-console.log('PASS: 98 productos Kardex + 6 donados; stock físico sin doble conteo; lotes, capacidades y vencimiento');
+console.log('PASS: 98 productos Kardex exclusivamente; stock físico sin doble conteo; lotes, capacidades y vencimiento');

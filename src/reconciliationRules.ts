@@ -2,7 +2,7 @@
  * A return never automatically restores available stock; a physical correction
  * must be processed separately through an audited inventory adjustment.
  */
-import {kardexCatalog} from './kardexCatalog';
+import {kardexCatalog,legacyDonatedCatalog} from './kardexCatalog';
 import {type StockLedger} from './kardexMovements';
 import {postConfirmedAttentionDelivery,type ConfirmedDelivery,type SavedClinicalAttention} from './attentionKardex';
 
@@ -36,7 +36,7 @@ export function validateMappingEvents(input:unknown):CatalogMappingEvent[]{
   const kardexCode=validText(e.kardexCode,1,64,'Código Kardex');
   const kardexName=validText(e.kardexName,1,240,'Producto Kardex');
   const reason=validText(e.reason,8,240,'Motivo');
-  const catalogItem=kardexCatalog.find(p=>p.id===kardexCode);
+  const catalogItem=[...kardexCatalog,...legacyDonatedCatalog].find(p=>p.id===kardexCode);
   if(!catalogItem||catalogItem.name!==kardexName)throw Error('El producto Kardex no existe en el catálogo oficial.');
   ids.add(e.id);
   return{id:e.id,kind:e.kind,clinicalCode,clinicalName,kardexCode,kardexName,reason,at:validTime(e.at)};
@@ -49,6 +49,7 @@ export function activeCatalogMapping(events:CatalogMappingEvent[],clinicalCode:s
 export function recordCatalogMapping(events:CatalogMappingEvent[],request:CatalogMappingEvent):CatalogMappingEvent[]{
  const previous=validateMappingEvents(events);
  const proposed=validateMappingEvents([request])[0];
+ if(proposed.kind==='verify'&&!kardexCatalog.some(p=>p.id===proposed.kardexCode))throw Error('Donados excluidos de nuevas equivalencias.');
  if(previous.length>=maxRecords||previous.some(e=>e.id===proposed.id))throw Error('Equivalencia duplicada o límite alcanzado.');
  const prior=activeCatalogMapping(previous,proposed.clinicalCode);
  if(proposed.kind==='revoke'){
@@ -103,6 +104,7 @@ export function postDeliveryWithMapping(
  if(!item)throw Error('Producto clínico no encontrado.');
  const verified=activeCatalogMapping(mappings,item.code);
  const lot=ledger.lots.find(l=>l.id===confirmation.lotId);
+ if(!verified||verified.clinicalName!==item.name||!lot||!kardexCatalog.some(p=>p.id===lot.code)||verified.kardexCode!==lot.code||verified.kardexName!==lot.name)throw Error('Entrega bloqueada: verifica primero la equivalencia del código de atención con los 98 materiales del Kardex.');
  if(verified&&lot&&verified.kardexCode!==lot.code)
   throw Error('El lote seleccionado no coincide con la equivalencia verificada. Revoca o actualiza la equivalencia antes de continuar.');
  return postConfirmedAttentionDelivery(ledger,attention,confirmation);

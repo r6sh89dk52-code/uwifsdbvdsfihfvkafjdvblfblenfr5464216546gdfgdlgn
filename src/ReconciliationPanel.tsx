@@ -12,7 +12,7 @@ export default function ReconciliationPanel({attentions,ledger,mappings,incident
  const [incidentQty,setIncidentQty]=useState('1'),[incidentReason,setIncidentReason]=useState(''),[feedback,setFeedback]=useState('');
  const attention=attentions.find(a=>a.id===attentionId&&a.status==='saved');
  const item=attention?.items.find(i=>i.id===itemId),current=item?activeCatalogMapping(mappings,item.code):undefined;
- const deliveryMoves=ledger.movements.filter(m=>m.kind==='use'&&m.dispenseRef);
+ const deliveryMoves=ledger.movements.filter(m=>m.kind==='use'&&m.dispenseRef&&kardexCatalog.some(p=>p.id===m.code));
  const original=deliveryMoves.find(m=>m.id===incidentId);
  function mapEvent(kind:'verify'|'revoke'){
   if(!item)return;

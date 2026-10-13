@@ -1,10 +1,12 @@
 import {useMemo,useState} from 'react';
 import {Check,PackageCheck} from 'lucide-react';
-import {postConfirmedAttentionDelivery,alreadyDispensed,availableLots,type SavedClinicalAttention} from './attentionKardex';
+import {alreadyDispensed,availableLots,type SavedClinicalAttention} from './attentionKardex';
+import {postDeliveryWithMapping,activeCatalogMapping,type CatalogMappingEvent} from './reconciliationRules';
+import {kardexCatalog} from './kardexCatalog';
 import {countPhysicalUnits} from './inventoryRules';
 import {type StockLedger} from './kardexMovements';
-type Props={attentions:SavedClinicalAttention[];ledger:StockLedger;onChange:(next:StockLedger)=>void};
-export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Props){
+type Props={attentions:SavedClinicalAttention[];ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(next:StockLedger)=>void};
+export default function AttentionDeliveryPanel({attentions,ledger,mappings,onChange}:Props){
  const [attentionId,setAttentionId]=useState('');
  const [itemId,setItemId]=useState('');
  const [lotId,setLotId]=useState('');
@@ -19,6 +21,8 @@ export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Prop
  const item=attention?.items.find(i=>i.id===itemId);
  const lot=ledger.lots.find(l=>l.id===lotId);
  const permitted=lot?availableLots(ledger.lots,lot.code):[];
+ const verified=item?activeCatalogMapping(mappings,item.code):undefined;
+ const allowedLots=verified?ledger.lots.filter(l=>l.code===verified.kardexCode&&kardexCatalog.some(p=>p.id===l.code)):[];
  const done=Boolean(attention&&item&&alreadyDispensed(ledger,attention.id,item.id));
  function resetChecks(){setIdentity(false);setUnits(false);setGiven(false);setOpen(false);setMessage('')}
  function chooseAttention(id:string){setAttentionId(id);setItemId('');setLotId('');resetChecks()}
@@ -29,10 +33,10 @@ export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Prop
   if(done){setMessage('Este producto ya fue descontado para esa atención.');return}
   const physicalQuantity=quantity.trim()===''?Number.NaN:Number(quantity.replace(',','.'));
   try{
-   const next=postConfirmedAttentionDelivery(ledger,attention,{
+   const next=postDeliveryWithMapping(ledger,attention,{
     itemId:item.id,lotId:lot.id,physicalQuantity,
     confirmIdentity:identity,confirmUnits:units,confirmDelivery:given,openNewContainer:open,timestamp:Date.now()
-   });
+   },mappings);
    onChange(next);resetChecks();setMessage('Entrega ficticia registrada y descontada una sola vez. Comprueba el movimiento en Kardex.');
   }catch(error){setMessage(error instanceof Error?error.message:'No se pudo descontar el producto.')}
  }
@@ -54,10 +58,12 @@ export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Prop
   {item&&<div className="kardexPreview"><strong>Producto de atención:</strong> {item.name} · código {item.code} · {item.quantity} {item.unit}
     <p className="hint">Debes confirmar personalmente la equivalencia con el producto del Kardex y convertir la cantidad a las unidades físicas correctas.</p>
   </div>}
+  {item&&!verified&&<p className="kardexError" role="alert">Producto sin equivalencia oficial verificada. No puede entregarse desde el Kardex.</p>}
+  {item&&verified&&<p className="hint">Equivalencia verificada: {verified.kardexName} ({verified.kardexCode}).</p>}
   {item&&<label>Producto y lote del Kardex (selección explícita)
    <select value={lotId} onChange={e=>chooseLot(e.target.value)}>
     <option value="">Seleccionar producto/lote disponible…</option>
-    {ledger.lots.filter(l=>availableLots(ledger.lots,l.code).some(x=>x.id===l.id)).sort((a,b)=>a.name.localeCompare(b.name,'es')).map(l=>
+    {allowedLots.filter(l=>availableLots(ledger.lots,l.code).some(x=>x.id===l.id)).sort((a,b)=>a.name.localeCompare(b.name,'es')).map(l=>
      <option key={l.id} value={l.id}>{l.name} · lote {l.lot||'sin registrar'} · {countPhysicalUnits(l)} {l.catalogUnit}</option>)}
    </select>
   </label>}
@@ -72,7 +78,7 @@ export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Prop
   </>}
   {done&&<p className="kardexPreview"><Check size={16}/> Ya existe una entrega registrada para este medicamento de esta atención. No se permite un segundo descuento.</p>}
   {message&&<p className="hint" role="status">{message}</p>}
-  <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!lot||!item||done||!permitted.some(x=>x.id===lot.id)} onClick={send}><PackageCheck size={18}/> Confirmar entrega y descontar</button></div>
+  <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!lot||!item||!verified||done||!permitted.some(x=>x.id===lot.id)} onClick={send}><PackageCheck size={18}/> Confirmar entrega y descontar</button></div>
   <p className="hint">No se sincroniza con el Excel oficial ni realiza conversiones automáticamente. Los datos continúan siendo exclusivos de pruebas.</p>
  </section>;
 }

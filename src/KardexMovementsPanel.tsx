@@ -1,14 +1,17 @@
 import {useMemo,useState} from 'react';
 import {ArrowDownCircle,ClipboardCheck,PackageOpen,RefreshCw} from 'lucide-react';
 import {countPhysicalUnits,type StockLot} from './inventoryRules';
+import {kardexCatalog} from './kardexCatalog';
+import products from './products.json';
+import {activeCatalogMapping,type CatalogMappingEvent} from './reconciliationRules';
 import {postStockMovement,suggestFEFOLot,type StockLedger,type StockCommand,type MovementKind} from './kardexMovements';
 
-type Props={ledger:StockLedger;onChange:(value:StockLedger)=>void};
+type Props={ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(value:StockLedger)=>void};
 const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).format(v);
 function numberValue(v:string){return v.trim()===''?Number.NaN:Number(v.replace(',','.'))}
 function label(l:StockLot){return l.name+(l.lot?' — lote '+l.lot:' — sin lote')+(l.expires?' · vence '+l.expires:'')}
 function changedName(kind:MovementKind){return kind==='extraordinary'?'Ingreso extraordinario':kind==='use'?'Consumo de prueba':'Ajuste auditado'}
-export default function KardexMovementsPanel({ledger,onChange}:Props){
+export default function KardexMovementsPanel({ledger,mappings,onChange}:Props){
  const [kind,setKind]=useState<MovementKind>('extraordinary');
  const [productCode,setProductCode]=useState('');
  const [lotId,setLotId]=useState('');
@@ -22,7 +25,11 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
  const [reason,setReason]=useState('');
  const [error,setError]=useState('');
  const [historyLimit,setHistoryLimit]=useState(15);
- const available=useMemo(()=>Array.from(new Map<string,string>(ledger.lots.map(x=>[x.code,x.name] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'es')),[ledger.lots]);
+ const coded=useMemo(()=>new Set(products.filter(p=>{
+  const mapping=activeCatalogMapping(mappings,p.code);
+  return mapping?.clinicalName===p.name&&kardexCatalog.some(k=>k.id===mapping.kardexCode&&k.name===mapping.kardexName);
+ }).map(p=>activeCatalogMapping(mappings,p.code)!.kardexCode)),[mappings]);
+ const available=useMemo(()=>Array.from(new Map<string,string>(ledger.lots.filter(x=>kardexCatalog.some(p=>p.id===x.code)&&(kind!=='use'||coded.has(x.code))).map(x=>[x.code,x.name] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'es')),[ledger.lots,kind,coded]);
  const matching=useMemo(()=>ledger.lots.filter(x=>x.code===productCode).sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')),[ledger.lots,productCode]);
  const fefo=suggestFEFOLot(ledger.lots,productCode);
  const selected=ledger.lots.find(x=>x.id===lotId);
@@ -50,6 +57,8 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
 }
  function apply(){
   if(!selected){setError('Selecciona primero un producto con inventario y su lote.');return}
+  if(!kardexCatalog.some(p=>p.id===selected.code)){setError('Producto excluido del Kardex de Enfermería.');return}
+  if(kind==='use'&&!coded.has(selected.code)){setError('No se permite consumo sin código numérico oficial y equivalencia verificada.');return}
   const cmd:StockCommand={
    kind,id:crypto.randomUUID(),lotId:selected.id,at:Date.now(),description:reason.trim(),
    ...(kind==='extraordinary'?{sealedAdded:numberValue(sealed),looseAdded:numberValue(loose)}:
@@ -65,7 +74,7 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
  }
  return <section className="panel kardexMovementPanel">
   <h3><ArrowDownCircle size={18}/>Movimientos y aperturas</h3>
-  <p className="hint">Movimientos manuales de prueba. Cada cambio queda registrado con saldo anterior y posterior. Las atenciones aún no descuentan stock automáticamente.</p>
+  <p className="hint">Movimientos manuales de prueba. Cada cambio queda registrado con saldo anterior y posterior. El consumo manual requiere equivalencia oficial verificada; ingresos y ajustes no alteran el Indicador de atenciones.</p>
   <div className="kardexActionKinds">
    {(['extraordinary','use','adjustment'] as MovementKind[]).map(v=><button key={v} type="button" className={kind===v?'selected':''} onClick={()=>selectKind(v)}>{changedName(v)}</button>)}
   </div>
@@ -76,6 +85,7 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
     <p className="kardexPreview">Saldo actual: <strong>{fmt(countPhysicalUnits(selected))} {selected.catalogUnit}</strong> · {selected.sealedContainers} cerrados · {fmt(selected.openedRemaining)} abiertos restantes</p>
     {fefo?.id===selected.id&&kind==='use'&&<p className="hint">Sugerencia FEFO: lote con vencimiento más próximo entre los disponibles.</p>}
     {fefo?.id!==selected.id&&kind==='use'&&fefo&&<p className="hint">FEFO sugiere primero el lote <strong>{fefo.lot||'sin lote'}</strong> (vence {fefo.expires||'sin fecha'}). Puedes seleccionar otro lote válido si corresponde.</p>}
+    {kind==='use'&&!coded.has(selected.code)&&<p className="kardexError">Sin equivalencia oficial verificada: consumo bloqueado.</p>}
     {expired&&kind==='use'&&<p className="kardexError">Este lote está vencido. La aplicación no permite registrar su consumo.</p>}
     {kind==='extraordinary'&&<div className="fields two">
       <label>Envases cerrados ingresados<input inputMode="numeric" type="number" min="0" step="1" value={sealed} onChange={e=>setSealed(e.target.value)}/></label>
@@ -93,7 +103,7 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
     </div>}
     <label>Motivo del movimiento (obligatorio)<input value={reason} maxLength={250} onChange={e=>setReason(e.target.value)} placeholder={kind==='extraordinary'?'Ejemplo: ingreso extraordinario de prueba':kind==='use'?'Ejemplo: uso de demostración':'Ejemplo: diferencia en recuento físico'}/></label>
     {error&&<p className="kardexError" role="alert">{error}</p>}
-    <div className="kardexActions"><button className="workerPrimary" onClick={apply} disabled={expired&&kind==='use'}><ClipboardCheck size={18}/>Registrar {kind==='use'?'salida':kind==='extraordinary'?'ingreso':'ajuste'}</button></div>
+    <div className="kardexActions"><button className="workerPrimary" onClick={apply} disabled={(expired||!coded.has(selected.code))&&kind==='use'}><ClipboardCheck size={18}/>Registrar {kind==='use'?'salida':kind==='extraordinary'?'ingreso':'ajuste'}</button></div>
    </>}
   </>}
   <div className="kardexHistory">
