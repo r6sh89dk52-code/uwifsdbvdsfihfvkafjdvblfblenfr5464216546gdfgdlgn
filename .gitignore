@@ -1,0 +1,9 @@
+node_modules/
+dist/
+ios/
+outputs/
+*.ipa
+*.xcarchive
+.env
+.env.*
+.DS_Store

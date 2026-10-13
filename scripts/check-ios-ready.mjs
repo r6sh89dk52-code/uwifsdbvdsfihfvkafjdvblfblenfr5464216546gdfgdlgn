@@ -1,0 +1,11 @@
+import {readFileSync,existsSync} from 'node:fs';
+import {strict as assert} from 'node:assert';
+const pkg=JSON.parse(readFileSync('package.json','utf8'));
+const capacitor=readFileSync('capacitor.config.ts','utf8');
+assert(pkg.dependencies['@capacitor/core'] && pkg.devDependencies['@capacitor/ios'],'Faltan paquetes Capacitor');
+assert(pkg.dependencies['@capacitor/local-notifications'],'Falta plugin de notificaciones');
+assert(capacitor.includes("webDir:'dist'"),'Ruta webDir inesperada');
+assert(existsSync('resources/icon.png'),'Falta icono oficial');
+assert(existsSync('.github/workflows/ios-ipa.yml'),'Falta flujo de compilación');
+assert(existsSync('scripts/build-ios-ipa.sh'),'Falta script de empaquetado');
+console.log('PASS: estructura de compilación iOS v0.7 (sin compilar Xcode)');

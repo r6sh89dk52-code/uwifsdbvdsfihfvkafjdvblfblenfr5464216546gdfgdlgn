@@ -1,0 +1,37 @@
+{
+  "name": "danper-salud-movil-etapa-a",
+  "private": true,
+  "version": "0.7.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:logic": "node scripts/test-logic.cjs && node scripts/test-draft-logic.cjs",
+    "ios:sync": "npx cap sync ios",
+    "ios:open": "npx cap open ios",
+    "ios:prepare": "npm run build && npx cap sync ios",
+    "ios:project": "npm run build && npx cap add ios && npx cap sync ios",
+    "ios:icon": "node scripts/apply-ios-icon.mjs",
+    "ios:check": "node scripts/check-ios-ready.mjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.468.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.6.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/ios": "^7.0.0"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

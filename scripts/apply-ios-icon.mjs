@@ -1,0 +1,11 @@
+import {existsSync,mkdirSync,copyFileSync,writeFileSync} from 'node:fs';
+import {join,resolve} from 'node:path';
+const folder=resolve('ios/App/App/Assets.xcassets/AppIcon.appiconset');
+const original=resolve('resources/icon.png');
+if(!existsSync(original))throw new Error('Falta resources/icon.png');
+if(!existsSync(resolve('ios/App/App.xcworkspace')))throw new Error('Falta proyecto Xcode: npx cap add ios');
+mkdirSync(folder,{recursive:true});
+copyFileSync(original,join(folder,'AppIcon-512@2x.png'));
+const manifest={images:[{filename:'AppIcon-512@2x.png',idiom:'universal',platform:'ios',size:'1024x1024'}],info:{author:'xcode',version:1}};
+writeFileSync(join(folder,'Contents.json'),JSON.stringify(manifest,null,2)+'\n');
+console.log('OK: icono oficial DANPER aplicado al proyecto iOS.');

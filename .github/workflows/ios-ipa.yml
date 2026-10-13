@@ -1,0 +1,51 @@
+name: DANPER Salud Movil - IPA de pruebas
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - name: Obtener fuentes
+        uses: actions/checkout@v4
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Version de Xcode
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: Garantizar CocoaPods
+        run: |
+          if ! command -v pod >/dev/null 2>&1; then brew install cocoapods; fi
+          pod --version
+      - name: Instalar dependencias npm
+        run: npm install --no-fund
+      - name: Pruebas de lógica
+        run: npm run test:logic
+      - name: Auditoría de dependencias
+        run: npm audit --audit-level=high
+      - name: Comprobar preparación iOS
+        run: npm run ios:check
+      - name: Compilar aplicación web
+        run: npm run build
+      - name: Generar proyecto iOS
+        run: |
+          npx cap add ios
+          npx cap sync ios
+      - name: Generar IPA sin firmar
+        run: bash scripts/build-ios-ipa.sh
+      - name: Adjuntar IPA descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER-Salud-Movil-iPhone-v0.7
+          path: |
+            outputs/*.ipa
+            outputs/*.sha256
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,34 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+const ts=require('typescript');
+function loadTs(file){
+  const full=path.join(__dirname,'..',file);
+  const compiled=ts.transpileModule(fs.readFileSync(full,'utf8'),{fileName:full,reportDiagnostics:true,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}});
+  assert.equal((compiled.diagnostics||[]).filter(x=>x.category===ts.DiagnosticCategory.Error).length,0);
+  const mod={exports:{}};
+  vm.runInNewContext(compiled.outputText,{module:mod,exports:mod.exports});return mod.exports;
+}
+const {DRAFT_REMINDER_MS,reminderDueAt,draftIsMeaningful,pendingDraftCount,notificationId}=loadTs('src/draftRules.ts');
+assert.equal(DRAFT_REMINDER_MS,3600000);
+assert.equal(reminderDueAt(1000),3601000);
+assert.equal(pendingDraftCount([{status:'draft',updatedAt:1000}],3600999),0);
+assert.equal(pendingDraftCount([{status:'draft',updatedAt:1000}],3601000),1);
+assert.equal(pendingDraftCount([{status:'saved',updatedAt:1000}],3601000),0);
+assert.equal(pendingDraftCount([{status:'draft',updatedAt:1000},{status:'draft',updatedAt:3600500}],3601000),1);
+assert.equal(draftIsMeaningful({worker:{dni:'',name:''},items:[],diagnosis:''}),false);
+assert.equal(draftIsMeaningful({worker:{dni:'00000001'},items:[],diagnosis:''}),true);
+assert.equal(draftIsMeaningful({worker:{},items:[{code:'FAKE'}],diagnosis:''}),true);
+assert.equal(notificationId('prueba-1'),notificationId('prueba-1'));
+assert.notEqual(notificationId('prueba-1'),notificationId('prueba-2'));
+assert.ok(notificationId('prueba-1')>=800000000&&notificationId('prueba-1')<1700000000);
+const native=fs.readFileSync(path.join(__dirname,'..','src/nativeReminders.ts'),'utf8');
+assert.ok(native.includes('Tienes una atención pendiente por completar.'));
+assert.ok(!native.includes('dni')&&!native.includes('diagnosis')&&!native.includes('worker.name'));
+const app=fs.readFileSync(path.join(__dirname,'..','src/main.tsx'),'utf8');
+assert.ok(app.includes('setTimeout(()=>{const copy={...active,updatedAt:Date.now()}'));
+assert.ok(app.includes("window.addEventListener('pagehide',flush)"));
+assert.ok(app.includes('reminderDueAt(a.updatedAt)<=reminderTick'));
+assert.ok(app.includes('a.originId'));
+console.log('PASS: v0.6 avisos de 60 minutos, privacidad, autoguardado y edición trazable.');

@@ -1,0 +1,11 @@
+DANPER Salud Movil v0.7 - Publicacion para GitHub privado
+
+1. Crea en github.com/new el repositorio danper-salud-movil-pruebas, PRIVADO, sin README ni gitignore iniciales.
+2. Extrae todos los archivos de este ZIP juntos en una carpeta.
+3. Abre PowerShell en la carpeta que contiene package.json y PUBLICAR_GITHUB.ps1.
+4. Ejecuta: .\PUBLICAR_GITHUB.ps1
+   (puede pedirte iniciar sesion de GitHub desde el navegador).
+5. El workflow se inicia al subir los archivos a la rama main. Revisa Actions.
+6. Autoriza el repositorio en la instalacion de GitHub de ChatGPT si quieres que ChatGPT revise el progreso.
+
+AVISO: Solo datos ficticios; el almacenamiento local no esta cifrado.
