@@ -16,6 +16,13 @@ assert.equal(catalog.kardexCatalog[97].name,'REPELENTE');
 assert.equal(catalog.kardexCatalog[98].name,'Azitral 200 15ml');
 const l={id:'demo-1',code:'E-87',name:'ALCOHOL 120 ML',catalogUnit:'mL',lot:'FICTICIO-2026',expires:'2027-01-31',container:'frasco',unitsPerContainer:120,sealedContainers:2,looseUnits:0,openedRemaining:60,updatedAt:Date.now()};
 const saved=rules.validateStockLot(l);
+assert.equal(saved.updatedAt,l.updatedAt,'Date.now() must be valid, not treated as stock');
+assert.equal(rules.validateStockLot({...l,updatedAt:0}).updatedAt,0,'Unix epoch valid');
+assert.throws(()=>rules.validateStockLot({...l,updatedAt:-1}),/Fecha de modificación/);
+assert.throws(()=>rules.validateStockLot({...l,updatedAt:12.5}),/Fecha de modificación/);
+assert.throws(()=>rules.validateStockLot({...l,updatedAt:Number.POSITIVE_INFINITY}),/Fecha de modificación/);
+assert.throws(()=>rules.validateStockLot({...l,updatedAt:Number.MAX_SAFE_INTEGER+1}),/Fecha de modificación/);
+
 assert.equal(rules.countPhysicalUnits(saved),300);
 assert.equal(rules.countPhysicalUnits({...saved,sealedContainers:0,openedRemaining:0}),0);
 assert.equal(rules.countPhysicalUnits({...saved,sealedContainers:1,looseUnits:2.5,openedRemaining:60}),182.5);
