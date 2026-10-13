@@ -250,7 +250,7 @@ export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,mat
      }
     }
    }
-   if(i===2)editCell(doc,'D1','CONTEO FÍSICO '+plan.end+' · '+material?.countConfirmed+' DE 432 VERIFICADOS');
+   if(i===2)editCell(doc,'D1',material?'CONTEO FÍSICO '+plan.end+' · '+material.countConfirmed+' DE 432 VERIFICADOS':'INVENTARIO PENDIENTE DE CONCILIACIÓN');
 
    if(i===3){
     editCell(doc,'H1','INGRESOS '+plan.start+' AL '+plan.end+(material?.reviewed?' · REVISADOS':' · SIN CERRAR'));
