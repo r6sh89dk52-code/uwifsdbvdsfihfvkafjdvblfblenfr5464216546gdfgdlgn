@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from 'react';
+import {useMemo,useState} from 'react';
 import {Check,ClipboardList,Package,Plus,Search,Trash2,X} from 'lucide-react';
 import {kardexCatalog,kardexMainCount,kardexDonatedCount} from './kardexCatalog';
 import {countPhysicalUnits,inventoryTotals,validateStockLot,type StockLot,type ContainerKind} from './inventoryRules';
@@ -26,10 +26,6 @@ export default function KardexPanel({lots,onChange}:Props){
  const[opened,setOpened]=useState('0');
  const[problem,setProblem]=useState('');
  const selected=kardexCatalog.find(p=>p.id===selectedId);
- const visibleCatalog=useMemo(()=>kardexCatalog.filter(p=>
-   (filter==='all'||(filter==='donated'?p.donated:!p.donated))&&
-   (!search||clean(p.name).includes(clean(search))||clean(p.group).includes(clean(search)))
- ),[search,filter]);
  const listed=useMemo(()=>lots.filter(l=>{
    const p=kardexCatalog.find(x=>x.id===l.code);
    return (filter==='all'||(filter==='donated'?p?.donated:!p?.donated)) &&
