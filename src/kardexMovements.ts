@@ -54,10 +54,27 @@ export function validateStockMovements(v:unknown):StockMovement[]{
   return {...m,before,after};
  });
 }
+/** Detect corrupted or overwritten stock history before allowing further writes. */
+export function validateStockLedger(value:StockLedger):StockLedger{
+ const lots=validateStockLots(value.lots);
+ const movements=validateStockMovements(value.movements);
+ const last=new Map<string,StockLot>();
+ for(const move of movements){
+  const previous=last.get(move.lotId);
+  if(previous && JSON.stringify(previous)!==JSON.stringify(move.before))
+    throw Error('El historial del lote contiene movimientos discontinuos.');
+  last.set(move.lotId,move.after);
+ }
+ for(const [lotId,after] of last.entries()){
+  const current=lots.find(x=>x.id===lotId);
+  if(!current||JSON.stringify(current)!==JSON.stringify(after))
+   throw Error('El saldo del lote no coincide con el historial auditado.');
+ }
+ return {lots,movements};
+}
 export function postStockMovement(ledger:StockLedger,command:StockCommand):StockLedger{
  validCommand(command);
- const lots=validateStockLots(ledger.lots);
- const movements=validateStockMovements(ledger.movements);
+ const {lots,movements}=validateStockLedger(ledger);
  const existing=movements.find(x=>x.id===command.id);
  if(existing){
    if(existing.lotId!==command.lotId||existing.kind!==command.kind||existing.at!==command.at||
