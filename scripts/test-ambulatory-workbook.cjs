@@ -4,6 +4,7 @@ const {load,parse,all,value,visit,options,M}=require('./ambulatory-test-helpers.
 const {exportAmbulatoryWorkbook:exportBook}=load('src/ambulatoryExcel.ts');
 const {readAmbulatoryArchive}=load('src/ambulatoryArchive.ts');
 const {buildAmbulatoryRows:build}=load('src/ambulatoryRows.ts');
+const {reconcileAmbulatoryReport:reconcile}=load('src/ambulatoryReconciliation.ts');
 const template=require('../src/ambulatoryTemplate.json'),products=require('../src/products.json');
 const fixture=new Uint8Array(fs.readFileSync('scripts/fixtures/ambulatory-empty.xlsx'));
 const plan=vs=>build(vs,{lots:[],movements:[]},'2026-10-13','2026-10-13',options);
@@ -14,7 +15,7 @@ const cell=(d,ref)=>all(d,'c').find(c=>c.getAttribute('r')===ref);
 const patch=(name,fn,base=fixture)=>{const parts=unzipSync(base);parts[name]=strToU8(fn(strFromU8(parts[name])));return zipSync(parts);};
 let passed=0;
 function test(name,run){try{run();passed++;}catch(e){console.error('FAIL:',name);throw e}}
-function integrity(bytes,rows){
+function integrity(bytes,rows,reconciled=false){
  const parts=unpack(bytes);
  for(const[name,data]of Object.entries(parts)){
   assert.ok(name.endsWith('.xml')||name.endsWith('.rels'));
@@ -45,8 +46,10 @@ function integrity(bytes,rows){
  assert.equal(all(t,'calculatedColumnFormula').length,2,'only verified organization formulas');
  for(const col of [8,9,10,16,28])assert.equal(all(columns[col],'calculatedColumnFormula').length,0,'must not overwrite current plan data');
  for(const sheet of [2,3,4])assert.equal(all(doc(parts,`xl/worksheets/sheet${sheet}.xml`),'row').length,434);
- assert.equal(value(cell(doc(parts,'xl/worksheets/sheet4.xml'),'D3')),'');
- assert.equal(value(cell(doc(parts,'xl/worksheets/sheet4.xml'),'M3')),'STOCK INICIAL, INGRESOS Y CONTEO PENDIENTES');
+ if(!reconciled){
+  assert.equal(value(cell(doc(parts,'xl/worksheets/sheet4.xml'),'D3')),'');
+  assert.equal(value(cell(doc(parts,'xl/worksheets/sheet4.xml'),'M3')),'STOCK INICIAL, INGRESOS Y CONTEO PENDIENTES');
+ }
  const gui=doc(parts,'xl/worksheets/sheet7.xml');for(const c of all(gui,'c'))if(/^[TU][2-9]\d*$|^[TU]1\d+$/.test(c.getAttribute('r')))assert.equal(value(c),'');
  return parts;
 }
@@ -103,6 +106,47 @@ test('same worker paracetamol across two visits: R equals actual units',()=>{
  assert.equal(value(cell(d,'R2')),'1');
  assert.equal(value(cell(d,'R3')),'2');
  assert.equal(value(cell(d,'S3')),'SEGUNDA');
+});
+test('audited CONTEO INGRESOS RESU preserve original sheet and zero vs blank',()=>{
+ const at=Date.parse('2026-10-20T15:00:00Z'),p=products[0],q=products[1],start='2026-10-13',end='2026-10-19';
+ let n=0;const event=(kind,code,quantity,extra={})=>({
+  id:'v016-'+(++n),kind,subdivision:options.subdivision,code,date:kind==='count'?end:start,
+  at:at+n*1000,quantity,reason:'Registro ficticio verificado por responsable',
+  document:kind==='receipt'?'ING-001':'',expires:'',periodEnd:kind==='review'?end:'',voidOf:'',...extra
+ });
+ const events=[
+  event('opening',p.code,10),
+  event('receipt',p.code,5,{expires:'2027-12-30'}),
+  event('count',p.code,13),
+  event('opening',q.code,0),
+  event('count',q.code,0),
+  event('review','',0)
+ ];
+ const report=plan([visit('example')]);
+ report.start=start;report.end=end;
+ const material=reconcile(report,events,options.subdivision);
+ assert.equal(material.byCode[p.code].closing,15);
+ assert.equal(material.byCode[p.code].difference,2);
+ assert.equal(material.byCode[q.code].opening,0);
+ assert.equal(material.byCode[q.code].closing,0);
+ const result=integrity(exportBook(fixture,report,material),1,true);
+ const count=doc(result,'xl/worksheets/sheet2.xml'),
+  income=doc(result,'xl/worksheets/sheet3.xml'),
+  summary=doc(result,'xl/worksheets/sheet4.xml');
+ assert.equal(value(cell(count,'D3')),'13');
+ assert.equal(value(cell(count,'D4')),'0');
+ assert.equal(value(cell(count,'D5')),'','unrecorded counts remain blank');
+ assert.equal(value(cell(income,'H3')),'5');
+ assert.equal(value(cell(income,'I3')),'46308');
+ assert.equal(value(cell(income,'K3')),'ING-001');
+ assert.ok(all(cell(income,'X3'),'f')[0].textContent.includes('COUNTA'));
+ assert.ok(all(cell(income,'X4'),'f')[0].textContent.includes(',0,SUM('),'explicitly reviewed empty income is numeric zero after Excel recalculation');
+ assert.equal(value(cell(summary,'D3')),'10');
+ assert.equal(value(cell(summary,'D4')),'0');
+ assert.equal(value(cell(summary,'D5')),'');
+ assert.ok(value(cell(summary,'M3')).includes('DIFERENCIA'));
+ assert.equal(value(cell(summary,'M4')),'CONCILIADO');
+ assert.ok(all(cell(summary,'F3'),'f')[0].textContent.includes('SUMIF'));
 });
 // Private-input audit is optional locally and never needed by CI or bundled in IPA.
 if(process.env.AMBULATORY_PRIVATE_SOURCE)test('actual original source',()=>{const raw=new Uint8Array(fs.readFileSync(process.env.AMBULATORY_PRIVATE_SOURCE));integrity(exportBook(raw,one),1);});
