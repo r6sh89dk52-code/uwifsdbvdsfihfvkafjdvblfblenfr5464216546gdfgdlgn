@@ -12,7 +12,7 @@ const options:{value:ContainerKind;label:string}[]=[
 const clean=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
 const safeNumber=(v:string)=>Number(v.replace(',','.'));
 const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).format(v);
-export default function KardexPanel({ledger,mappings,onChange,responsible}:Props){
+export default function KardexPanel({ledger,onChange}:Props){
  const lots=ledger.lots;
  const[search,setSearch]=useState('');
  const[selectedId,setSelectedId]=useState('');

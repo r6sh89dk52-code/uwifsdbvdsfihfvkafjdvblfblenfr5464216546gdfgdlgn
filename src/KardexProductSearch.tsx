@@ -1,4 +1,4 @@
-import {useEffect,useId,useState} from 'react';
+import {useEffect,useId,useRef,useState} from 'react';
 import {Search} from 'lucide-react';
 import {findKardexProducts,type KardexSearchOption} from './kardexProductSearchRules';
 type Props={label:string;value:string;onChange:(id:string)=>void;products:KardexSearchOption[];disabled?:boolean;placeholder?:string};
@@ -8,7 +8,8 @@ export default function KardexProductSearch({label,value,onChange,products,disab
  const [query,setQuery]=useState(current?.name||'');
  const [open,setOpen]=useState(false);
  const [active,setActive]=useState(0);
- useEffect(()=>{setQuery(current?.name||'')},[value,current?.name]);
+ const typing=useRef(false);
+ useEffect(()=>{if(typing.current){typing.current=false;return}setQuery(current?.name||'')},[value,current?.name]);
  const matches=findKardexProducts(products,query,8);
  function choose(p:KardexSearchOption){onChange(p.id);setQuery(p.name);setOpen(false);setActive(0)}
  return <div className="kardexPicker">
@@ -16,7 +17,7 @@ export default function KardexProductSearch({label,value,onChange,products,disab
   <div className="kardexPickerInput"><Search size={19} aria-hidden="true"/>
    <input id={inputId} role="combobox" aria-autocomplete="list" aria-controls={listId} aria-expanded={open&&matches.length>0}
     autoComplete="off" disabled={disabled} value={query} placeholder={placeholder}
-    onChange={e=>{setQuery(e.target.value);setOpen(true);setActive(0);if(value)onChange('')}}
+    onChange={e=>{setQuery(e.target.value);setOpen(true);setActive(0);if(value){typing.current=true;onChange('')}}}
     onFocus={()=>setOpen(true)}
     onBlur={()=>{window.setTimeout(()=>setOpen(false),120)}}
     onKeyDown={e=>{
