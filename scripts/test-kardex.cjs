@@ -8,9 +8,9 @@ function compile(path,imports={}){
 }
 const catalog=compile('src/kardexCatalog.ts');
 const rules=compile('src/inventoryRules.ts');
-assert.equal(catalog.kardexCatalog.length,104,'98 general + 6 donated from source workbook');
+assert.equal(catalog.kardexCatalog.length,98,'98 general only from source workbook');
 assert.equal(catalog.kardexCatalog.filter(p=>!p.donated).length,98);
-assert.equal(catalog.kardexCatalog.filter(p=>p.donated).length,6);
+assert.equal(catalog.kardexCatalog.filter(p=>p.donated).length,0);
 assert.equal(catalog.kardexCatalog[0].name,'AERO-OM GRAGEAS');
 assert.equal(catalog.kardexCatalog[97].name,'REPELENTE');
 assert.equal(catalog.kardexCatalog[98].name,'Azitral 200 15ml');
