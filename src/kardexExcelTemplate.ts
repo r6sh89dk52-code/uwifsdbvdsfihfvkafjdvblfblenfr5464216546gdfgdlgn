@@ -54,7 +54,7 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
  const files=['xl/workbook.xml','xl/worksheets/sheet1.xml','xl/worksheets/sheet2.xml','xl/styles.xml','xl/sharedStrings.xml'];
  if(files.some(x=>!zip[x]))throw Error('La plantilla no contiene los componentes esperados.');
  const workbook=decode(zip[files[0]]),regular=decode(zip[files[2]]);
- const styles=decode(zip['xl/styles.xml']),strings=decode(zip['xl/sharedStrings.xml']);
+ const strings=decode(zip['xl/sharedStrings.xml']);
  const sharedStrings=Array.from(strings.getElementsByTagNameNS(NS,'si')).map(si=>si.textContent||'');
  const label=(doc:Document,ref:string)=>{
   const c=Array.from(doc.getElementsByTagNameNS(NS,'c')).find(x=>x.getAttribute('r')===ref);
