@@ -50,9 +50,40 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
  if(!responsible.trim())throw Error('Indica el responsable del registro.');
  let zip:Record<string,Uint8Array>;
  try{zip=unzipSync(template)}catch{throw Error('Selecciona un archivo .xlsx válido.')}
- const files=['xl/workbook.xml','xl/worksheets/sheet1.xml','xl/worksheets/sheet2.xml'];
+ const files=['xl/workbook.xml','xl/worksheets/sheet1.xml','xl/worksheets/sheet2.xml','xl/styles.xml','xl/sharedStrings.xml'];
  if(files.some(x=>!zip[x]))throw Error('La plantilla no contiene los componentes esperados.');
  const workbook=decode(zip[files[0]]),donations=decode(zip[files[1]]),regular=decode(zip[files[2]]);
+ const styles=decode(zip['xl/styles.xml']),strings=decode(zip['xl/sharedStrings.xml']);
+ const sharedStrings=Array.from(strings.getElementsByTagNameNS(NS,'si')).map(si=>si.textContent||'');
+ const label=(doc:Document,ref:string)=>{
+  const c=Array.from(doc.getElementsByTagNameNS(NS,'c')).find(x=>x.getAttribute('r')===ref);
+  if(!c)return '';
+  const value=c.getElementsByTagNameNS(NS,'v')[0]?.textContent||'';
+  return c.getAttribute('t')==='s'?sharedStrings[Number(value)]||'':c.textContent||'';
+ };
+ // Avoid silently placing stock data in a different workbook with similar tab names.
+ if(!label(regular,'C7').includes('AERO-OM')||!label(regular,'C104').includes('REPELENTE')||
+    !label(donations,'A6').includes('Azitral'))
+  throw Error('La plantilla no coincide con el Kardex oficial de octubre de 2026.');
+ // The source donor F/S cells E6:E11 were formatted as dates; clone their
+ // existing border/font style and change only its number format to numeric.
+ const xfs=styles.getElementsByTagNameNS(NS,'cellXfs')[0];
+ if(!xfs)throw Error('La plantilla no contiene estilos de celda.');
+ const formats=new Map<string,string>();
+ const fmtCell=(doc:Document,ref:string)=>{
+  const c=cell(doc,ref),id=c.getAttribute('s')||'0';
+  let newId=formats.get(id);
+  if(!newId){
+   const originals=Array.from(xfs.children).filter(x=>x.localName==='xf');
+   const original=originals[Number(id)];
+   if(!original)throw Error('Formato numérico de plantilla no encontrado.');
+   const next=original.cloneNode(true) as Element;
+   next.setAttribute('numFmtId','1');next.setAttribute('applyNumberFormat','1');
+   newId=String(originals.length);xfs.append(next);xfs.setAttribute('count',String(originals.length+1));
+   formats.set(id,newId);
+  }
+  c.setAttribute('s',newId);
+ };
  ensure(workbook,'KARDEX ENFERMERAS');ensure(workbook,'Hoja1');
  if(!report.rows||report.rows.filter(r=>!r.donated).length!==98||report.rows.filter(r=>r.donated).length!==6)
   throw Error('Reporte incompleto: se esperan 98 productos generales y 6 donados.');
@@ -84,9 +115,10 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
   setNum(donations,'B'+row,r.initial);
   setNum(donations,'C'+row,r.consumed);
   setNum(donations,'D'+row,r.final,'B'+row+'-C'+row);
+  fmtCell(donations,'E'+row);
   setNum(donations,'E'+row,r.fs);
  });
- zip[files[1]]=encode(donations);zip[files[2]]=encode(regular);
+ zip[files[1]]=encode(donations);zip[files[2]]=encode(regular);zip['xl/styles.xml']=encode(styles);
  // Force Excel to recalculate formulas while cached values remain available.
  const calc=workbook.getElementsByTagNameNS(NS,'calcPr')[0];
  if(calc){calc.setAttribute('fullCalcOnLoad','1');calc.setAttribute('forceFullCalc','1')}
