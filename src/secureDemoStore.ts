@@ -11,6 +11,7 @@ export type DemoSnapshot<A=unknown,W=unknown,R=unknown>={
   stockMovements:unknown[];
   catalogMappings:unknown[];
   deliveryIncidents:unknown[];
+  ambulatoryReconciliation:unknown[];
 };
 const ATT='danper-etapa-a-demo-v1';
 const WORK='danper-etapa-a-demo-workers-v2';
@@ -20,12 +21,13 @@ const INVENTORY='danper-etapa-b0-stock-v010';
 const MOVEMENTS='danper-etapa-b1-movements-v011';
 const MAPPINGS='danper-etapa-b3-mappings-v013';
 const INCIDENTS='danper-etapa-b3-incidents-v013';
+const AMBULATORY_RECON='danper-v016-ambulatory-reconciliation';
 const SECURE_KEY='prototype-snapshot-v1';
 let configured:Promise<void>|undefined;
 let writeQueue:Promise<void>=Promise.resolve();
 
 export function isNativeSecureStore(){return Capacitor.isNativePlatform()&&Capacitor.getPlatform()==='ios'}
-export function emptyDemoSnapshot():DemoSnapshot{return{attentions:[],workers:[],allergies:{},notifications:false,stockLots:[],stockMovements:[],catalogMappings:[],deliveryIncidents:[]}}
+export function emptyDemoSnapshot():DemoSnapshot{return{attentions:[],workers:[],allergies:{},notifications:false,stockLots:[],stockMovements:[],catalogMappings:[],deliveryIncidents:[],ambulatoryReconciliation:[]}}
 function object(value:unknown):value is Record<string,unknown>{return value!==null&&typeof value==='object'&&!Array.isArray(value)}
 export function validateDemoSnapshot(value:unknown):DemoSnapshot{
   if(!object(value)||!Array.isArray(value.attentions)||!Array.isArray(value.workers)||!object(value.allergies)||typeof value.notifications!=='boolean'){
@@ -36,7 +38,8 @@ export function validateDemoSnapshot(value:unknown):DemoSnapshot{
   if(value.stockMovements!==undefined&&(!Array.isArray(value.stockMovements)||value.stockMovements.length>1000))throw new Error('Historial de movimientos incompatible. No se sobrescribirá.');
   if(value.catalogMappings!==undefined&&(!Array.isArray(value.catalogMappings)||value.catalogMappings.length>500))throw Error('Equivalencias incompatibles.');
   if(value.deliveryIncidents!==undefined&&(!Array.isArray(value.deliveryIncidents)||value.deliveryIncidents.length>500))throw Error('Incidencias incompatibles.');
-  return {attentions:value.attentions,workers:value.workers,allergies:value.allergies,notifications:value.notifications,stockLots:value.stockLots??[],stockMovements:value.stockMovements??[],catalogMappings:value.catalogMappings??[],deliveryIncidents:value.deliveryIncidents??[]};
+  if(value.ambulatoryReconciliation!==undefined&&(!Array.isArray(value.ambulatoryReconciliation)||value.ambulatoryReconciliation.length>1200))throw Error('Conciliaciones incompatibles. Los datos existentes no se sobrescribirán.');
+  return {attentions:value.attentions,workers:value.workers,allergies:value.allergies,notifications:value.notifications,stockLots:value.stockLots??[],stockMovements:value.stockMovements??[],catalogMappings:value.catalogMappings??[],deliveryIncidents:value.deliveryIncidents??[],ambulatoryReconciliation:value.ambulatoryReconciliation??[]};
 }
 export function readLegacyDemoSnapshot():DemoSnapshot{
   const parse=(key:string,fallback:unknown)=>{
@@ -44,12 +47,12 @@ export function readLegacyDemoSnapshot():DemoSnapshot{
     if(raw===null)return fallback;
     try{return JSON.parse(raw)}catch{throw new Error(`Datos de prueba dañados: ${key}. No se sobrescribirán.`)}
   };
-  return validateDemoSnapshot({attentions:parse(ATT,[]),workers:parse(WORK,[]),allergies:parse(ALLERGY,{}),notifications:localStorage.getItem(REMINDERS)==='yes',stockLots:parse(INVENTORY,[]),stockMovements:parse(MOVEMENTS,[]),catalogMappings:parse(MAPPINGS,[]),deliveryIncidents:parse(INCIDENTS,[])});
+  return validateDemoSnapshot({attentions:parse(ATT,[]),workers:parse(WORK,[]),allergies:parse(ALLERGY,{}),notifications:localStorage.getItem(REMINDERS)==='yes',stockLots:parse(INVENTORY,[]),stockMovements:parse(MOVEMENTS,[]),catalogMappings:parse(MAPPINGS,[]),deliveryIncidents:parse(INCIDENTS,[]),ambulatoryReconciliation:parse(AMBULATORY_RECON,[])});
 }
 export function clearLegacyDemoSnapshot(){
-  for(const key of [ATT,WORK,ALLERGY,REMINDERS,INVENTORY,MOVEMENTS,MAPPINGS,INCIDENTS])localStorage.removeItem(key);
+  for(const key of [ATT,WORK,ALLERGY,REMINDERS,INVENTORY,MOVEMENTS,MAPPINGS,INCIDENTS,AMBULATORY_RECON])localStorage.removeItem(key);
 }
-function containsData(s:DemoSnapshot){return s.attentions.length>0||s.workers.length>0||Object.keys(s.allergies).length>0||s.notifications||s.stockLots.length>0||s.stockMovements.length>0||s.catalogMappings.length>0||s.deliveryIncidents.length>0}
+function containsData(s:DemoSnapshot){return s.attentions.length>0||s.workers.length>0||Object.keys(s.allergies).length>0||s.notifications||s.stockLots.length>0||s.stockMovements.length>0||s.catalogMappings.length>0||s.deliveryIncidents.length>0||s.ambulatoryReconciliation.length>0}
 async function configureKeychain(){
   if(!configured)configured=(async()=>{
     // Never sync prototype clinical data via iCloud Keychain.
@@ -95,6 +98,7 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
       localStorage.setItem(MOVEMENTS,JSON.stringify(safe.stockMovements));
       localStorage.setItem(MAPPINGS,JSON.stringify(safe.catalogMappings));
       localStorage.setItem(INCIDENTS,JSON.stringify(safe.deliveryIncidents));
+      localStorage.setItem(AMBULATORY_RECON,JSON.stringify(safe.ambulatoryReconciliation));
     }
   });
   return writeQueue;

@@ -8,6 +8,7 @@ import {type ExportPlan,type ExportValue,validExportDate} from './ambulatoryRows
 import template from './ambulatoryTemplate.json';
 import products from './products.json';
 import {readAmbulatoryArchive} from './ambulatoryArchive';
+import {type ReconciliationPlan} from './ambulatoryReconciliation';
 const M='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const PKG='http://schemas.openxmlformats.org/package/2006/relationships';
 const EXPECTED=['BD MATERIALES','CONTEO','INGRESOS','RESU','CONSUMOS','JUSTIFICACIONES','GUIA','@subuo','BASE TRU','@uo'];
@@ -153,14 +154,17 @@ function validateOriginal(entries:Record<string,Uint8Array>){
  if(tables.length!==19||consumption.length!==1||all(consumption[0],'tableColumn').length!==30)throw Error('Estructura de tablas original incompatible.');
  if(all(consumption[0],'tableColumn').some((c,i)=>c.getAttribute('name')!==template.tableHeaders[i]))throw Error('Columnas de la tabla CONSUMOS incompatibles.');
 }
+const cellCache=new WeakMap<Document,Map<string,Element>>();
 function editCell(doc:Document,reference:string,value:ExportValue){
- const cell=all(doc,'c').find(e=>e.getAttribute('r')===reference);if(!cell)return;
+ let cache=cellCache.get(doc);
+ if(!cache){cache=new Map(all(doc,'c').map(e=>[e.getAttribute('r')||'',e]));cellCache.set(doc,cache)}
+ const cell=cache.get(reference);if(!cell)return;
  const row=cell.parentNode as Element;const i=index(reference),style=cell.getAttribute('s')||undefined;
  for(const c of Array.from(cell.childNodes))cell.removeChild(c);
  cell.removeAttribute('t');
  const holder=make(doc,'row');holder.setAttribute('r',row.getAttribute('r')||'1');put(doc,holder,i,value,style);
  const replacement=child(holder,'c')!;
- row.replaceChild(replacement,cell);
+ row.replaceChild(replacement,cell);cache.set(reference,replacement);
 }
 function resizeSheet(doc:Document,last:number,originalLast:number){
  for(const element of Array.from(doc.getElementsByTagName('*'))){
@@ -174,7 +178,7 @@ function organizationFormula(column:number,row:number):string{
  if(column===2)return `IF(A${row}="","",IFERROR(VLOOKUP(A${row},'@subuo'!$A$3:$C$59,2,FALSE),""))`;
  return `IF(OR(A${row}="",B${row}=""),"",IFERROR(VLOOKUP(CONCATENATE(VLOOKUP(A${row},'@subuo'!$A$3:$C$59,3,FALSE),B${row}),'@uo'!$D$2:$E$234,2,FALSE),""))`;
 }
-export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan):Uint8Array{
+export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,material?:ReconciliationPlan):Uint8Array{
  if(plan.blockers.length)throw Error('Resuelve primero las entregas y datos pendientes de conciliación.');
  if(!validExportDate(plan.start)||!validExportDate(plan.end)||plan.start>plan.end||plan.lines.length>10000)throw Error('Plan de exportación inválido.');
  const ids=new Set<string>();
@@ -209,9 +213,53 @@ export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan):Ui
   if(i===2||i===3||i===4){
    replaceData(doc,2,makeRowsForProducts(products,i),i===2?8:i===3?25:13);applyFormulas(doc,i);
    resizeSheet(doc,434,439);
-   if(i===2)editCell(doc,'D1','INVENTARIO PENDIENTE DE CONCILIACIÓN');
-   if(i===3){editCell(doc,'H1','INGRESOS '+plan.start+' AL '+plan.end+' · PENDIENTES');for(const r of direct(all(doc,'sheetData')[0],'row')){if(Number(r.getAttribute('r'))>=3){const y=direct(r,'c').find(c=>index(c.getAttribute('r')||'')===24);if(y){const is=make(doc,'is'),t=make(doc,'t');t.textContent='PENDIENTE DE CONCILIACIÓN';is.appendChild(t);y.setAttribute('t','inlineStr');y.appendChild(is)}}}}
-   if(i===4){editCell(doc,'E1',plan.start+' AL '+plan.end);for(const r of direct(all(doc,'sheetData')[0],'row')){if(Number(r.getAttribute('r'))>=3){const m=direct(r,'c').find(c=>index(c.getAttribute('r')||'')===12);if(m){const is=make(doc,'is'),t=make(doc,'t');t.textContent='STOCK INICIAL, INGRESOS Y CONTEO PENDIENTES';is.appendChild(t);m.setAttribute('t','inlineStr');m.appendChild(is)}}}}
+   // The original 10-sheet layout has one row for each authorized material.
+   // Undefined = not verified (blank); declared zero = measured 0.
+   if(material){
+    for(let p=0;p<products.length;p++){
+     const row=p+3,data=material.byCode[products[p].code];
+     if(!data)throw Error('No hay conciliación para el código oficial '+products[p].code);
+     if(i===2&&data.count!==undefined)editCell(doc,'D'+row,data.count);
+     if(i===3){
+      const positions=[['H','I','J','K'],['L','M','N','O'],['P','Q','R','S'],['T','U','V','W']];
+      if(data.receiptDetails.length>4)throw Error('La hoja original admite cuatro ingresos por material.');
+      data.receiptDetails.forEach((receipt,j)=>{
+       const[cQty,cDate,cExpiry,cDocument]=positions[j];
+       editCell(doc,cQty+row,receipt.quantity);
+       editCell(doc,cDate+row,(Date.parse(receipt.date+'T00:00:00Z')-Date.UTC(1899,11,30))/86400000);
+       if(receipt.expires)editCell(doc,cExpiry+row,(Date.parse(receipt.expires+'T00:00:00Z')-Date.UTC(1899,11,30))/86400000);
+       editCell(doc,cDocument+row,receipt.document);
+      });
+      if(material.reviewed){
+       const x=all(doc,'c').find(e=>e.getAttribute('r')==='X'+row);
+       if(!x)throw Error('La hoja INGRESOS perdió la celda de totales.');
+       for(const c of Array.from(x.childNodes))x.removeChild(c);
+       x.removeAttribute('t');
+       setFormula(doc,x,`IF(COUNTA(H${row},L${row},P${row},T${row})=0,0,SUM(H${row},L${row},P${row},T${row}))`);
+      }else editCell(doc,'X'+row,'');
+     }
+     if(i===4){
+      if(data.opening!==undefined)editCell(doc,'D'+row,data.opening);
+      const pending=[
+       data.opening===undefined?'STOCK INICIAL PENDIENTE':'',
+       !material.reviewed?'INGRESOS NO REVISADOS':'',
+       data.count===undefined?'CONTEO PENDIENTE':'',
+       data.difference!==undefined&&data.difference!==0?'DIFERENCIA POR REVISAR':''
+      ].filter(Boolean);
+      editCell(doc,'M'+row,pending.length?pending.join(' · '):'CONCILIADO');
+     }
+    }
+   }
+   if(i===2)editCell(doc,'D1',material?'CONTEO FÍSICO '+plan.end+' · '+material.countConfirmed+' DE 432 VERIFICADOS':'INVENTARIO PENDIENTE DE CONCILIACIÓN');
+
+   if(i===3){
+    editCell(doc,'H1','INGRESOS '+plan.start+' AL '+plan.end+(material?.reviewed?' · REVISADOS':' · SIN CERRAR'));
+    if(!material)for(const r of direct(all(doc,'sheetData')[0],'row'))if(Number(r.getAttribute('r'))>=3)editCell(doc,'Y'+r.getAttribute('r'),'PENDIENTE DE CONCILIACIÓN');
+   }
+   if(i===4){
+    editCell(doc,'E1',plan.start+' AL '+plan.end);
+    if(!material)for(const r of direct(all(doc,'sheetData')[0],'row'))if(Number(r.getAttribute('r'))>=3)editCell(doc,'M'+r.getAttribute('r'),'STOCK INICIAL, INGRESOS Y CONTEO PENDIENTES');
+   }
   }
   if(i===5){
    replaceData(doc,1,plan.lines.map(x=>x.cells),30);resizeSheet(doc,last,2793);
