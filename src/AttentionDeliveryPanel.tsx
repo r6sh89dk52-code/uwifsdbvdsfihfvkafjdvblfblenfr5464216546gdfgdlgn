@@ -1,12 +1,13 @@
 import {useMemo,useState} from 'react';
 import {Check,PackageCheck} from 'lucide-react';
 import {alreadyDispensed,availableLots,type SavedClinicalAttention} from './attentionKardex';
-import {postDeliveryWithMapping,activeCatalogMapping,type CatalogMappingEvent} from './reconciliationRules';
+import {postDeliveryWithMapping,type CatalogMappingEvent} from './reconciliationRules';
+import {reviewedAssociationsFor,isReviewedAssociation} from './reviewedKardexAssociations';
 import {kardexCatalog} from './kardexCatalog';
 import {countPhysicalUnits} from './inventoryRules';
 import {type StockLedger} from './kardexMovements';
-type Props={attentions:SavedClinicalAttention[];ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(next:StockLedger)=>void};
-export default function AttentionDeliveryPanel({attentions,ledger,mappings,onChange}:Props){
+type Props={attentions:SavedClinicalAttention[];ledger:StockLedger;mappings?:CatalogMappingEvent[];onChange:(next:StockLedger)=>void};
+export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Props){
  const [attentionId,setAttentionId]=useState('');
  const [itemId,setItemId]=useState('');
  const [lotId,setLotId]=useState('');
@@ -21,8 +22,8 @@ export default function AttentionDeliveryPanel({attentions,ledger,mappings,onCha
  const item=attention?.items.find(i=>i.id===itemId);
  const lot=ledger.lots.find(l=>l.id===lotId);
  const permitted=lot?availableLots(ledger.lots,lot.code):[];
- const verified=item?activeCatalogMapping(mappings,item.code):undefined;
- const allowedLots=verified?ledger.lots.filter(l=>l.code===verified.kardexCode&&kardexCatalog.some(p=>p.id===l.code)):[];
+ const candidates=item?reviewedAssociationsFor(item.code).filter(p=>p.clinicalName===item.name&&p.clinicalUnit===item.unit):[];
+ const allowedLots=ledger.lots.filter(l=>candidates.some(p=>p.kardexCode===l.code&&p.kardexName===l.name)&&kardexCatalog.some(p=>p.id===l.code));
  const done=Boolean(attention&&item&&alreadyDispensed(ledger,attention.id,item.id));
  function resetChecks(){setIdentity(false);setUnits(false);setGiven(false);setOpen(false);setMessage('')}
  function chooseAttention(id:string){setAttentionId(id);setItemId('');setLotId('');resetChecks()}
@@ -36,13 +37,13 @@ export default function AttentionDeliveryPanel({attentions,ledger,mappings,onCha
    const next=postDeliveryWithMapping(ledger,attention,{
     itemId:item.id,lotId:lot.id,physicalQuantity,
     confirmIdentity:identity,confirmUnits:units,confirmDelivery:given,openNewContainer:open,timestamp:Date.now()
-   },mappings);
+   },[]);
    onChange(next);resetChecks();setMessage('Entrega ficticia registrada y descontada una sola vez. Comprueba el movimiento en Kardex.');
   }catch(error){setMessage(error instanceof Error?error.message:'No se pudo descontar el producto.')}
  }
  return <section className="panel attentionDelivery">
   <h3><PackageCheck size={18}/>Entrega vinculada a una atención</h3>
-  <p className="hint">Solo datos ficticios. Este proceso es voluntario después de guardar la atención. No se utiliza una equivalencia automática entre los códigos de los dos catálogos.</p>
+  <p className="hint">Solo datos ficticios. Este proceso es voluntario después de guardar la atención. Solo se permiten las 86 asociaciones aprobadas. La equivalencia no genera entregas automáticas: selecciona el lote y confirma las cantidades.</p>
   <label>Atención confirmada
    <select value={attentionId} onChange={e=>chooseAttention(e.target.value)}>
     <option value="">Seleccionar una atención guardada…</option>
@@ -58,9 +59,9 @@ export default function AttentionDeliveryPanel({attentions,ledger,mappings,onCha
   {item&&<div className="kardexPreview"><strong>Producto de atención:</strong> {item.name} · código {item.code} · {item.quantity} {item.unit}
     <p className="hint">Debes confirmar personalmente la equivalencia con el producto del Kardex y convertir la cantidad a las unidades físicas correctas.</p>
   </div>}
-  {item&&!verified&&<p className="kardexError" role="alert">Producto sin equivalencia oficial verificada. No puede entregarse desde el Kardex.</p>}
-  {item&&verified&&<p className="hint">Equivalencia verificada: {verified.kardexName} ({verified.kardexCode}).</p>}
-  {item&&<label>Producto y lote del Kardex (selección explícita)
+  {item&&candidates.length===0&&<p className="kardexError" role="alert">Producto sin correspondencia aprobada. No puede descontarse desde el Kardex de Enfermería.</p>}
+  {item&&candidates.length>0&&<p className="hint">Correspondencia(s) aprobada(s): {candidates.map(p=>p.kardexName+' ('+p.kardexCode+')').join(' / ')}. {candidates.length>1?'Elige expresamente la presentación utilizada; no se descontarán ambas.':''}</p>}
+  {item&&candidates.length>0&&<label>Producto y lote del Kardex (selección explícita)
    <select value={lotId} onChange={e=>chooseLot(e.target.value)}>
     <option value="">Seleccionar producto/lote disponible…</option>
     {allowedLots.filter(l=>availableLots(ledger.lots,l.code).some(x=>x.id===l.id)).sort((a,b)=>a.name.localeCompare(b.name,'es')).map(l=>
@@ -78,7 +79,7 @@ export default function AttentionDeliveryPanel({attentions,ledger,mappings,onCha
   </>}
   {done&&<p className="kardexPreview"><Check size={16}/> Ya existe una entrega registrada para este medicamento de esta atención. No se permite un segundo descuento.</p>}
   {message&&<p className="hint" role="status">{message}</p>}
-  <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!lot||!item||!verified||done||!permitted.some(x=>x.id===lot.id)} onClick={send}><PackageCheck size={18}/> Confirmar entrega y descontar</button></div>
+  <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!lot||!item||!isReviewedAssociation(item.code,lot.code)||!allowedLots.some(x=>x.id===lot.id)||done||!permitted.some(x=>x.id===lot.id)} onClick={send}><PackageCheck size={18}/> Confirmar entrega y descontar</button></div>
   <p className="hint">No se sincroniza con el Excel oficial ni realiza conversiones automáticamente. Los datos continúan siendo exclusivos de pruebas.</p>
  </section>;
 }

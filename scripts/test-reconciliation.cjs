@@ -7,7 +7,10 @@ function load(path,dependencies={}){
 const catalog=load('src/kardexCatalog.ts'),stock=load('src/inventoryRules.ts');
 const ledger=load('src/kardexMovements.ts',{'./inventoryRules':stock});
 const attend=load('src/attentionKardex.ts',{'./kardexMovements':ledger,'./inventoryRules':stock});
-const r=load('src/reconciliationRules.ts',{'./kardexCatalog':catalog,'./kardexMovements':ledger,'./attentionKardex':attend});
+const reviewed=load('src/reviewedKardexAssociations.ts',{
+ './kardexCatalog':catalog,'./products.json':{default:require('../src/products.json')}
+});
+const r=load('src/reconciliationRules.ts',{'./kardexCatalog':catalog,'./kardexMovements':ledger,'./attentionKardex':attend,'./reviewedKardexAssociations':reviewed});
 const now=Date.parse('2026-10-13T18:00:00Z');
 const item=catalog.kardexCatalog[0];
 const mapping=(id,kind,code=item.id)=>({id,kind,clinicalCode:'16000182',clinicalName:'Medicamento ficticio',kardexCode:code,kardexName:catalog.kardexCatalog.find(x=>x.id===code).name,reason:'Verificacion manual',at:now});
