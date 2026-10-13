@@ -52,6 +52,7 @@ export function validateReconciliationEvents(input:unknown):ReconciliationEvent[
    if(!/^\d+$/.test(code)||!catalog.has(code))throw Error('Solo se admiten materiales oficiales numéricos.');
    if(!Number.isInteger(raw.quantity))throw Error('Las existencias en unidad oficial deben ser enteras.');
    if(raw.kind==='receipt'){
+    if(raw.quantity===0)throw Error('Un ingreso confirmado debe tener cantidad positiva.');
     text(document,3,100,'Documento de ingreso');
     if(expires&&!validExportDate(expires))throw Error('Vencimiento del ingreso inválido.');
    }else if(document||expires)throw Error('Un conteo no puede contener datos de ingreso.');
