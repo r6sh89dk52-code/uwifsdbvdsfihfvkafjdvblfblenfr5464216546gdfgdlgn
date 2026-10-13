@@ -37,7 +37,11 @@ export function validateStockLot(x:unknown):StockLot{
   if(opened>size)throw new Error('El contenido abierto supera la capacidad del envase.');
   if(v.expires && (!/^\d{4}-\d{2}-\d{2}$/.test(v.expires as string)||Number.isNaN(Date.parse(v.expires as string))))
     throw new Error('Fecha de vencimiento inválida.');
-  const updatedAt=nonnegative(v.updatedAt,'fecha de modificación',true);
+  // El timestamp (milisegundos Unix) no es una cantidad física de inventario.
+  // Date.now() ≈ 1.8e12, mayor que el límite de 10 millones para saldos.
+  if(typeof v.updatedAt!=='number'||!Number.isSafeInteger(v.updatedAt)||v.updatedAt<0)
+    throw new Error('Fecha de modificación inválida.');
+  const updatedAt=v.updatedAt;
   return {id:v.id as string,code:(v.code as string).trim(),name:(v.name as string).trim(),catalogUnit:v.catalogUnit as string,
     lot:(v.lot as string).trim(),expires:v.expires as string,container:v.container as ContainerKind,unitsPerContainer:size,
     sealedContainers:sealed,looseUnits:loose,openedRemaining:opened,updatedAt};
