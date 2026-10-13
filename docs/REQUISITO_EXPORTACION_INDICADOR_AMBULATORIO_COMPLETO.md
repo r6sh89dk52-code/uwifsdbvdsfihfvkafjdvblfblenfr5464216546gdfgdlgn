@@ -1,45 +1,57 @@
-# Requisito prioritario — Exportación del libro COMPLETO de Indicador Ambulatorio
+# REQUISITO DEFINITIVO: exportación del Indicador Ambulatorio completo (10 hojas)
 
-**Confirmación del usuario (2026-10-13).** La exportación del Indicador de Atenciones Ambulatorias debe generar, como primera opción, **todo el libro original XLSX**, no solamente la hoja `CONSUMOS`.
+**Decisión del usuario, 13 de octubre de 2026.** La única plantilla oficial de referencia para la exportación del Indicador Ambulatorio de DANPER Salud Móvil es **`01 INDICADOR AMBULATORIO -KARDEX 2026(2).xlsx`**, el libro de **10 hojas**. Descartar como referencia de esta funcionalidad el libro `REAL INDICADOR AMBULATORIO -KARDEX (MEJORADO) (version 1).xlsx` (15 hojas). No mezclar estructuras.
 
-## Fuente oficial y alcance exacto
-Archivo de referencia adjuntado por el usuario:
-`REAL INDICADOR AMBULATORIO -KARDEX (MEJORADO) (version 1).xlsx`.
+## Hojas obligatorias y orden original
 
-Inspección estructural del libro original:
-- 15 hojas, en el orden original: `BD MATERIALES`, `CONSUMOS2`, `RESU (2)`, `KARDEX DIARIO`, `CONSUMOS`, `CONTEO`, `INGRESOS`, `RESU`, `REGISTRO`, `PERSONAL`, `GUIA`, `@subuo`, `BASE TRU`, `@uo`, `JUSTIFICACIONES`.
-- `CONSUMOS`: encabezados A:AD; tabla estructurada `TB_CONSUMOS`; 168 filas actuales, parte de sus columnas contienen fórmulas de búsqueda al padrón/catálogos.
-- `CONSUMOS2`: tabla `TB_CONSUMOS2` con atenciones históricas.
-- `RESU` y `RESU (2)`: resúmenes con fórmulas de consumo, inventario e ingresos; NO copiar valores históricos.
-- `PERSONAL` y `BASE TRU`: contienen miles de registros personales históricos de plantilla. **No incluir datos históricos no autorizados en ninguna exportación.**
-- `GUIA`, `@subuo`, `@uo`, `BD MATERIALES`: referencias auxiliares para validaciones y fórmulas.
-- El archivo contiene al menos una tabla dinámica y caché de tabla dinámica basada en `TB_CONSUMOS`, además de tablas y metadatos OOXML.
+1. `BD MATERIALES`
+2. `CONTEO`
+3. `INGRESOS`
+4. `RESU`
+5. `CONSUMOS`
+6. `JUSTIFICACIONES`
+7. `GUIA`
+8. `@subuo`
+9. `BASE TRU`
+10. `@uo`
 
-## Comportamiento de exportación requerido
-1. **Opción predeterminada:** `Exportar libro completo (original)`. `Solo hoja CONSUMOS` es una alternativa secundaria, disponible si no es posible asegurar la integridad del libro.
-2. Preservar nombres, orden de hojas, estilos, columnas, filas de encabezado, fórmulas, referencias y tablas, configuraciones de impresión y elementos compatibles de la plantilla.
-3. Exportar exclusivamente los datos de atenciones y consumos del período seleccionado desde DANPER. La opción semanal por defecto será `esta semana`, con posibilidad de cambiar el intervalo.
-4. Una atención con múltiples medicamentos/insumos puede generar varias filas en `CONSUMOS`; debe mantenerse un único identificador de atención, evitando duplicar registro clínico o consumos al repetir la exportación.
-5. Usar los códigos oficiales guardados junto al producto. `CONSUMOS` columna R: para envases abiertos, 1 solo al confirmar apertura y 0 para usos posteriores; para unidad individual, la cantidad real entregada. No inferir códigos ni dosis por coincidencia de nombres.
-6. Redimensionar `TB_CONSUMOS` y las fórmulas necesarias cuando el número de filas supere el espacio original (A1:AD168). No truncar silenciosamente registros.
-7. Sustituir/limpiar **datos históricos sensibles** de `CONSUMOS`, `CONSUMOS2`, `PERSONAL`, `BASE TRU`, `JUSTIFICACIONES` y cualquier otra hoja o caché que almacene registros anteriores. No distribuir el archivo original con nombres/DNIs reales incrustados en el IPA ni en el repositorio.
-8. Retener únicamente catálogos y elementos auxiliares apropiados, y reconstruir las vistas derivadas que deban reflejar el período. `PERSONAL` deberá rellenarse únicamente con el padrón actual autorizado para la exportación (si es necesario para las fórmulas), nunca copiar el padrón histórico de la plantilla.
-9. Invalidar/reconstruir la caché de la tabla dinámica y marcar recálculo/refresco al abrir en Excel; no permitir que una vista o un gráfico muestre cifras antiguas aunque `CONSUMOS` esté actualizado.
-10. No inventar datos ausentes ni saldos que no puedan conciliarse. Validar fechas, codificación, unidades, cantidad física, turno/responsable y referencias de fórmulas.
-11. La exportación del **libro ambulatorio** es independiente del Excel del **Kardex diario de Enfermería**: deben coexistir como dos archivos/funciones distintas.
-12. Ejecutarse **localmente en iPhone**, sin enviar datos de personas a servidores; abrir hoja de compartir nativa iOS para guardar/enviar XLSX a Archivos, correo o WhatsApp.
-13. La plantilla puede seleccionarse desde Archivos del iPhone y trabajarse en memoria; antes de incorporarla al proyecto como recurso, debe pasar un proceso de sanitización/verificación de privacidad.
-14. Si las funciones avanzadas (tablas dinámicas, vínculos, fórmulas) no se pueden preservar con garantías, avisar explícitamente y permitir `Solo CONSUMOS`, sin afirmar que el libro completo es idéntico.
+La exportación predeterminada debe preservar **las diez hojas originales** y sus estilos, fórmulas, tablas estructuradas y referencias compatibles. **Solo CONSUMOS** es una alternativa cuando no se pueda garantizar la integridad del libro completo; nunca cambiar silenciosamente al otro modelo de 15 hojas.
 
-## Pruebas obligatorias de aceptación
-- Conserva **las 15 hojas y sus nombres/orden**, con estructura compatible y sin errores de reparación al abrir en Microsoft Excel y Apple Numbers (según soporte).
-- Caso con cero atenciones, una atención, varias atenciones con productos múltiples, y más de 167 filas de CONSUMOS.
-- Código y cantidad de cada producto correctos, frecuencia por día, fechas y horas Excel correctas, códigos y unidades verificados.
-- Fórmulas, tablas y referencias funcionales; revisión de caché pivot y cálculos derivados, sin números antiguos.
-- No aparecen nombres, DNI, diagnósticos ni historiales antiguos del XLSX plantilla ni otros períodos fuera de la selección. Probar búsqueda en XML interno, hojas ocultas y cachés de tablas dinámicas.
-- Exportación no cambia ni elimina datos originales en el iPhone; repetir una exportación produce resultados coherentes sin descontar stock.
-- Compartir XLSX usando Share Sheet nativo de iOS y abrir archivo exportado en Excel, incluyendo formatos y estilos.
-- Pruebas automáticas de lógica y estructura OOXML en GitHub Actions antes de compilar IPA; validación manual con archivo generado.
+## Fuente única de códigos, nombres y unidades
 
-## Estado
-**Requisito documentado. NO está implementada todavía la exportación del libro completo.** El trabajo técnico y las pruebas deberán desarrollarse en una entrega posterior, tomando como base la versión principal validada. No hacer afirmaciones de compatibilidad o ausencia de datos personales hasta verificar el archivo exportado.
+En el Excel de diez hojas, `BD MATERIALES!A1:C438` incluye encabezados (A1:C1) y 437 filas de materiales (A2:C438):
+- **432 registros tienen códigos formados exclusivamente por dígitos** y son los únicos permitidos en el catálogo operativo, selector de atención y exportación.
+- **5 registros tienen códigos con letras, agregados manualmente por el usuario porque carecían de código oficial; NO importarlos, sugerirlos, asignarles códigos inventados ni exportarlos como artículos autorizados.** Son:
+  - `o1000243` — OXIGENO MEDICINAL (RECARGA)
+  - `o2001232` — PIZARRA DE CORCHO
+  - `o2002298` — SELLO JEBE BASE MADERA RECTANG
+  - `o2002299` — SELLO JEBE BASE MADERA CIRCULAR
+  - `O2001117` — PAPEL BOND 75 GR A-3
+- **Regla:** `^\\d+$` sobre el **código original como texto**, sin convertir letras a números ni eliminar ceros iniciales.
+- En `main` a 2026-10-13, `src/products.json` **ya contiene exactamente los 432 materiales permitidos y ninguno de los cinco excluidos. No reemplazar innecesariamente este catálogo.**
+- Comprobación comparativa fuente XLSX ↔ JSON: 432 códigos únicos numéricos; los 432 pares código/nombre/unidad coinciden tras eliminar espacios extremos. Hash FNV-1a/32 de filas ordenadas por código `codigo|nombre.trim()|unidad.trim()` separadas por LF: `d6cdf096`. Hash de códigos: `f6d63606`.
+- No confundir con `src/kardexCatalog.ts`: los 98 productos del Kardex de Enfermería y 6 donados pertenecen a **otro informe**. Mantener ambos catálogos separados y conciliar por equivalencias verificadas, nunca por semejanza de nombre.
+
+## Exportación diaria/semanal del libro de diez hojas
+
+1. Por defecto, botón **Exportar libro completo (10 hojas)**. Permitirse elegir intervalo: por defecto semana corriente. El archivo resulta de una **copia trabajada y sanitizada del Excel de diez hojas**, no un libro nuevo con nombres aproximados.
+2. `CONSUMOS`: plantilla tiene `A1:AD2793` y tabla `TB_CONSUMOS` (original `A1:AD2793`). Rellenar atenciones del intervalo escogido; una atención con varios insumos puede representar varias filas. Expandir tabla/fórmulas cuando haya más datos; no truncar.
+3. Emplear códigos originales exclusivamente numéricos, descripción y unidad tomados de `BD MATERIALES` o referencia verificada. Si alguna atención usa código no numérico o sin correspondencia, **detener la exportación de esa fila con aviso explícito**; no inventar código ni asignar sustitutos.
+4. `CONSUMOS` columna R (cantidad): si corresponde a apertura de envase confirmado, 1 al abrir y 0 en los usos posteriores; productos individuales según cantidad efectivamente entregada; no tomar cantidad por parecido de nombre.
+5. `CONTEO`, `INGRESOS`, `RESU`: actualizar/calcualr los campos derivados únicamente de los registros autorizados del período y los movimientos conciliados; donde falte recuento físico o información de ingreso, dejar pendiente y mostrar advertencia. Preservar fórmulas funcionales y forzar su recálculo al abrir.
+6. `BD MATERIALES` exportada: excluir los cinco registros de código alfanumérico del catálogo operativo, redimensionando tabla/referencias de forma segura; conservar los 432 numéricos en código, nombre y unidad.
+7. `JUSTIFICACIONES`, `GUIA`, `@subuo`, `BASE TRU`, `@uo`: conservar estructura y catálogos/validaciones necesarios; eliminar datos personales/históricos ajenos al período o no autorizados. La plantilla original **no debe empaquetarse íntegra con datos de terceros en el IPA ni subirse sin sanitizar al repositorio**.
+8. Los valores antiguos, datos personales y hojas auxiliares del Excel fuente deben verificarse en **todo el ZIP OOXML**: hojas visibles/ocultas, tablas y cadenas compartidas y propiedades. No asumir que limpiar `CONSUMOS` limpia todas las referencias.
+9. El libro de **Kardex diario de Enfermería** (98+6) continúa siendo una exportación independiente del Indicador Ambulatorio (432 materiales numéricos).
+10. Exportar localmente en iPhone con hoja de compartir nativa de iOS, sin subir atenciones a servidores. Una exportación repetida no modifica ni descuenta nuevamente el stock.
+
+## Verificación automatizada antes de generar IPA
+- Assert exactamente **10 hojas** en el orden descrito y `BD MATERIALES` con **432 códigos numéricos**, cero códigos con letras.
+- Comparar los 432 códigos, nombres y unidades con la fuente (tras normalizar espacios extremos) y bloquear duplicados.
+- Confirmar tabla `TB_CONSUMOS`, referencias de fórmulas correctas, ausencia de vínculos rotos y de datos anteriores en todo el ZIP.
+- Casos de cero atenciones, múltiples materiales en una atención, exceder límite original de tabla, reiteración de exportación, y selección de fecha/semana.
+- Validar `CONSUMOS` R=1/0 y los códigos de cada línea; nunca exportar medicamentos manuales con letras.
+- Abrir archivo final en Microsoft Excel (sin mensaje de reparación) y comprobar compartir con Archivos/Correo/WhatsApp en iPhone.
+
+## Estado de implementación
+**Este documento define la fuente y los criterios de aceptación. La exportación del libro ambulatorio completo no debe anunciarse como terminada hasta pasar estas pruebas.** Integrar esta especificación con la implementación, evitando compilar iOS solo para modificar documentación.
