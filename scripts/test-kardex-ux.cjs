@@ -26,5 +26,8 @@ assert.ok(history.includes('<KardexProductSearch '));
 assert.ok(!inventory.includes('<KardexMovementsPanel '));
 assert.ok(!inventory.includes('<KardexDailyExport '));
 assert.ok(daily.includes('kardexPreviewDetails'));
+assert.ok(daily.includes('internal/kardex-template.bin'));
+assert.ok(!daily.includes('type="file"'));
+assert.ok(fs.readFileSync('src/kardexExcelTemplate.ts','utf8').includes('files.filter((_,i)=>i!==1)'));
 assert.ok(!inventory.includes('Aún no hay descuento por atenciones ni exportación'));
 console.log('PASS: kardex modular, buscador sin tildes, 98 originales, sin scroll monolítico ni mensajes obsoletos.');

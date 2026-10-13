@@ -1,4 +1,5 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
+import {unzipSync} from 'fflate';
 import {FileSpreadsheet,Share2} from 'lucide-react';
 import {type StockLedger} from './kardexMovements';
 import {buildDailyReport} from './dailyKardex';
@@ -11,19 +12,33 @@ export default function KardexDailyExport({ledger,responsible}:Props){
  const [date,setDate]=useState(localDate);
  const [turn,setTurn]=useState('');
  const [template,setTemplate]=useState<Uint8Array|null>(null);
- const [templateName,setTemplateName]=useState('');
+ const [templateStatus,setTemplateStatus]=useState<'loading'|'ready'|'missing'>('loading');
  const [error,setError]=useState('');
  const [busy,setBusy]=useState(false);
  const [counts,setCounts]=useState<Record<string,number>>({});
  const [filter,setFilter]=useState('');
  const result=useMemo(()=>{try{return {report:buildDailyReport(ledger,date,counts),error:''}}catch(e){return {report:null,error:e instanceof Error?e.message:'No se pudo generar el reporte.'}}},[ledger,date,counts]);
  const rows=result.report?.rows.filter(r=>r.name.toLowerCase().includes(filter.toLowerCase()))||[];
- async function loadTemplate(file?:File){
-  setError('');setTemplate(null);setTemplateName('');
-  if(!file)return;
-  if(!file.name.toLowerCase().endsWith('.xlsx')||file.size>6*1024*1024){setError('Selecciona la plantilla Excel oficial (.xlsx, máximo 6 MB).');return}
-  const data=new Uint8Array(await file.arrayBuffer());setTemplate(data);setTemplateName(file.name);
- }
+ useEffect(()=>{
+  let cancelled=false;
+  async function loadInternalTemplate(){
+   try{
+    const url=import.meta.env.BASE_URL+'internal/kardex-template.bin';
+    const response=await fetch(url,{cache:'force-cache'});
+    if(!response.ok)throw Error('El recurso interno no existe.');
+    const data=new Uint8Array(await response.arrayBuffer());
+    if(data.length<1500||data.length>6*1024*1024)throw Error('El recurso interno no es válido.');
+    const files=unzipSync(data);
+    for(const name of ['xl/workbook.xml','xl/worksheets/sheet2.xml','xl/styles.xml','xl/sharedStrings.xml'])
+     if(!files[name])throw Error('Faltan componentes del formato oficial.');
+    if(!cancelled){setTemplate(data);setTemplateStatus('ready');}
+   }catch{
+    if(!cancelled){setTemplate(null);setTemplateStatus('missing');setError('No está integrada la plantilla original depurada. El reporte no puede exportarse hasta incorporar el recurso oficial en la aplicación.');}
+   }
+  }
+  void loadInternalTemplate();
+  return()=>{cancelled=true};
+ },[]);
  async function exportReport(){
   if(!result.report||!template)return;
   setError('');setBusy(true);
@@ -41,10 +56,7 @@ export default function KardexDailyExport({ledger,responsible}:Props){
    <label>Fecha del reporte<input type="date" value={date} max={localDate()} onChange={e=>{setDate(e.target.value);setError('')}}/></label>
    <label>Turno<select value={turn} onChange={e=>setTurn(e.target.value)}><option value="">Seleccionar turno…</option><option>MAÑANA</option><option>TARDE</option><option>NOCHE</option></select></label>
   </div>
-  <label>Plantilla original del Kardex
-   <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e=>{void loadTemplate(e.target.files?.[0])}}/>
-  </label>
-  {template&&<p className="hint">Plantilla seleccionada: {templateName}. Se usará para generar una copia, sin modificar el original.</p>}
+  <p className="hint" role="status">{templateStatus==='ready'?'Plantilla oficial interna preparada. No es necesario importar ningún Excel.':templateStatus==='loading'?'Preparando el formato oficial del Kardex…':'Formato original interno pendiente de integración.'}</p>
   <p className="hint">Responsable: {responsible}. El cálculo cubre el día completo. El turno identifica el reporte, pero no filtra horas: aún no hay saldos históricos comprobables por turno.</p>
   {result.error&&<p className="kardexError" role="alert">{result.error}</p>}
   {result.report&&<>
