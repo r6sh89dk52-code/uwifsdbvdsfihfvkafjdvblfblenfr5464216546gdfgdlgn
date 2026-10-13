@@ -17,8 +17,13 @@ export default function KardexDailyExport({ledger,responsible}:Props){
  const [busy,setBusy]=useState(false);
  const [counts,setCounts]=useState<Record<string,number>>({});
  const [filter,setFilter]=useState('');
+ const [previewPage,setPreviewPage]=useState(0);
+ const pageSize=20;
  const result=useMemo(()=>{try{return {report:buildDailyReport(ledger,date,counts),error:''}}catch(e){return {report:null,error:e instanceof Error?e.message:'No se pudo generar el reporte.'}}},[ledger,date,counts]);
- const rows=result.report?.rows.filter(r=>r.name.toLowerCase().includes(filter.toLowerCase()))||[];
+ const simplify=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const rows=result.report?.rows.filter(r=>simplify(r.name).includes(simplify(filter)))||[];
+ const pageCount=Math.max(1,Math.ceil(rows.length/pageSize));
+ const previewRows=rows.slice(previewPage*pageSize,(previewPage+1)*pageSize);
  useEffect(()=>{
   let cancelled=false;
   async function loadInternalTemplate(){
@@ -53,7 +58,7 @@ export default function KardexDailyExport({ledger,responsible}:Props){
   <h3><FileSpreadsheet size={18}/>Reporte diario · Excel oficial</h3>
   <p className="hint">Selecciona la fecha y el turno. El Excel conserva exclusivamente «KARDEX ENFERMERAS»: 98 productos y mismo formato de impresión; no incluye donados. Todo se procesa localmente.</p>
   <div className="fields two">
-   <label>Fecha del reporte<input type="date" value={date} max={localDate()} onChange={e=>{setDate(e.target.value);setError('')}}/></label>
+   <label>Fecha del reporte<input type="date" value={date} max={localDate()} onChange={e=>{setDate(e.target.value);setCounts({});setPreviewPage(0);setError('')}}/></label>
    <label>Turno<select value={turn} onChange={e=>setTurn(e.target.value)}><option value="">Seleccionar turno…</option><option>MAÑANA</option><option>TARDE</option><option>NOCHE</option></select></label>
   </div>
   <p className="hint" role="status">{templateStatus==='ready'?'Plantilla oficial interna preparada. No es necesario importar ningún Excel.':templateStatus==='loading'?'Preparando el formato oficial del Kardex…':'Formato original interno pendiente de integración.'}</p>
@@ -67,20 +72,23 @@ export default function KardexDailyExport({ledger,responsible}:Props){
    </div>}
    <details className="kardexPreviewDetails"><summary>Mostrar vista previa y recuento físico ({result.report.rows.length} productos)</summary>
    <p className="hint">Los recuentos introducidos aquí son temporales; completa y exporta antes de cambiar de sección.</p>
-   <label>Filtrar vista previa por medicamento<input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Nombre del producto…"/></label>
+   <label>Filtrar vista previa por medicamento<input value={filter} onChange={e=>{setFilter(e.target.value);setPreviewPage(0)}} placeholder="Nombre del producto…"/></label>
    <p className="hint">D inicial + E extraordinario = F total; F − G consumo = H final. F/S queda vacío si no has contado físicamente el producto.</p>
    <div className="dailyTableScroll"><table><thead><tr><th>Medicamento</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>Recuento físico</th><th>F/S</th></tr></thead><tbody>
-    {rows.slice(0,25).map(r=><tr key={r.code}><td>{r.name}</td><td>{r.stockKnown?r.initial:'—'}</td><td>{r.stockKnown?r.extraordinary:'—'}</td><td>{r.stockKnown?r.total:'—'}</td><td>{r.stockKnown?r.consumed:'—'}</td><td>{r.stockKnown?r.final:'—'}</td><td><input className="dailyPhysicalCount" type="number" inputMode="decimal" min="0" step="any" aria-label={'Recuento físico '+r.name}
+    {previewRows.map(r=><tr key={r.code}><td>{r.name}</td><td>{r.stockKnown?r.initial:'—'}</td><td>{r.stockKnown?r.extraordinary:'—'}</td><td>{r.stockKnown?r.total:'—'}</td><td>{r.stockKnown?r.consumed:'—'}</td><td>{r.stockKnown?r.final:'—'}</td><td><input className="dailyPhysicalCount" type="number" inputMode="decimal" min="0" step="any" aria-label={'Recuento físico '+r.name}
    value={counts[r.code]===undefined?'':counts[r.code]} onChange={e=>{
     const raw=e.target.value;
     setCounts(prev=>{const next={...prev};if(raw.trim()==='')delete next[r.code];else next[r.code]=Number(raw);return next})
    }}/></td><td>{r.fs===null?'—':r.fs}</td></tr>)}
    </tbody></table></div>
-   {rows.length>25&&<p className="hint">Vista previa de 25 de {rows.length} productos. El Excel contiene todos los productos.</p>}
+   <div className="kardexPagination" aria-label="Paginación de productos">
+    <span>{rows.length===0?'Sin coincidencias':`Mostrando ${previewPage*pageSize+1}–${Math.min((previewPage+1)*pageSize,rows.length)} de ${rows.length}`} · Página {previewPage+1} de {pageCount}</span>
+    <div><button type="button" disabled={previewPage===0} onClick={()=>setPreviewPage(p=>Math.max(0,p-1))}>Anterior</button><button type="button" disabled={previewPage>=pageCount-1} onClick={()=>setPreviewPage(p=>Math.min(pageCount-1,p+1))}>Siguiente</button></div>
+   </div>
    </details>
   </>}
   {error&&<p className="kardexError" role="alert">{error}</p>}
   <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!result.report?.exportable||!template||!turn||busy} onClick={()=>void exportReport()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel y compartir'}</button></div>
-  <p className="hint">Datos ficticios. No se modifica el historial de atenciones, inventario ni movimientos al exportar. Para validar F/S se necesitará incorporar el conteo físico por producto en una etapa posterior.</p>
+  <p className="hint">Datos ficticios. No se modifica el historial de atenciones, inventario ni movimientos al exportar. F/S se calcula únicamente a partir de los recuentos físicos introducidos; no se inventan saldos pendientes.</p>
  </section>;
 }
