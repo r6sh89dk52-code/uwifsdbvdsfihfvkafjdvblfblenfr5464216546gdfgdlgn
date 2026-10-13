@@ -1,20 +1,20 @@
 {
   "name": "danper-salud-movil-etapa-a",
   "private": true,
-  "version": "0.15.1",
+  "version": "0.16.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test:logic": "node scripts/test-logic.cjs && node scripts/test-draft-logic.cjs && node scripts/test-secure-store.cjs && node scripts/test-ios-gesture.cjs && node scripts/test-kardex.cjs && node scripts/test-kardex-movements.cjs && node scripts/test-attention-kardex.cjs && node scripts/test-reconciliation.cjs && node scripts/test-daily-kardex.cjs && node scripts/test-ambulatory-rows.cjs && node scripts/test-ambulatory-source-catalog.cjs && node scripts/test-ambulatory-workbook.cjs",
+    "test:logic": "node scripts/test-logic.cjs && node scripts/test-draft-logic.cjs && node scripts/test-secure-store.cjs && node scripts/test-ios-gesture.cjs && node scripts/test-kardex.cjs && node scripts/test-kardex-movements.cjs && node scripts/test-attention-kardex.cjs && node scripts/test-reconciliation.cjs && node scripts/test-daily-kardex.cjs && node scripts/test-ambulatory-rows.cjs && node scripts/test-ambulatory-source-catalog.cjs && node scripts/test-ambulatory-workbook.cjs && node scripts/test-ambulatory-reconciliation.cjs",
     "ios:sync": "npx cap sync ios",
     "ios:open": "npx cap open ios",
     "ios:prepare": "npm run build && npx cap sync ios",
     "ios:project": "npm run build && npx cap add ios && npx cap sync ios",
     "ios:icon": "node scripts/apply-ios-icon.mjs",
     "ios:check": "node scripts/check-ios-ready.mjs",
-    "test:ambulatory": "node scripts/test-ambulatory-source-catalog.cjs && node scripts/test-ambulatory-rows.cjs && node scripts/test-ambulatory-workbook.cjs"
+    "test:ambulatory": "node scripts/test-ambulatory-source-catalog.cjs && node scripts/test-ambulatory-rows.cjs && node scripts/test-ambulatory-workbook.cjs && node scripts/test-ambulatory-reconciliation.cjs"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "7.1.6",
