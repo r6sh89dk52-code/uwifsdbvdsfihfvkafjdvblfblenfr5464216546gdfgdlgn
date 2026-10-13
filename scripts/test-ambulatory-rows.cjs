@@ -42,6 +42,11 @@ test('same worker first and second paracetamol doses never become zero',()=>{
  assert.deepEqual(r.lines.map(x=>x.cells[17]),[1,2]);
  assert.deepEqual(r.lines.map(x=>x.cells[18]),['PRIMERA','SEGUNDA']);
 });
+test('individual paracetamol rejects bottle accounting and mismatched physical doses',()=>{
+ const a=visit('individual',[item]);
+ assert.throws(()=>deliver(state(true),a,true),/Unidad física incompatible/);
+ assert.throws(()=>delivery.postConfirmedAttentionDelivery(state(),a,{itemId:'i',lotId:'lot',physicalQuantity:2,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:false,timestamp:at}),/Cantidad física individual diferente/);
+});
 test('R tampering',()=>{const a=visit('a',[item]),s=deliver(state(),a);s.movements[0].excelQuantity=9;assert.throws(()=>build([a],s),/Cantidad R/);});
 test('stale clinical delivery',()=>{const a=visit('a',[item]),s=deliver(state(),a);assert.throws(()=>build([visit('a',[{...item,quantity:2}])],s),/modificada/);});
 test('wrong movement kind',()=>{const a=visit('a',[item]),s=deliver(state(),a);s.movements[0].kind='adjustment';assert.throws(()=>build([a],s),/inválido/);});
