@@ -1,0 +1,33 @@
+const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),ts=require('typescript');
+function load(path,dependencies={}){
+ const c=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
+ assert.equal(c.diagnostics.filter(x=>x.category===ts.DiagnosticCategory.Error).length,0);
+ const exports={};vm.runInNewContext(c.outputText,{exports,require(n){if(n in dependencies)return dependencies[n];throw Error(n)},Date,Number,Set,Map,Math,JSON,Error,Array});return exports;
+}
+const catalog=load('src/kardexCatalog.ts'),stock=load('src/inventoryRules.ts');
+const ledger=load('src/kardexMovements.ts',{'./inventoryRules':stock});
+const attend=load('src/attentionKardex.ts',{'./kardexMovements':ledger,'./inventoryRules':stock});
+const r=load('src/reconciliationRules.ts',{'./kardexCatalog':catalog,'./kardexMovements':ledger,'./attentionKardex':attend});
+const now=Date.parse('2026-10-13T18:00:00Z');
+const item=catalog.kardexCatalog[0];
+const mapping=(id,kind,code=item.id)=>({id,kind,clinicalCode:'16000182',clinicalName:'Medicamento ficticio',kardexCode:code,kardexName:catalog.kardexCatalog.find(x=>x.id===code).name,reason:'Verificacion manual',at:now});
+let mappings=r.recordCatalogMapping([],mapping('m1','verify'));
+assert.equal(r.activeCatalogMapping(mappings,'16000182').kardexCode,item.id);
+assert.throws(()=>r.recordCatalogMapping(mappings,mapping('m2','verify')),/ya está verificada/);
+const second=catalog.kardexCatalog[1];mappings=r.recordCatalogMapping(mappings,mapping('m3','verify',second.id));
+assert.equal(r.activeCatalogMapping(mappings,'16000182').kardexCode,second.id);
+mappings=r.recordCatalogMapping(mappings,mapping('m4','revoke',second.id));
+assert.equal(r.activeCatalogMapping(mappings,'16000182'),undefined);
+const lot=stock.validateStockLot({id:'lot',code:item.id,name:item.name,catalogUnit:'UND',lot:'DEMO',expires:'2027-12-30',container:'unidad',unitsPerContainer:1,sealedContainers:5,looseUnits:0,openedRemaining:0,updatedAt:now});
+const attention={id:'attention',status:'saved',items:[{id:'item',code:'16000182',name:'Medicamento ficticio',unit:'UND',quantity:1}]};
+const l=attend.postConfirmedAttentionDelivery({lots:[lot],movements:[]},attention,{itemId:'item',lotId:'lot',physicalQuantity:1,confirmIdentity:true,confirmUnits:true,confirmDelivery:true,openNewContainer:false,timestamp:now});
+const base={id:'i1',movementId:l.movements[0].id,attentionId:'attention',itemId:'item',kind:'returned',quantity:1,reason:'Devolucion ficticia',at:now+1,stockRestored:false};
+const incidents=r.recordDeliveryIncident(l,[],base);
+assert.equal(incidents.length,1);
+assert.equal(l.lots[0].sealedContainers,4,'Recording incident never restores stock');
+assert.throws(()=>r.recordDeliveryIncident(l,incidents,{...base,id:'i2'}),/ya tiene una incidencia/);
+assert.throws(()=>r.recordDeliveryIncident(l,[],{...base,quantity:2}),/no puede superar/);
+assert.throws(()=>r.recordDeliveryIncident(l,[],{...base,stockRestored:true}),/inválida/);
+assert.equal(r.validateMappingEvents([]).length,0);
+assert.equal(r.validateDeliveryIncidents([]).length,0);
+console.log('PASS: mapping verify/revoke, incident provenance, duplicate returns and no automatic restock');
