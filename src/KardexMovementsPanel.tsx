@@ -1,6 +1,7 @@
 import {useMemo,useState} from 'react';
 import {ArrowDownCircle,ClipboardCheck,PackageOpen,RefreshCw} from 'lucide-react';
 import {countPhysicalUnits,type StockLot} from './inventoryRules';
+import {kardexCatalog} from './kardexCatalog';
 import {postStockMovement,suggestFEFOLot,type StockLedger,type StockCommand,type MovementKind} from './kardexMovements';
 
 type Props={ledger:StockLedger;onChange:(value:StockLedger)=>void};
@@ -22,7 +23,7 @@ export default function KardexMovementsPanel({ledger,onChange}:Props){
  const [reason,setReason]=useState('');
  const [error,setError]=useState('');
  const [historyLimit,setHistoryLimit]=useState(15);
- const available=useMemo(()=>Array.from(new Map<string,string>(ledger.lots.map(x=>[x.code,x.name] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'es')),[ledger.lots]);
+ const available=useMemo(()=>Array.from(new Map<string,string>(ledger.lots.filter(x=>kardexCatalog.some(p=>p.id===x.code)).map(x=>[x.code,x.name] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'es')),[ledger.lots]);
  const matching=useMemo(()=>ledger.lots.filter(x=>x.code===productCode).sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')),[ledger.lots,productCode]);
  const fefo=suggestFEFOLot(ledger.lots,productCode);
  const selected=ledger.lots.find(x=>x.id===lotId);
