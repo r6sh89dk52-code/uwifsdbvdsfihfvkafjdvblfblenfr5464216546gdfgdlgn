@@ -1,0 +1,44 @@
+const assert=require('node:assert/strict');
+const fs=require('fs');
+const vm=require('node:vm');
+const ts=require('typescript');
+async function run(){
+  const source=fs.readFileSync('src/iosGesture.ts','utf8');
+  const result=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
+  assert.equal(result.diagnostics.filter(e=>e.category===ts.DiagnosticCategory.Error).length,0);
+  const exports={};vm.runInNewContext(result.outputText,{exports,window:{},Date,Math,Element:function(){}});
+  const {shouldTriggerEdgeBack}=exports;
+  const start={x:12,y:150,time:100};
+  assert.equal(shouldTriggerEdgeBack(start,{x:140,y:167,time:270},390),true,'correct edge gesture');
+  assert.equal(shouldTriggerEdgeBack({...start,x:74},{x:225,y:170,time:300},390),false,'ordinary horizontal scroll');
+  assert.equal(shouldTriggerEdgeBack(start,{x:195,y:310,time:320},390),false,'vertical scroll');
+  assert.equal(shouldTriggerEdgeBack(start,{x:195,y:140,time:1230},390),false,'long/delayed touch');
+  assert.equal(shouldTriggerEdgeBack(start,{x:42,y:146,time:200},390),false,'short swipe');
+  assert.equal(shouldTriggerEdgeBack({...start,x:3},{x:116,y:160,time:310},320),true,'small iPhone');
+  // UI bridge invokes the app's existing back handler, which protects drafts.
+  const bridgeSource=fs.readFileSync('src/nativeBackBridge.ts','utf8');
+  const bridgeJS=ts.transpileModule(bridgeSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  let clicks=0,blurs=0; const document={activeElement:null,querySelector(sel){if(sel==='.pageHead > button')return this.back??null;if(sel==='nav > button:first-child')return this.home??null;return null}};
+  const HTMLElement=class {constructor(){this.disabled=false;this.classList={contains:()=>false}}click(){clicks++}matches(){return false}blur(){blurs++}};
+  const moduleBridge={exports:{}};
+  const bridgeContext={exports:moduleBridge.exports,module:moduleBridge,window:{addEventListener(){}},document,HTMLElement,require(name){if(name==='./iosGesture')return {IOS_BACK_EVENT:'danper-native-swipe-back',attachBrowserEdgeBack:()=>()=>{}};if(name==='./nativeReminders')return {isNativeIOS:()=>true};throw Error(name)}};
+  vm.runInNewContext(bridgeJS,bridgeContext,{filename:'nativeBackBridge.js'});
+  const perform=moduleBridge.exports.performNativeBack;
+  assert.equal(perform(document),'noop');
+  document.home=new HTMLElement();assert.equal(perform(document),'home');assert.equal(clicks,1);
+  document.back=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,2);
+  document.activeElement=new HTMLElement();document.activeElement.matches=()=>true;
+  assert.equal(perform(document),'keyboard');assert.equal(blurs,1);assert.equal(clicks,2);
+  document.activeElement=null;document.back=null;document.home.classList.contains=()=>true;
+  assert.equal(perform(document),'noop');
+  const {installGestureInAppDelegate}=await import('./install-ios-gesture.mjs');
+  const fixture=`import UIKit\nimport Capacitor\n@UIApplicationMain\nclass AppDelegate: UIResponder, UIApplicationDelegate {\n var window: UIWindow?\n func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {\n return true\n }\n}\n`;
+  const installed=installGestureInAppDelegate(fixture);
+  assert.ok(installed.includes('UIScreenEdgePanGestureRecognizer'));
+  assert.ok(installed.includes('UIWindow.didBecomeVisibleNotification'));
+  assert.ok(installed.includes("new Event('danper-native-swipe-back')"));
+  assert.equal(installGestureInAppDelegate(installed),installed,'idempotent Swift injection');
+  assert.throws(()=>installGestureInAppDelegate('different template'),/desconocido/);
+  console.log('PASS: swipe edge thresholds, UI back/keyboard/draft handler, Swift bridge, idempotence');
+}
+run().catch(e=>{console.error(e);process.exitCode=1});

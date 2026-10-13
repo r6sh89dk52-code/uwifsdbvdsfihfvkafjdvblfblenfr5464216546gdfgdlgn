@@ -38,12 +38,13 @@ jobs:
         run: |
           npx cap add ios
           npx cap sync ios
+          node scripts/install-ios-gesture.mjs
       - name: Generar IPA sin firmar
         run: bash scripts/build-ios-ipa.sh
       - name: Adjuntar IPA descargable
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER-Salud-Movil-iPhone-v0.8
+          name: DANPER-Salud-Movil-iPhone-v0.9
           path: |
             outputs/*.ipa
             outputs/*.sha256

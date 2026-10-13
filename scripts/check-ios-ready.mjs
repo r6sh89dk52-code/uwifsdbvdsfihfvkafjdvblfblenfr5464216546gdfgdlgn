@@ -9,4 +9,7 @@ assert(capacitor.includes("webDir:'dist'"),'Ruta webDir inesperada');
 assert(existsSync('resources/icon.png'),'Falta icono oficial');
 assert(existsSync('.github/workflows/ios-ipa.yml'),'Falta flujo de compilación');
 assert(existsSync('scripts/build-ios-ipa.sh'),'Falta script de empaquetado');
-console.log('PASS: estructura de compilación iOS v0.8 (sin compilar Xcode)');
+assert(existsSync('scripts/install-ios-gesture.mjs'),'Falta integrador de gesto nativo iOS');
+assert(existsSync('src/iosGesture.ts'),'Falta gesto de respaldo web');
+assert(existsSync('src/nativeBackBridge.ts'),'Falta puente UI del gesto');
+console.log('PASS: estructura de compilación iOS v0.9 (sin compilar Xcode)');
