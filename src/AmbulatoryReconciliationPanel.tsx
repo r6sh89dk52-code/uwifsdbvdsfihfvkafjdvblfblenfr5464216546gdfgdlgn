@@ -6,7 +6,6 @@ import {appendReconciliationEvent,activeReconciliationEvents,reconcileAmbulatory
 import {type ExportPlan} from './ambulatoryRows';
 type Props={plan:ExportPlan|null;events:ReconciliationEvent[];onChange:(events:ReconciliationEvent[])=>void;
  subdivision:string;start:string;end:string};
-const iso=(date:Date)=>date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
 export default function AmbulatoryReconciliationPanel({plan,events,onChange,subdivision,start,end}:Props){
  const [kind,setKind]=useState<ReconciliationKind>('opening');
  const [code,setCode]=useState('');
