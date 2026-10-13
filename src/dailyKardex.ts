@@ -8,7 +8,11 @@ import {type StockLot,countPhysicalUnits} from './inventoryRules';
 export type DailyRow={code:string;name:string;donated:boolean;initial:number;extraordinary:number;total:number;consumed:number;final:number;expiry:string;fs:number|null};
 export type DailyReport={date:string;rows:DailyRow[];warnings:string[];exportable:boolean};
 const rnd=(x:number)=>Math.round((x+Number.EPSILON)*1000)/1000;
-function dateOnly(t:number){return new Date(t).toISOString().slice(0,10)}
+function dateOnly(t:number){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(t));
+ const value=(type:string)=>parts.find(x=>x.type===type)?.value||'';
+ return value('year')+'-'+value('month')+'-'+value('day');
+}
 const packaged=(l:StockLot)=>l.container!=='unidad'||l.unitsPerContainer!==1||l.catalogUnit!=='UND';
 const reportBalance=(l:StockLot)=>packaged(l)?l.sealedContainers:countPhysicalUnits(l);
 function dayMoves(moves:StockMovement[],date:string){return moves.filter(m=>dateOnly(m.at)===date)}
