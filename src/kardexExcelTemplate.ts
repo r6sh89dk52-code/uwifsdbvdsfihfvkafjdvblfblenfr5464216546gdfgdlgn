@@ -4,9 +4,7 @@
 import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {type DailyReport} from './dailyKardex';
 const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
-const sha='kardex official source: October 2026';
 function nodeName(n:Element){return n.localName}
-function child(parent:Element,name:string){return Array.from(parent.children).find(x=>nodeName(x)===name)}
 function cell(root:Document,address:string){
  const ref=address.match(/^([A-Z]+)(\d+)$/);
  if(!ref)throw Error('Celda del formato no reconocida.');
