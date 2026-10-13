@@ -5,6 +5,7 @@
 import {kardexCatalog,legacyDonatedCatalog} from './kardexCatalog';
 import {type StockLedger} from './kardexMovements';
 import {postConfirmedAttentionDelivery,type ConfirmedDelivery,type SavedClinicalAttention} from './attentionKardex';
+import {reviewedAssociationsFor} from './reviewedKardexAssociations';
 
 export type MappingKind='verify'|'revoke';
 export type CatalogMappingEvent={
@@ -96,16 +97,24 @@ export function recordDeliveryIncident(
  if(value.at<movement.at)throw Error('La incidencia no puede ser anterior al movimiento.');
  return[...previous,value];
 }
+/** Every new attention-linked stock deduction must match the user-reviewed catalog.
+ * Legacy manual mapping events are kept for history; they cannot authorize
+ * an unreviewed product, nor pick one of two valves automatically.
+ */
 export function postDeliveryWithMapping(
  ledger:StockLedger,attention:SavedClinicalAttention,confirmation:ConfirmedDelivery,events:CatalogMappingEvent[]
 ):StockLedger{
- const mappings=validateMappingEvents(events);
+ validateMappingEvents(events); // validates older history without using it as dispensing authorization
  const item=attention.items.find(i=>i.id===confirmation.itemId);
  if(!item)throw Error('Producto clínico no encontrado.');
- const verified=activeCatalogMapping(mappings,item.code);
  const lot=ledger.lots.find(l=>l.id===confirmation.lotId);
- if(!verified||verified.clinicalName!==item.name||!lot||!kardexCatalog.some(p=>p.id===lot.code)||verified.kardexCode!==lot.code||verified.kardexName!==lot.name)throw Error('Entrega bloqueada: verifica primero la equivalencia del código de atención con los 98 materiales del Kardex.');
- if(verified&&lot&&verified.kardexCode!==lot.code)
-  throw Error('El lote seleccionado no coincide con la equivalencia verificada. Revoca o actualiza la equivalencia antes de continuar.');
+ const candidates=reviewedAssociationsFor(item.code);
+ if(!candidates.length)throw Error('El material de la atención no tiene una correspondencia aprobada con el Kardex.');
+ if(!lot)throw Error('Selecciona un lote real del Kardex.');
+ const chosen=candidates.find(p=>p.kardexCode===lot.code);
+ if(!chosen||chosen.kardexName!==lot.name||chosen.clinicalName!==item.name||chosen.clinicalUnit!==item.unit)
+  throw Error('La selección no corresponde al producto y presentación verificados de esta atención.');
+ if(!kardexCatalog.some(p=>p.id===lot.code&&p.name===lot.name))
+  throw Error('Producto ausente del Kardex de Enfermería autorizado (98 productos).');
  return postConfirmedAttentionDelivery(ledger,attention,confirmation);
 }
