@@ -1,12 +1,12 @@
 import {useMemo,useState} from 'react';
 import {Check,PackageCheck} from 'lucide-react';
 import {alreadyDispensed,availableLots,type SavedClinicalAttention} from './attentionKardex';
-import {postDeliveryWithMapping} from './reconciliationRules';
+import {postDeliveryWithMapping,type CatalogMappingEvent} from './reconciliationRules';
 import {reviewedAssociationsFor,isReviewedAssociation} from './reviewedKardexAssociations';
 import {kardexCatalog} from './kardexCatalog';
 import {countPhysicalUnits} from './inventoryRules';
 import {type StockLedger} from './kardexMovements';
-type Props={attentions:SavedClinicalAttention[];ledger:StockLedger;onChange:(next:StockLedger)=>void};
+type Props={attentions:SavedClinicalAttention[];ledger:StockLedger;mappings?:CatalogMappingEvent[];onChange:(next:StockLedger)=>void};
 export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Props){
  const [attentionId,setAttentionId]=useState('');
  const [itemId,setItemId]=useState('');
