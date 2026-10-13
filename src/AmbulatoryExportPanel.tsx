@@ -16,14 +16,15 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
  const[template,setTemplate]=useState<Uint8Array|null>(null),[templateName,setTemplateName]=useState('');
  const[busy,setBusy]=useState(false),[error,setError]=useState(''),[subdivision,setSubdivision]=useState(''),[done,setDone]=useState('');
  const selection=useRef(0),exporting=useRef(false);
- const [reconciliationFault,setReconciliationFault]=useState('');
+
  const result=useMemo(()=>{try{return{data:buildAmbulatoryRows(attentions,ledger,start,end,{subdivision,mappings,incidents}),error:''}}
   catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo preparar la exportación.'}}},[attentions,ledger,start,end,subdivision,mappings,incidents]);
- const material=useMemo(()=>{
-  if(!result.data||!subdivision)return null;
-  try{setReconciliationFault('');return reconcileAmbulatoryReport(result.data,reconciliation,subdivision)}
-  catch(e){setReconciliationFault(e instanceof Error?e.message:'No se pudo conciliar el período.');return null}
+ const materialState=useMemo(()=>{
+  if(!result.data||!subdivision)return {data:null,error:''};
+  try{return {data:reconcileAmbulatoryReport(result.data,reconciliation,subdivision),error:''}}
+  catch(e){return {data:null,error:e instanceof Error?e.message:'No se pudo conciliar el período.'}}
  },[result.data,reconciliation,subdivision]);
+ const material=materialState.data,reconciliationFault=materialState.error;
  async function select(file?:File){
   const token=++selection.current;
   setError('');setDone('');setTemplate(null);setTemplateName('');
