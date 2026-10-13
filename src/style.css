@@ -217,3 +217,14 @@ html,body,#root{width:100%;min-width:0}
 .reconciliationPanel{min-width:0;overflow-wrap:break-word}
 .reconciliationPanel select,.reconciliationPanel input{font-size:16px!important;min-width:0;max-width:100%}
 .reconciliationPanel .kardexHistory{margin-top:22px}
+
+/* v0.14: tabla previa y carga de formato original Kardex en iPhone. */
+.kardexDaily{min-width:0;overflow-wrap:anywhere}
+.kardexDaily select,.kardexDaily input:not([type=checkbox]){font-size:16px!important;max-width:100%;min-width:0}
+.kardexDaily input[type=file]{width:100%;line-height:1.4;padding:11px!important}
+.kardexDaily .dailyTableScroll{overflow-x:auto;width:100%;border:1px solid var(--border,#444);border-radius:12px;margin:12px 0;-webkit-overflow-scrolling:touch}
+.kardexDaily table{border-collapse:collapse;min-width:560px;font-size:12px;width:100%}
+.kardexDaily th,.kardexDaily td{padding:8px 7px;border-bottom:1px solid var(--border,#444);text-align:right}
+.kardexDaily th:first-child,.kardexDaily td:first-child{text-align:left;min-width:195px}
+.kardexDaily thead{background:rgba(227,24,45,.12)}
+.kardexDaily .kardexError li{margin:6px 0;line-height:1.4}

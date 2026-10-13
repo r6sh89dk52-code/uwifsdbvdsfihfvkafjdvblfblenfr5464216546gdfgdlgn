@@ -2,8 +2,8 @@ import {useMemo,useState} from 'react';
 import {Check,ClipboardList,Package,Plus,Search,Trash2,X} from 'lucide-react';
 import {kardexCatalog,kardexMainCount,kardexDonatedCount} from './kardexCatalog';
 import {countPhysicalUnits,inventoryTotals,validateStockLot,type StockLot,type ContainerKind} from './inventoryRules';
-import {type StockLedger} from './kardexMovements';import KardexMovementsPanel from './KardexMovementsPanel';
-type Props={ledger:StockLedger;onChange:(value:StockLedger)=>void};
+import {type StockLedger} from './kardexMovements';import KardexMovementsPanel from './KardexMovementsPanel';import KardexDailyExport from './KardexDailyExport';
+type Props={ledger:StockLedger;onChange:(value:StockLedger)=>void;responsible:string};
 const options:{value:ContainerKind;label:string}[]=[
  {value:'unidad',label:'Unidad individual'},{value:'caja',label:'Caja'},
  {value:'frasco',label:'Frasco'},{value:'paquete',label:'Paquete'},
@@ -12,7 +12,7 @@ const options:{value:ContainerKind;label:string}[]=[
 const clean=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
 const safeNumber=(v:string)=>Number(v.replace(',','.'));
 const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).format(v);
-export default function KardexPanel({ledger,onChange}:Props){
+export default function KardexPanel({ledger,onChange,responsible}:Props){
  const lots=ledger.lots;
  const[search,setSearch]=useState('');
  const[filter,setFilter]=useState<'all'|'normal'|'donated'>('all');
@@ -108,6 +108,7 @@ export default function KardexPanel({ledger,onChange}:Props){
    <div className="kardexActions"><button type="button" className="workerPrimary" onClick={save}><Check size={18}/>{editId?'Guardar cambio':'Agregar al inventario'}</button>{editId&&<button type="button" className="workerSecondary" onClick={reset}><X size={18}/>Cancelar</button>}</div>
   </section>
   <KardexMovementsPanel ledger={ledger} onChange={onChange}/>
+  <KardexDailyExport ledger={ledger} responsible={responsible}/>
   <section className="panel">
    <h3><ClipboardList size={18}/>Inventario registrado</h3>
    <div className="kardexFilter"><label className="kardexSearch"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o lote…"/></label>
