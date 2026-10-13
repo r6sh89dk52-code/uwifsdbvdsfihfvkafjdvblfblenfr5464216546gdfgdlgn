@@ -188,3 +188,20 @@ html,body,#root{width:100%;min-width:0}
 .kardexEmpty{padding:19px;text-align:center;color:var(--muted,#aaa);line-height:1.45}
 #kardex-entry{scroll-margin-top:calc(90px + env(safe-area-inset-top,0px))}
 @media(max-width:440px){.kardexPage .fields.two{grid-template-columns:minmax(0,1fr)}.kardexFilter{grid-template-columns:minmax(0,1fr)}.kardexActions button{flex:1}}
+
+
+/* Kardex B1 v0.11 — acciones manuales y movimientos auditables. */
+.kardexMovementPanel{min-width:0;overflow-wrap:break-word}
+.kardexActionKinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+.kardexActionKinds button{font-size:13px;min-width:0;white-space:normal;padding:12px 7px;border-radius:12px;line-height:1.3;border:1px solid var(--border,#444);background:transparent;color:inherit}
+.kardexActionKinds button.selected{border-color:#e3182d;background:rgba(227,24,45,.15);font-weight:750}
+.kardexMovementPanel input,.kardexMovementPanel select{font-size:16px!important;max-width:100%;min-width:0}
+.kardexMovementPanel .kardexCheck{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border,#444);border-radius:12px;padding:12px;line-height:1.4}
+.kardexMovementPanel .kardexCheck input{flex:0 0 20px;width:20px;height:20px;margin:1px 0 0;accent-color:#e3182d}
+.kardexHistory{padding-top:22px;margin-top:22px;border-top:1px solid var(--border,#444)}
+.kardexHistoryItem{border:1px solid var(--border,#444);border-radius:12px;padding:12px;margin:9px 0}
+.kardexHistoryItem>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.kardexHistoryItem strong{font-size:14px;line-height:1.4}
+.kardexHistoryItem small,.kardexHistoryItem p{color:var(--muted,#a4a4ac);font-size:12px;line-height:1.5}
+.kardexHistoryItem p{margin:5px 0}
+@media(max-width:500px){.kardexActionKinds{grid-template-columns:minmax(0,1fr)}}
