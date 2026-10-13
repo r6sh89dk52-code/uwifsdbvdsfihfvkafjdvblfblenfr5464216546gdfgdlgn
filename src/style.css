@@ -95,3 +95,63 @@ html[data-theme='dark']{--allergy-pill:#40252b;--allergy-border:#633c43}
 .historyActions span{font-size:10px;color:var(--muted)}.historyActions button{color:#dd2b45;display:flex;align-items:center;gap:5px;padding:6px;font-size:10px;background:transparent}
 .nativePending{border:1px dashed var(--line);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)}
 @media(max-width:360px){.historyActions{flex-wrap:wrap}}
+
+
+/* v0.7.1 — iPhone/WKWebView: no ampliar automáticamente al enfocar campos.
+ * Mantiene el zoom manual accesible para quienes lo necesiten.
+ */
+:root{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body,#root{width:100%;min-width:0}
+.app{width:100%;min-width:0;overflow-x:clip}
+.app main,.panel,.medGroup,.itemEdit,.addSearch,.fields.two>label{min-width:0;max-width:100%}
+.fields.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.panel label{min-width:0;overflow-wrap:break-word}
+.app input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.app select,.app textarea{font-size:16px!important;min-width:0;max-width:100%;line-height:1.3}
+.itemEdit .itemControls input,.itemEdit .itemControls select{font-size:16px!important}
+.app input[type="date"],.app input[type="time"]{min-width:0;max-width:100%;min-height:46px}
+.app input[type="date"]::-webkit-date-and-time-value,
+.app input[type="time"]::-webkit-date-and-time-value{text-align:left;min-width:0}
+.app input,.app select,.app textarea{scroll-margin-top:calc(82px + env(safe-area-inset-top,0px));scroll-margin-bottom:calc(155px + env(safe-area-inset-bottom,0px))}
+.brand{height:auto;min-height:calc(76px + env(safe-area-inset-top,0px));padding:calc(11px + env(safe-area-inset-top,0px)) 16px 12px;background:#ff0000;gap:10px}
+.brandmark{min-width:0;gap:5px;max-width:calc(100% - 46px)}
+.brand-logo-crop{width:145px;height:49px;max-width:100%;flex:0 1 145px}
+.brand-logo-crop img{width:176px;height:176px;left:-16px;top:-65px}
+.brandmark small{font-size:10px;line-height:1.15;letter-spacing:.8px;white-space:nowrap;flex-shrink:0}
+.headIcon{flex-shrink:0}
+.workerActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.workerActions button{min-width:0;width:100%;white-space:normal;text-align:center;line-height:1.25}
+.workerActions button svg{flex-shrink:0}
+.medGroups,.medGroup,.itemSummary,.itemSummaryText,.itemEdit{min-width:0;max-width:100%}
+.itemEdit .itemControls{grid-template-columns:74px minmax(0,1fr) 38px;gap:8px;align-items:end}
+.itemEdit .itemControls label{min-width:0;overflow-wrap:break-word}
+.itemEdit .itemControls select{width:100%;text-overflow:ellipsis;white-space:nowrap;padding:10px 6px!important}
+.itemEdit .itemControls input{width:100%;padding:10px 6px!important}
+.itemEdit .itemControls button{height:46px;min-width:0}
+.addAnother{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:center;line-height:1.4;padding:13px 10px}
+.addAnother svg{flex-shrink:0}
+.allergyPanel>h3{display:grid;grid-template-columns:20px minmax(0,1fr);gap:7px 8px;align-items:center}
+.allergyPanel>h3 .allergy-priority{grid-column:2;margin-left:0;justify-self:start;max-width:100%;font-size:10px}
+.registerDock{grid-template-columns:repeat(2,minmax(0,1fr)) minmax(0,1.15fr);width:min(100%,620px);gap:7px}
+.registerDock button{min-width:0;max-width:100%;white-space:nowrap;font-size:12px}
+.registerDock button svg{flex-shrink:0}
+.registerOpen{padding-bottom:calc(235px + env(safe-area-inset-bottom,0px))}
+#attention-result{scroll-margin-bottom:calc(170px + env(safe-area-inset-bottom,0px))}
+@media(max-width:540px){
+ .fields.two:has(input[type="date"],input[type="time"]){grid-template-columns:minmax(0,1fr)}
+ .fields.two:has(input[type="date"],input[type="time"])>label{max-width:100%}
+}
+@media(max-width:395px){
+ .brand{padding-left:12px;padding-right:12px}
+ .brand-logo-crop{width:126px;height:46px;flex-basis:126px}
+ .brand-logo-crop img{width:158px;height:158px;left:-15px;top:-59px}
+ .brandmark small{font-size:9px;letter-spacing:.55px}
+ .registerDock{padding-left:8px;padding-right:8px;gap:5px}
+ .registerDock button{font-size:11px;padding:9px 3px}
+ .itemEdit .itemControls{grid-template-columns:65px minmax(0,1fr) 36px;gap:6px}
+}
+@media(max-width:350px){
+ .workerActions{grid-template-columns:1fr}
+ .itemEdit .itemControls{grid-template-columns:54px minmax(0,1fr) 35px;gap:5px}
+ .brandmark small{font-size:8px}
+}
