@@ -81,6 +81,11 @@ export function validateReconciliationEvents(input:unknown):ReconciliationEvent[
   if(key&&uniques.has(key))throw Error('Recuento, ingreso o cierre de período repetido.');
   uniques.add(key);
  }
+ const reviews=active.filter(e=>e.kind==='review');
+ for(const receipt of active.filter(e=>e.kind==='receipt')){
+  if(reviews.some(r=>r.subdivision===receipt.subdivision&&receipt.date>=r.date&&receipt.date<=r.periodEnd&&receipt.at>r.at))
+   throw Error('Un ingreso posterior al cierre exige anular el cierre y volver a revisarlo.');
+ }
  return all;
 }
 export function appendReconciliationEvent(source:ReconciliationEvent[],event:ReconciliationEvent):ReconciliationEvent[]{
