@@ -2,8 +2,9 @@
 import products from './products.json';
 import template from './ambulatoryTemplate.json';
 import {validateStockLedger,postStockMovement,type StockLedger,type StockMovement} from './kardexMovements';
-import {type CatalogMappingEvent,type DeliveryIncident,validateMappingEvents,validateDeliveryIncidents,activeCatalogMapping} from './reconciliationRules';
+import {type CatalogMappingEvent,type DeliveryIncident,validateMappingEvents,validateDeliveryIncidents} from './reconciliationRules';
 import {procedureDetail} from './procedureRules';
+import {isReviewedAssociation} from './reviewedKardexAssociations';
 export type ExportVisit={
  id:string;status:'draft'|'saved';date:string;time:string;
  worker:{dni:string;name:string;area:string;labor:string;sex:string;age:string|number;ubigeo:string};
@@ -42,7 +43,7 @@ function auditedQuantity(m:StockMovement):number{
 export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,start:string,end:string,options:ExportOptions={}):ExportPlan{
  if(!validExportDate(start)||!validExportDate(end)||start>end)throw Error('Intervalo de fechas inválido.');
  const valid=validateStockLedger(ledger);
- const mappings=validateMappingEvents(options.mappings||[]),incidents=validateDeliveryIncidents(options.incidents||[]);
+ validateMappingEvents(options.mappings||[]);const incidents=validateDeliveryIncidents(options.incidents||[]);
  const selected=visits.filter(v=>v.status==='saved'),seen=new Set<string>();
  for(const a of selected){
   if(!a.id?.trim()||seen.has(a.id))throw Error('Atención duplicada o sin identificador.');seen.add(a.id);
@@ -80,9 +81,10 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
      const ref=m.dispenseRef!;
      if(ref.clinicalCode!==item.code||ref.clinicalName.trim()!==item.name.trim()||ref.clinicalUnit.trim()!==item.unit.trim()||ref.clinicalQuantity!==item.quantity)
       throw Error('La atención fue modificada después de confirmar la entrega.');
-     const verified=activeCatalogMapping(mappings,item.code);
-     if(m.code!==item.code&&(!verified||verified.kardexCode!==m.code||verified.clinicalName.trim()!==item.name.trim()))
-      blockers.push('Falta equivalencia verificada entre el material y su lote: '+item.code);
+     // The official Indicator code and the nursing Kardex stock code are
+     // independent catalogs. Only explicit user-reviewed pairs are valid.
+     if(!isReviewedAssociation(item.code,m.code))
+      blockers.push('Falta correspondencia aprobada entre el material y el lote: '+item.code);
      if(incidents.some(i=>i.movementId===m.id))blockers.push('Entrega con devolución o discrepancia pendiente de conciliación: '+item.code);
      quantity=auditedQuantity(m);linkedDeliveries++;
     }
