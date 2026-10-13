@@ -1,0 +1,26 @@
+name: DANPER - validacion del codigo en PR
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Obtener codigo
+        uses: actions/checkout@v4
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependencias
+        run: npm install --no-fund
+      - name: Pruebas de logica
+        run: npm run test:logic
+      - name: Validacion TypeScript y Vite
+        run: npm run build
+      - name: Auditoria de dependencias
+        run: npm audit --audit-level=high
