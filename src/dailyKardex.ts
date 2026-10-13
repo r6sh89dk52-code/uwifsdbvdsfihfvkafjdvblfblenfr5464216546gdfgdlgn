@@ -16,7 +16,7 @@ export function buildDailyReport(ledger:StockLedger,date:string,physicalCounts:R
   const units=[...new Set(lots.map(l=>l.catalogUnit))];
   if(units.length>1)warnings.push(p.name+': unidades incompatibles entre lotes');
   const unit=units[0]||'';
-  let finalNow=lots.reduce((n,l)=>n+countPhysicalUnits(l),0);
+  const finalNow=lots.reduce((n,l)=>n+countPhysicalUnits(l),0);
   // Rewind all movements after the end of the requested calendar day.
   const after=moves.filter(m=>dateOnly(m.at)>date);
   const laterDelta=after.reduce((n,m)=>n+m.physicalChange,0);
