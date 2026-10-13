@@ -58,7 +58,15 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
  validCommand(command);
  const lots=validateStockLots(ledger.lots);
  const movements=validateStockMovements(ledger.movements);
- if(movements.some(x=>x.id===command.id))return {lots,movements}; // Retry is idempotent.
+ const existing=movements.find(x=>x.id===command.id);
+ if(existing){
+   if(existing.lotId!==command.lotId||existing.kind!==command.kind||existing.at!==command.at||
+      existing.description!==command.description.trim()||
+      (command.kind==='use'&&existing.quantity!==command.quantity)||
+      (command.kind==='extraordinary'&&(existing.sealedAdded!==(command.sealedAdded??0)||existing.looseAdded!==(command.looseAdded??0))))
+     throw Error('Identificador de movimiento reutilizado con otros datos.');
+   return {lots,movements}; // Retry is idempotent.
+ }
  if(movements.length>=maxMoves)throw Error('Límite de movimientos del prototipo alcanzado. No se guardó el movimiento.');
  const index=lots.findIndex(x=>x.id===command.lotId);
  if(index<0)throw Error('Lote no encontrado. Actualiza la pantalla.');
@@ -73,6 +81,8 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
   after.sealedContainers+=sealedAdded;after.looseUnits=round(after.looseUnits+looseAdded);
   quantity=round(sealedAdded*before.unitsPerContainer+looseAdded);
  }else if(command.kind==='use'){
+  const day=new Date(command.at).toISOString().slice(0,10);
+  if(before.expires && before.expires < day)throw Error('Lote vencido: no está permitido registrar su uso.');
   quantity=amount(command.quantity,'Cantidad utilizada',!pack);
   quantity=round(quantity);
   if(quantity<=0)throw Error('Cantidad demasiado pequeña.');
@@ -120,4 +130,11 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
  };
  const next=[...lots];next[index]=after;
  return {lots:next,movements:[...movements,newMovement]};
+}
+
+/** FEFO ordering, expired lots excluded; products without known expiration come last. */
+export function suggestFEFOLot(lots:StockLot[],code:string,at:number=Date.now()):StockLot|undefined{
+ const today=new Date(at).toISOString().slice(0,10);
+ return lots.filter(x=>x.code===code&&countPhysicalUnits(x)>0&&(!x.expires||x.expires>=today))
+ .sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')||a.id.localeCompare(b.id))[0];
 }
