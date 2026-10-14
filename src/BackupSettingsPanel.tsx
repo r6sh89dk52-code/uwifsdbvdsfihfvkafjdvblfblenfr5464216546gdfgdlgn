@@ -3,7 +3,7 @@ import {Capacitor} from '@capacitor/core';
 import {Directory,Filesystem} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
 import {encryptPortableBackup,decryptPortableBackup} from './portableBackup';
-import {loadDemoSnapshot,validateDemoSnapshot,hasActiveRecords,restoreEmptyDeviceFromBackup,type DemoSnapshot} from './secureDemoStore';
+import {loadDemoSnapshot,readStableSnapshotForBackup,validateDemoSnapshot,hasActiveRecords,restoreEmptyDeviceFromBackup,type DemoSnapshot} from './secureDemoStore';
 import {feedback} from './nativeHaptics';
 
 function base64Utf8(value:string):string{
@@ -27,7 +27,7 @@ export default function BackupSettingsPanel(){
   if(password.length<14||password!==confirmation){setError('La contraseña debe tener al menos 14 caracteres y ambas entradas deben coincidir.');return}
   setBusy(true);
   try{
-   const snapshot=validateDemoSnapshot(await loadDemoSnapshot());
+   const snapshot=validateDemoSnapshot(await readStableSnapshotForBackup());
    const encrypted=await encryptPortableBackup(snapshot,password);
    const name='DANPER-Respaldo-'+new Date().toISOString().slice(0,10)+'.danperbackup';
    const result=await Filesystem.writeFile({path:name,directory:Directory.Cache,data:base64Utf8(encrypted)});
