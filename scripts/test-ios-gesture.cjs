@@ -26,7 +26,9 @@ async function run(){
   const perform=moduleBridge.exports.performNativeBack;
   assert.equal(perform(document),'noop');
   document.home=new HTMLElement();assert.equal(perform(document),'home');assert.equal(clicks,1);
-  document.back=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,2);\n  document.nested=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,3,'nested Kardex must be the first back action');\n  document.nested=null;assert.equal(perform(document),'page');assert.equal(clicks,4,'second gesture exits Kardex dashboard');
+  document.back=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,2);
+  document.nested=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,3,'nested Kardex must be the first back action');
+  document.nested=null;assert.equal(perform(document),'page');assert.equal(clicks,4,'second gesture exits Kardex dashboard');
   document.activeElement=new HTMLElement();document.activeElement.matches=()=>true;
   assert.equal(perform(document),'keyboard');assert.equal(blurs,1);assert.equal(clicks,4);
   document.activeElement=null;document.back=null;document.nested=null;document.home.classList.contains=()=>true;
