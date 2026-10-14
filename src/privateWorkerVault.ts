@@ -139,3 +139,28 @@ export async function restoreMissingWorkerVault(rows:unknown[]):Promise<void>{
  await commitWorkerVault(rows,true);
  missingFile=false;
 }
+
+/** Stage a replacement roster without changing the active Keychain pointer.
+ * Used only by an explicit, journaled portable backup restore.
+ */
+export async function stageWorkerRestore(rows:unknown[]):Promise<string>{
+ verifyWorkers(rows);
+ const serialized=JSON.stringify(rows);
+ if(new TextEncoder().encode(serialized).byteLength>10*1024*1024)throw Error('Padrón de respaldo demasiado grande.');
+ const key=await secret(),iv=crypto.getRandomValues(new Uint8Array(12));
+ const ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(serialized)));
+ const path='danper/private/workers-'+crypto.randomUUID()+'.enc';
+ await ensurePrivateDirectory();
+ await Filesystem.writeFile({path,directory:Directory.Data,encoding:Encoding.UTF8,data:JSON.stringify({version:1,iv:b64(iv),payload:b64(ciphertext)})});
+ const actual=await decode(path,key);
+ if(JSON.stringify(actual)!==serialized)throw Error('No se verificó el padrón preparado.');
+ return path;
+}
+/** Idempotent activation, safe to retry after iOS interrupts a restore. */
+export async function activateWorkerRestore(path:string):Promise<void>{
+ const workers=await decode(path,await secret());
+ await SecureStorage.setItem(POINTER,path);
+ if(await SecureStorage.getItem(POINTER)!==path)throw Error('No se confirmó el padrón restaurado.');
+ lastWrite=JSON.stringify(workers);
+ missingFile=false;
+}
