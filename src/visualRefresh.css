@@ -1,0 +1,323 @@
+/*
+ * DANPER Salud Móvil · Etapa A: iOS visual refresh
+ * Visual layer ONLY. Never change clinical calculations, storage, Excel or security here.
+ * Loaded after style.css to keep all legacy functionality untouched.
+ */
+.app{
+  --ui-accent:#e3182d;
+  --ui-accent-soft:rgba(227,24,45,.09);
+  --ui-surface:#fff;
+  --ui-surface-soft:#f5f5f7;
+  --ui-line:#e6e6eb;
+  --ui-elevation:0 6px 22px rgba(23,23,29,.035);
+  --ui-header-height:64px;
+  background:var(--bg,#f6f6f8);
+  -webkit-font-smoothing:antialiased;
+}
+html[data-theme='dark'] .app{
+  --ui-surface:#252529;
+  --ui-surface-soft:#2d2d32;
+  --ui-line:#414148;
+  --ui-elevation:0 6px 22px rgba(0,0,0,.08);
+  --ui-accent-soft:rgba(239,44,68,.16);
+}
+@media(prefers-color-scheme:dark){
+  html[data-theme='auto'] .app{
+    --ui-surface:#252529;
+    --ui-surface-soft:#2d2d32;
+    --ui-line:#414148;
+    --ui-elevation:0 6px 22px rgba(0,0,0,.08);
+    --ui-accent-soft:rgba(239,44,68,.16);
+  }
+}
+
+/* Compact, brand-accurate chrome with safe-area preservation. */
+.app .brand{
+  position:sticky;
+  top:0;
+  z-index:40;
+  min-height:calc(var(--ui-header-height) + env(safe-area-inset-top,0px));
+  height:auto;
+  padding:calc(7px + env(safe-area-inset-top,0px)) 18px 8px;
+  background:#e3182d;
+  gap:10px;
+  box-shadow:0 3px 14px rgba(45,0,10,.08);
+}
+.app .brandmark{gap:6px;max-width:calc(100% - 50px)}
+.app .brand-logo-crop{width:133px;height:44px;flex:0 1 133px}
+.app .brand-logo-crop img{width:161px;height:161px;left:-15px;top:-59px}
+.app .brandmark small{font-size:9px;letter-spacing:.65px;font-weight:800}
+.app .headIcon{
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.12);
+  color:#fff;
+}
+.app main{padding:18px 16px 40px}
+.app .pageHead{gap:11px;margin:4px 0 15px}
+.app .pageHead>button{
+  width:43px;height:43px;flex-shrink:0;
+  border:1px solid var(--ui-line);
+  border-radius:15px;
+  background:var(--ui-surface);
+}
+.app .pageHead h2,.app .sectionTop h2{
+  font-size:25px;line-height:1.15;letter-spacing:-.75px;
+  margin:4px 0;
+}
+.app .pageHead span,.app .eyebrow{font-size:10px;letter-spacing:1.35px}
+.app .sectionTop{margin:3px 0 18px}
+
+/* Hierarchy: readable content, fewer heavy outlines. */
+.app .panel{
+  border-radius:20px;
+  border:1px solid var(--ui-line);
+  background:var(--ui-surface);
+  box-shadow:var(--ui-elevation);
+  padding:17px 16px;
+  margin:12px 0;
+}
+.app .panel h3{font-size:16px;line-height:1.35;gap:9px;margin:0 0 13px}
+.app .panel h3 svg{flex-shrink:0}
+.app .hint{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.55;
+  margin:8px 0;
+}
+.app .panel label{font-size:13px;line-height:1.35;margin-bottom:12px;font-weight:680}
+.app .panel input:not([type="checkbox"]):not([type="radio"]),
+.app .panel textarea,
+.app .panel select{
+  font-size:16px!important;
+  min-height:48px;
+  border:1px solid var(--ui-line);
+  background:var(--input,var(--ui-surface-soft));
+  border-radius:13px;
+  padding:11px 12px;
+  line-height:1.35;
+}
+.app .panel textarea{min-height:100px;resize:vertical}
+.app .panel :is(input,select,textarea):focus{
+  outline:2px solid rgba(227,24,45,.37);
+  outline-offset:1px;
+  border-color:var(--ui-accent);
+}
+.app :is(.workerPrimary,.primary,.secondary,.workerSecondary){
+  min-height:45px;
+  border-radius:13px;
+  font-weight:720;
+}
+.app :is(.workerPrimary,.primary){
+  background:#e3182d;
+  color:#fff;
+  box-shadow:0 5px 12px rgba(227,24,45,.11);
+}
+.app .warning{
+  border-radius:16px;
+  padding:12px 13px;
+  line-height:1.5;
+  font-size:12px;
+}
+.app .warning p{line-height:1.5;margin:9px 0 0}
+
+/* Home: one prominent action, quieter operational tools. */
+.page-home .greeting{margin:5px 0 18px}
+.page-home .greeting h1{font-size:27px;line-height:1.12;letter-spacing:-.9px}
+.page-home .greeting p{font-size:12px}
+.page-home .pulse{border-radius:19px}
+.page-home .hero{
+  border-radius:24px;
+  padding:20px 20px;
+  min-height:124px;
+  box-shadow:0 10px 24px rgba(200,8,34,.14);
+}
+.page-home .hero h2{font-size:25px;margin:7px 0 4px}
+.page-home .hero svg{width:27px;height:27px}
+.page-home .stats{gap:9px;margin:13px 0 22px}
+.page-home .stats>div{padding:13px 5px;border-radius:17px;background:var(--ui-surface)}
+.page-home .stats strong{font-size:25px}
+.page-home .stats span{font-size:11px}
+.page-home h3{margin:18px 0 12px;font-size:17px}
+.page-home .tiles{gap:10px}
+.page-home .tiles button{
+  min-height:116px;
+  padding:15px;
+  gap:8px;
+  border-radius:19px;
+  border:1px solid var(--ui-line);
+  background:var(--ui-surface);
+  box-shadow:var(--ui-elevation);
+}
+.page-home .tiles button svg{height:23px;width:23px}
+.page-home .tiles strong{font-size:15px;line-height:1.25}
+.page-home .tiles span{font-size:12px;line-height:1.4}
+
+/* Safety disclosure: still present and available, no giant banner by default. */
+.app .demoNotice{
+  margin:0 0 15px;
+  background:var(--ui-accent-soft);
+  border:1px solid rgba(227,24,45,.19);
+  color:var(--text);
+  padding:0;
+  overflow:hidden;
+}
+.app .demoNotice summary{
+  display:flex;align-items:center;gap:8px;
+  min-height:45px;padding:10px 13px;
+  font-size:12px;font-weight:750;
+  list-style:none;cursor:pointer;
+}
+.app .demoNotice summary::-webkit-details-marker{display:none}
+.app .demoNotice summary svg{color:var(--ui-accent);flex:0 0 17px}
+.app .demoNotice p{padding:0 13px 12px;margin:0;font-size:12px;color:var(--muted)}
+.app .demoNotice[open] summary{margin-bottom:2px}
+
+/* Register: shortcuts provide wayfinding without modifying the form state. */
+.page-register .pageHead{margin-bottom:10px}
+.page-register .registerSteps{
+  display:flex;align-items:stretch;gap:8px;
+  overflow-x:auto;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  padding:4px 1px 12px;
+  margin-bottom:2px;
+}
+.page-register .registerSteps::-webkit-scrollbar{display:none}
+.page-register .registerSteps button{
+  flex:0 0 auto;min-height:42px;
+  display:flex;align-items:center;gap:7px;
+  border:1px solid var(--ui-line);
+  border-radius:999px;
+  padding:8px 13px 8px 9px;
+  background:var(--ui-surface);
+  color:var(--text);
+  font-size:12px;font-weight:700;
+  white-space:nowrap;
+}
+.page-register .registerSteps button span{
+  display:grid;place-items:center;
+  width:23px;height:23px;border-radius:50%;
+  background:var(--ui-accent-soft);
+  color:var(--ui-accent);
+  font-size:11px;font-weight:800;
+}
+.page-register .registerSteps button:focus-visible{outline-offset:2px}
+.page-register #attention-worker,
+.page-register #attention-clinical,
+.page-register #attention-treatment,
+.page-register #attention-result{
+  scroll-margin-top:calc(88px + env(safe-area-inset-top,0px));
+}
+.page-register .workerActions{gap:8px}
+.page-register .workerActions button{min-height:45px;padding:9px;line-height:1.3}
+.page-register .allergyPanel{border-color:var(--allergy-border,var(--ui-line))}
+.page-register .addAnother{border-radius:14px;min-height:46px}
+.page-register .itemSummary{min-height:50px}
+.page-register .registerDock{
+  bottom:calc(68px + env(safe-area-inset-bottom,0px));
+  z-index:19;
+  border:1px solid var(--ui-line);
+  border-bottom:none;
+  border-radius:18px 18px 0 0;
+  padding:9px 12px;
+  background:var(--ui-surface);
+  box-shadow:0 -7px 24px rgba(0,0,0,.065);
+  gap:7px;
+}
+.page-register .registerDock button{min-height:44px;border-radius:12px}
+.app.registerOpen{padding-bottom:calc(210px + env(safe-area-inset-bottom,0px))}
+
+/* Workers/history: touch entire rows; light, separated visual rhythm. */
+.app .workerCard,.app .historyEntry{
+  border:1px solid var(--ui-line);
+  border-radius:17px;
+  background:var(--ui-surface);
+  box-shadow:var(--ui-elevation);
+  margin:9px 0;
+  overflow:hidden;
+}
+.app .workerCard{padding:4px}
+.app .workerCardSelect{padding:11px 12px;gap:5px}
+.app .workerCardSelect strong{
+  font-size:14px;line-height:1.35;
+  overflow-wrap:anywhere;
+}
+.app .workerCardSelect small,.app .workerCardSelect span{font-size:12px;line-height:1.3}
+.app .workerEdit{min-width:44px;width:44px;border-radius:13px;background:var(--ui-surface-soft)}
+.app .historyEntry .history{background:transparent;border:none;border-radius:0;padding:13px}
+.app .historyEntry .history strong{font-size:14px}
+.app .historyEntry .history small,.app .historyEntry .history span{font-size:12px}
+.app .historyActions{border-color:var(--ui-line);border-left:0;border-right:0;border-bottom:0}
+
+/* Kardex hub, product cards, exports and settings. */
+.app .kardexSectionGrid{gap:10px}
+.app .kardexSectionGrid button{
+  min-height:122px;border-radius:19px;
+  border-color:var(--ui-line);
+  padding:16px 13px;
+  background:var(--ui-surface);
+  box-shadow:var(--ui-elevation);
+}
+.app .kardexSectionGrid button span{font-size:12px}
+.app .kardexStats{gap:9px;margin:15px 0}
+.app .kardexStats>div{background:var(--ui-surface);border-radius:16px;padding:12px 8px}
+.app .kardexStats strong{font-size:24px}
+.app .kardexStats span{font-size:12px}
+.app .kardexSectionHeader{margin:6px 0 13px}
+.app .kardexSectionHeader>button{border-radius:13px;min-height:44px}
+.app .kardexSubtabs button{border-radius:14px;min-height:49px}
+.app .kardexLot{border-color:var(--ui-line);border-radius:17px}
+.app .kardexActions button{min-height:46px;border-radius:13px}
+.app .backupPanel input[type=file]{overflow:hidden}
+.page-settings .panel{margin-bottom:13px}
+
+/* Persistent navigation: all four destinations preserved, safer tap targets. */
+.app .appTabBar{
+  border-top:1px solid var(--ui-line);
+  background:var(--ui-surface);
+  padding:7px 5px calc(7px + env(safe-area-inset-bottom,0px));
+  min-height:calc(65px + env(safe-area-inset-bottom,0px));
+  z-index:20;
+}
+.app .appTabBar button{
+  min-height:52px;min-width:66px;
+  gap:2px;padding:3px 4px;
+  font-size:11px;font-weight:570;
+  color:var(--muted);
+}
+.app .appTabBar button svg{
+  width:22px;height:22px;
+  box-sizing:content-box;
+  padding:5px 11px;
+  border-radius:13px;
+}
+.app .appTabBar button.active{color:var(--ui-accent);font-weight:750}
+.app .appTabBar button.active svg{background:var(--ui-accent-soft)}
+
+/* Micro-motion and accessibility. Keep existing reduced-motion guarantees. */
+@media(prefers-reduced-motion:no-preference){
+  .app .registerSteps button,
+  .app .appTabBar button svg,
+  .app .demoNotice summary{
+    transition:background-color 170ms ease,transform 170ms ease,border-color 170ms ease;
+  }
+  .app .registerSteps button:active{transform:scale(.97)}
+}
+@media(prefers-reduced-motion:reduce){
+  .app .registerSteps button,.app .appTabBar button svg,.app .demoNotice summary{transition:none!important}
+}
+@media(max-width:395px){
+  .app .brand{padding-right:13px;padding-left:13px}
+  .app .brand-logo-crop{width:120px;height:42px;flex-basis:120px}
+  .app .brand-logo-crop img{width:150px;height:150px;left:-15px;top:-56px}
+  .app .brandmark small{font-size:8.5px;letter-spacing:.45px}
+  .app main{padding:15px 12px 34px}
+  .app .panel{padding:15px 13px}
+  .page-home .tiles button{min-height:111px;padding:13px 12px}
+  .page-register .registerDock{padding:8px}
+  .app .appTabBar button{min-width:56px}
+}
