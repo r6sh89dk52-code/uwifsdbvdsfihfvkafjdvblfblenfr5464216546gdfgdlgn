@@ -310,3 +310,44 @@ html,body,#root{width:100%;min-width:0}
 @media(max-width:620px){.ambulatoryExport .fields.two{
   display:grid;grid-template-columns:minmax(0,1fr);gap:0;
 }}
+
+/* v0.19 — iOS/macOS micro-interactions, designed for smooth low-cost rendering.
+ * Respect the platform Reduce Motion preference, including opening overlays.
+ */
+.app{--motion-ease:cubic-bezier(.2,.8,.2,1);--motion-spring:cubic-bezier(.2,1.25,.45,1);--motion-fast:165ms;--motion-normal:270ms}
+.app :where(button,a,[role="button"]){-webkit-tap-highlight-color:transparent}
+.app :where(button,select,input,textarea):focus-visible{outline:2px solid #e91d35;outline-offset:3px}
+.app :where(.panel,.tile,.kardexMenuCard,.workerCard,.historyEntry){backface-visibility:hidden}
+@media(prefers-reduced-motion:no-preference){
+ @keyframes danperViewIn{0%{opacity:0;transform:translate3d(0,12px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}
+ @keyframes danperBannerIn{0%{opacity:0;transform:translate3d(0,-7px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}
+ @keyframes danperToastIn{0%{opacity:0;transform:translate3d(-50%,16px,0) scale(.95)}100%{opacity:1;transform:translate3d(-50%,0,0) scale(1)}}
+ @keyframes danperCheckIn{0%{opacity:.3;transform:scale(.75)}70%{transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+ .app main :where(.pageHead,.sectionTop){animation:danperBannerIn var(--motion-normal) var(--motion-ease) both}
+ .app main>:where(.panel,.warning,.empty,.pendingInfo){animation:danperViewIn var(--motion-normal) var(--motion-ease) both}
+ .app .toast{animation:danperToastIn 320ms var(--motion-spring) both}
+ .app .importSuccess svg,.app [role="status"]>svg{animation:danperCheckIn 330ms var(--motion-spring) both}
+ .app button:not(:disabled),.app .tile,.app .workerCard{
+  transition:transform var(--motion-fast) var(--motion-ease),box-shadow var(--motion-normal) ease,
+   background-color var(--motion-fast) ease,border-color var(--motion-fast) ease,opacity var(--motion-fast) ease}
+ .app button:active:not(:disabled),.app .tile:active{transform:scale(.975)}
+ .app nav button:active:not(:disabled){transform:translateY(2px) scale(.96)}
+ .app .workerCard:active{transform:scale(.994)}
+ @media(hover:hover){
+  .app :where(.tile,.workerCard):hover{transform:translateY(-2px)}
+  .app :where(.workerPrimary,.primary):hover:not(:disabled){box-shadow:0 5px 18px rgba(227,24,45,.18)}
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ .app,.app *,.app *::before,.app *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+ .app button:active{transform:none!important}
+}
+/* Safe-area aware glass details; backdrop-filter falls back to solid colors. */
+@supports((-webkit-backdrop-filter:blur(12px)) or (backdrop-filter:blur(12px))){
+ .app .toast{-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+}
+.hapticSettings{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hapticSettings>label{display:flex;align-items:center;gap:9px;cursor:pointer;min-height:44px}
+.hapticSettings input{width:20px;height:20px;accent-color:#e3182d}
+.hapticSettings .hint{margin:0}
+.app .toast{max-width:min(92vw,440px)}
