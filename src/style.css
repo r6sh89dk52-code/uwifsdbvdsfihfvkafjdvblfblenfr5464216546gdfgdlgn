@@ -370,3 +370,9 @@ html,body,#root{width:100%;min-width:0}
 .migrationGate input[type="file"]{padding:12px 6px;overflow:hidden}
 .migrationGate button{min-height:48px;white-space:normal}
 .migrationGate .hint{overflow-wrap:anywhere;line-height:1.48}
+
+.appLockScreen{display:grid;gap:18px;max-width:560px;margin:auto;padding-bottom:calc(env(safe-area-inset-bottom) + 24px)}
+.appLockScreen .panel,.appLockSettings{display:grid;gap:12px;min-width:0}
+.appLockScreen label,.appLockSettings label{display:grid;gap:7px}
+.appLockScreen input,.appLockSettings input{box-sizing:border-box;width:100%;min-width:0;font-size:16px}
+.appLockScreen button,.appLockSettings button{min-height:44px;white-space:normal}
