@@ -356,3 +356,11 @@ html,body,#root{width:100%;min-width:0}
 .safeExportPanel label{display:grid;gap:6px;min-width:0;overflow-wrap:anywhere}
 .safeExportPanel input{box-sizing:border-box;width:100%;min-width:0;font-size:16px}
 .safeExportPanel button{min-height:44px}
+
+/* iOS v0.19.2 backup: feedback remains adjacent to actions on short screens. */
+.safeExportPanel .backupFeedback{padding:10px 12px;border:1px solid #72727a;border-radius:12px;overflow-wrap:anywhere}
+.safeExportPanel .backupFeedback p{margin:4px 0;line-height:1.5}
+.safeExportPanel .backupFeedback .importError{color:#ff737e;font-weight:600}
+.safeExportPanel .backupPrepared{border:1px solid #808087;border-radius:14px;padding:12px;display:grid;gap:8px;min-width:0;overflow-wrap:anywhere}
+.safeExportPanel .backupPrepared p{margin:0}
+.safeExportPanel input[type=file]{max-width:100%;padding:12px 6px}
