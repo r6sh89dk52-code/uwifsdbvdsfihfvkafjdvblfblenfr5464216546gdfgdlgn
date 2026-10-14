@@ -364,3 +364,20 @@ html,body,#root{width:100%;min-width:0}
 .safeExportPanel .backupPrepared{border:1px solid #808087;border-radius:14px;padding:12px;display:grid;gap:8px;min-width:0;overflow-wrap:anywhere}
 .safeExportPanel .backupPrepared p{margin:0}
 .safeExportPanel input[type=file]{max-width:100%;padding:12px 6px}
+
+/* v0.19.3: independent verification form, always visible beside password.
+ * No fixed heights; iOS keyboard and Dynamic Type can expand naturally. */
+.safeExportPanel .backupVerifySection{
+ display:grid;gap:12px;min-width:0;max-width:100%;
+ margin-top:14px;padding:16px 12px;
+ border:1px solid var(--border,#595960);border-radius:16px;
+ box-sizing:border-box;
+}
+.safeExportPanel .backupVerifySection h4{margin:0}
+.safeExportPanel .backupVerifySection label{display:grid;gap:8px;min-width:0}
+.safeExportPanel .backupVerifySection input[type="password"],
+.safeExportPanel .backupVerifySection input[type="file"]{
+ width:100%;min-width:0;max-width:100%;font-size:16px;box-sizing:border-box;
+}
+.safeExportPanel .backupVerifySection input[type="file"]{padding:10px 6px;overflow:hidden}
+.safeExportPanel .backupVerifySection .hint{overflow-wrap:anywhere}
