@@ -1,0 +1,24 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+(async()=>{
+ const {installNativeBackupKey,MARKER}=await import('../scripts/install-ios-backup-key.mjs');
+ const base=['import UIKit','import Capacitor','import LocalAuthentication','class AppDelegate: UIResponder { }','extension AppDelegate {','    @objc private func danperAuthWindowVisible(_ notification: Notification) {','        danperAddLockOverlay(to: window)','    }','}'].join('\n');
+ const result=installNativeBackupKey(base);
+ assert.ok(result.includes(MARKER));
+ assert.ok(result.includes('bridge.registerPluginInstance(DanperBackupKeyPlugin())'));
+ assert.ok(result.includes('kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly'));
+ assert.ok(result.includes('.userPresence'));
+ assert.ok(result.includes('.deviceOwnerAuthentication'));
+ assert.ok(result.includes('kSecAttrAccessControl'));
+ assert.ok(result.includes('SecRandomCopyBytes'));
+ assert.ok(result.includes('import Security'));
+ assert.equal(installNativeBackupKey(result),result,'idempotence');
+ const ui=fs.readFileSync('src/BackupSettingsPanel.tsx','utf8');
+ assert.ok(ui.includes('obtainDeviceBackupKey(false)'));
+ assert.ok(ui.includes('restoreEmptyDeviceFromBackup(preview)'));
+ assert.ok(ui.includes('Crear respaldo con Face ID / código'));
+ assert.ok(ui.includes('makeDeviceBackup'));
+ const pipeline=fs.readFileSync('.github/workflows/ios-ipa.yml','utf8');
+ assert.ok(pipeline.includes('node scripts/install-ios-backup-key.mjs'));
+ console.log('PASS: iOS device-backup plugin installer idempotence, userPresence, passcode fallback and restore guard.');
+})().catch(e=>{console.error(e);process.exitCode=1});
