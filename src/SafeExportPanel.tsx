@@ -12,6 +12,13 @@ export default function SafeExportPanel(){
  const [busy,setBusy]=useState(false),[sharing,setSharing]=useState(false);
  const [prepared,setPrepared]=useState<PreparedBackup|null>(null);
  const [status,setStatus]=useState(''),[error,setError]=useState('');
+ // Verification uses its OWN password: creating a backup must not require
+ // keeping the export password in memory, and a failed check retains the file.
+ const [verifyPassword,setVerifyPassword]=useState('');
+ const [verifyFileSelection,setVerifyFileSelection]=useState<File|null>(null);
+ const [verifying,setVerifying]=useState(false);
+ const [verifyStatus,setVerifyStatus]=useState('');
+ const [verifyError,setVerifyError]=useState('');
  const mismatch=confirm.length>0&&secret!==confirm;
  const ready=secret.length>=14&&secret===confirm;
  async function prepare(){
@@ -45,22 +52,30 @@ export default function SafeExportPanel(){
    feedback('error');
   }finally{setSharing(false)}
  }
- async function verifyFile(file:File|undefined){
-  setError('');setStatus('');
-  if(!native||!file||busy||sharing)return;
-  if(!file.name.toLowerCase().endsWith('.danperbackup')||file.size>42*1024*1024){
-   setError('Selecciona un archivo de respaldo .danperbackup de hasta 42 MB.');return
+ async function verifySelectedFile(){
+  setVerifyStatus('');setVerifyError('');
+  if(!native||busy||sharing||verifying)return;
+  const file=verifyFileSelection;
+  if(!file){setVerifyError('Selecciona primero el archivo .danperbackup guardado en Archivos.');return}
+  if(!file.name.toLowerCase().endsWith('.danperbackup')||file.size>42*1024*1024||file.size<100){
+   setVerifyError('El archivo seleccionado no es un respaldo .danperbackup válido de hasta 42 MB.');return
   }
-  if(secret.length<14){setError('Introduce primero la contraseña del respaldo que deseas comprobar.');return}
-  setBusy(true);setStatus('Leyendo y autenticando el archivo seleccionado…');
+  if(verifyPassword.length<14){
+   setVerifyError('Introduce aquí la contraseña original con la que creaste este respaldo (al menos 14 caracteres).');
+   return
+  }
+  setVerifying(true);setVerifyStatus('Comprobando contraseña y autenticidad del respaldo…');
   try{
-   const snapshot=validateDemoSnapshot(await decryptPortableBackup(await file.text(),secret));
-   setStatus('Archivo externo verificado: '+snapshot.workers.length+' trabajadores y '+snapshot.attentions.length+' atenciones. Ningún registro fue modificado.');
+   const snapshot=validateDemoSnapshot(await decryptPortableBackup(await file.text(),verifyPassword));
+   setVerifyStatus('Respaldo comprobado correctamente: '+snapshot.workers.length+' trabajadores y '+snapshot.attentions.length+' atenciones. Ningún dato fue restaurado, eliminado ni modificado.');
+   setVerifyPassword(''); // do not retain the secret after successful verification
    feedback('success');
   }catch(e){
-   setError(e instanceof Error?e.message:'No se pudo verificar el respaldo externo.');
+   // Keep file and input available so the user can correct a typing error.
+   setVerifyStatus('');
+   setVerifyError(e instanceof Error?e.message:'No se pudo verificar el archivo. Comprueba la contraseña original.');
    feedback('error');
-  }finally{setBusy(false)}
+  }finally{setVerifying(false)}
  }
  return <section className="panel safeExportPanel">
   <h3>Respaldo cifrado de seguridad</h3>
@@ -87,9 +102,30 @@ export default function SafeExportPanel(){
    {status&&<p role="status">{status}</p>}
    {error&&<p className="importError" role="alert">{error}</p>}
   </div>}
-  <h4>Comprobar el archivo guardado</h4>
-  <p className="hint">Después de guardar una copia en Archivos, selecciónala aquí para confirmar que tu contraseña la descifra. No restaura ni elimina información.</p>
-  <input type="file" accept=".danperbackup" disabled={!native||busy||sharing} onChange={e=>{const file=e.currentTarget.files?.[0];void verifyFile(file);e.currentTarget.value=''}}/>
+  <section className="backupVerifySection" aria-label="Comprobar respaldo cifrado guardado">
+   <h4>Comprobar el archivo guardado</h4>
+   <p className="hint">Esta operación <strong>solo comprueba</strong> que el respaldo guardado pueda descifrarse. No restaura, mezcla ni elimina trabajadores o atenciones.</p>
+   <label>Archivo cifrado guardado en Archivos
+    <input type="file" accept=".danperbackup" disabled={!native||busy||sharing||verifying} onChange={e=>{
+      const file=e.currentTarget.files?.[0]??null;
+      setVerifyFileSelection(file);setVerifyStatus('');setVerifyError('');
+      e.currentTarget.value='';
+    }}/>
+   </label>
+   {verifyFileSelection&&<p className="hint" role="status">Seleccionado: {verifyFileSelection.name}</p>}
+   <label>Contraseña del archivo de respaldo (para comprobarlo)
+    <input type="password" autoComplete="off" value={verifyPassword}
+      onChange={e=>{setVerifyPassword(e.target.value);setVerifyError('');setVerifyStatus('')}}
+      placeholder="Escribe la contraseña original del respaldo" disabled={!native||busy||sharing||verifying}/>
+   </label>
+   <button type="button" className="workerPrimary wide"
+    disabled={!native||busy||sharing||verifying}
+    onClick={()=>void verifySelectedFile()}>{verifying?'Verificando respaldo…':'Verificar respaldo seleccionado'}</button>
+   {(verifyStatus||verifyError)&&<div className="backupFeedback" aria-live="polite">
+    {verifyStatus&&<p role="status">{verifyStatus}</p>}
+    {verifyError&&<p className="importError" role="alert">{verifyError}</p>}
+   </div>}
+  </section>
   {!native&&<p className="hint">La exportación privada solo funciona dentro de la aplicación nativa de iPhone.</p>}
  </section>;
 }
