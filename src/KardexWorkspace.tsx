@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {feedback} from './nativeHaptics';
 import {ArrowLeft,ArrowLeftRight,ClipboardCheck,FileSpreadsheet,PackageSearch} from 'lucide-react';
 import KardexPanel from './KardexPanel';
 import KardexMovementsPanel from './KardexMovementsPanel';
@@ -16,7 +17,7 @@ const names:Record<Section,string>={home:'Kardex de Enfermería',inventory:'Inve
 export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attentions,mappings,incidents,onChange,onMappings,onIncidents,responsible}:Props){
  const [section,setSection]=useState<Section>('home');
  const [deliveryTab,setDeliveryTab]=useState<'confirm'|'incidents'>('confirm');
- function navigate(next:Section){setSection(next);window.scrollTo({top:0,behavior:'auto'})}
+ function navigate(next:Section){feedback('selection');setSection(next);window.scrollTo({top:0,behavior:'auto'})}
  return <div className="kardexWorkspace">
   {section==='home'?<>
    <div className="pageHead"><button type="button" onClick={onExit} aria-label="Volver al inicio"><ArrowLeft/></button><div><span>GESTIÓN DE EXISTENCIAS</span><h2>Kardex</h2><small>Control físico de existencias de prueba</small></div></div>
@@ -34,7 +35,7 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
    {section==='movements'&&<KardexMovementsPanel ledger={ledger} mappings={mappings} onChange={onChange}/>}
    {section==='reports'&&<KardexDailyExport ledger={ledger} responsible={responsible}/>}
    {section==='deliveries'&&<>
-    <div className="kardexSubtabs"><button type="button" className={deliveryTab==='confirm'?'selected':''} onClick={()=>setDeliveryTab('confirm')}>Confirmar entrega</button><button type="button" className={deliveryTab==='incidents'?'selected':''} onClick={()=>setDeliveryTab('incidents')}>Incidencias y equivalencias</button></div>
+    <div className="kardexSubtabs"><button type="button" className={deliveryTab==='confirm'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('confirm')}}>Confirmar entrega</button><button type="button" className={deliveryTab==='incidents'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('incidents')}}>Incidencias y equivalencias</button></div>
     {deliveryTab==='confirm'?<AttentionDeliveryPanel attentions={attentions} ledger={ledger} mappings={mappings} onChange={onChange}/>:<ReconciliationPanel attentions={attentions} ledger={ledger} mappings={mappings} incidents={incidents} onMappings={onMappings} onIncidents={onIncidents}/>}
    </>}
   </>}
