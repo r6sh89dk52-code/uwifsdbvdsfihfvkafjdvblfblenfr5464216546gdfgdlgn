@@ -360,3 +360,13 @@ html,body,#root{width:100%;min-width:0}
 .backupPanel button{min-height:44px}
 .backupPanel .backupPreview{border:1px solid var(--border,#45454d);border-radius:15px;padding:14px;overflow-wrap:anywhere}
 .backupPanel hr{width:100%;border:0;border-top:1px solid #474750;margin:10px 0}
+
+/* v0.20.2: explicit clinical storage migration gate, no auto-commit. */
+.migrationGate{display:grid;gap:16px;max-width:620px;margin:auto;padding-bottom:calc(env(safe-area-inset-bottom) + 32px)}
+.migrationGate>h1{margin:0}
+.migrationGate .panel{display:grid;gap:14px;min-width:0}
+.migrationGate label{display:grid;gap:8px;min-width:0;overflow-wrap:anywhere}
+.migrationGate input{min-width:0;width:100%;max-width:100%;font-size:16px;box-sizing:border-box}
+.migrationGate input[type="file"]{padding:12px 6px;overflow:hidden}
+.migrationGate button{min-height:48px;white-space:normal}
+.migrationGate .hint{overflow-wrap:anywhere;line-height:1.48}
