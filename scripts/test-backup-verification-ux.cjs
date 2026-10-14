@@ -9,9 +9,9 @@ const useState=init=>{
  return [states[index],next=>{states[index]=typeof next==='function'?next(states[index]):next}];
 };
 const jsx=(type,props)=>({type,props:props||{}});
-const exports={};const mod={exports};
+const virtualExports={};const mod={exports:virtualExports};
 const environment={
- module:mod,exports,
+ module:mod,exports:virtualExports,
  require(name){
   if(name==='react')return{useState};
   if(name==='react/jsx-runtime')return{jsx,jsxs:jsx};
