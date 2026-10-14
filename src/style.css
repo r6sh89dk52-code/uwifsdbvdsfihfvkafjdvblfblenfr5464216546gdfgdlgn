@@ -276,3 +276,16 @@ html,body,#root{width:100%;min-width:0}
 .kardexPreviewDetails{border:1px solid var(--line);border-radius:12px;padding:11px;margin-top:15px;min-width:0}
 .kardexPreviewDetails summary{cursor:pointer;font-weight:700;font-size:13px}
 @media(max-width:440px){.kardexPage .fields.two,.kardexDaily .fields.two{grid-template-columns:minmax(0,1fr)}.kardexSectionGrid button{padding:14px 11px}.kardexSubtabs button{font-size:12px}}
+
+/* v0.16.4 iPhone date input and product-appropriate stock forms. */
+.kardexEntryBasics,.kardexPackaging{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;width:100%;min-width:0}
+.kardexEntryBasics label,.kardexPackaging label{display:block;width:100%;max-width:100%;min-width:0;overflow:visible}
+.kardexEntryBasics input,.kardexEntryBasics select,.kardexPackaging input,.kardexPackaging select{display:block;min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.kardexEntryBasics input[inputmode="numeric"]:not([type="number"]){-webkit-appearance:none;appearance:none}
+.kardexModeChoice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:9px 0}
+.kardexModeChoice button{min-width:0;padding:11px 7px;border-radius:11px;border:1px solid var(--line,#444);background:var(--surface,#252529);color:var(--text);font-size:13px;line-height:1.35}
+.kardexModeChoice button.selected{border-color:#e3182d;color:#e3182d;font-weight:700}
+.app .panel .fields.two>label,.app .panel .fields.two>label input,.app .panel .fields.two>label select{min-width:0;max-width:100%;box-sizing:border-box}
+.app .panel input[type="date"],.app .panel input[type="time"]{display:block;min-width:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box;-webkit-appearance:none;appearance:none;overflow:hidden}
+.app .panel input[type="date"]::-webkit-date-and-time-value,.app .panel input[type="time"]::-webkit-date-and-time-value{min-width:0;text-align:left}
+@media(max-width:620px){.app .panel .fields.two:has(input[type="date"],input[type="time"]){display:grid;grid-template-columns:minmax(0,1fr)}}

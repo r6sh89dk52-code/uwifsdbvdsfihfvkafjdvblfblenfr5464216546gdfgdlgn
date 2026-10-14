@@ -10,15 +10,16 @@ import {type SavedClinicalAttention} from './attentionKardex';
 import {type StockLedger} from './kardexMovements';
 import {type CatalogMappingEvent,type DeliveryIncident} from './reconciliationRules';
 type Section='home'|'inventory'|'movements'|'deliveries'|'reports';
-type Props={ledger:StockLedger;attentions:SavedClinicalAttention[];mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];
+type Props={onExit:()=>void;ledger:StockLedger;attentions:SavedClinicalAttention[];mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];
  onChange:(ledger:StockLedger)=>void;onMappings:(m:CatalogMappingEvent[])=>void;onIncidents:(m:DeliveryIncident[])=>void;responsible:string};
 const names:Record<Section,string>={home:'Kardex de Enfermería',inventory:'Inventario',movements:'Movimientos',deliveries:'Entregas',reports:'Reportes'};
-export default function KardexWorkspace({ledger,attentions,mappings,incidents,onChange,onMappings,onIncidents,responsible}:Props){
+export default function KardexWorkspace({onExit,ledger,attentions,mappings,incidents,onChange,onMappings,onIncidents,responsible}:Props){
  const [section,setSection]=useState<Section>('home');
  const [deliveryTab,setDeliveryTab]=useState<'confirm'|'incidents'>('confirm');
  function navigate(next:Section){setSection(next);window.scrollTo({top:0,behavior:'auto'})}
  return <div className="kardexWorkspace">
   {section==='home'?<>
+   <div className="pageHead"><button type="button" onClick={onExit} aria-label="Volver al inicio"><ArrowLeft/></button><div><span>GESTIÓN DE EXISTENCIAS</span><h2>Kardex</h2><small>Control físico de existencias de prueba</small></div></div>
    <p className="hint">Control de existencias, lotes, movimientos y reportes. Solo utilizar datos ficticios.</p>
    <div className="kardexStats"><div><strong>{kardexMainCount}</strong><span>Productos oficiales</span></div><div><strong>{ledger.lots.filter(l=>/^E-/.test(l.code)).length}</strong><span>Lotes registrados</span></div></div>
    <div className="kardexSectionGrid">
