@@ -1,7 +1,6 @@
 /** v0.17 — one physical source for daily Kardex and the 9th-to-8th Indicator.
  * Does not create a second stock ledger or infer unknown/uncertified conversions.
  */
-import {kardexCatalog} from './kardexCatalog';
 import products from './products.json';
 import {reviewedAssociations} from './reviewedKardexAssociations';
 import {countPhysicalUnits,type StockLot} from './inventoryRules';
