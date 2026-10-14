@@ -48,6 +48,7 @@ jobs:
           npx cap sync ios
           node scripts/install-ios-gesture.mjs
           node scripts/install-ios-access-lock.mjs
+          node scripts/install-ios-backup-key.mjs
       - name: Generar IPA sin firmar
         run: bash scripts/build-ios-ipa.sh
       - name: Verificar IPA y recursos
