@@ -4,10 +4,18 @@ const JSZip=(window as Window&{JSZip?:{loadAsync(file:Uint8Array):Promise<ZipIns
 import {compileWorkers,type ImportResult} from './workerRules';
 const RID='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 function elements(parent:Element,local:string):Element[]{return Array.from(parent.getElementsByTagNameNS('*',local));}
-function xml(text:string):Document{
- if(/<!DOCTYPE|<!ENTITY/i.test(text))throw Error('El Excel contiene XML no permitido.');
- const doc=new DOMParser().parseFromString(text,'application/xml');
- if(doc.getElementsByTagName('parsererror').length)throw Error('El Excel contiene XML mal formado.');
+/** Imported xlsx may contain a UTF-8 BOM before the XML declaration.
+ * In WKWebView, DOMParser receives a JavaScript string, not a raw byte
+ * stream: U+FEFF preceding <?xml can produce a parsererror.
+ * Normalize only the leading BOM, preserving all worksheet content.
+ */
+function xml(text:string,part:string):Document{
+ const normalized=text.replace(/^\uFEFF/,'');
+ if(/<!DOCTYPE|<!ENTITY/i.test(normalized))throw Error('XML no permitido en '+part+'.');
+ const doc=new DOMParser().parseFromString(normalized,'application/xml');
+ if(doc.documentElement.localName==='parsererror'||doc.getElementsByTagName('parsererror').length||
+    doc.getElementsByTagNameNS('*','parsererror').length)
+   throw Error('No se pudo leer la estructura XML de '+part+'. Comprueba el archivo Excel.');
  return doc;
 }
 function excelColumn(ref:string):number{
@@ -29,17 +37,17 @@ export async function readPersonal(file:File):Promise<ImportResult>{
   if(value.length>max)throw Error('Una hoja del Excel es demasiado grande.');
   return value;
  };
- const wb=xml(await extract('xl/workbook.xml',1024*1024));
+ const wb=xml(await extract('xl/workbook.xml',1024*1024),'xl/workbook.xml');
  const sheet=elements(wb.documentElement,'sheet').find(n=>n.getAttribute('name')?.trim().toUpperCase()==='PERSONAL');
  if(!sheet)throw Error('Este Excel no contiene la hoja PERSONAL.');
  const rid=sheet.getAttributeNS(RID,'id')||sheet.getAttribute('r:id');
- const rels=xml(await extract('xl/_rels/workbook.xml.rels',1024*1024));
+ const rels=xml(await extract('xl/_rels/workbook.xml.rels',1024*1024),'xl/_rels/workbook.xml.rels');
  const target=elements(rels.documentElement,'Relationship').find(n=>n.getAttribute('Id')===rid)?.getAttribute('Target')||'';
  const normalized=target.startsWith('/xl/')?target.slice(1):`xl/${target.replace(/^\.\/|^xl\//,'')}`;
  if(!/^xl\/worksheets\/[a-zA-Z0-9_.-]+\.xml$/.test(normalized))throw Error('La referencia a PERSONAL no es válida.');
- const shared=zip.file('xl/sharedStrings.xml')?xml(await extract('xl/sharedStrings.xml',12*1024*1024)):null;
+ const shared=zip.file('xl/sharedStrings.xml')?xml(await extract('xl/sharedStrings.xml',12*1024*1024),'xl/sharedStrings.xml'):null;
  const strings=shared?elements(shared.documentElement,'si').map(si=>elements(si,'t').map(t=>t.textContent||'').join('')):[];
- const ws=xml(await extract(normalized,16*1024*1024));
+ const ws=xml(await extract(normalized,16*1024*1024),normalized);
  const sheetRows=elements(ws.documentElement,'sheetData')[0];
  if(!sheetRows)throw Error('La hoja PERSONAL no tiene filas.');
  const rows:unknown[][]=[];
