@@ -1,7 +1,5 @@
-/** DANPER v0.15: client-only XLSX OOXML sanitizer/exporter.
- * Requires user-selected original ten-sheet source on iPhone. Never embed the
- * historical workbook in the IPA. Rebuild shared strings instead of shipping
- * hidden original patient data. No remote upload or third-party processing.
+/** DANPER v0.17: export from the reviewed sanitised, locally embedded ten-sheet
+ * layout. Never include the historical workbook or any real patient data.
  */
 import {strFromU8,strToU8,unzipSync,zipSync} from 'fflate';
 import {type ExportPlan,type ExportValue,validExportDate} from './ambulatoryRows';
@@ -230,7 +228,7 @@ export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,mat
        if(receipt.expires)editCell(doc,cExpiry+row,(Date.parse(receipt.expires+'T00:00:00Z')-Date.UTC(1899,11,30))/86400000);
        editCell(doc,cDocument+row,receipt.document);
       });
-      if(material.reviewed){
+      if(data.receipts!==undefined){
        const x=all(doc,'c').find(e=>e.getAttribute('r')==='X'+row);
        if(!x)throw Error('La hoja INGRESOS perdió la celda de totales.');
        for(const c of Array.from(x.childNodes))x.removeChild(c);
@@ -242,7 +240,7 @@ export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,mat
       if(data.opening!==undefined)editCell(doc,'D'+row,data.opening);
       const pending=[
        data.opening===undefined?'STOCK INICIAL PENDIENTE':'',
-       !material.reviewed?'INGRESOS NO REVISADOS':'',
+       data.receipts===undefined?'INGRESOS NO VERIFICADOS':'',
        data.count===undefined?'CONTEO PENDIENTE':'',
        data.difference!==undefined&&data.difference!==0?'DIFERENCIA POR REVISAR':''
       ].filter(Boolean);
@@ -253,7 +251,7 @@ export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,mat
    if(i===2)editCell(doc,'D1',material?'CONTEO FÍSICO '+plan.end+' · '+material.countConfirmed+' DE 432 VERIFICADOS':'INVENTARIO PENDIENTE DE CONCILIACIÓN');
 
    if(i===3){
-    editCell(doc,'H1','INGRESOS '+plan.start+' AL '+plan.end+(material?.reviewed?' · REVISADOS':' · SIN CERRAR'));
+    editCell(doc,'H1','INGRESOS '+plan.start+' AL '+plan.end+(material?' · SEGÚN INVENTARIO':' · SIN VERIFICAR'));
     if(!material)for(const r of direct(all(doc,'sheetData')[0],'row'))if(Number(r.getAttribute('r'))>=3)editCell(doc,'Y'+r.getAttribute('r'),'PENDIENTE DE CONCILIACIÓN');
    }
    if(i===4){
