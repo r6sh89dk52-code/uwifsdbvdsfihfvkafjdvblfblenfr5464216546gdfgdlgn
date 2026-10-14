@@ -1,6 +1,7 @@
 /** iPhone-only local clinical data with AES-GCM encrypted snapshots. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
+import {decryptPortableBackup} from './portableBackup';
 import {loadClinicalVault,writeClinicalVault,stageClinicalRestore,verifyStagedClinicalRestore,activateClinicalRestore} from './privateClinicalVault';
 import {loadWorkerVault,writeWorkerVault,stageWorkerRestore,verifyStagedWorkerRestore,activateWorkerRestore,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
 export {workerVaultRecoveryRequired} from './privateWorkerVault';
@@ -27,6 +28,11 @@ const INCIDENTS='danper-etapa-b3-incidents-v013';
 const AMBULATORY_RECON='danper-v016-ambulatory-reconciliation';
 const SECURE_KEY='prototype-snapshot-v1';
 const CLINICAL_MARKER=JSON.stringify({format:'encrypted-clinical-v1',version:2});
+/** A pending migration MUST NOT silently write on app startup. */
+export class ClinicalMigrationRequiredError extends Error{
+ constructor(){super('Antes de migrar tus datos clínicos, selecciona y verifica un respaldo cifrado externo.');this.name='ClinicalMigrationRequiredError'}
+}
+let migrationInProgress=false;
 const LEGACY_CLINICAL_BACKUP='clinical-v1-legacy-verified-snapshot';
 const RESTORE_JOURNAL='clinical-v1-portable-restore-pending';
 const RESTORE_DONE='finished';
@@ -103,7 +109,7 @@ async function configureKeychain(){
  * Legacy data is overwritten by a small marker ONLY after encrypted migration
  * and worker-vault validation; never auto-reset on missing/corrupt files.
  */
-export async function loadDemoSnapshot():Promise<DemoSnapshot>{
+export async function loadDemoSnapshot(allowVerifiedMigration=false):Promise<DemoSnapshot>{
  if(!isNativeSecureStore())return readLegacyDemoSnapshot();
  await configureKeychain();
  await finishPendingRestore();
@@ -115,6 +121,21 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
  // Reject incompatible marker formats. Never silently discard a prior version.
  if(raw!==null&&raw!==CLINICAL_MARKER&&!prior)
   throw Error('Formato anterior del almacén clínico incompatible.');
+ // Migration gate: a first launch only inspects the old snapshot and roster;
+ // writes happen exclusively after authenticating a user-supplied external
+ // .danperbackup that matches these exact current records.
+ if(encrypted===null&&!allowVerifiedMigration){
+  if(prior){
+   let roster:unknown[]|null;
+   try{roster=await loadWorkerVault()}
+   catch(error){if(error instanceof MissingWorkerVaultError)return prior;throw error}
+   if(roster!==null&&prior.workers.length&&JSON.stringify(roster)!==JSON.stringify(prior.workers))
+    throw Error('Padrón duplicado divergente. No se migrará.');
+   if(containsData({...prior,workers:roster??prior.workers}))throw new ClinicalMigrationRequiredError();
+  }else{
+   if(containsData(readLegacyDemoSnapshot()))throw new ClinicalMigrationRequiredError();
+  }
+ }
  if(encrypted!==null){
   const parsed=validateDemoSnapshot(encrypted);
   if(parsed.workers.length)throw Error('El almacén clínico contiene un padrón duplicado.');
@@ -232,4 +253,50 @@ export async function readStableSnapshotForBackup():Promise<DemoSnapshot>{
  if(!isNativeSecureStore())throw Error('Respaldo privado disponible solo en iPhone.');
  await writeQueue;
  return loadDemoSnapshot();
+}
+
+/** Read original iPhone data without changing any pointer, clinical file or
+ * localStorage. Used to compare with the authenticated external backup.
+ */
+async function readSourceBeforeMigration():Promise<DemoSnapshot>{
+ await configureKeychain();
+ if(await loadClinicalVault()!==null)throw Error('El almacenamiento clínico ya está migrado.');
+ const raw=await SecureStorage.getItem(SECURE_KEY);
+ if(raw===CLINICAL_MARKER)throw Error('El estado clínico ya utiliza el almacén cifrado.');
+ if(raw!==null){
+  const prior=validateDemoSnapshot(JSON.parse(raw));
+  const roster=await loadWorkerVault();
+  if(roster===null&&prior.workers.length)
+   throw Error('No se encuentra el padrón cifrado anterior. No se realizará la migración.');
+  if(roster!==null&&prior.workers.length&&JSON.stringify(roster)!==JSON.stringify(prior.workers))
+   throw Error('Los trabajadores en Keychain y el padrón privado no coinciden.');
+  return {...prior,workers:roster??prior.workers};
+ }
+ const legacy=readLegacyDemoSnapshot();
+ const roster=await loadWorkerVault();
+ if(roster!==null&&legacy.workers.length&&JSON.stringify(roster)!==JSON.stringify(legacy.workers))
+  throw Error('Los trabajadores guardados no coinciden. No se realizará la migración.');
+ return {...legacy,workers:roster??legacy.workers};
+}
+/** Explicit authorization from a backup verified with its original password.
+ * Never modifies the device on a missing, stale, tampered or wrong-password
+ * file. On success the existing migration uses copy-on-write generations and
+ * preserves the original Keychain snapshot.
+ */
+export async function migrateFromVerifiedPortableBackup(archive:string,password:string):Promise<DemoSnapshot>{
+ if(!isNativeSecureStore())throw Error('La migración cifrada solo está disponible en iPhone.');
+ if(migrationInProgress)throw Error('Ya se está comprobando una migración.');
+ migrationInProgress=true;
+ try{
+  await writeQueue;
+  const actual=await readSourceBeforeMigration();
+  const archiveSnapshot=validateDemoSnapshot(await decryptPortableBackup(archive,password));
+  if(JSON.stringify(archiveSnapshot)!==JSON.stringify(actual))
+   throw Error('Este respaldo no coincide con los registros actuales del iPhone. Crea y verifica una copia nueva antes de migrar.');
+  if(!containsData(actual))throw Error('La base está vacía; no necesita migración.');
+  const migrated=await loadDemoSnapshot(true);
+  if(JSON.stringify(migrated)!==JSON.stringify(actual))
+   throw Error('La comprobación final de la migración no coincide. No continúes registrando datos.');
+  return migrated;
+ }finally{migrationInProgress=false}
 }
