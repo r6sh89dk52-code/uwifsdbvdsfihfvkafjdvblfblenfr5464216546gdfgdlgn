@@ -10,10 +10,10 @@ import {type SavedClinicalAttention} from './attentionKardex';
 import {type StockLedger} from './kardexMovements';
 import {type CatalogMappingEvent,type DeliveryIncident} from './reconciliationRules';
 type Section='home'|'inventory'|'movements'|'deliveries'|'reports';
-type Props={onExit:()=>void;ledger:StockLedger;attentions:SavedClinicalAttention[];mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];
+type Props={onExit:()=>void;onOpenIndicator:()=>void;ledger:StockLedger;attentions:SavedClinicalAttention[];mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];
  onChange:(ledger:StockLedger)=>void;onMappings:(m:CatalogMappingEvent[])=>void;onIncidents:(m:DeliveryIncident[])=>void;responsible:string};
 const names:Record<Section,string>={home:'Kardex de Enfermería',inventory:'Inventario',movements:'Movimientos',deliveries:'Entregas',reports:'Reportes'};
-export default function KardexWorkspace({onExit,ledger,attentions,mappings,incidents,onChange,onMappings,onIncidents,responsible}:Props){
+export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attentions,mappings,incidents,onChange,onMappings,onIncidents,responsible}:Props){
  const [section,setSection]=useState<Section>('home');
  const [deliveryTab,setDeliveryTab]=useState<'confirm'|'incidents'>('confirm');
  function navigate(next:Section){setSection(next);window.scrollTo({top:0,behavior:'auto'})}
@@ -30,7 +30,7 @@ export default function KardexWorkspace({onExit,ledger,attentions,mappings,incid
    </div>
   </>:<>
    <div className="kardexSectionHeader"><button type="button" onClick={()=>navigate('home')}><ArrowLeft size={17}/> Kardex</button><h3>{names[section]}</h3></div>
-   {section==='inventory'&&<KardexPanel ledger={ledger} mappings={mappings} onChange={onChange} responsible={responsible}/>}
+   {section==='inventory'&&<KardexPanel ledger={ledger} mappings={mappings} onChange={onChange} responsible={responsible} onOpenIndicator={onOpenIndicator}/>}
    {section==='movements'&&<KardexMovementsPanel ledger={ledger} mappings={mappings} onChange={onChange}/>}
    {section==='reports'&&<KardexDailyExport ledger={ledger} responsible={responsible}/>}
    {section==='deliveries'&&<>

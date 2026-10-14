@@ -34,5 +34,6 @@ const entry=fs.readFileSync('src/KardexPanel.tsx','utf8');
 assert.ok(entry.includes('formatDateInput')&&entry.includes('parseDateInput'));
 assert.ok(entry.includes('Cantidad disponible (unidades)'));
 assert.ok(entry.includes('forcedIndividual'));
+assert.ok(entry.includes('onOpenIndicator')&&main.includes("onOpenIndicator={()=>goToPage('ambulatory')}"));
 assert.ok(!main.includes('GESTIÓN DE EXISTENCIAS'),'the duplicate back/header must not be rendered from main');
 console.log('PASS: kardex modular, buscador sin tildes, 98 originales, sin scroll monolítico ni mensajes obsoletos.');

@@ -4,7 +4,7 @@ import {kardexCatalog,kardexMainCount} from './kardexCatalog';
 import {countPhysicalUnits,inventoryTotals,validateStockLot,type StockLot,type ContainerKind} from './inventoryRules';
 import {isIndividualNursingProduct,formatDateInput,parseDateInput,isoToDateInput} from './kardexEntryRules';
 import {type StockLedger} from './kardexMovements';import {type CatalogMappingEvent} from './reconciliationRules';import KardexProductSearch from './KardexProductSearch';
-type Props={ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(value:StockLedger)=>void;responsible:string};
+type Props={ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(value:StockLedger)=>void;responsible:string;onOpenIndicator:()=>void};
 const options:{value:ContainerKind;label:string}[]=[
  {value:'unidad',label:'Unidad individual'},{value:'caja',label:'Caja'},
  {value:'frasco',label:'Frasco'},{value:'paquete',label:'Paquete'},
@@ -13,7 +13,7 @@ const options:{value:ContainerKind;label:string}[]=[
 const clean=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
 const safeNumber=(v:string)=>Number(v.replace(',','.'));
 const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).format(v);
-export default function KardexPanel({ledger,onChange}:Props){
+export default function KardexPanel({ledger,onChange,onOpenIndicator}:Props){
  const lots=ledger.lots;
  const[search,setSearch]=useState('');
  const[selectedId,setSelectedId]=useState('');
@@ -89,6 +89,7 @@ export default function KardexPanel({ledger,onChange}:Props){
    <p>Registro de existencias físicas por producto y lote</p>
   </div></div>
   <div className="warning">SOLO DATOS FICTICIOS. Aquí se registra la existencia física del Kardex. El Indicador Ambulatorio tiene además un corte por fecha y subdivisión: se debe conciliar con estos productos, sin duplicar ni inventar saldos.</div>
+  <div className="kardexLinkingInfo"><strong>Dos libros, un stock físico para conciliar</strong><p>El Kardex refleja existencias reales por lote. El Indicador Ambulatorio exige stocks iniciales por fecha, subdivisión y unidad oficial para 432 materiales. En las 86 correspondencias aprobadas, verifica la igualdad del mismo material y fecha de corte; por seguridad no se copian cantidades entre ambos libros sin esa conciliación.</p><button type="button" className="workerSecondary" onClick={onOpenIndicator}>Abrir conciliación del Indicador</button></div>
   <div className="kardexStats">
    <div><strong>{kardexMainCount}</strong><span>Productos oficiales</span></div>
    <div><strong>{totals.lots}</strong><span>Lotes registrados</span></div>
