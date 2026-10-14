@@ -1,6 +1,6 @@
 import {useRef,useState} from 'react';
 import {FileSpreadsheet,Upload,CheckCircle2,AlertTriangle} from 'lucide-react';
-import{readPersonal}from'./workbookPersonal';
+import{readPersonal}from'./workbookPersonal';import {feedback} from './nativeHaptics';
 import{reconcileWorkers,type ImportResult,type WorkerRecord}from'./workerRules';
 interface Props{current:WorkerRecord[];onApply:(workers:WorkerRecord[])=>void|Promise<void>}
 export default function PersonalImporter({current,onApply}:Props){
@@ -16,8 +16,8 @@ export default function PersonalImporter({current,onApply}:Props){
   finally{setBusy(false)}
  }
  async function confirm(){if(!estimated||!preview||busy)return;setBusy(true);setError('');
-  try{await onApply(estimated.workers);setApplied(true);setPreview(null)}
-  catch(error){setError(error instanceof Error?error.message:'Error al guardar el padrón. No se ha confirmado.')}
+  try{await onApply(estimated.workers);setApplied(true);setPreview(null);feedback('success')}
+  catch(error){setError(error instanceof Error?error.message:'Error al guardar el padrón. No se ha confirmado.');feedback('error')}
   finally{setBusy(false)}
  }
  return <section className="panel importPanel"><h3><FileSpreadsheet size={18}/> Importar padrón desde Excel</h3>
@@ -26,7 +26,7 @@ export default function PersonalImporter({current,onApply}:Props){
  <button type="button" className="workerSecondary wide" onClick={()=>{if(ref.current)ref.current.value='';ref.current?.click()}} disabled={busy}><Upload size={16}/>{busy?'Procesando archivo...':'Seleccionar Excel (.xlsx)'}</button>
  {fileName&&<p className="hint">Archivo seleccionado: {fileName}</p>}
  {error&&<p role="alert" className="importError"><AlertTriangle size={16}/> {error}</p>}
- {applied&&<p role="status" className="importSuccess"><CheckCircle2 size={16}/> Padrón de prueba incorporado. Busca al trabajador por DNI o nombre.</p>}
+ {applied&&<p role="status" className="importSuccess"><CheckCircle2 size={16}/> Padrón incorporado y guardado. Busca al trabajador por DNI o nombre.</p>}
  {preview&&estimated&&<div className="importPreview"><strong>Vista previa de importación</strong><div className="previewStats"><div><b>{preview.stats.valid}</b><span>DNIs únicos válidos</span></div><div><b>{estimated.stats.added}</b><span>Nuevos</span></div><div><b>{estimated.stats.merged}</b><span>Ya existentes</span></div></div>
  <p className="hint">DNI inválido: {preview.stats.invalidDni}. Sin nombre: {preview.stats.withoutName}. DNI repetido dentro del Excel: {preview.stats.duplicates}. Sexo vacío: {preview.stats.sexMissing}. Sexo fuera del catálogo: {preview.stats.sexInvalid}. Sexo contradictorio entre duplicados: {preview.stats.sexConflicts}. Fichas manuales conservadas: {estimated.stats.manualPreserved}.</p>
  <p className="hint">Comparación con el padrón existente: {estimated.stats.added} nuevos, {estimated.stats.merged} ya registrados. Cambios de nombres por revisar: {estimated.stats.nameConflicts}. Cambios M/F por revisar: {estimated.stats.sexConflicts}. Los DNI existentes conservan una sola ficha.</p>
