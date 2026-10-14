@@ -1,6 +1,8 @@
 /** Etapa A: small prototype dataset only. Large clinical databases require SQLCipher. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
+import {loadWorkerVault,writeWorkerVault,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
+export {workerVaultRecoveryRequired} from './privateWorkerVault';
 
 export type DemoSnapshot<A=unknown,W=unknown,R=unknown>={
   attentions:A[];
@@ -69,14 +71,41 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
   const raw=await SecureStorage.getItem(SECURE_KEY);
   if(raw!==null){
     const parsed=validateDemoSnapshot(JSON.parse(raw));
+    let separate:unknown[]|null;
+    try{separate=await loadWorkerVault()}
+    catch(error){
+      if(error instanceof MissingWorkerVaultError){
+        // Keep clinical snapshot unchanged. Missing directory requires user
+        // confirmation to restore. Never create an empty vault on startup.
+        return parsed;
+      }
+      throw error;
+    }
+    if(separate!==null){
+      if(parsed.workers.length&&JSON.stringify(parsed.workers)!==JSON.stringify(separate))
+       throw Error('Existen versiones divergentes del padrón. No se reemplazará automáticamente.');
+      if(parsed.workers.length)await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...parsed,workers:[]}));
+      clearLegacyDemoSnapshot();
+      return {...parsed,workers:separate};
+    }
+    if(parsed.workers.length){
+      await writeWorkerVault(parsed.workers);
+      await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...parsed,workers:[]}));
+    }
     clearLegacyDemoSnapshot();
     return parsed;
   }
   const legacy=readLegacyDemoSnapshot();
+  let detached:unknown[]|null;
+  try{detached=await loadWorkerVault()}
+  catch(error){if(error instanceof MissingWorkerVaultError)return legacy;throw error}
+  if(detached!==null)throw Error('Existe un padrón privado sin estado principal. Se necesita una recuperación antes de continuar.');
   if(containsData(legacy)){
-    await SecureStorage.setItem(SECURE_KEY,JSON.stringify(legacy));
+    await writeWorkerVault(legacy.workers);
+    const withoutWorkers=JSON.stringify({...legacy,workers:[]});
+    await SecureStorage.setItem(SECURE_KEY,withoutWorkers);
     const verify=await SecureStorage.getItem(SECURE_KEY);
-    if(verify!==JSON.stringify(legacy))throw new Error('No se pudo verificar la migración al llavero seguro. No se borraron los datos anteriores.');
+    if(verify!==withoutWorkers)throw new Error('No se pudo verificar la migración al llavero seguro. No se borraron los datos anteriores.');
     clearLegacyDemoSnapshot();
   }
   return legacy;
@@ -84,11 +113,12 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
 /** Native writes are serialized to avoid older writes overwriting newer snapshots. */
 export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
   const safe=validateDemoSnapshot(snapshot);
-  const serialized=JSON.stringify(safe);
   writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
     if(isNativeSecureStore()){
       await configureKeychain();
-      await SecureStorage.setItem(SECURE_KEY,serialized);
+      if(workerVaultRecoveryRequired())throw new MissingWorkerVaultError();
+      await writeWorkerVault(safe.workers);
+      await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...safe,workers:[]}));
     }else{
       localStorage.setItem(ATT,JSON.stringify(safe.attentions));
       localStorage.setItem(WORK,JSON.stringify(safe.workers));
@@ -102,4 +132,10 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
     }
   });
   return writeQueue;
+}
+/** Export-only bridge waits for v0.19 native writes; no storage migration. */
+export async function readStableSnapshotForBackup():Promise<DemoSnapshot>{
+ if(!isNativeSecureStore())throw Error('Respaldo privado disponible solo en iPhone.');
+ await writeQueue;
+ return loadDemoSnapshot();
 }
