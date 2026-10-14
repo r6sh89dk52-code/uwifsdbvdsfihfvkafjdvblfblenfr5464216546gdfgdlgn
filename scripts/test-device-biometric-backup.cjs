@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const ts=require('typescript');
+const {webcrypto,randomUUID}=require('node:crypto');
+const compiled=ts.transpileModule(fs.readFileSync('src/portableBackup.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const m={exports:{}};
+vm.runInNewContext(compiled,{module:m,exports:m.exports,crypto:{subtle:webcrypto.subtle,getRandomValues:a=>webcrypto.getRandomValues(a),randomUUID},TextEncoder,TextDecoder,Uint8Array,Promise,Date,Error,JSON,Object,Array,String,Number,ArrayBuffer,atob:s=>Buffer.from(s,'base64').toString('latin1'),btoa:s=>Buffer.from(s,'latin1').toString('base64')});
+const {encryptDeviceBackup,decryptDeviceBackup,encryptPortableBackup,decryptPortableBackup}=m.exports;
+(async()=>{
+ const roster=Array.from({length:19270},(_,i)=>({dni:String(10000000+i),name:'EMPLEADO SINTÉTICO '+i,source:'imported'}));
+ const data={workers:roster,attentions:[{id:'ATENCION FICTICIA',worker:roster[0]}],allergies:{},notifications:false,stockLots:[],stockMovements:[],catalogMappings:[],deliveryIncidents:[],ambulatoryReconciliation:[]};
+ const key=webcrypto.getRandomValues(new Uint8Array(32));
+ const archive=await encryptDeviceBackup(data,key);
+ assert.equal(JSON.parse(archive).version,2);
+ assert.ok(!archive.includes('EMPLEADO SINTÉTICO'),'No plaintext workers');
+ const restored=await decryptDeviceBackup(archive,key);
+ assert.equal(JSON.stringify(restored),JSON.stringify(data));
+ const other=webcrypto.getRandomValues(new Uint8Array(32));
+ await assert.rejects(decryptDeviceBackup(archive,other),/No puede abrirse/);
+ const altered=JSON.parse(archive);altered.data=altered.data.slice(0,24)+(altered.data[24]==='A'?'B':'A')+altered.data.slice(25);
+ await assert.rejects(decryptDeviceBackup(JSON.stringify(altered),key),/alterado/);
+ await assert.rejects(encryptDeviceBackup(data,new Uint8Array(16)),/inválida/);
+ const old='ContraseñaRecuperableDeEmergencia2026';
+ const oldArchive=await encryptPortableBackup(data,old);
+ assert.equal(JSON.stringify(await decryptPortableBackup(oldArchive,old)),JSON.stringify(data),'Portable v1 retains cross-device recovery');
+ console.log('PASS: biometric-gated backup AES-GCM v2, 19,270 synthetic workers, wrong device key, tamper, legacy v1 intact.');
+})().catch(e=>{console.error(e);process.exitCode=1});
