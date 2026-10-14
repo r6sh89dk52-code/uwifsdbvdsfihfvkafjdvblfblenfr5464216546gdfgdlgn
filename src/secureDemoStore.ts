@@ -1,7 +1,8 @@
 /** Etapa A: small prototype dataset only. Large clinical databases require SQLCipher. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
-import {loadWorkerVault,writeWorkerVault} from './privateWorkerVault';
+import {loadWorkerVault,writeWorkerVault,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
+export {workerVaultRecoveryRequired} from './privateWorkerVault';
 
 export type DemoSnapshot<A=unknown,W=unknown,R=unknown>={
   attentions:A[];
@@ -70,7 +71,16 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
   const raw=await SecureStorage.getItem(SECURE_KEY);
   if(raw!==null){
     const parsed=validateDemoSnapshot(JSON.parse(raw));
-    const separate=await loadWorkerVault();
+    let separate:unknown[]|null;
+    try{separate=await loadWorkerVault()}
+    catch(error){
+      if(error instanceof MissingWorkerVaultError){
+        // Keep clinical snapshot unchanged. Missing directory requires user
+        // confirmation to restore. Never create an empty vault on startup.
+        return parsed;
+      }
+      throw error;
+    }
     if(separate!==null){
       if(parsed.workers.length&&JSON.stringify(parsed.workers)!==JSON.stringify(separate))
        throw Error('Existen versiones divergentes del padrón. No se reemplazará automáticamente.');
@@ -86,7 +96,9 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
     return parsed;
   }
   const legacy=readLegacyDemoSnapshot();
-  const detached=await loadWorkerVault();
+  let detached:unknown[]|null;
+  try{detached=await loadWorkerVault()}
+  catch(error){if(error instanceof MissingWorkerVaultError)return legacy;throw error}
   if(detached!==null)throw Error('Existe un padrón privado sin estado principal. Se necesita una recuperación antes de continuar.');
   if(containsData(legacy)){
     await writeWorkerVault(legacy.workers);
@@ -104,6 +116,7 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
   writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
     if(isNativeSecureStore()){
       await configureKeychain();
+      if(workerVaultRecoveryRequired())throw new MissingWorkerVaultError();
       await writeWorkerVault(safe.workers);
       await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...safe,workers:[]}));
     }else{
