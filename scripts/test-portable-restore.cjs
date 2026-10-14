@@ -33,6 +33,7 @@ context.require=name=>{
  if(name==='@aparajita/capacitor-secure-storage')return {SecureStorage:keychainAPI,KeychainAccess:{whenUnlockedThisDeviceOnly:1}};
  if(name==='@capacitor/core')return {Capacitor:{isNativePlatform:()=>true,getPlatform:()=> 'ios'}};
  if(name==='./privateClinicalVault')return mock.clinical;
+ if(name==='./portableBackup')return {decryptPortableBackup:async()=>{throw Error('not used')}};
  if(name==='./privateWorkerVault')return mock.worker;
  throw Error(name);
 };
