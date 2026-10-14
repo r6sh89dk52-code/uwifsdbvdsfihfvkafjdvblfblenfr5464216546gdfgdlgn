@@ -194,3 +194,33 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
   });
   return writeQueue;
 }
+/** Destructive restore is disabled on populated databases. First stage both
+ * encrypted files, then commit the replay journal, then change active refs.
+ * A power loss is resolved by finishPendingRestore() on the next launch.
+ */
+export function hasActiveRecords(snapshot:DemoSnapshot):boolean{return containsData(snapshot)}
+export async function restoreEmptyDeviceFromBackup(backup:unknown):Promise<void>{
+ if(!isNativeSecureStore())throw Error('La restauración requiere la aplicación nativa de iPhone.');
+ const requested=validateDemoSnapshot(backup);
+ const stable=JSON.parse(JSON.stringify(requested)) as DemoSnapshot;
+ writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
+  await configureKeychain();
+  if(workerVaultRecoveryRequired())throw new MissingWorkerVaultError();
+  await finishPendingRestore();
+  const current=await loadDemoSnapshot();
+  if(containsData(current))
+   throw Error('Ya existen trabajadores, atenciones o inventario. No se restaurará encima de una base con registros.');
+  const workerPath=await stageWorkerRestore(stable.workers);
+  const clinicalPath=await stageClinicalRestore({...stable,workers:[]});
+  const record:RestoreJournal={v:1,workerPath,clinicalPath};
+  const journal=JSON.stringify(record);
+  await SecureStorage.setItem(RESTORE_JOURNAL,journal);
+  if(await SecureStorage.getItem(RESTORE_JOURNAL)!==journal)
+   throw Error('No se confirmó la preparación del respaldo.');
+  await finishPendingRestore();
+  const restored=await loadDemoSnapshot();
+  if(JSON.stringify(restored)!==JSON.stringify(stable))
+   throw Error('La restauración no coincide con el respaldo verificado.');
+ });
+ return writeQueue;
+}
