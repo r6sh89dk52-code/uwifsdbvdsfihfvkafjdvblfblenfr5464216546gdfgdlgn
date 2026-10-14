@@ -133,3 +133,9 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
   });
   return writeQueue;
 }
+/** Export-only bridge waits for v0.19 native writes; no storage migration. */
+export async function readStableSnapshotForBackup():Promise<DemoSnapshot>{
+ if(!isNativeSecureStore())throw Error('Respaldo privado disponible solo en iPhone.');
+ await writeQueue;
+ return loadDemoSnapshot();
+}
