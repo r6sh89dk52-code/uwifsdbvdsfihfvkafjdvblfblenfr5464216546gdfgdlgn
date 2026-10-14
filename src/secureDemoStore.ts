@@ -1,8 +1,8 @@
 /** iPhone-only local clinical data with AES-GCM encrypted snapshots. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
-import {loadClinicalVault,writeClinicalVault} from './privateClinicalVault';
-import {loadWorkerVault,writeWorkerVault,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
+import {loadClinicalVault,writeClinicalVault,stageClinicalRestore,verifyStagedClinicalRestore,activateClinicalRestore} from './privateClinicalVault';
+import {loadWorkerVault,writeWorkerVault,stageWorkerRestore,verifyStagedWorkerRestore,activateWorkerRestore,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
 export {workerVaultRecoveryRequired} from './privateWorkerVault';
 
 export type DemoSnapshot<A=unknown,W=unknown,R=unknown>={
