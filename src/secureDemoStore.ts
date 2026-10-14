@@ -28,6 +28,30 @@ const AMBULATORY_RECON='danper-v016-ambulatory-reconciliation';
 const SECURE_KEY='prototype-snapshot-v1';
 const CLINICAL_MARKER=JSON.stringify({format:'encrypted-clinical-v1',version:2});
 const LEGACY_CLINICAL_BACKUP='clinical-v1-legacy-verified-snapshot';
+const RESTORE_JOURNAL='clinical-v1-portable-restore-pending';
+const RESTORE_DONE='finished';
+type RestoreJournal={v:1;workerPath:string;clinicalPath:string};
+/** Recovery journal is replayed on launch before any state becomes visible.
+ * Two staged files are verified before changing either Keychain pointer.
+ */
+async function finishPendingRestore():Promise<void>{
+ const raw=await SecureStorage.getItem(RESTORE_JOURNAL);
+ if(raw===null||raw===RESTORE_DONE)return;
+ let state:RestoreJournal;
+ try{state=JSON.parse(raw) as RestoreJournal}
+ catch{throw Error('Registro de restauración dañado. No se modifican datos.')}
+ if(state?.v!==1||typeof state.workerPath!=='string'||typeof state.clinicalPath!=='string')
+  throw Error('Registro de restauración incompatible. No se modifican datos.');
+ await verifyStagedWorkerRestore(state.workerPath);
+ await verifyStagedClinicalRestore(state.clinicalPath);
+ await activateWorkerRestore(state.workerPath);
+ await activateClinicalRestore(state.clinicalPath);
+ await SecureStorage.setItem(SECURE_KEY,CLINICAL_MARKER);
+ if(await SecureStorage.getItem(SECURE_KEY)!==CLINICAL_MARKER)throw Error('No se confirmó la restauración clínica.');
+ await SecureStorage.setItem(RESTORE_JOURNAL,RESTORE_DONE);
+ if(await SecureStorage.getItem(RESTORE_JOURNAL)!==RESTORE_DONE)
+  throw Error('No se pudo finalizar la restauración. Se reintentará al abrir la aplicación.');
+}
 /** Retain the verified v0.19 Keychain snapshot for manual recovery if iOS loses its file container. */
 async function preserveLegacySnapshot(raw:string):Promise<void>{
  const previous=await SecureStorage.getItem(LEGACY_CLINICAL_BACKUP);
