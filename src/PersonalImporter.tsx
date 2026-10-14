@@ -17,7 +17,7 @@ export default function PersonalImporter({current,onApply}:Props){
  }
  function confirm(){if(!estimated||!preview)return;onApply(estimated.workers);setApplied(true);setPreview(null);}
  return <section className="panel importPanel"><h3><FileSpreadsheet size={18}/> Importar padrón desde Excel</h3>
- <p className="hint">Selecciona el Excel del Indicador Ambulatorio: se leerá <strong>únicamente PERSONAL</strong>. No se importan atenciones ni historias. Los nombres y DNIs del archivo no se incorporan al código de la aplicación.</p>
+ <p className="hint">Selecciona un Excel de padrón que incluya la hoja <strong>PERSONAL</strong>: se leerá únicamente esa hoja. No se importan atenciones ni historias. Los nombres y DNIs del archivo no se incorporan al código de la aplicación.</p>
  <input ref={ref} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Seleccionar Excel de trabajadores" onChange={e=>void pickFile(e.target.files?.[0])} className="importInput" />
  <button type="button" className="workerSecondary wide" onClick={()=>{if(ref.current)ref.current.value='';ref.current?.click()}} disabled={busy}><Upload size={16}/>{busy?'Procesando archivo...':'Seleccionar Excel (.xlsx)'}</button>
  {fileName&&<p className="hint">Archivo seleccionado: {fileName}</p>}
@@ -28,6 +28,6 @@ export default function PersonalImporter({current,onApply}:Props){
  <p className="hint"><strong>La app respeta los cambios manuales existentes</strong> y completa sus campos vacíos con datos importados. Puedes revisar antes de confirmar.</p>
  <div className="importSample"><span>Muestra de registros reconocidos:</span>{preview.workers.slice(0,3).map(w=><div key={w.dni}>{w.dni} — {w.name}</div>)}</div>
  <div className="actions"><button type="button" className="secondary" onClick={()=>setPreview(null)}>Cancelar</button><button type="button" className="primary" onClick={confirm}><CheckCircle2 size={17}/> Confirmar importación</button></div></div>}
- <p className="hint">Versión de pruebas: los datos confirmados se guardan en el navegador sin cifrado. Utiliza únicamente información ficticia o anonimizada hasta la protección nativa.</p>
+ <p className="hint">Versión de pruebas: en navegador se guardan sin cifrado y en iPhone se usa un almacenamiento provisional protegido con Keychain. No importar datos identificables reales hasta habilitar la base cifrada de producción.</p>
  </section>
 }
