@@ -224,3 +224,12 @@ export async function restoreEmptyDeviceFromBackup(backup:unknown):Promise<void>
  });
  return writeQueue;
 }
+
+/** Wait for all previously queued native writes before exporting a backup.
+ * A failed write blocks export rather than silently archiving stale data.
+ */
+export async function readStableSnapshotForBackup():Promise<DemoSnapshot>{
+ if(!isNativeSecureStore())throw Error('Respaldo privado disponible solo en iPhone.');
+ await writeQueue;
+ return loadDemoSnapshot();
+}
