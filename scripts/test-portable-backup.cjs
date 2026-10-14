@@ -3,9 +3,9 @@ const vm=require('node:vm'),fs=require('node:fs'),ts=require('typescript');
 const {webcrypto,randomUUID}=require('node:crypto');
 const source=fs.readFileSync('src/portableBackup.ts','utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-const exports={},module={exports};
-vm.runInNewContext(compiled,{module,exports,crypto:{subtle:webcrypto.subtle,getRandomValues:a=>webcrypto.getRandomValues(a),randomUUID},TextEncoder,TextDecoder,Uint8Array,Promise,Date,Error,JSON,Object,Array,String,Number,ArrayBuffer,atob:s=>Buffer.from(s,'base64').toString('latin1'),btoa:s=>Buffer.from(s,'latin1').toString('base64')},{filename:'portableBackup.js'});
-const {encryptPortableBackup,decryptPortableBackup}=module.exports;
+const virtualExports={},virtualModule={exports:virtualExports};
+vm.runInNewContext(compiled,{module:virtualModule,exports:virtualExports,crypto:{subtle:webcrypto.subtle,getRandomValues:a=>webcrypto.getRandomValues(a),randomUUID},TextEncoder,TextDecoder,Uint8Array,Promise,Date,Error,JSON,Object,Array,String,Number,ArrayBuffer,atob:s=>Buffer.from(s,'base64').toString('latin1'),btoa:s=>Buffer.from(s,'latin1').toString('base64')},{filename:'portableBackup.js'});
+const {encryptPortableBackup,decryptPortableBackup}=virtualModule.exports;
 (async()=>{
  const snapshot={
   attentions:Array.from({length:250},(_,i)=>({id:'A'+i,diagnosis:'DIAGNOSTICO DE PRUEBA'})),
