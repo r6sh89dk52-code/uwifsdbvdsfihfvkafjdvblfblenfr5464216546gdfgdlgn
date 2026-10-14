@@ -14,7 +14,7 @@ const mock={
  clinical:{
   loadClinicalVault:async()=>activeClinical,
   writeClinicalVault:async snapshot=>{activeClinical=JSON.parse(JSON.stringify(snapshot))},
-  stageClinicalRestore:async snapshot=>{const path='clinical-'+(++seq);preparedClinical.set(path,JSON.parse(JSON.stringify(snapshot)));return path},
+  stageClinicalRestore:async snapshot=>{if(verifiedFails)throw Error('clinical staging damaged');const path='clinical-'+(++seq);preparedClinical.set(path,JSON.parse(JSON.stringify(snapshot)));return path},
   verifyStagedClinicalRestore:async path=>{if(verifiedFails||!preparedClinical.has(path))throw Error('clinical staging damaged')},
   activateClinicalRestore:async path=>{if(clinicalCommitFail){clinicalCommitFail=false;throw Error('simulated iOS crash')}activeClinical=preparedClinical.get(path)}
  },
