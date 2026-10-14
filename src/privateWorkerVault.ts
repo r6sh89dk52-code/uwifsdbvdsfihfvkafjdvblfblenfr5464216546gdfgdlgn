@@ -16,6 +16,34 @@ function isMissingFileError(error:unknown){
  return /does not exist|no such file|\bENOENT\b|file not found/i.test(message);
 }
 
+/**
+ * iOS Filesystem.mkdir({recursive:true}) is NOT idempotent: when the
+ * directory already exists it can throw "already exists, cannot be overwritten".
+ * Check its actual type first, and accept a concurrent creator only after
+ * stat confirms the destination is a directory. Never delete a folder.
+ */
+async function ensurePrivateDirectory():Promise<void>{
+ const path='danper/private';
+ const location={path,directory:Directory.Data};
+ try{
+  const existing=await Filesystem.stat(location);
+  if(existing.type!=='directory')throw Error('La ruta del padrón existe, pero no es una carpeta. No se modificará.');
+  return;
+ }catch(error){
+  if(!isMissingFileError(error))throw error;
+ }
+ try{
+  await Filesystem.mkdir({...location,recursive:true});
+ }catch(error){
+  // Another save may have created the directory between stat and mkdir.
+  // Do not swallow permission errors or overwrite a file at this path.
+  let found;
+  try{found=await Filesystem.stat(location)}catch{throw error}
+  if(found.type!=='directory')throw error;
+ }
+ const confirmed=await Filesystem.stat(location);
+ if(confirmed.type!=='directory')throw Error('No se pudo confirmar la carpeta privada del padrón.');
+}
 function b64(data:Uint8Array){
  let s='';for(let n=0;n<data.length;n+=6000)s+=String.fromCharCode(...data.subarray(n,n+6000));
  return btoa(s);
@@ -77,7 +105,7 @@ async function commitWorkerVault(rows:unknown[],explicitRestore:boolean):Promise
  const key=await secret(),iv=crypto.getRandomValues(new Uint8Array(12));
  const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(data)));
  const path='danper/private/workers-'+crypto.randomUUID()+'.enc';
- await Filesystem.mkdir({path:'danper/private',directory:Directory.Data,recursive:true});
+ await ensurePrivateDirectory();
  await Filesystem.writeFile({path,directory:Directory.Data,encoding:Encoding.UTF8,
   data:JSON.stringify({version:1,iv:b64(iv),payload:b64(cipher)})});
  const check=await decode(path,key);
