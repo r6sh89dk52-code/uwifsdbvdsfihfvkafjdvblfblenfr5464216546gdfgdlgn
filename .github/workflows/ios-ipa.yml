@@ -55,7 +55,7 @@ jobs:
       - name: Adjuntar IPA descargable
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER-Salud-Movil-iPhone-v0.20.8-REDISENO-ETAPA-A-EXPERIMENTAL
+          name: DANPER-Salud-Movil-iPhone-v0.20.9-ATENCION-POR-ETAPAS-EXPERIMENTAL
           path: |
             outputs/*.ipa
             outputs/*.sha256
