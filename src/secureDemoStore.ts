@@ -106,6 +106,7 @@ async function configureKeychain(){
 export async function loadDemoSnapshot():Promise<DemoSnapshot>{
  if(!isNativeSecureStore())return readLegacyDemoSnapshot();
  await configureKeychain();
+ await finishPendingRestore();
  const raw=await SecureStorage.getItem(SECURE_KEY);
  const prior=raw!==null&&raw!==CLINICAL_MARKER?validateDemoSnapshot(JSON.parse(raw)):null;
  const encrypted=await loadClinicalVault();
@@ -171,6 +172,8 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
   writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
     if(isNativeSecureStore()){
       await configureKeychain();
+      const pending=await SecureStorage.getItem(RESTORE_JOURNAL);
+      if(pending!==null&&pending!==RESTORE_DONE)throw Error('Restauración pendiente. No se permiten guardados.');
       if(workerVaultRecoveryRequired())throw new MissingWorkerVaultError();
       await writeWorkerVault(safe.workers);
       await writeClinicalVault({...safe,workers:[]});
