@@ -70,6 +70,8 @@ function consumedByCode(plan:ExportPlan){
 export function sharedMonthlyReconciliation(ledger:StockLedger,plan:ExportPlan):ReconciliationPlan{
  if(!validExportDate(plan.start)||!validExportDate(plan.end)||plan.start>plan.end)throw Error('Período del informe inválido.');
  const check=validateStockLedger(ledger);
+ const today=limaDate(Date.now());
+ const periodClosed=plan.end<=today;
  const consumption=consumedByCode(plan),byCode:Record<string,MaterialCutoff>={},warnings:string[]=[];
  for(const p of products)byCode[p.code]={code:p.code,consumed:consumption.get(p.code)||0,receiptDetails:[]};
  let openingConfirmed=0,receiptsConfirmed=0;
@@ -77,7 +79,7 @@ export function sharedMonthlyReconciliation(ledger:StockLedger,plan:ExportPlan):
   const meta=official.get(code);
   if(!meta)throw Error('Código oficial no registrado: '+code);
   const lots=check.lots.filter(l=>codes.includes(l.code));
-  if(!lots.length)continue; // never convert absence to a confirmed zero
+  if(!lots.length||plan.start>today)continue; // never convert absence to a confirmed zero
   let opening=0,closing=0,valid=true;
   for(const l of lots){
    const initial=timeline(l,check.movements,plan.start,false);
@@ -111,18 +113,23 @@ export function sharedMonthlyReconciliation(ledger:StockLedger,plan:ExportPlan):
   if(receipts.length>4){warnings.push(meta.name+': más de cuatro ingresos; el formato oficial solo admite cuatro.');continue}
   const received=receipts.reduce((n,m)=>n+m.quantity,0),issued=consumption.get(code)||0;
   // Do not report a false closing balance if confirmed visits and stock movement disagree.
-  if(rnd(opening+received-issued)!==rnd(closing)){
+  if(periodClosed&&rnd(opening+received-issued)!==rnd(closing)){
    warnings.push(meta.name+': el saldo físico no coincide con las entregas confirmadas en CONSUMOS; revisar.');
    continue;
   }
   const cutoff=byCode[code];
   cutoff.opening=rnd(opening);
-  cutoff.receipts=rnd(received);
-  cutoff.receiptDetails=receipts;
-  cutoff.closing=rnd(closing);
+  if(periodClosed){
+   cutoff.receipts=rnd(received);
+   cutoff.receiptDetails=receipts;
+   cutoff.closing=rnd(closing);
+  }
+  // A future month's remaining movements are unknowable.
+  // Its report can be drafted but cannot claim a verified final/zero receipts.
   openingConfirmed++;
   receiptsConfirmed+=receipts.length;
  }
+ if(!periodClosed)warnings.push('Período mensual todavía en curso; ingresos y saldos finales permanecen pendientes del cierre.');
  if(openingConfirmed<products.length)warnings.push('Inventario pendiente para '+(products.length-openingConfirmed)+' de los 432 códigos oficiales; sus saldos quedan vacíos.');
  warnings.push('CONTEO se deja vacío hasta registrar un recuento físico independiente: no equivale al saldo calculado.');
  return {byCode,openingConfirmed,countConfirmed:0,receiptsConfirmed,reviewed:false,warnings};
