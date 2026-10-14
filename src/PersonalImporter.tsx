@@ -24,10 +24,11 @@ export default function PersonalImporter({current,onApply}:Props){
  {error&&<p role="alert" className="importError"><AlertTriangle size={16}/> {error}</p>}
  {applied&&<p role="status" className="importSuccess"><CheckCircle2 size={16}/> Padrón de prueba incorporado. Busca al trabajador por DNI o nombre.</p>}
  {preview&&estimated&&<div className="importPreview"><strong>Vista previa de importación</strong><div className="previewStats"><div><b>{preview.stats.valid}</b><span>DNIs únicos válidos</span></div><div><b>{estimated.stats.added}</b><span>Nuevos</span></div><div><b>{estimated.stats.merged}</b><span>Ya existentes</span></div></div>
- <p className="hint">DNI inválido: {preview.stats.invalidDni}. Sin nombre: {preview.stats.withoutName}. DNI repetido dentro del Excel: {preview.stats.duplicates}. Fichas manuales conservadas: {estimated.stats.manualPreserved}.</p>
+ <p className="hint">DNI inválido: {preview.stats.invalidDni}. Sin nombre: {preview.stats.withoutName}. DNI repetido dentro del Excel: {preview.stats.duplicates}. Sexo vacío: {preview.stats.sexMissing}. Sexo fuera del catálogo: {preview.stats.sexInvalid}. Sexo contradictorio entre duplicados: {preview.stats.sexConflicts}. Fichas manuales conservadas: {estimated.stats.manualPreserved}.</p>
+ {(preview.stats.sexConflicts>0||preview.stats.sexInvalid>0)&&<p className="kardexError" role="alert">Hay valores de sexo que requieren verificación. No se deducirá el sexo por el nombre ni se elegirán códigos contradictorios automáticamente.</p>}
  <p className="hint"><strong>La app respeta los cambios manuales existentes</strong> y completa sus campos vacíos con datos importados. Puedes revisar antes de confirmar.</p>
  <div className="importSample"><span>Muestra de registros reconocidos:</span>{preview.workers.slice(0,3).map(w=><div key={w.dni}>{w.dni} — {w.name}</div>)}</div>
  <div className="actions"><button type="button" className="secondary" onClick={()=>setPreview(null)}>Cancelar</button><button type="button" className="primary" onClick={confirm}><CheckCircle2 size={17}/> Confirmar importación</button></div></div>}
- <p className="hint">Versión de pruebas: en navegador se guardan sin cifrado y en iPhone se usa un almacenamiento provisional protegido con Keychain. No importar datos identificables reales hasta habilitar la base cifrada de producción.</p>
+ <p className="hint">En iPhone el padrón se guarda localmente en un archivo cifrado AES-GCM, con clave privada en Keychain. El navegador sigue siendo un entorno de prueba sin cifrar. La información clínica todavía requiere una migración a una base segura antes de su uso real.</p>
  </section>
 }
