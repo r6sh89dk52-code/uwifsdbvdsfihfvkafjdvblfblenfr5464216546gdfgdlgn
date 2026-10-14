@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {unzipSync} from 'fflate';
 import {FileSpreadsheet,Share2} from 'lucide-react';
 import {type StockLedger} from './kardexMovements';
-import {buildDailyReport} from './dailyKardex';
+import {buildDailyReport,buildKardexRangeReport} from './dailyKardex';
 import {exportOfficialKardex,reportFilename} from './kardexExcelTemplate';
 import {shareXlsx} from './shareKardexFile';
 
@@ -11,6 +11,9 @@ const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getM
 export default function KardexDailyExport({ledger,responsible}:Props){
  const [date,setDate]=useState(localDate);
  const [turn,setTurn]=useState('');
+ const [mode,setMode]=useState<'daily'|'weekly'|'custom'>('daily');
+ const [rangeStart,setRangeStart]=useState(localDate);
+ const [rangeEnd,setRangeEnd]=useState(localDate);
  const [template,setTemplate]=useState<Uint8Array|null>(null);
  const [templateStatus,setTemplateStatus]=useState<'loading'|'ready'|'missing'>('loading');
  const [error,setError]=useState('');
@@ -19,7 +22,15 @@ export default function KardexDailyExport({ledger,responsible}:Props){
  const [filter,setFilter]=useState('');
  const [previewPage,setPreviewPage]=useState(0);
  const pageSize=20;
- const result=useMemo(()=>{try{return {report:buildDailyReport(ledger,date,counts),error:''}}catch(e){return {report:null,error:e instanceof Error?e.message:'No se pudo generar el reporte.'}}},[ledger,date,counts]);
+ const weekly=useMemo(()=>{
+  const day=new Date(date+'T12:00:00Z'),shift=(day.getUTCDay()+6)%7;
+  const monday=new Date(Date.UTC(day.getUTCFullYear(),day.getUTCMonth(),day.getUTCDate()-shift)).toISOString().slice(0,10);
+  const sunday=new Date(Date.UTC(day.getUTCFullYear(),day.getUTCMonth(),day.getUTCDate()+6-shift)).toISOString().slice(0,10);
+  return{start:monday,end:sunday>localDate()?localDate():sunday};
+ },[date]);
+ const from=mode==='daily'?date:mode==='weekly'?weekly.start:rangeStart;
+ const to=mode==='daily'?date:mode==='weekly'?weekly.end:rangeEnd;
+ const result=useMemo(()=>{try{return{report:mode==='daily'?buildDailyReport(ledger,date,counts):buildKardexRangeReport(ledger,from,to,counts),error:''}}catch(e){return{report:null,error:e instanceof Error?e.message:'No se pudo generar el reporte.'}}},[ledger,mode,date,from,to,counts]);
  const simplify=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const rows=result.report?.rows.filter(r=>simplify(r.name).includes(simplify(filter)))||[];
  const pageCount=Math.max(1,Math.ceil(rows.length/pageSize));
@@ -48,21 +59,26 @@ export default function KardexDailyExport({ledger,responsible}:Props){
   if(!result.report||!template)return;
   setError('');setBusy(true);
   try{
-   if(!turn)throw Error('Selecciona un turno.');
-   const xlsx=exportOfficialKardex(template,result.report,turn,responsible);
-   await shareXlsx(reportFilename(date),xlsx);
+   if(mode==='daily'&&!turn)throw Error('Selecciona un turno.');
+   const xlsx=exportOfficialKardex(template,result.report,mode==='daily'?turn:'CONSOLIDADO',responsible);
+   await shareXlsx(mode==='daily'?reportFilename(date):'DANPER_Kardex_'+from+'_al_'+to+'.xlsx',xlsx);
   }catch(e){setError(e instanceof Error?e.message:'No fue posible exportar el archivo Excel.')}
   finally{setBusy(false)}
  }
  return <section className="panel kardexDaily">
-  <h3><FileSpreadsheet size={18}/>Reporte diario · Excel oficial</h3>
-  <p className="hint">Selecciona la fecha y el turno. El Excel conserva exclusivamente «KARDEX ENFERMERAS»: 98 productos y mismo formato de impresión; no incluye donados. Todo se procesa localmente.</p>
+  <h3><FileSpreadsheet size={18}/>Kardex · Excel oficial de Enfermería</h3>
+  <p className="hint">Reportes diarios, semanales o de rango personalizado con el mismo inventario físico. El Kardex no utiliza el corte mensual del Indicador.</p>
+  <label>Modalidad de reporte<select value={mode} onChange={e=>{setMode(e.target.value as 'daily'|'weekly'|'custom');setCounts({});setPreviewPage(0)}}><option value="daily">Diario</option><option value="weekly">Semanal</option><option value="custom">Rango personalizado</option></select></label>
   <div className="fields two">
-   <label>Fecha del reporte<input type="date" value={date} max={localDate()} onChange={e=>{setDate(e.target.value);setCounts({});setPreviewPage(0);setError('')}}/></label>
-   <label>Turno<select value={turn} onChange={e=>setTurn(e.target.value)}><option value="">Seleccionar turno…</option><option>MAÑANA</option><option>TARDE</option><option>NOCHE</option></select></label>
+   {mode!=='custom'?<label>{mode==='weekly'?'Día de la semana a consultar':'Fecha del reporte'}<input type="date" value={date} max={localDate()} onChange={e=>{setDate(e.target.value);setCounts({});setPreviewPage(0);setError('')}}/></label>:<>
+    <label>Desde<input type="date" value={rangeStart} max={localDate()} onChange={e=>{setRangeStart(e.target.value);setCounts({});setPreviewPage(0)}}/></label>
+    <label>Hasta<input type="date" value={rangeEnd} max={localDate()} onChange={e=>{setRangeEnd(e.target.value);setCounts({});setPreviewPage(0)}}/></label>
+   </>}
+   {mode==='daily'&&<label>Turno<select value={turn} onChange={e=>setTurn(e.target.value)}><option value="">Seleccionar turno…</option><option>MAÑANA</option><option>TARDE</option><option>NOCHE</option></select></label>}
   </div>
+  {mode!=='daily'&&<p className="hint">Reporte consolidado del {from} al {to} (ambos incluidos). No se duplica el saldo inicial entre días.</p>}
   <p className="hint" role="status">{templateStatus==='ready'?'Plantilla oficial interna preparada. No es necesario importar ningún Excel.':templateStatus==='loading'?'Preparando el formato oficial del Kardex…':'Formato original interno pendiente de integración.'}</p>
-  <p className="hint">Responsable: {responsible}. El cálculo cubre el día completo. El turno identifica el reporte, pero no filtra horas: aún no hay saldos históricos comprobables por turno.</p>
+  <p className="hint">Responsable: {responsible}. El cálculo se realiza por día completo. En modo diario el turno identifica el reporte, sin filtrar horas.</p>
   {result.error&&<p className="kardexError" role="alert">{result.error}</p>}
   {result.report&&<>
    <div className="kardexStats"><div><strong>98</strong><span>Enfermeras</span></div><div><strong>{result.report.warnings.length}</strong><span>Observaciones</span></div></div>
@@ -88,7 +104,7 @@ export default function KardexDailyExport({ledger,responsible}:Props){
    </details>
   </>}
   {error&&<p className="kardexError" role="alert">{error}</p>}
-  <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!result.report?.exportable||!template||!turn||busy} onClick={()=>void exportReport()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel y compartir'}</button></div>
+  <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!result.report?.exportable||!template||(mode==='daily'&&!turn)||busy} onClick={()=>void exportReport()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel y compartir'}</button></div>
   <p className="hint">Datos ficticios. No se modifica el historial de atenciones, inventario ni movimientos al exportar. F/S se calcula únicamente a partir de los recuentos físicos introducidos; no se inventan saldos pendientes.</p>
  </section>;
 }

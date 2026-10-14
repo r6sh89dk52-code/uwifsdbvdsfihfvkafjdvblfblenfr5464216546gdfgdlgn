@@ -47,7 +47,7 @@ function ensure(source:Document,tab:string){
 }
 export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shift:string,responsible:string):Uint8Array{
  if(!report.exportable)throw Error('El reporte contiene observaciones sin conciliar. Revísalas antes de exportar.');
- if(!['MAÑANA','TARDE','NOCHE'].includes(shift))throw Error('Elige un turno válido.');
+ if(!['MAÑANA','TARDE','NOCHE','CONSOLIDADO'].includes(shift))throw Error('Elige un turno válido.');
  if(!responsible.trim())throw Error('Indica el responsable del registro.');
  let zip:Record<string,Uint8Array>;
  try{zip=unzipSync(template)}catch{throw Error('Selecciona un archivo .xlsx válido.')}
@@ -76,7 +76,9 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
  const dd=report.date.split('-').reverse().join('/');
  setText(regular,'A3','TURNO: '+shift);
  setText(regular,'A4','RESPONSABLE: '+responsible.trim());
- setText(regular,'I3','FECHA: '+dd);
+ setText(regular,'I3',report.periodEnd&&report.periodEnd!==report.date
+  ?'PERÍODO: '+dd+' AL '+report.periodEnd.split('-').reverse().join('/')
+  :'FECHA: '+dd);
  report.rows.filter(r=>!r.donated).forEach((r,i)=>{
   const row=i+7;
   setNum(regular,'D'+row,r.stockKnown?r.initial:null);
