@@ -20,7 +20,7 @@
     "@aparajita/capacitor-secure-storage": "7.1.6",
     "@capacitor/core": "^7.0.0",
     "@capacitor/filesystem": "^7.0.0",
-    "@capacitor/haptics": "7.0.0",
+    "@capacitor/haptics": "7.0.2",
     "@capacitor/local-notifications": "^7.0.0",
     "@capacitor/share": "^7.0.0",
     "fflate": "^0.8.2",
