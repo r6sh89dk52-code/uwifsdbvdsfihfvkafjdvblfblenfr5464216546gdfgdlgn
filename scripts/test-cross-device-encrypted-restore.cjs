@@ -70,7 +70,7 @@ function phone(){
  };
  await source.secure.writeDemoSnapshot(synthetic);
  const loaded=await source.secure.readStableSnapshotForBackup();
- assert.equal(JSON.stringify(loaded),JSON.stringify(synthetic),'source iPhone save and read');
+ assert.deepEqual(JSON.parse(JSON.stringify(loaded)),JSON.parse(JSON.stringify(synthetic)),'source iPhone save and read');
  const password='ClaveFicticiaDemo2026%';
  const archive=await source.portable.encryptPortableBackup(loaded,password);
  assert(!archive.includes('EMPLEADO FICTICIO')&&!archive.includes('EJEMPLO DEMO'),'no plaintext in exported archive');
@@ -82,12 +82,12 @@ function phone(){
  const restored=await destination.portable.decryptPortableBackup(archive,password);
  await destination.secure.restoreEmptyDeviceFromBackup(restored);
  const newData=await destination.secure.loadDemoSnapshot();
- assert.equal(JSON.stringify(newData),JSON.stringify(synthetic),'all clinical and inventory fields restored exactly');
+ assert.deepEqual(JSON.parse(JSON.stringify(newData)),JSON.parse(JSON.stringify(synthetic)),'all clinical and inventory fields restored exactly');
  assert.notEqual(destination.keys.get('workers-v1-aes-key'),source.keys.get('workers-v1-aes-key'),'new device must generate different private worker key');
  assert.notEqual(destination.keys.get('clinical-v1-aes256-key'),source.keys.get('clinical-v1-aes256-key'),'new device must generate different clinical key');
  assert.equal(destination.keys.get('clinical-v1-portable-restore-pending'),'finished');
  const restarted=destination.simulateRestart();
- assert.equal(JSON.stringify(await restarted.loadDemoSnapshot()),JSON.stringify(synthetic),'restart re-opens restored snapshot');
+ assert.deepEqual(JSON.parse(JSON.stringify(await restarted.loadDemoSnapshot())),JSON.parse(JSON.stringify(synthetic)),'restart re-opens restored snapshot');
  const beforePointer=destination.keys.get('clinical-v1-active-file');
  await assert.rejects(restarted.restoreEmptyDeviceFromBackup(restored),/Ya existen trabajadores/,'no replacing a populated iPhone');
  assert.equal(destination.keys.get('clinical-v1-active-file'),beforePointer);
