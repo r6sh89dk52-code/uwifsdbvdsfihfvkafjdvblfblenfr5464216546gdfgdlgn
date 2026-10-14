@@ -52,7 +52,7 @@ export function exportOfficialKardex(template:Uint8Array,report:DailyReport,shif
  let zip:Record<string,Uint8Array>;
  try{zip=unzipSync(template)}catch{throw Error('Selecciona un archivo .xlsx válido.')}
  const files=['xl/workbook.xml','xl/worksheets/sheet1.xml','xl/worksheets/sheet2.xml','xl/styles.xml','xl/sharedStrings.xml'];
- if(files.some(x=>!zip[x]))throw Error('La plantilla no contiene los componentes esperados.');
+ if(files.filter((_,i)=>i!==1).some(x=>!zip[x]))throw Error('La plantilla no contiene los componentes esperados.');
  const workbook=decode(zip[files[0]]),regular=decode(zip[files[2]]);
  const strings=decode(zip['xl/sharedStrings.xml']);
  const sharedStrings=Array.from(strings.getElementsByTagNameNS(NS,'si')).map(si=>si.textContent||'');
