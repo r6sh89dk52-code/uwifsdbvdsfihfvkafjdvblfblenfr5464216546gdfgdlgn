@@ -28,7 +28,7 @@ const mock={
   activateWorkerRestore:async path=>{activeWorkers=preparedWorkers.get(path)}
  }
 };
-const module={exports:{}},context={module,exports:module.exports,localStorage,JSON,Object,Array,String,Error,Promise};
+const virtualModule={exports:{}},context={module:virtualModule,exports:virtualModule.exports,localStorage,JSON,Object,Array,String,Error,Promise};
 context.require=name=>{
  if(name==='@aparajita/capacitor-secure-storage')return {SecureStorage:keychainAPI,KeychainAccess:{whenUnlockedThisDeviceOnly:1}};
  if(name==='@capacitor/core')return {Capacitor:{isNativePlatform:()=>true,getPlatform:()=> 'ios'}};
@@ -37,7 +37,7 @@ context.require=name=>{
  throw Error(name);
 };
 vm.runInNewContext(code,context,{filename:'secureDemoStore.js'});
-const store=module.exports;
+const store=virtualModule.exports;
 (async()=>{
  const sample={attentions:[{id:'VISITA FICTICIA'}],workers:[{dni:'12345678',name:'TRABAJADOR DEMO'}],allergies:{},notifications:false,stockLots:[],stockMovements:[],catalogMappings:[],deliveryIncidents:[],ambulatoryReconciliation:[]};
  workerFails=true;
