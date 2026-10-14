@@ -1,7 +1,6 @@
 /** iPhone-only local clinical data with AES-GCM encrypted snapshots. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
-import {Filesystem,Directory} from '@capacitor/filesystem';
 import {decryptPortableBackup} from './portableBackup';
 import {loadClinicalVault,writeClinicalVault,stageClinicalRestore,verifyStagedClinicalRestore,activateClinicalRestore} from './privateClinicalVault';
 import {loadWorkerVault,writeWorkerVault,stageWorkerRestore,verifyStagedWorkerRestore,activateWorkerRestore,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
@@ -320,12 +319,13 @@ export async function resetDisposableLocalDatabase():Promise<void>{
   // Drain earlier writes, including failures; no new snapshot may be enqueued.
   await writeQueue.catch(()=>undefined);
   await configureKeychain();
+  const {Filesystem,Directory}=await import('@capacitor/filesystem');
   const location={path:'danper',directory:Directory.Data};
   let present=false;
   try{await Filesystem.stat(location);present=true}
   catch(error){
    const message=error instanceof Error?error.message:String(error);
-   if(!/does not exist|no such file|\\bENOENT\\b|file not found/i.test(message))throw error;
+   if(!/does not exist|no such file|ENOENT|file not found/i.test(message))throw error;
   }
   if(present){
    await Filesystem.rmdir({...location,recursive:true});
@@ -334,7 +334,7 @@ export async function resetDisposableLocalDatabase():Promise<void>{
     throw Error('Persisten archivos privados tras el intento de reinicio.');
    }catch(error){
     const message=error instanceof Error?error.message:String(error);
-    if(!/does not exist|no such file|\\bENOENT\\b|file not found/i.test(message))throw error;
+    if(!/does not exist|no such file|ENOENT|file not found/i.test(message))throw error;
    }
   }
   // Clear only keys in the existing DANPER prefix. iOS Keychain may survive app uninstall.
