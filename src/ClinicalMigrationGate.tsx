@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {migrateFromVerifiedPortableBackup} from './secureDemoStore';
+import FreshStartPanel from './FreshStartPanel';
 import {feedback} from './nativeHaptics';
 
 /** No app state mounts while this gate is visible. Nothing is exported,
@@ -58,6 +59,6 @@ export default function ClinicalMigrationGate(){
    {status&&<p role="status" className="hint">{status}</p>}
    {error&&<p className="importError" role="alert">{error}</p>}
   </section>
-  <p className="hint">No desinstales la aplicación ni borres sus datos. Si no tienes un respaldo actualizado, conserva el archivo anterior y consulta antes de continuar.</p>
+  <p className="hint">No desinstales la aplicación ni borres sus datos a menos que sepas con certeza que todos los registros existentes son ficticios y prescindibles.</p><FreshStartPanel/>
  </main></div>;
 }
