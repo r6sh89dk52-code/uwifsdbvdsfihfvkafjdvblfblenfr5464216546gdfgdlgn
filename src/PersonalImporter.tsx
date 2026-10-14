@@ -12,7 +12,9 @@ export default function PersonalImporter({current,onApply,linkedDnis=[]}:Props){
  const [error,setError]=useState('');
  const [applied,setApplied]=useState(false);
  const estimated=preview?reconcileWorkers(current,preview.workers):null;
- const compared=preview&&current.length?reviewOfficialRoster(current,preview.workers,linkedDnis):null;
+ let compared:ReturnType<typeof reviewOfficialRoster>|null=null;
+ let reviewError='';
+ if(preview&&current.length){try{compared=reviewOfficialRoster(current,preview.workers,linkedDnis)}catch(e){reviewError=e instanceof Error?e.message:'No pudo conciliarse el padrón oficial.'}}
  async function pickFile(file?:File){if(!file)return;setBusy(true);setPreview(null);setApplied(false);setError('');setFileName(file.name);
   try{setPreview(await readPersonal(file));}catch(e){setError(e instanceof Error?e.message:'No se pudo interpretar el Excel.');}
   finally{setBusy(false)}
@@ -34,6 +36,7 @@ export default function PersonalImporter({current,onApply,linkedDnis=[]}:Props){
  <p className="hint">Comparación con el padrón existente: {estimated.stats.added} nuevos, {estimated.stats.merged} ya registrados. Cambios de nombres por revisar: {estimated.stats.nameConflicts}. Cambios M/F por revisar: {estimated.stats.sexConflicts}. Los DNI existentes conservan una sola ficha.</p>
  {(preview.stats.sexConflicts>0||preview.stats.sexInvalid>0||estimated.stats.nameConflicts>0||estimated.stats.sexConflicts>0)&&<p className="kardexError" role="alert">Hay datos de identidad o sexo que requieren verificación. Nunca se deduce el sexo por el nombre; si un DNI ya existe, no se reemplazan automáticamente nombres ni sexos contradictorios.</p>}
  <p className="hint"><strong>La app respeta los cambios manuales existentes</strong> y completa sus campos vacíos con datos importados. Puedes revisar antes de confirmar.</p>
+ {reviewError&&<p className="importError" role="alert">Revisión bloqueada: {reviewError}. No se eliminó ningún trabajador.</p>}
  {compared&&<section className="panel" aria-label="Conciliación de padrón oficial (solo lectura)">
   <h4>Revisión del padrón REAL: únicamente vista previa</h4>
   <p className="hint">El Excel PERSONAL es la referencia de DNI reales. No basta con que un DNI no aparezca para asegurar que sea ficticio; esta pantalla no borra ningún trabajador.</p>
