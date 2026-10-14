@@ -58,7 +58,10 @@ public class DanperBackupKeyPlugin: CAPPlugin, CAPBridgedPlugin {
                 var status = SecItemCopyMatching(query as CFDictionary, &result)
                 if status == errSecItemNotFound && allowCreate {
                     var randomKey = [UInt8](repeating: 0, count: 32)
-                    guard SecRandomCopyBytes(kSecRandomDefault, randomKey.count, &randomKey) == errSecSuccess else {
+                    let generated = randomKey.withUnsafeMutableBytes { buffer in
+                        SecRandomCopyBytes(kSecRandomDefault, buffer.count, buffer.baseAddress!)
+                    }
+                    guard generated == errSecSuccess else {
                         call.reject("No se pudo generar una clave cifrada de respaldo.")
                         return
                     }
