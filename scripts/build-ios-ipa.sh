@@ -4,6 +4,12 @@ cd "$(dirname "$0")/.."
 command -v xcodebuild >/dev/null || { echo 'ERROR: Se necesita macOS y Xcode'; exit 2; }
 [ -d ios/App/App.xcworkspace ] || { echo 'ERROR: Ejecuta npx cap add ios y npx cap sync ios'; exit 2; }
 [ -f resources/icon.png ] || { echo 'ERROR: Falta icono'; exit 2; }
+# Face ID privacy declaration must be embedded in compiled application, not
+# merely changed in an unsigned IPA after compilation.
+PLIST="ios/App/App/Info.plist"
+[ -f "$PLIST" ] || { echo 'ERROR: falta Info.plist de iOS'; exit 4; }
+/usr/libexec/PlistBuddy -c "Print :NSFaceIDUsageDescription" "$PLIST" >/dev/null 2>&1 || \
+  /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string DANPER Salud Movil utiliza Face ID para proteger registros de salud ocupacional en este iPhone." "$PLIST"
 node scripts/apply-ios-icon.mjs
 mkdir -p outputs
 xcodebuild \
@@ -26,7 +32,7 @@ cp -R "$APP" "$TMP/Payload/"
 VERSION=$(node -p "require('./package.json').version")
 # Las versiones del IPA deben coincidir con la release, sin modificar el ejecutable.
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$TMP/Payload/App.app/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 162" "$TMP/Payload/App.app/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 206" "$TMP/Payload/App.app/Info.plist"
 FILENAME="DanperSaludMovil-v${VERSION}-SIN_FIRMAR.ipa"
 ( cd "$TMP" && /usr/bin/zip -qry "$OLDPWD/outputs/$FILENAME" Payload )
 ( cd outputs && shasum -a 256 "$FILENAME" > "$FILENAME.sha256" )
