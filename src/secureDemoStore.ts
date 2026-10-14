@@ -1,6 +1,7 @@
 /** Etapa A: small prototype dataset only. Large clinical databases require SQLCipher. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
+import {loadWorkerVault,writeWorkerVault} from './privateWorkerVault';
 
 export type DemoSnapshot<A=unknown,W=unknown,R=unknown>={
   attentions:A[];
@@ -69,14 +70,30 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
   const raw=await SecureStorage.getItem(SECURE_KEY);
   if(raw!==null){
     const parsed=validateDemoSnapshot(JSON.parse(raw));
+    const separate=await loadWorkerVault();
+    if(separate!==null){
+      if(parsed.workers.length&&JSON.stringify(parsed.workers)!==JSON.stringify(separate))
+       throw Error('Existen versiones divergentes del padrón. No se reemplazará automáticamente.');
+      if(parsed.workers.length)await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...parsed,workers:[]}));
+      clearLegacyDemoSnapshot();
+      return {...parsed,workers:separate};
+    }
+    if(parsed.workers.length){
+      await writeWorkerVault(parsed.workers);
+      await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...parsed,workers:[]}));
+    }
     clearLegacyDemoSnapshot();
     return parsed;
   }
   const legacy=readLegacyDemoSnapshot();
+  const detached=await loadWorkerVault();
+  if(detached!==null)throw Error('Existe un padrón privado sin estado principal. Se necesita una recuperación antes de continuar.');
   if(containsData(legacy)){
-    await SecureStorage.setItem(SECURE_KEY,JSON.stringify(legacy));
+    await writeWorkerVault(legacy.workers);
+    const withoutWorkers=JSON.stringify({...legacy,workers:[]});
+    await SecureStorage.setItem(SECURE_KEY,withoutWorkers);
     const verify=await SecureStorage.getItem(SECURE_KEY);
-    if(verify!==JSON.stringify(legacy))throw new Error('No se pudo verificar la migración al llavero seguro. No se borraron los datos anteriores.');
+    if(verify!==withoutWorkers)throw new Error('No se pudo verificar la migración al llavero seguro. No se borraron los datos anteriores.');
     clearLegacyDemoSnapshot();
   }
   return legacy;
@@ -88,7 +105,8 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
   writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
     if(isNativeSecureStore()){
       await configureKeychain();
-      await SecureStorage.setItem(SECURE_KEY,serialized);
+      await writeWorkerVault(safe.workers);
+      await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...safe,workers:[]}));
     }else{
       localStorage.setItem(ATT,JSON.stringify(safe.attentions));
       localStorage.setItem(WORK,JSON.stringify(safe.workers));
