@@ -15,7 +15,8 @@ export function installAccessInAppDelegate(source){
  let output=source.replace('import Capacitor','import Capacitor\nimport LocalAuthentication');
  const lifecycle=`\n        NotificationCenter.default.addObserver(self, selector: #selector(danperAuthWindowVisible(_:)), name: UIWindow.didBecomeVisibleNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(danperAuthWillResign(_:)), name: UIApplication.willResignActiveNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(danperAuthDidBecomeActive(_:)), name: UIApplication.didBecomeActiveNotification, object: nil)`;
+        NotificationCenter.default.addObserver(self, selector: #selector(danperAuthDidBecomeActive(_:)), name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(danperAuthDidEnterBackground(_:)), name: UIApplication.didEnterBackgroundNotification, object: nil)`;
  output=output.replace(notificationAnchor,notificationAnchor+lifecycle);
  return output+`
 
@@ -23,22 +24,47 @@ ${ACCESS_MARKER}
 private let danperNativeLockTag = 20261014
 private var danperAuthAttemptInFlight = false
 private var danperAuthUnlocked = false
+private var danperAuthGeneration = 0
+private var danperAuthContext: LAContext?
 
 extension AppDelegate {
     @objc private func danperAuthWindowVisible(_ notification: Notification) {
         guard let window = notification.object as? UIWindow,
               window.rootViewController is CAPBridgeViewController else { return }
+        // A freshly visible CAP window must not cover an authenticated session.
+        if danperAuthUnlocked {
+            window.viewWithTag(danperNativeLockTag)?.removeFromSuperview()
+            return
+        }
         danperAddLockOverlay(to: window)
         if UIApplication.shared.applicationState == .active { danperAttemptAuthentication() }
     }
 
     @objc private func danperAuthWillResign(_ notification: Notification) {
+        // Face ID/código may temporarily resign app activity. Cover the content
+        // for privacy, but DO NOT cancel/forget an authentication in progress.
+        // A real background transition is handled by didEnterBackground.
+        for window in danperAppWindows() { danperAddLockOverlay(to: window) }
+    }
+
+    @objc private func danperAuthDidEnterBackground(_ notification: Notification) {
+        danperAuthGeneration += 1
         danperAuthUnlocked = false
+        danperAuthAttemptInFlight = false
+        danperAuthContext?.invalidate()
+        danperAuthContext = nil
         for window in danperAppWindows() { danperAddLockOverlay(to: window) }
     }
 
     @objc private func danperAuthDidBecomeActive(_ notification: Notification) {
-        if !danperAuthUnlocked { danperAttemptAuthentication() }
+        // Face ID may succeed while UIKit is still inactive. Reveal on resume.
+        if danperAuthUnlocked {
+            for window in danperAppWindows() {
+                window.viewWithTag(danperNativeLockTag)?.removeFromSuperview()
+            }
+        } else if !danperAuthAttemptInFlight {
+            danperAttemptAuthentication()
+        }
     }
 
     private func danperAppWindows() -> [UIWindow] {
@@ -116,15 +142,24 @@ extension AppDelegate {
             return
         }
         danperAuthAttemptInFlight = true
+        danperAuthContext = context
+        let generation = danperAuthGeneration
         danperSetLockMessage("Confirma tu identidad en iOS. Si no funciona Face ID, usa el código del dispositivo.")
         context.evaluatePolicy(policy, localizedReason: "Proteger la información ocupacional guardada en DANPER Salud Móvil") { [weak self] success, error in
             DispatchQueue.main.async {
-                danperAuthAttemptInFlight = false
                 guard let self = self else { return }
-                if success && UIApplication.shared.applicationState == .active {
+                // Ignore stale callbacks after a real background transition.
+                guard generation == danperAuthGeneration else { return }
+                danperAuthAttemptInFlight = false
+                danperAuthContext = nil
+                if success {
+                    // iOS may still be .inactive when LocalAuthentication reports
+                    // success. Remember it, then uncover now or on didBecomeActive.
                     danperAuthUnlocked = true
-                    for window in self.danperAppWindows() {
-                        window.viewWithTag(danperNativeLockTag)?.removeFromSuperview()
+                    if UIApplication.shared.applicationState == .active {
+                        for window in self.danperAppWindows() {
+                            window.viewWithTag(danperNativeLockTag)?.removeFromSuperview()
+                        }
                     }
                 } else {
                     danperAuthUnlocked = false
