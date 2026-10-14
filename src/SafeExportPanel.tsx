@@ -3,7 +3,7 @@ import {Capacitor} from '@capacitor/core';
 import {Directory,Filesystem} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
 import {readStableSnapshotForBackup,validateDemoSnapshot} from './secureDemoStore';
-import {encryptPortableBackup} from './portableBackup';
+import {encryptPortableBackup,decryptPortableBackup} from './portableBackup';
 import {feedback} from './nativeHaptics';
 function fileBase64(s:string):string{
  const bytes=new TextEncoder().encode(s);let out='';
@@ -33,6 +33,21 @@ export default function SafeExportPanel(){
    feedback('error');
   }finally{setBusy(false)}
  }
+ async function verifyFile(file:File|undefined){
+  setError('');setStatus('');
+  if(!native||!file||busy)return;
+  if(!file.name.toLowerCase().endsWith('.danperbackup')||file.size>42*1024*1024){setError('Selecciona un archivo de respaldo .danperbackup válido.');return}
+  if(secret.length<14){setError('Introduce primero la contraseña original del respaldo.');return}
+  setBusy(true);
+  try{
+   const snapshot=validateDemoSnapshot(await decryptPortableBackup(await file.text(),secret));
+   setStatus('Copia externa comprobada correctamente: '+snapshot.workers.length+' trabajadores y '+snapshot.attentions.length+' atenciones. No se modificó la base del iPhone.');
+   feedback('success');
+  }catch(e){
+   setError(e instanceof Error?e.message:'No se pudo autenticar el respaldo.');
+   feedback('error');
+  }finally{setBusy(false)}
+ }
  return <section className="panel safeExportPanel">
   <h3>Respaldo cifrado de seguridad</h3>
   <p className="hint">Versión puente: exporta trabajadores, atenciones, inventario, alergias y reportes sin cambiar el almacenamiento actual. El archivo es privado y no se envía a GitHub.</p>
@@ -44,6 +59,9 @@ export default function SafeExportPanel(){
   </label>
   <p className="hint">Guarda esta contraseña en un lugar seguro fuera del iPhone. Si se pierde, el respaldo no se podrá descifrar. Comprueba que el archivo aparece en Archivos o en otra ubicación segura.</p>
   <button type="button" className="workerPrimary wide" disabled={!native||busy||secret.length<14||secret!==confirm} onClick={()=>void saveBackup()}>{busy?'Cifrando…':'Crear y compartir respaldo cifrado'}</button>
+  <h4>Comprobar archivo guardado</h4>
+  <p className="hint">Selecciona desde Archivos el .danperbackup que acabas de guardar y confirma que la contraseña permite abrirlo. Esta comprobación NO restaura ni cambia los registros.</p>
+  <input type="file" accept=".danperbackup" disabled={!native||busy} onChange={e=>{const file=e.currentTarget.files?.[0];void verifyFile(file);e.currentTarget.value=''}}/>
   {!native&&<p className="hint">Esta función está disponible únicamente en la app nativa para iPhone.</p>}
   {status&&<p className="hint" role="status">{status}</p>}
   {error&&<p className="importError" role="alert">{error}</p>}
