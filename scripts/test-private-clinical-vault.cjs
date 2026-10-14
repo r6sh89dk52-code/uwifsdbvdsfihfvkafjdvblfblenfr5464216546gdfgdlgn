@@ -94,6 +94,6 @@ const vault=moduleFrom('src/privateClinicalVault.ts',name=>{
  const changed={...loaded,attentions:[{id:'FICTICIA-NEW'}]};
  await secure.writeDemoSnapshot(changed);
  assert.equal((await secure.loadDemoSnapshot()).attentions[0].id,'FICTICIA-NEW');
- assert.equal(writeWorkerCalls,0,'unchanged roster is already stored outside this simulator');
+ assert.equal(writeWorkerCalls,1,'clinical save keeps existing worker roster in the separate encrypted store');
  console.log('PASS: AES-GCM clinical storage, rollback, 1500 fake attentions, pre-migration backup, missing worker rejection, reopen and encrypted update.');
 })().catch(error=>{console.error(error);process.exitCode=1});
