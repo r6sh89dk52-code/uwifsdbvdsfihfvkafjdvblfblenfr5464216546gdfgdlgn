@@ -106,3 +106,4 @@ export default function BackupSettingsPanel(){
   {status&&<p className="hint" role="status">{status}</p>}
   {error&&<p className="importError" role="alert">{error}</p>}
  </section>;
+}
