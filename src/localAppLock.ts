@@ -35,6 +35,7 @@ export async function appLockEnabled():Promise<boolean>{
  const value=await SecureStorage.getItem(LOCK);
  if(value===null)return false;
  const record=JSON.parse(value) as {v?:number;s?:unknown;h?:unknown};
+ if(record.v===0)return false;
  if(record.v!==1||typeof record.s!=='string'||typeof record.h!=='string')throw Error('El bloqueo de aplicación está dañado. No se desbloqueará automáticamente.');
  return true;
 }
@@ -58,21 +59,26 @@ export async function unlockAppLock(passphrase:string):Promise<boolean>{
  let record:{v:number;s:string;h:string};
  try{record=JSON.parse(stored)}catch{throw Error('Datos del bloqueo inaccesibles. No se abrirá automáticamente.')}
  if(record.v!==1||typeof record.s!=='string'||typeof record.h!=='string')throw Error('Formato de bloqueo no compatible.');
- const failures=Number(await SecureStorage.getItem(FAILED)??'0');
- if(!Number.isSafeInteger(failures)||failures<0)throw Error('Registro de intentos dañado. No se desbloqueará.');
- if(failures>=10)throw Error('Demasiados intentos. Bloqueo de acceso detenido por seguridad.');
+ const raw=await SecureStorage.getItem(FAILED)??'0:0';
+ const [attemptText,untilText]=raw.split(':');
+ let failures=Number(attemptText),until=Number(untilText??0);
+ if(!Number.isSafeInteger(failures)||failures<0||!Number.isFinite(until)||until<0)
+  throw Error('Registro de intentos dañado. No se desbloqueará.');
+ if(until>Date.now())throw Error('Demasiados intentos. Espera 15 minutos para volver a intentarlo.');
+ if(until>0&&until<=Date.now())failures=0;
  const candidate=await verifier(passphrase,decode(record.s));
  const a=decode(candidate),b=decode(record.h);
  let diff=a.length^b.length;
  for(let i=0;i<Math.max(a.length,b.length);i++)diff|=(a[i]??0)^(b[i]??0);
  if(diff!==0){
-  await SecureStorage.setItem(FAILED,String(failures+1));
+  await SecureStorage.setItem(FAILED,failures+1>=10?String(failures+1)+':'+String(Date.now()+15*60*1000):String(failures+1)+':0');
   return false;
  }
  await SecureStorage.setItem(FAILED,'0');
  return true;
 }
 export async function disableAppLock(passphrase:string):Promise<void>{
+ if(!await appLockEnabled())throw Error('No hay un bloqueo activo.');
  if(!await unlockAppLock(passphrase))throw Error('Clave de acceso incorrecta.');
  // To avoid depending on undocumented remove API, use a verified disabled marker.
  // Keep the old verifier for forensics until it is replaced.
