@@ -157,6 +157,9 @@ export async function stageWorkerRestore(rows:unknown[]):Promise<string>{
  return path;
 }
 /** Idempotent activation, safe to retry after iOS interrupts a restore. */
+export async function verifyStagedWorkerRestore(path:string):Promise<void>{
+ await decode(path,await secret());
+}
 export async function activateWorkerRestore(path:string):Promise<void>{
  const workers=await decode(path,await secret());
  await SecureStorage.setItem(POINTER,path);
