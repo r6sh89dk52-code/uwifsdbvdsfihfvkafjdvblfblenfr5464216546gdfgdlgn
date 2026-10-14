@@ -244,3 +244,69 @@ html,body,#root{width:100%;min-width:0}
 .ambulatoryReconciliation .kardexActionKinds{grid-template-columns:repeat(3,minmax(0,1fr))}
 .ambulatoryReconciliation .kardexHistoryItem p{overflow-wrap:break-word}
 @media(max-width:480px){.ambulatoryReconciliation .kardexActionKinds{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* v0.16.3: independent Kardex sections and iOS safe-area fixes. */
+.brand{position:sticky;top:0;z-index:40;isolation:isolate}
+.app main{min-width:0;overflow-wrap:break-word}
+.app .panel,.app .kardexPage,.app .kardexWorkspace{width:100%;min-width:0}
+.app .panel input[type="date"],.app .panel input[type="time"],.app .panel input[type="file"]{display:block;width:100%;max-width:100%;box-sizing:border-box}
+.app .panel .fields>*{min-width:0;max-width:100%}
+.kardexSectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+.kardexSectionGrid button{display:flex;align-items:flex-start;flex-direction:column;gap:8px;padding:18px 14px;text-align:left;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:17px;min-height:137px;min-width:0}
+.kardexSectionGrid button svg{width:23px;height:23px;color:#e3182d}
+.kardexSectionGrid button strong{font-size:15px}
+.kardexSectionGrid button span{font-size:12px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.kardexSectionHeader{display:flex;align-items:center;gap:12px;margin:10px 0 14px;min-width:0}
+.kardexSectionHeader h3{margin:0;font-size:19px}
+.kardexSectionHeader>button{display:flex;align-items:center;gap:5px;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;flex-shrink:0}
+.kardexSubtabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kardexSubtabs button{background:var(--surface);color:var(--text);padding:13px 8px;line-height:1.4;border-radius:12px;border:1px solid var(--line)}
+.kardexSubtabs .selected{border-color:#e3182d;color:#e3182d;font-weight:700}
+.kardexPicker{position:relative;margin-bottom:15px;min-width:0}
+.kardexPicker>label{font-size:13px;font-weight:690;display:block;margin-bottom:4px}
+.kardexPickerInput{position:relative;min-width:0}
+.kardexPickerInput>svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted)}
+.kardexPickerInput input{padding-left:41px!important;width:100%;min-width:0}
+.kardexSuggestions{position:relative;z-index:10;background:var(--surface);border:1px solid var(--line);border-radius:12px;max-height:270px;overflow-y:auto;box-shadow:0 8px 24px #0002}
+.kardexSuggestions>button{width:100%;padding:11px 13px;text-align:left;display:flex;flex-direction:column;gap:3px;border-bottom:1px solid var(--line);background:transparent;color:var(--text)}
+.kardexSuggestions>button.selected,.kardexSuggestions>button:focus-visible{background:rgba(227,24,45,.09)}
+.kardexSuggestions>button span{font-size:13px;font-weight:700}
+.kardexSuggestions>button small{font-size:11px;color:var(--muted)}
+.kardexPreviewDetails{border:1px solid var(--line);border-radius:12px;padding:11px;margin-top:15px;min-width:0}
+.kardexPreviewDetails summary{cursor:pointer;font-weight:700;font-size:13px}
+@media(max-width:440px){.kardexPage .fields.two,.kardexDaily .fields.two{grid-template-columns:minmax(0,1fr)}.kardexSectionGrid button{padding:14px 11px}.kardexSubtabs button{font-size:12px}}
+
+/* v0.16.4 iPhone date input and product-appropriate stock forms. */
+.kardexEntryBasics,.kardexPackaging{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;width:100%;min-width:0}
+.kardexEntryBasics label,.kardexPackaging label{display:block;width:100%;max-width:100%;min-width:0;overflow:visible}
+.kardexEntryBasics input,.kardexEntryBasics select,.kardexPackaging input,.kardexPackaging select{display:block;min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.kardexEntryBasics input[inputmode="numeric"]:not([type="number"]){-webkit-appearance:none;appearance:none}
+.kardexModeChoice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:9px 0}
+.kardexModeChoice button{min-width:0;padding:11px 7px;border-radius:11px;border:1px solid var(--line,#444);background:var(--surface,#252529);color:var(--text);font-size:13px;line-height:1.35}
+.kardexModeChoice button.selected{border-color:#e3182d;color:#e3182d;font-weight:700}
+.app .panel .fields.two>label,.app .panel .fields.two>label input,.app .panel .fields.two>label select{min-width:0;max-width:100%;box-sizing:border-box}
+.app .panel input[type="date"],.app .panel input[type="time"]{display:block;min-width:0!important;width:100%!important;max-width:100%!important;box-sizing:border-box;-webkit-appearance:none;appearance:none;overflow:hidden}
+.app .panel input[type="date"]::-webkit-date-and-time-value,.app .panel input[type="time"]::-webkit-date-and-time-value{min-width:0;text-align:left}
+@media(max-width:620px){.app .panel .fields.two:has(input[type="date"],input[type="time"]){display:grid;grid-template-columns:minmax(0,1fr)}}
+
+/* v0.17.1: preserve the native month picker, but prevent WebKit's intrinsic
+   month input width from protruding outside the Indicador form on iPhone. */
+.ambulatoryExport,.ambulatoryExport .fields.two,.ambulatoryExport .fields.two>label{min-width:0;max-width:100%;box-sizing:border-box}
+.ambulatoryExport .fields.two>label{overflow:clip}
+.ambulatoryExport .fields.two input,.ambulatoryExport .fields.two select{
+  display:block;width:100%;min-width:0!important;max-width:100%!important;
+  box-sizing:border-box;font-size:16px!important;text-align:left;
+}
+.ambulatoryExport .fields.two .ambulatoryMonthInput{
+  display:block;width:100%;max-width:100%;min-width:0;min-height:48px;
+  padding:11px 13px;box-sizing:border-box;
+  -webkit-appearance:none;appearance:none;text-align:left;
+}
+.ambulatoryMonthInput::-webkit-date-and-time-value{
+  text-align:left;min-width:0;max-width:100%;display:block;
+}
+.ambulatoryMonthInput::-webkit-datetime-edit{padding:0;min-width:0;text-align:left}
+@media(max-width:620px){.ambulatoryExport .fields.two{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:0;
+}}
