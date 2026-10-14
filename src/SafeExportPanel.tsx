@@ -1,69 +1,95 @@
 import {useState} from 'react';
 import {Capacitor} from '@capacitor/core';
-import {Directory,Filesystem} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
-import {readStableSnapshotForBackup,validateDemoSnapshot} from './secureDemoStore';
-import {encryptPortableBackup,decryptPortableBackup} from './portableBackup';
+import {validateDemoSnapshot} from './secureDemoStore';
+import {decryptPortableBackup} from './portableBackup';
+import {prepareEncryptedBackup,type PreparedBackup} from './safeBackupFile';
 import {feedback} from './nativeHaptics';
-function fileBase64(s:string):string{
- const bytes=new TextEncoder().encode(s);let out='';
- for(let i=0;i<bytes.length;i+=8192)out+=String.fromCharCode(...bytes.subarray(i,i+8192));
- return btoa(out);
-}
+
 export default function SafeExportPanel(){
  const native=Capacitor.isNativePlatform()&&Capacitor.getPlatform()==='ios';
  const [secret,setSecret]=useState(''),[confirm,setConfirm]=useState('');
- const [busy,setBusy]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState('');
- async function saveBackup(){
-  if(!native||busy)return;
-  setStatus('');setError('');
-  if(secret.length<14||secret!==confirm){setError('La contraseña debe tener al menos 14 caracteres y coincidir en los dos campos.');return}
+ const [busy,setBusy]=useState(false),[sharing,setSharing]=useState(false);
+ const [prepared,setPrepared]=useState<PreparedBackup|null>(null);
+ const [status,setStatus]=useState(''),[error,setError]=useState('');
+ const mismatch=confirm.length>0&&secret!==confirm;
+ const ready=secret.length>=14&&secret===confirm;
+ async function prepare(){
+  if(!native||busy||sharing)return;
+  setError('');setStatus('');setPrepared(null);
+  if(secret.length<14){setError('La contraseña necesita como mínimo 14 caracteres.');feedback('warning');return}
+  if(secret!==confirm){setError('Las contraseñas no coinciden exactamente. Revisa mayúsculas, espacios y símbolos.');feedback('warning');return}
   setBusy(true);
   try{
-   const snapshot=validateDemoSnapshot(await readStableSnapshotForBackup());
-   const encrypted=await encryptPortableBackup(snapshot,secret);
-   const filename='DANPER-Respaldo-'+new Date().toISOString().slice(0,10)+'.danperbackup';
-   const file=await Filesystem.writeFile({path:filename,directory:Directory.Cache,data:fileBase64(encrypted)});
-   await Share.share({title:'Copia cifrada de DANPER Salud Móvil',url:file.uri,dialogTitle:'Guardar respaldo cifrado fuera del iPhone'});
-   setSecret('');setConfirm('');
-   setStatus('Respaldo cifrado creado. Verifica que realmente quedó guardado fuera del dispositivo.');
+   const result=await prepareEncryptedBackup(secret,setStatus);
+   setPrepared(result);
+   setStatus('Respaldo cifrado creado y comprobado. Ahora toca «Compartir / Guardar en Archivos».');
    feedback('success');
   }catch(e){
-   setError(e instanceof Error?e.message:'Error al crear o compartir el respaldo.');
+   setError('No se pudo preparar el respaldo: '+(e instanceof Error?e.message:'error de almacenamiento desconocido.'));
    feedback('error');
   }finally{setBusy(false)}
  }
- async function verifyFile(file:File|undefined){
-  setError('');setStatus('');
-  if(!native||!file||busy)return;
-  if(!file.name.toLowerCase().endsWith('.danperbackup')||file.size>42*1024*1024){setError('Selecciona un archivo de respaldo .danperbackup válido.');return}
-  if(secret.length<14){setError('Introduce primero la contraseña original del respaldo.');return}
-  setBusy(true);
+ async function sharePrepared(){
+  if(!native||!prepared||sharing||busy)return;
+  setError('');setSharing(true);setStatus('Abriendo la hoja de compartir de iOS…');
   try{
-   const snapshot=validateDemoSnapshot(await decryptPortableBackup(await file.text(),secret));
-   setStatus('Copia externa comprobada correctamente: '+snapshot.workers.length+' trabajadores y '+snapshot.attentions.length+' atenciones. No se modificó la base del iPhone.');
+   // This is invoked directly from a second user tap. The data is already
+   // encrypted and written, so no lengthy operations delay the share sheet.
+   await Share.share({title:'Respaldo cifrado DANPER Salud Móvil',url:prepared.uri,dialogTitle:'Guardar en Archivos o compartir'});
+   setStatus('Hoja de compartir cerrada. Comprueba en Archivos que el respaldo esté guardado fuera de la aplicación.');
    feedback('success');
   }catch(e){
-   setError(e instanceof Error?e.message:'No se pudo autenticar el respaldo.');
+   setError('No se pudo abrir Compartir en iOS: '+(e instanceof Error?e.message:'fallo del sistema.'));
+   setStatus('El archivo cifrado sigue preparado en la aplicación. Puedes volver a pulsar Compartir.');
+   feedback('error');
+  }finally{setSharing(false)}
+ }
+ async function verifyFile(file:File|undefined){
+  setError('');setStatus('');
+  if(!native||!file||busy||sharing)return;
+  if(!file.name.toLowerCase().endsWith('.danperbackup')||file.size>42*1024*1024){
+   setError('Selecciona un archivo de respaldo .danperbackup de hasta 42 MB.');return
+  }
+  if(secret.length<14){setError('Introduce primero la contraseña del respaldo que deseas comprobar.');return}
+  setBusy(true);setStatus('Leyendo y autenticando el archivo seleccionado…');
+  try{
+   const snapshot=validateDemoSnapshot(await decryptPortableBackup(await file.text(),secret));
+   setStatus('Archivo externo verificado: '+snapshot.workers.length+' trabajadores y '+snapshot.attentions.length+' atenciones. Ningún registro fue modificado.');
+   feedback('success');
+  }catch(e){
+   setError(e instanceof Error?e.message:'No se pudo verificar el respaldo externo.');
    feedback('error');
   }finally{setBusy(false)}
  }
  return <section className="panel safeExportPanel">
   <h3>Respaldo cifrado de seguridad</h3>
-  <p className="hint">Versión puente: exporta trabajadores, atenciones, inventario, alergias y reportes sin cambiar el almacenamiento actual. El archivo es privado y no se envía a GitHub.</p>
+  <p className="hint">Esta versión conserva el almacenamiento actual. El respaldo cifrado incluye trabajadores, atenciones, alergias, inventario y conciliaciones; no se sube a GitHub.</p>
   <label>Contraseña del respaldo
-   <input type="password" autoComplete="off" value={secret} onChange={e=>setSecret(e.target.value)} placeholder="14 caracteres como mínimo" disabled={!native||busy}/>
+   <input type="password" autoComplete="off" value={secret} onChange={e=>{setSecret(e.target.value);setPrepared(null);setError('')}} placeholder="14 caracteres como mínimo" disabled={!native||busy||sharing}/>
   </label>
   <label>Repetir contraseña
-   <input type="password" autoComplete="off" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Confirmar contraseña" disabled={!native||busy}/>
+   <input type="password" autoComplete="off" value={confirm} onChange={e=>{setConfirm(e.target.value);setPrepared(null);setError('')}} placeholder="Confirmar contraseña" disabled={!native||busy||sharing}/>
   </label>
-  <p className="hint">Guarda esta contraseña en un lugar seguro fuera del iPhone. Si se pierde, el respaldo no se podrá descifrar. Comprueba que el archivo aparece en Archivos o en otra ubicación segura.</p>
-  <button type="button" className="workerPrimary wide" disabled={!native||busy||secret.length<14||secret!==confirm} onClick={()=>void saveBackup()}>{busy?'Cifrando…':'Crear y compartir respaldo cifrado'}</button>
-  <h4>Comprobar archivo guardado</h4>
-  <p className="hint">Selecciona desde Archivos el .danperbackup que acabas de guardar y confirma que la contraseña permite abrirlo. Esta comprobación NO restaura ni cambia los registros.</p>
-  <input type="file" accept=".danperbackup" disabled={!native||busy} onChange={e=>{const file=e.currentTarget.files?.[0];void verifyFile(file);e.currentTarget.value=''}}/>
-  {!native&&<p className="hint">Esta función está disponible únicamente en la app nativa para iPhone.</p>}
-  {status&&<p className="hint" role="status">{status}</p>}
-  {error&&<p className="importError" role="alert">{error}</p>}
+  <p className="hint" role="status">{secret.length<14?'Contraseña: faltan '+(14-secret.length)+' caracteres.':mismatch?'Las contraseñas todavía no coinciden.':ready?'Contraseña válida y coincidente. Puedes preparar el respaldo.':'Repite la contraseña para continuar.'}</p>
+  <p className="hint">Conserva la contraseña fuera del iPhone. Sin ella no será posible recuperar el respaldo.</p>
+  <button type="button" className="workerPrimary wide" disabled={!native||busy||sharing} onClick={()=>void prepare()}>
+   {busy?'Preparando el respaldo…':'1. Crear y verificar respaldo cifrado'}
+  </button>
+  {prepared&&<div className="backupPrepared">
+   <strong>Archivo cifrado listo</strong>
+   <p className="hint">{prepared.name} · Archivo temporal; debes guardarlo fuera de la aplicación.</p>
+   <button type="button" className="workerPrimary wide" disabled={busy||sharing} onClick={()=>void sharePrepared()}>
+    {sharing?'Abriendo Compartir…':'2. Compartir / Guardar en Archivos'}
+   </button>
+  </div>}
+  {(status||error)&&<div className="backupFeedback" aria-live="polite">
+   {status&&<p role="status">{status}</p>}
+   {error&&<p className="importError" role="alert">{error}</p>}
+  </div>}
+  <h4>Comprobar el archivo guardado</h4>
+  <p className="hint">Después de guardar una copia en Archivos, selecciónala aquí para confirmar que tu contraseña la descifra. No restaura ni elimina información.</p>
+  <input type="file" accept=".danperbackup" disabled={!native||busy||sharing} onChange={e=>{const file=e.currentTarget.files?.[0];void verifyFile(file);e.currentTarget.value=''}}/>
+  {!native&&<p className="hint">La exportación privada solo funciona dentro de la aplicación nativa de iPhone.</p>}
  </section>;
 }
