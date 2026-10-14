@@ -2,7 +2,8 @@ import {useState} from 'react';
 import {Capacitor} from '@capacitor/core';
 import {Directory,Filesystem} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
-import {encryptPortableBackup,decryptPortableBackup} from './portableBackup';
+import {encryptPortableBackup,decryptPortableBackup,encryptDeviceBackup,decryptDeviceBackup} from './portableBackup';
+import {obtainDeviceBackupKey} from './nativeDeviceBackup';
 import {loadDemoSnapshot,readStableSnapshotForBackup,validateDemoSnapshot,hasActiveRecords,restoreEmptyDeviceFromBackup,type DemoSnapshot} from './secureDemoStore';
 import {feedback} from './nativeHaptics';
 
@@ -21,6 +22,49 @@ export default function BackupSettingsPanel(){
  const [error,setError]=useState('');
  const [preview,setPreview]=useState<DemoSnapshot|null>(null);
  const [sourceName,setSourceName]=useState('');
+ const [deviceArchive,setDeviceArchive]=useState<string|null>(null);
+
+ async function makeDeviceBackup(){
+  if(!native||busy)return;
+  setBusy(true);setError('');setStatus('');setPreview(null);setDeviceArchive(null);
+  try{
+   // Always ask iOS to authenticate; the device-only Keychain item also
+   // requires userPresence for every retrieval.
+   const raw=await obtainDeviceBackupKey(true);
+   const snapshot=validateDemoSnapshot(await readStableSnapshotForBackup());
+   const encrypted=await encryptDeviceBackup(snapshot,raw);
+   raw.fill(0);
+   const name='DANPER-SoloEsteiPhone-'+new Date().toISOString().slice(0,10)+'.danperbackup';
+   const file=await Filesystem.writeFile({path:name,directory:Directory.Cache,data:base64Utf8(encrypted)});
+   await Share.share({title:'Respaldo local cifrado DANPER',url:file.uri,dialogTitle:'Guardar copia local fuera de la app'});
+   setStatus('Respaldo protegido por Face ID/código generado. Comprueba en Archivos que quedó guardado. IMPORTANTE: no se puede recuperar en otro iPhone sin la clave de este dispositivo.');
+   feedback('success');
+  }catch(e){
+   setError(e instanceof Error?e.message:'No se pudo crear la copia protegida.');
+   feedback('error');
+  }finally{setBusy(false)}
+ }
+ async function inspectDeviceBackup(file:File|undefined){
+  setPreview(null);setDeviceArchive(null);setSourceName('');setError('');setStatus('');
+  if(!file||busy)return;
+  if(!native){setError('Necesitas un iPhone.');return}
+  if(file.size<100||file.size>42*1024*1024||!file.name.toLowerCase().endsWith('.danperbackup')){
+   setError('Selecciona una copia .danperbackup local de hasta 42 MB.');return;
+  }
+  setBusy(true);
+  try{
+   const current=validateDemoSnapshot(await loadDemoSnapshot());
+   if(hasActiveRecords(current))throw Error('Solo se restaura sobre una instalación vacía. No se borrarán registros existentes.');
+   const content=await file.text();
+   const raw=await obtainDeviceBackupKey(false);
+   const data=validateDemoSnapshot(await decryptDeviceBackup(content,raw));
+   raw.fill(0);
+   setPreview(data);setDeviceArchive(content);setSourceName(file.name);
+   setStatus('Copia local verificada con Face ID/código. Aún no se ha restaurado nada.');
+  }catch(e){setError(e instanceof Error?e.message:'No se pudo comprobar la copia del iPhone.');feedback('error')}
+  finally{setBusy(false)}
+ }
+
  async function makeBackup(){
   if(!native||busy)return;
   setError('');setStatus('');
@@ -41,7 +85,7 @@ export default function BackupSettingsPanel(){
   }finally{setBusy(false)}
  }
  async function inspectBackup(file:File|undefined){
-  setPreview(null);setSourceName('');setError('');setStatus('');
+  setDeviceArchive(null);setPreview(null);setSourceName('');setError('');setStatus('');
   if(!file||busy)return;
   if(!native){setError('La restauración privada está disponible únicamente en iPhone.');return}
   if(file.size>42*1024*1024||!file.name.toLowerCase().endsWith('.danperbackup')){
@@ -68,8 +112,14 @@ export default function BackupSettingsPanel(){
   if(!window.confirm('Esta operación recuperará el padrón y todos los registros del respaldo en esta BASE VACÍA. ¿Confirmas la restauración?'))return;
   setBusy(true);setError('');setStatus('');
   try{
+   if(deviceArchive){
+    const raw=await obtainDeviceBackupKey(false);
+    const currentCopy=validateDemoSnapshot(await decryptDeviceBackup(deviceArchive,raw));
+    raw.fill(0);
+    if(JSON.stringify(currentCopy)!==JSON.stringify(preview))throw Error('La copia verificada cambió. No se restaurará.');
+   }
    await restoreEmptyDeviceFromBackup(preview);
-   setPreview(null);setPassword('');setConfirmation('');
+   setPreview(null);setDeviceArchive(null);setPassword('');setConfirmation('');
    setStatus('Restauración verificada. Reabriendo la aplicación.');
    feedback('success');
    window.location.reload();
@@ -80,7 +130,16 @@ export default function BackupSettingsPanel(){
  }
  return <section className="panel backupPanel">
   <h3>Respaldo y recuperación</h3>
-  <p className="hint">Copia cifrada con contraseña independiente de Keychain: incluye trabajadores, atenciones, alergias, inventario, entregas y conciliaciones. No se envía a GitHub ni a un servidor.</p>
+  <p className="hint">Respaldo cifrado de trabajadores, atenciones, alergias, existencias y Kardex. Todo se procesa localmente.</p>
+  <h4>Face ID o código de este iPhone</h4>
+  <p className="hint">No es necesario escribir una contraseña. iOS solicitará Face ID o su código de desbloqueo. Esta copia usa una clave ligada a ESTE dispositivo: si pierdes o cambias el iPhone, no podrás descifrarla en otro. Para esa recuperación conserva también una copia portátil independiente.</p>
+  <button type="button" className="workerPrimary wide" disabled={!native||busy} onClick={()=>void makeDeviceBackup()}>{busy?'Procesando…':'Crear respaldo con Face ID / código'}</button>
+  <label className="backupLabel">Verificar o recuperar copia local en este iPhone
+   <input type="file" accept=".danperbackup" disabled={!native||busy} onChange={e=>{const file=e.currentTarget.files?.[0];void inspectDeviceBackup(file);e.currentTarget.value=''}}/>
+  </label>
+  <hr/>
+  <h4>Copia portátil de emergencia (otro iPhone)</h4>
+  <p className="hint">El respaldo portátil anterior sigue disponible y necesita contraseña propia, porque Face ID de un dispositivo no permite descifrar datos en otro. No elimines la copia externa que ya verificaste.</p>
   {!native&&<p className="hint" role="status">Solo disponible en la aplicación nativa de iPhone. El navegador continúa siendo un entorno de pruebas.</p>}
   <label className="backupLabel">Contraseña privada del respaldo
    <input type="password" autoComplete="off" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 14 caracteres" disabled={busy||!native}/>
