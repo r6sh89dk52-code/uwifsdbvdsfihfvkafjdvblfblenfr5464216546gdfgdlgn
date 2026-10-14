@@ -3,7 +3,7 @@ import {Check,ClipboardList,Package,Plus,Search,Trash2,X} from 'lucide-react';
 import {kardexCatalog,kardexMainCount} from './kardexCatalog';
 import {countPhysicalUnits,inventoryTotals,validateStockLot,type StockLot,type ContainerKind} from './inventoryRules';
 import {isIndividualNursingProduct,formatDateInput,parseDateInput,isoToDateInput} from './kardexEntryRules';
-import {type StockLedger} from './kardexMovements';import {type CatalogMappingEvent} from './reconciliationRules';import KardexProductSearch from './KardexProductSearch';
+import {type StockLedger} from './kardexMovements';import {type CatalogMappingEvent} from './reconciliationRules';import KardexProductSearch from './KardexProductSearch';import './stockReconciliationInfo.css';
 type Props={ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(value:StockLedger)=>void;responsible:string;onOpenIndicator:()=>void};
 const options:{value:ContainerKind;label:string}[]=[
  {value:'unidad',label:'Unidad individual'},{value:'caja',label:'Caja'},
