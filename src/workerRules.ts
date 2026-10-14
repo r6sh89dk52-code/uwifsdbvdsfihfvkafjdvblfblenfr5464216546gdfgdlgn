@@ -2,7 +2,7 @@
 export type WorkerRecord={dni:string;name:string;area:string;labor:string;sex:string;age:string;ubigeo:string;source?:'manual'|'imported'};
 export type ImportStats={total:number;valid:number;invalidDni:number;withoutName:number;duplicates:number;sexInvalid:number;sexMissing:number;sexConflicts:number;nameConflicts:number};
 export type ImportResult={workers:WorkerRecord[];stats:ImportStats};
-export type MergeStats={added:number;merged:number;manualPreserved:number};
+export type MergeStats={added:number;merged:number;manualPreserved:number;nameConflicts:number;sexConflicts:number};
 export function normalizeDni(value:unknown):string{
   const v=String(value??'').trim().replace(/\.0$/,'');
   // Reject hyphens, scientific notation, and malformed values rather than guessing.
@@ -54,16 +54,26 @@ export function compileWorkers(rows:unknown[][]):ImportResult{
 }
 export function reconcileWorkers(existing:WorkerRecord[],incoming:WorkerRecord[]):{workers:WorkerRecord[];stats:MergeStats}{
  const result=new Map(existing.filter(w=>normalizeDni(w.dni)).map(w=>[w.dni,w]));
- const stats:MergeStats={added:0,merged:0,manualPreserved:0};
+ const stats:MergeStats={added:0,merged:0,manualPreserved:0,nameConflicts:0,sexConflicts:0};
  for(const w of incoming){
    const old=result.get(w.dni);
    if(!old){result.set(w.dni,{...w,source:'imported'});stats.added++;continue}
    stats.merged++;
+   const identity=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleUpperCase('es').trim().replace(/\s+/g,' ');
+   const differentName=Boolean(old.name&&w.name&&identity(old.name)!==identity(w.name));
+   const differentSex=Boolean(old.sex&&w.sex&&old.sex!==w.sex);
+   if(differentName)stats.nameConflicts++;
+   if(differentSex)stats.sexConflicts++;
    if(old.source!=='imported'){
      stats.manualPreserved++;
      result.set(w.dni,{...w,...old,area:pick(old.area,w.area),labor:pick(old.labor,w.labor),sex:pick(old.sex,w.sex),age:pick(old.age,w.age),ubigeo:pick(old.ubigeo,w.ubigeo),source:'manual'});
    }else{
-     result.set(w.dni,{...old,...w,name:pick(w.name,old.name),area:pick(w.area,old.area),labor:pick(w.labor,old.labor),sex:pick(w.sex,old.sex),age:pick(w.age,old.age),ubigeo:pick(w.ubigeo,old.ubigeo),source:'imported'});
+     // A DNI is the unique key. Conflicting identity data is never silently
+     // overwritten. Manual corrections have already taken precedence above.
+     result.set(w.dni,{...old,...w,name:differentName?old.name:pick(w.name,old.name),
+       area:pick(w.area,old.area),labor:pick(w.labor,old.labor),
+       sex:differentSex?old.sex:pick(w.sex,old.sex),
+       age:pick(w.age,old.age),ubigeo:pick(w.ubigeo,old.ubigeo),source:'imported'});
    }
  }
  return {workers:[...result.values()],stats};
