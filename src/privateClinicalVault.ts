@@ -106,6 +106,9 @@ export async function stageClinicalRestore(value:unknown):Promise<string>{
  return path;
 }
 /** Idempotent finalization for interrupted journaled restoration. */
+export async function verifyStagedClinicalRestore(path:string):Promise<void>{
+ await decode(path,await key());
+}
 export async function activateClinicalRestore(path:string):Promise<void>{
  const state=await decode(path,await key());
  await SecureStorage.setItem(POINTER,path);
