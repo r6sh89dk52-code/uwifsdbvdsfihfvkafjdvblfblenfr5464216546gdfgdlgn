@@ -18,7 +18,7 @@ const tmp=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP||'/tmp','danper-ipa-'
 try{
  const local=path.join(tmp,'Info.plist');fs.writeFileSync(local,parts[prefix+'Info.plist']);
  const packed=JSON.parse(execFileSync('plutil',['-convert','json','-o','-',local],{encoding:'utf8'}));
- assert.equal(packed.CFBundleShortVersionString,version);assert.equal(packed.CFBundleVersion,'162');
+ assert.equal(packed.CFBundleShortVersionString,version);assert.equal(packed.CFBundleVersion,'203');
  assert.equal(packed.CFBundleIdentifier,'pe.danper.saludmovil.prototipo');
  const name=packed.CFBundleExecutable;
  assert.equal(typeof name,'string');assert(!name.includes('/')&&!name.includes('..'),'Nombre de ejecutable inválido');
@@ -29,6 +29,9 @@ try{
  assert.equal(header.readUInt32LE(12),2,'El Mach-O no es un ejecutable');
 }finally{fs.rmSync(tmp,{recursive:true,force:true})}
 assert(!Object.keys(parts).some(n=>/\.xlsx$|\.xls$|\.ipa$|upload\//i.test(n)),'Se incluyó un Excel o adjunto bruto');
+const embedded=parts[prefix+'public/internal/kardex-template.bin'];
+assert(embedded?.length>8000,'El IPA no contiene el Kardex de Enfermería');
+assert.equal(crypto.createHash('sha256').update(embedded).digest('hex'),'4e6948b331be7e2ef5f24a9d26d4fa76197db1701cdd47a858523d398d6ca07e');
 const js=Object.entries(parts).filter(([n])=>n.startsWith(prefix+'public/')&&n.endsWith('.js'));
 assert(js.some(([,b])=>strFromU8(b).includes('TB_CONSUMOS')),'Falta exportador ambulatorio');
-console.log(`PASS: IPA ${version}, build 162, ejecutable, exportador, ausencia de XLSX bruto y SHA256 ${hash}`);
+console.log(`PASS: IPA ${version}, build 203, ejecutable, exportador, ausencia de XLSX bruto y SHA256 ${hash}`);
