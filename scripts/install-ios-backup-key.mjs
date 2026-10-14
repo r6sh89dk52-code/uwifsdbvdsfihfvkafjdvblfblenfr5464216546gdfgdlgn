@@ -80,11 +80,7 @@ public class DanperBackupKeyPlugin: CAPPlugin, CAPBridgedPlugin {
                         call.reject("Keychain no permitió guardar la clave local protegida.")
                         return
                     }
-                    randomKey.withUnsafeMutableBufferPointer { buffer in
-                        if let base = buffer.baseAddress {
-                            base.initialize(repeating: 0, count: buffer.count)
-                        }
-                    }
+                    randomKey = [UInt8](repeating: 0, count: 32)
                     result = nil
                     status = SecItemCopyMatching(query as CFDictionary, &result)
                 }
