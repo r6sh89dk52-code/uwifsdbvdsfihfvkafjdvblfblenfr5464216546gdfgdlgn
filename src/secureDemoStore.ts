@@ -1,6 +1,7 @@
-/** Etapa A: small prototype dataset only. Large clinical databases require SQLCipher. */
+/** iPhone-only local clinical data with AES-GCM encrypted snapshots. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
+import {loadClinicalVault,writeClinicalVault} from './privateClinicalVault';
 import {loadWorkerVault,writeWorkerVault,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
 export {workerVaultRecoveryRequired} from './privateWorkerVault';
 
@@ -25,6 +26,7 @@ const MAPPINGS='danper-etapa-b3-mappings-v013';
 const INCIDENTS='danper-etapa-b3-incidents-v013';
 const AMBULATORY_RECON='danper-v016-ambulatory-reconciliation';
 const SECURE_KEY='prototype-snapshot-v1';
+const CLINICAL_MARKER=JSON.stringify({format:'encrypted-clinical-v1',version:2});
 let configured:Promise<void>|undefined;
 let writeQueue:Promise<void>=Promise.resolve();
 
@@ -64,51 +66,72 @@ async function configureKeychain(){
   })();
   return configured;
 }
-/** On iOS, fails closed. Migration happens only after verified Keychain persistence. */
+/** On iOS the active clinical vault always wins over the legacy snapshot.
+ * Legacy data is overwritten by a small marker ONLY after encrypted migration
+ * and worker-vault validation; never auto-reset on missing/corrupt files.
+ */
 export async function loadDemoSnapshot():Promise<DemoSnapshot>{
-  if(!isNativeSecureStore())return readLegacyDemoSnapshot();
-  await configureKeychain();
-  const raw=await SecureStorage.getItem(SECURE_KEY);
-  if(raw!==null){
-    const parsed=validateDemoSnapshot(JSON.parse(raw));
-    let separate:unknown[]|null;
-    try{separate=await loadWorkerVault()}
-    catch(error){
-      if(error instanceof MissingWorkerVaultError){
-        // Keep clinical snapshot unchanged. Missing directory requires user
-        // confirmation to restore. Never create an empty vault on startup.
-        return parsed;
-      }
-      throw error;
-    }
-    if(separate!==null){
-      if(parsed.workers.length&&JSON.stringify(parsed.workers)!==JSON.stringify(separate))
-       throw Error('Existen versiones divergentes del padrón. No se reemplazará automáticamente.');
-      if(parsed.workers.length)await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...parsed,workers:[]}));
-      clearLegacyDemoSnapshot();
-      return {...parsed,workers:separate};
-    }
-    if(parsed.workers.length){
-      await writeWorkerVault(parsed.workers);
-      await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...parsed,workers:[]}));
-    }
-    clearLegacyDemoSnapshot();
+ if(!isNativeSecureStore())return readLegacyDemoSnapshot();
+ await configureKeychain();
+ const raw=await SecureStorage.getItem(SECURE_KEY);
+ const prior=raw!==null&&raw!==CLINICAL_MARKER?validateDemoSnapshot(JSON.parse(raw)):null;
+ const encrypted=await loadClinicalVault();
+ if(raw===CLINICAL_MARKER&&encrypted===null)
+  throw Error('Se perdió la referencia al almacén clínico cifrado. No se crearán registros nuevos.');
+ // Reject incompatible marker formats. Never silently discard a prior version.
+ if(raw!==null&&raw!==CLINICAL_MARKER&&!prior)
+  throw Error('Formato anterior del almacén clínico incompatible.');
+ if(encrypted!==null){
+  const parsed=validateDemoSnapshot(encrypted);
+  if(parsed.workers.length)throw Error('El almacén clínico contiene un padrón duplicado.');
+  try{
+   const workers=await loadWorkerVault();
+   if(workers===null){
+    if(prior?.workers.length)throw Error('Padrón privado no disponible para migración.');
     return parsed;
+   }
+   clearLegacyDemoSnapshot();
+   // Clinical storage has already been committed; complete the old-key cleanup.
+   if(raw!==CLINICAL_MARKER){
+    await SecureStorage.setItem(SECURE_KEY,CLINICAL_MARKER);
+    if(await SecureStorage.getItem(SECURE_KEY)!==CLINICAL_MARKER)
+     throw Error('No se confirmó la migración clínica en Keychain.');
+   }
+   return {...parsed,workers};
+  }catch(error){
+   if(error instanceof MissingWorkerVaultError)return parsed;
+   throw error;
   }
-  const legacy=readLegacyDemoSnapshot();
-  let detached:unknown[]|null;
-  try{detached=await loadWorkerVault()}
-  catch(error){if(error instanceof MissingWorkerVaultError)return legacy;throw error}
-  if(detached!==null)throw Error('Existe un padrón privado sin estado principal. Se necesita una recuperación antes de continuar.');
-  if(containsData(legacy)){
-    await writeWorkerVault(legacy.workers);
-    const withoutWorkers=JSON.stringify({...legacy,workers:[]});
-    await SecureStorage.setItem(SECURE_KEY,withoutWorkers);
-    const verify=await SecureStorage.getItem(SECURE_KEY);
-    if(verify!==withoutWorkers)throw new Error('No se pudo verificar la migración al llavero seguro. No se borraron los datos anteriores.');
-    clearLegacyDemoSnapshot();
-  }
-  return legacy;
+ }
+ if(prior){
+  let workers:unknown[]|null;
+  try{workers=await loadWorkerVault()}
+  catch(error){if(error instanceof MissingWorkerVaultError)return prior;throw error}
+  if(workers!==null&&prior.workers.length&&JSON.stringify(workers)!==JSON.stringify(prior.workers))
+   throw Error('Padrón duplicado divergente. No se migra automáticamente.');
+  if(workers===null&&prior.workers.length)await writeWorkerVault(prior.workers);
+  const stripped={...prior,workers:[]};
+  await writeClinicalVault(stripped);
+  await SecureStorage.setItem(SECURE_KEY,CLINICAL_MARKER);
+  if(await SecureStorage.getItem(SECURE_KEY)!==CLINICAL_MARKER)
+   throw Error('No se verificó el marcador del almacén clínico.');
+  clearLegacyDemoSnapshot();
+  return {...prior,workers:workers??prior.workers};
+ }
+ const legacy=readLegacyDemoSnapshot();
+ let separate:unknown[]|null;
+ try{separate=await loadWorkerVault()}
+ catch(error){if(error instanceof MissingWorkerVaultError)return legacy;throw error}
+ if(separate!==null)throw Error('Existe un padrón sin estado clínico principal. No se puede reiniciar.');
+ if(containsData(legacy)){
+  await writeWorkerVault(legacy.workers);
+  await writeClinicalVault({...legacy,workers:[]});
+  await SecureStorage.setItem(SECURE_KEY,CLINICAL_MARKER);
+  if(await SecureStorage.getItem(SECURE_KEY)!==CLINICAL_MARKER)
+   throw Error('La migración a almacenamiento clínico cifrado no se verificó.');
+  clearLegacyDemoSnapshot();
+ }
+ return legacy;
 }
 /** Native writes are serialized to avoid older writes overwriting newer snapshots. */
 export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
@@ -118,7 +141,10 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
       await configureKeychain();
       if(workerVaultRecoveryRequired())throw new MissingWorkerVaultError();
       await writeWorkerVault(safe.workers);
-      await SecureStorage.setItem(SECURE_KEY,JSON.stringify({...safe,workers:[]}));
+      await writeClinicalVault({...safe,workers:[]});
+      await SecureStorage.setItem(SECURE_KEY,CLINICAL_MARKER);
+      if(await SecureStorage.getItem(SECURE_KEY)!==CLINICAL_MARKER)
+        throw Error('Guardado clínico no confirmado en Keychain.');
     }else{
       localStorage.setItem(ATT,JSON.stringify(safe.attentions));
       localStorage.setItem(WORK,JSON.stringify(safe.workers));
