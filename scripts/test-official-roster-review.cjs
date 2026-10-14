@@ -1,0 +1,34 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const ts=require('typescript');
+function load(path,required={}){
+ const m={exports:{}};
+ const js=ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ vm.runInNewContext(js,{module:m,exports:m.exports,require:id=>required[id]||(()=>{throw Error(id)})(),Set,Map,Error,Array,Number,String,Object},{filename:path});
+ return m.exports;
+}
+const workerRules=load('src/workerRules.ts');
+const {reviewOfficialRoster}=load('src/officialRosterReview.ts',{'./workerRules':workerRules});
+const row=(number,name,source='imported')=>({dni:String(number).padStart(8,'0'),name,area:'',labor:'',sex:'',age:'',ubigeo:'',source});
+const fictitious=Array.from({length:9635},(_,i)=>row(i+1000000,'PERSONA FICTICIA '+i));
+fictitious[0].source='manual';
+const real=Array.from({length:9635},(_,i)=>row(i+3000000,'PERSONA REAL '+i));
+const existing=[...fictitious,...real];
+const inspected=reviewOfficialRoster(existing,real,[fictitious[1].dni]);
+assert.equal(inspected.currentCount,19270);
+assert.equal(inspected.officialCount,9635);
+assert.equal(inspected.matchingDni,9635);
+assert.equal(inspected.absentFromOfficial,9635);
+assert.equal(inspected.protectedAbsent,2);
+assert.equal(inspected.eligibleForFurtherReview,9633);
+assert.equal(inspected.protectedManual,1);
+assert.equal(inspected.protectedLinked,1);
+assert.equal(existing.length,19270,'Preview must not mutate original');
+assert.equal(real.length,9635,'Official reference unchanged');
+assert.equal(reviewOfficialRoster(existing,real.map((r,i)=>i===0?{...r,name:'NOMBRE OFICIAL CORREGIDO'}:r),[]).nameDiscrepancies,1);
+assert.throws(()=>reviewOfficialRoster(existing,[]),/vacía/);
+assert.throws(()=>reviewOfficialRoster(existing,[real[0],real[0]]),/repetidos/);
+assert.throws(()=>reviewOfficialRoster([...existing,existing[0]],real),/repetidos/);
+assert.throws(()=>reviewOfficialRoster(existing,[{...real[0],dni:'mal'}]),/DNI válido/);
+console.log('PASS: auditoría de 19.270 ficticios/reales en memoria, referencia de 9.635 reales, protección manual/clínica, duplicados y cero escrituras.');
