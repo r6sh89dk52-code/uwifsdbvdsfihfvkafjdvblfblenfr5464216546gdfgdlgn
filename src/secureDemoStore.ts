@@ -1,6 +1,7 @@
 /** iPhone-only local clinical data with AES-GCM encrypted snapshots. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
+import {Filesystem,Directory} from '@capacitor/filesystem';
 import {decryptPortableBackup} from './portableBackup';
 import {loadClinicalVault,writeClinicalVault,stageClinicalRestore,verifyStagedClinicalRestore,activateClinicalRestore} from './privateClinicalVault';
 import {loadWorkerVault,writeWorkerVault,stageWorkerRestore,verifyStagedWorkerRestore,activateWorkerRestore,MissingWorkerVaultError,workerVaultRecoveryRequired} from './privateWorkerVault';
@@ -33,6 +34,7 @@ export class ClinicalMigrationRequiredError extends Error{
  constructor(){super('Antes de migrar tus datos clínicos, selecciona y verifica un respaldo cifrado externo.');this.name='ClinicalMigrationRequiredError'}
 }
 let migrationInProgress=false;
+let intentionalResetInProgress=false;
 const LEGACY_CLINICAL_BACKUP='clinical-v1-legacy-verified-snapshot';
 const RESTORE_JOURNAL='clinical-v1-portable-restore-pending';
 const RESTORE_DONE='finished';
@@ -189,8 +191,10 @@ export async function loadDemoSnapshot(allowVerifiedMigration=false):Promise<Dem
 }
 /** Native writes are serialized to avoid older writes overwriting newer snapshots. */
 export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
+  if(intentionalResetInProgress)return Promise.reject(Error('Restablecimiento intencional en curso; se bloquearon nuevos guardados.'));
   const safe=validateDemoSnapshot(snapshot);
   writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
+    if(intentionalResetInProgress)throw Error('Restablecimiento intencional en curso.');
     if(isNativeSecureStore()){
       await configureKeychain();
       const pending=await SecureStorage.getItem(RESTORE_JOURNAL);
@@ -299,4 +303,43 @@ export async function migrateFromVerifiedPortableBackup(archive:string,password:
    throw Error('La comprobación final de la migración no coincide. No continúes registrando datos.');
   return migrated;
  }finally{migrationInProgress=false}
+}
+
+/**
+ * EXPLICIT single-device reset for a known disposable test installation.
+ * Never invoked automatically on startup, migrations, failures or reinstall.
+ * This removes only app-private runtime files and its scoped Keychain entries;
+ * packaged nursing catalogs, approved associations and Excel templates remain.
+ * A successful reset permanently blocks queued writes until the page reloads.
+ */
+export async function resetDisposableLocalDatabase():Promise<void>{
+ if(!isNativeSecureStore())throw Error('El reinicio completo solo está disponible en la aplicación iOS.');
+ if(intentionalResetInProgress)throw Error('Ya se está reiniciando la base local.');
+ intentionalResetInProgress=true;
+ try{
+  // Drain earlier writes, including failures; no new snapshot may be enqueued.
+  await writeQueue.catch(()=>undefined);
+  await configureKeychain();
+  const location={path:'danper',directory:Directory.Data};
+  let present=false;
+  try{await Filesystem.stat(location);present=true}
+  catch(error){
+   const message=error instanceof Error?error.message:String(error);
+   if(!/does not exist|no such file|\\bENOENT\\b|file not found/i.test(message))throw error;
+  }
+  if(present){
+   await Filesystem.rmdir({...location,recursive:true});
+   try{
+    await Filesystem.stat(location);
+    throw Error('Persisten archivos privados tras el intento de reinicio.');
+   }catch(error){
+    const message=error instanceof Error?error.message:String(error);
+    if(!/does not exist|no such file|\\bENOENT\\b|file not found/i.test(message))throw error;
+   }
+  }
+  // Clear only keys in the existing DANPER prefix. iOS Keychain may survive app uninstall.
+  await SecureStorage.clear(false);
+  if((await SecureStorage.keys(false)).length!==0)throw Error('Quedaron referencias en Keychain. No se confirmó el reinicio.');
+  clearLegacyDemoSnapshot();
+ }catch(error){intentionalResetInProgress=false;throw error}
 }
