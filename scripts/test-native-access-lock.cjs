@@ -25,7 +25,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
  assert.ok(withLock.includes('UIWindow.didBecomeVisibleNotification'),'lock during initial loading');
  assert.ok(withLock.includes('UIColor.systemBackground'),'overlay fully hides sensitive content');
  assert.ok(withLock.includes('guard context.canEvaluatePolicy(policy'),'do not unlock device without authentication');
- assert.ok(withLock.includes('if success && UIApplication.shared.applicationState == .active'),'unlock only after real iOS success');
+ assert.ok(withLock.includes('if success {'),'remember success even if app is temporarily inactive');
+ assert.ok(!withLock.includes('if success && UIApplication.shared.applicationState == .active'),'inactive Face ID success must not be rejected');
+ assert.ok(withLock.includes('UIApplication.didEnterBackgroundNotification'),'true background must revoke authorization');
+ assert.ok(withLock.includes('danperAuthGeneration += 1'),'invalidate old background-era callbacks');
+ assert.ok(withLock.includes('guard generation == danperAuthGeneration else { return }'),'stale authentication must not unlock a reopened app');
+ assert.ok(withLock.includes('danperAuthContext?.invalidate()'),'revoke in-flight Face ID when actually backgrounded');
+ const resignSection=withLock.split('@objc private func danperAuthWillResign')[1].split('@objc private func danperAuthDidEnterBackground')[0];
+ assert.ok(!resignSection.includes('danperAuthUnlocked = false'),'temporary Face ID interruption must not relock');
+ assert.ok(resignSection.includes('danperAddLockOverlay'),'privacy cover remains during Face ID transitions');
+ const foregroundSection=withLock.split('@objc private func danperAuthDidBecomeActive')[1].split('private func danperAppWindows')[0];
+ assert.ok(foregroundSection.includes('if danperAuthUnlocked'),'successful inactive authentication must resume without new prompt');
+ assert.ok(foregroundSection.includes('} else if !danperAuthAttemptInFlight'),'no duplicate Face ID prompt while a request is in flight');
+ const visibleSection=withLock.split('@objc private func danperAuthWindowVisible')[1].split('@objc private func danperAuthWillResign')[0];
+ assert.ok(visibleSection.includes('if danperAuthUnlocked'),'newly visible window must not lock an unlocked session');
+
  assert.ok(withLock.includes('viewWithTag(danperNativeLockTag)?.removeFromSuperview()'),'success unlocks');
  assert.ok(withLock.includes('Autenticación cancelada'),'cancel stays locked with retry');
  const workflow=fs.readFileSync('.github/workflows/ios-ipa.yml','utf8');
@@ -34,6 +48,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
  assert.ok(build.includes('NSFaceIDUsageDescription'),'Face ID usage reason mandatory');
  const verifier=fs.readFileSync('scripts/verify-ios-ipa.mjs','utf8');
  assert.ok(verifier.includes('NSFaceIDUsageDescription'),'shipped IPA must be inspected for Face ID key');
- console.log('PASS: iOS native biometric/passcode lock initial launch, background, resume, cancel/failure, idempotent Swift injection, Face ID plist.');
+ console.log('PASS: native Face ID lifecycle inactive-success, no prompt loop, real background re-lock, stale callback rejection, passcode fallback and Swift injection.');
 }
 run().catch(e=>{console.error(e);process.exitCode=1});
