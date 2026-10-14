@@ -19,7 +19,7 @@ vm.runInNewContext(compiled.outputText,context,{filename:'secureDemoStore.js'});
  assert.equal((await m.loadDemoSnapshot()).workers.length,1,'encrypted file roster loaded after update');
  failSet=true;await assert.rejects(m.writeDemoSnapshot(next),/storage unavailable/);failSet=false;
  failGet=true;await assert.rejects(m.loadDemoSnapshot(),/iOS locked/);failGet=false;
- const last=await m.loadDemoSnapshot();assert.equal(last.attentions[0].id,'B','read failure never replaces secure state');
+ const last=await m.loadDemoSnapshot();assert.equal(last.attentions[0].id,'demo-two','read failure never replaces secure state');
  ios=false;await m.writeDemoSnapshot({...last,notifications:true});assert.equal(legacy.get('danper-reminders-enabled-v06'),'yes');assert.equal(m.readLegacyDemoSnapshot().notifications,true);
  console.log('PASS: native Keychain migration, serialized writes, fail closed and browser demo fallback');
 })().catch(e=>{console.error(e);process.exitCode=1});
