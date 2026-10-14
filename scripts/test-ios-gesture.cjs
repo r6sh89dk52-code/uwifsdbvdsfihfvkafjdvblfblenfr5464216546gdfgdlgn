@@ -18,7 +18,7 @@ async function run(){
   // UI bridge invokes the app's existing back handler, which protects drafts.
   const bridgeSource=fs.readFileSync('src/nativeBackBridge.ts','utf8');
   const bridgeJS=ts.transpileModule(bridgeSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-  let clicks=0,blurs=0; const document={activeElement:null,querySelector(sel){if(sel==='.pageHead > button')return this.back??null;if(sel==='nav > button:first-child')return this.home??null;return null}};
+  let clicks=0,blurs=0; const document={activeElement:null,querySelector(sel){if(sel==='.kardexSectionHeader > button')return this.nested??null;if(sel==='.pageHead > button')return this.back??null;if(sel==='nav > button:first-child')return this.home??null;return null}};
   const HTMLElement=class {constructor(){this.disabled=false;this.classList={contains:()=>false}}click(){clicks++}matches(){return false}blur(){blurs++}};
   const moduleBridge={exports:{}};
   const bridgeContext={exports:moduleBridge.exports,module:moduleBridge,window:{addEventListener(){}},document,HTMLElement,require(name){if(name==='./iosGesture')return {IOS_BACK_EVENT:'danper-native-swipe-back',attachBrowserEdgeBack:()=>()=>{}};if(name==='./nativeReminders')return {isNativeIOS:()=>true};throw Error(name)}};
@@ -26,10 +26,10 @@ async function run(){
   const perform=moduleBridge.exports.performNativeBack;
   assert.equal(perform(document),'noop');
   document.home=new HTMLElement();assert.equal(perform(document),'home');assert.equal(clicks,1);
-  document.back=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,2);
+  document.back=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,2);\n  document.nested=new HTMLElement();assert.equal(perform(document),'page');assert.equal(clicks,3,'nested Kardex must be the first back action');\n  document.nested=null;assert.equal(perform(document),'page');assert.equal(clicks,4,'second gesture exits Kardex dashboard');
   document.activeElement=new HTMLElement();document.activeElement.matches=()=>true;
-  assert.equal(perform(document),'keyboard');assert.equal(blurs,1);assert.equal(clicks,2);
-  document.activeElement=null;document.back=null;document.home.classList.contains=()=>true;
+  assert.equal(perform(document),'keyboard');assert.equal(blurs,1);assert.equal(clicks,4);
+  document.activeElement=null;document.back=null;document.nested=null;document.home.classList.contains=()=>true;
   assert.equal(perform(document),'noop');
   const {installGestureInAppDelegate}=await import('./install-ios-gesture.mjs');
   const fixture=`import UIKit\nimport Capacitor\n@UIApplicationMain\nclass AppDelegate: UIResponder, UIApplicationDelegate {\n var window: UIWindow?\n func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {\n return true\n }\n}\n`;

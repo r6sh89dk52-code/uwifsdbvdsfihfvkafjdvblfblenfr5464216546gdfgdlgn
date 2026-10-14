@@ -45,7 +45,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
   <h3><FileSpreadsheet size={18}/>Indicador ambulatorio · Libro oficial de diez hojas</h3>
   <p className="hint">El formato original depurado ya está integrado en la aplicación. No debes importar ningún Excel. El Indicador cierra el día 9; el Kardex de Enfermería continúa calculando sus saldos diariamente.</p>
   <div className="fields two">
-   <label>Mes de inicio del corte (día 9)<input type="month" value={month} min="2020-01" max="2099-12" onChange={e=>{if(e.target.value)setMonth(e.target.value);setError('');setDone('')}}/></label>
+   <label>Mes de inicio del corte (día 9)<input type="month" className="ambulatoryMonthInput" value={month} min="2020-01" max="2099-12" onChange={e=>{if(e.target.value)setMonth(e.target.value);setError('');setDone('')}}/></label>
    <label>Período mensual oficial<input readOnly aria-label="Período mensual oficial" value={period.label}/></label>
   </div>
   <label>Subdivisión del informe<select value={subdivision} onChange={e=>setSubdivision(e.target.value)}><option value="">Seleccionar subdivisión</option>{templateLayout.subdivisions.map(p=><option key={p[1]} value={p[0]}>{p[0]}</option>)}</select></label>
