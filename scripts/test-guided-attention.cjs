@@ -5,7 +5,7 @@ const ts=require('typescript');
 const s=fs.readFileSync('src/main.tsx','utf8');
 const css=fs.readFileSync('src/attentionStepper.css','utf8');
 const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
-const result=ts.transpileModule(s,{fileName:'main.tsx',reportDiagnostics:true,compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,resolveJsonModule:true}});
+const result=ts.transpileModule(s,{fileName:'main.tsx',reportDiagnostics:true,compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,moduleResolution:ts.ModuleResolutionKind.Bundler,resolveJsonModule:true}});
 const errors=result.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error);
 assert.deepEqual(errors.map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')),[],'JSX must remain parseable');
 assert.equal(pkg.version,'0.20.9');
