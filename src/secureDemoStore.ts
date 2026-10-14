@@ -101,7 +101,6 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
 /** Native writes are serialized to avoid older writes overwriting newer snapshots. */
 export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
   const safe=validateDemoSnapshot(snapshot);
-  const serialized=JSON.stringify(safe);
   writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
     if(isNativeSecureStore()){
       await configureKeychain();
