@@ -27,6 +27,15 @@ const INCIDENTS='danper-etapa-b3-incidents-v013';
 const AMBULATORY_RECON='danper-v016-ambulatory-reconciliation';
 const SECURE_KEY='prototype-snapshot-v1';
 const CLINICAL_MARKER=JSON.stringify({format:'encrypted-clinical-v1',version:2});
+const LEGACY_CLINICAL_BACKUP='clinical-v1-legacy-verified-snapshot';
+/** Retain the verified v0.19 Keychain snapshot for manual recovery if iOS loses its file container. */
+async function preserveLegacySnapshot(raw:string):Promise<void>{
+ const previous=await SecureStorage.getItem(LEGACY_CLINICAL_BACKUP);
+ if(previous!==null)return; // never replace the original migration backup
+ await SecureStorage.setItem(LEGACY_CLINICAL_BACKUP,raw);
+ if(await SecureStorage.getItem(LEGACY_CLINICAL_BACKUP)!==raw)
+  throw Error('No se pudo conservar el respaldo previo a la migración clínica.');
+}
 let configured:Promise<void>|undefined;
 let writeQueue:Promise<void>=Promise.resolve();
 
@@ -86,17 +95,15 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
   if(parsed.workers.length)throw Error('El almacén clínico contiene un padrón duplicado.');
   try{
    const workers=await loadWorkerVault();
-   if(workers===null){
-    if(prior?.workers.length)throw Error('Padrón privado no disponible para migración.');
-    return parsed;
-   }
-   clearLegacyDemoSnapshot();
-   // Clinical storage has already been committed; complete the old-key cleanup.
+   if(workers===null)throw Error('No existe una referencia al padrón cifrado. Se bloquea el arranque para proteger los registros.');
+   // Clinical storage is verified; preserve old Keychain snapshot before switching.
    if(raw!==CLINICAL_MARKER){
+    if(raw!==null)await preserveLegacySnapshot(raw);
     await SecureStorage.setItem(SECURE_KEY,CLINICAL_MARKER);
     if(await SecureStorage.getItem(SECURE_KEY)!==CLINICAL_MARKER)
      throw Error('No se confirmó la migración clínica en Keychain.');
    }
+   clearLegacyDemoSnapshot();
    return {...parsed,workers};
   }catch(error){
    if(error instanceof MissingWorkerVaultError)return parsed;
@@ -109,9 +116,10 @@ export async function loadDemoSnapshot():Promise<DemoSnapshot>{
   catch(error){if(error instanceof MissingWorkerVaultError)return prior;throw error}
   if(workers!==null&&prior.workers.length&&JSON.stringify(workers)!==JSON.stringify(prior.workers))
    throw Error('Padrón duplicado divergente. No se migra automáticamente.');
-  if(workers===null&&prior.workers.length)await writeWorkerVault(prior.workers);
+  if(workers===null)await writeWorkerVault(prior.workers);
   const stripped={...prior,workers:[]};
   await writeClinicalVault(stripped);
+  if(raw!==null)await preserveLegacySnapshot(raw);
   await SecureStorage.setItem(SECURE_KEY,CLINICAL_MARKER);
   if(await SecureStorage.getItem(SECURE_KEY)!==CLINICAL_MARKER)
    throw Error('No se verificó el marcador del almacén clínico.');
