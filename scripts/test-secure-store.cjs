@@ -26,7 +26,7 @@ vm.runInNewContext(compiled.outputText,context,{filename:'secureDemoStore.js'});
  assert.equal(orphan.attentions[0].id,'demo-two','lost file must not hide clinical Keychain snapshot');
  assert.equal(orphan.workers.length,0);
  assert.equal(m.workerVaultRecoveryRequired(),true);
- await assert.rejects(m.writeDemoSnapshot(orphan),/MissingWorkerVaultError|missing/,'orphan pointer blocks automatic writes');
+ await assert.rejects(m.writeDemoSnapshot(orphan),err=>err instanceof MissingWorkerVaultError,'orphan pointer blocks automatic writes');
  assert.equal(JSON.parse(data.get('prototype-snapshot-v1')).attentions[0].id,'demo-two','no hidden overwrite of clinical data');
  vaultMissing=false;
  ios=false;await m.writeDemoSnapshot({...last,notifications:true});assert.equal(legacy.get('danper-reminders-enabled-v06'),'yes');assert.equal(m.readLegacyDemoSnapshot().notifications,true);
