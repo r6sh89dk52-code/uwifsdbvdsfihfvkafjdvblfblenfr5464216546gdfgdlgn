@@ -2,8 +2,9 @@ import {useRef,useState} from 'react';
 import {FileSpreadsheet,Upload,CheckCircle2,AlertTriangle} from 'lucide-react';
 import{readPersonal}from'./workbookPersonal';import {feedback} from './nativeHaptics';
 import{reconcileWorkers,type ImportResult,type WorkerRecord}from'./workerRules';
-interface Props{current:WorkerRecord[];onApply:(workers:WorkerRecord[])=>void|Promise<void>}
-export default function PersonalImporter({current,onApply}:Props){
+import {reviewOfficialRoster} from './officialRosterReview';
+interface Props{current:WorkerRecord[];onApply:(workers:WorkerRecord[])=>void|Promise<void>;linkedDnis?:string[]}
+export default function PersonalImporter({current,onApply,linkedDnis=[]}:Props){
  const ref=useRef<HTMLInputElement>(null);
  const [preview,setPreview]=useState<ImportResult|null>(null);
  const [fileName,setFileName]=useState('');
@@ -11,6 +12,7 @@ export default function PersonalImporter({current,onApply}:Props){
  const [error,setError]=useState('');
  const [applied,setApplied]=useState(false);
  const estimated=preview?reconcileWorkers(current,preview.workers):null;
+ const compared=preview&&current.length?reviewOfficialRoster(current,preview.workers,linkedDnis):null;
  async function pickFile(file?:File){if(!file)return;setBusy(true);setPreview(null);setApplied(false);setError('');setFileName(file.name);
   try{setPreview(await readPersonal(file));}catch(e){setError(e instanceof Error?e.message:'No se pudo interpretar el Excel.');}
   finally{setBusy(false)}
@@ -32,6 +34,13 @@ export default function PersonalImporter({current,onApply}:Props){
  <p className="hint">Comparación con el padrón existente: {estimated.stats.added} nuevos, {estimated.stats.merged} ya registrados. Cambios de nombres por revisar: {estimated.stats.nameConflicts}. Cambios M/F por revisar: {estimated.stats.sexConflicts}. Los DNI existentes conservan una sola ficha.</p>
  {(preview.stats.sexConflicts>0||preview.stats.sexInvalid>0||estimated.stats.nameConflicts>0||estimated.stats.sexConflicts>0)&&<p className="kardexError" role="alert">Hay datos de identidad o sexo que requieren verificación. Nunca se deduce el sexo por el nombre; si un DNI ya existe, no se reemplazan automáticamente nombres ni sexos contradictorios.</p>}
  <p className="hint"><strong>La app respeta los cambios manuales existentes</strong> y completa sus campos vacíos con datos importados. Puedes revisar antes de confirmar.</p>
+ {compared&&<section className="panel" aria-label="Conciliación de padrón oficial (solo lectura)">
+  <h4>Revisión del padrón REAL: únicamente vista previa</h4>
+  <p className="hint">El Excel PERSONAL es la referencia de DNI reales. No basta con que un DNI no aparezca para asegurar que sea ficticio; esta pantalla no borra ningún trabajador.</p>
+  <p className="hint">Actualmente: <strong>{compared.currentCount}</strong> trabajadores. Excel: <strong>{compared.officialCount}</strong> DNI. Coinciden: <strong>{compared.matchingDni}</strong>. Ausentes del Excel: <strong>{compared.absentFromOfficial}</strong>.</p>
+  <p className="hint">Requieren revisión individual: <strong>{compared.eligibleForFurtherReview}</strong>. Protegidos por creación manual o vínculos clínicos: <strong>{compared.protectedAbsent}</strong> (manuales {compared.protectedManual}; con atenciones/alergias {compared.protectedLinked}). Nombres discordantes para el mismo DNI: <strong>{compared.nameDiscrepancies}</strong>.</p>
+  <p className="kardexError" role="status">No se eliminará a nadie al confirmar una importación. La depuración necesita un respaldo externo verificado y otra confirmación específica; este paso aún NO está habilitado.</p>
+ </section>}
  <div className="importSample"><span>Muestra de registros reconocidos:</span>{preview.workers.slice(0,3).map(w=><div key={w.dni}>{w.dni} — {w.name}</div>)}</div>
  <div className="actions"><button type="button" className="secondary" onClick={()=>setPreview(null)}>Cancelar</button><button type="button" className="primary" onClick={()=>void confirm()} disabled={busy}><CheckCircle2 size={17}/> Confirmar importación</button></div></div>}
  <p className="hint">En iPhone el padrón se guarda localmente en un archivo cifrado AES-GCM, con clave privada en Keychain. El navegador sigue siendo un entorno de prueba sin cifrar. La información clínica todavía requiere una migración a una base segura antes de su uso real.</p>
