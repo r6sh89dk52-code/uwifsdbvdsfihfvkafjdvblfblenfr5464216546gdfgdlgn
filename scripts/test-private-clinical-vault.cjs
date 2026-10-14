@@ -68,6 +68,7 @@ const vault=moduleFrom('src/privateClinicalVault.ts',name=>{
  const secure=moduleFrom('src/secureDemoStore.ts',name=>{
   if(name==='@aparajita/capacitor-secure-storage')return{SecureStorage,KeychainAccess:{whenUnlockedThisDeviceOnly:1}};
   if(name==='@capacitor/core')return{Capacitor:{isNativePlatform:()=>true,getPlatform:()=> 'ios'}};
+  if(name==='./portableBackup')return {decryptPortableBackup:async()=>{throw Error('not used')}};
   if(name==='./privateClinicalVault')return {loadClinicalVault:vault.loadClinicalVault,writeClinicalVault:vault.writeClinicalVault};
   if(name==='./privateWorkerVault')return {
     MissingWorkerVaultError:class MissingWorkerVaultError extends Error {},
@@ -80,7 +81,8 @@ const vault=moduleFrom('src/privateClinicalVault.ts',name=>{
  const prior={...newer,workers:[]};
  const priorRaw=JSON.stringify(prior);
  keys.set('prototype-snapshot-v1',priorRaw);
- const merged=await secure.loadDemoSnapshot();
+ await assert.rejects(secure.loadDemoSnapshot(),e=>e.name==='ClinicalMigrationRequiredError');
+ const merged=await secure.loadDemoSnapshot(true);
  assert.equal(merged.workers[0].dni,'00000001','existing encrypted roster stays intact');
  assert.equal(merged.attentions.length,12);
  assert.equal(keys.get('clinical-v1-legacy-verified-snapshot'),priorRaw,'original Keychain snapshot preserved');
