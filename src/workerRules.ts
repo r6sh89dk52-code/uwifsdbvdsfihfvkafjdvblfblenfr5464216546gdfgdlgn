@@ -1,6 +1,6 @@
 /** No clinical records or real employee names are bundled in this module. */
 export type WorkerRecord={dni:string;name:string;area:string;labor:string;sex:string;age:string;ubigeo:string;source?:'manual'|'imported'};
-export type ImportStats={total:number;valid:number;invalidDni:number;withoutName:number;duplicates:number};
+export type ImportStats={total:number;valid:number;invalidDni:number;withoutName:number;duplicates:number;sexInvalid:number;sexMissing:number;sexConflicts:number;nameConflicts:number};
 export type ImportResult={workers:WorkerRecord[];stats:ImportStats};
 export type MergeStats={added:number;merged:number;manualPreserved:number};
 export function normalizeDni(value:unknown):string{
@@ -18,7 +18,8 @@ export function compileWorkers(rows:unknown[][]):ImportResult{
   if(index.dni<0||index.name<0)throw Error('PERSONAL debe tener encabezados DNI y NOMBRES. No se importó ningún trabajador.');
   const cell=(r:unknown[],i:number)=>i>=0?clean(r[i]):'';
   const result=new Map<string,WorkerRecord>();
-  const stats:ImportStats={total:0,valid:0,invalidDni:0,withoutName:0,duplicates:0};
+  const stats:ImportStats={total:0,valid:0,invalidDni:0,withoutName:0,duplicates:0,sexInvalid:0,sexMissing:0,sexConflicts:0,nameConflicts:0};
+  const conflictingSex=new Set<string>();
   for(const r of rows.slice(1)){
     if(r.every(v=>!clean(v)))continue;
     stats.total++;
@@ -26,13 +27,24 @@ export function compileWorkers(rows:unknown[][]):ImportResult{
     if(!dni){stats.invalidDni++;continue}
     const name=cell(r,index.name);
     if(!name){stats.withoutName++;continue}
-    const sex=cell(r,index.sex).toUpperCase();
+    const rawSex=cell(r,index.sex).toUpperCase();
+    const sex=['M','F'].includes(rawSex)?rawSex:'';
+    if(!rawSex)stats.sexMissing++;
+    else if(!sex)stats.sexInvalid++;
     const ageRaw=cell(r,index.manual)||cell(r,index.auto);
     const ageNum=Number(ageRaw);
     const age=/^\d{1,3}$/.test(ageRaw)&&Number.isInteger(ageNum)&&ageNum<=120?ageRaw:'';
-    const w:WorkerRecord={dni,name,area:cell(r,index.area),labor:cell(r,index.labor),sex:['M','F'].includes(sex)?sex:'',age,ubigeo:cell(r,index.ubi),source:'imported'};
+    const w:WorkerRecord={dni,name,area:cell(r,index.area),labor:cell(r,index.labor),sex,age,ubigeo:cell(r,index.ubi),source:'imported'};
     const previous=result.get(dni);
-    if(previous){stats.duplicates++;result.set(dni,{...previous,area:pick(previous.area,w.area),labor:pick(previous.labor,w.labor),sex:pick(previous.sex,w.sex),age:pick(previous.age,w.age),ubigeo:pick(previous.ubigeo,w.ubigeo)});}
+    if(previous){
+      stats.duplicates++;
+      if(previous.name.toLocaleLowerCase('es')!==w.name.toLocaleLowerCase('es'))stats.nameConflicts++;
+      if(previous.sex&&w.sex&&previous.sex!==w.sex&&!conflictingSex.has(dni)){
+        stats.sexConflicts++;conflictingSex.add(dni);
+      }
+      result.set(dni,{...previous,area:pick(previous.area,w.area),labor:pick(previous.labor,w.labor),
+       sex:conflictingSex.has(dni)?'':pick(previous.sex,w.sex),age:pick(previous.age,w.age),ubigeo:pick(previous.ubigeo,w.ubigeo)});
+    }
     else result.set(dni,w);
   }
   stats.valid=result.size;

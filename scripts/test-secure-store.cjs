@@ -2,10 +2,10 @@ const fs=require('fs');const ts=require('typescript');const assert=require('node
 const source=fs.readFileSync('src/secureDemoStore.ts','utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
 const diagnostics=compiled.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error);assert.equal(diagnostics.length,0,'Syntax errors');
-let data=new Map(),legacy=new Map(),ios=true,failGet=false,failSet=false;
+let data=new Map(),legacy=new Map(),ios=true,failGet=false,failSet=false,vault=null;
 const SecureStorage={async setKeyPrefix(){},async setSynchronize(sync){assert.equal(sync,false)},async setDefaultKeychainAccess(){},async getItem(k){if(failGet)throw Error('iOS locked');return data.get(k)??null},async setItem(k,v){if(failSet)throw Error('storage unavailable');data.set(k,v)}};
 const localStorage={getItem:k=>legacy.get(k)??null,setItem:(k,v)=>legacy.set(k,v),removeItem:k=>legacy.delete(k)};
-const moduleExports={};const context={exports:moduleExports,module:{exports:moduleExports},require(name){if(name==='@aparajita/capacitor-secure-storage')return {SecureStorage,KeychainAccess:{whenUnlockedThisDeviceOnly:1}};if(name==='@capacitor/core')return {Capacitor:{isNativePlatform:()=>ios,getPlatform:()=>ios?'ios':'web'}};throw Error(name)},localStorage,JSON,Promise,Error,Array,Object};
+const moduleExports={};const context={exports:moduleExports,module:{exports:moduleExports},require(name){if(name==='@aparajita/capacitor-secure-storage')return {SecureStorage,KeychainAccess:{whenUnlockedThisDeviceOnly:1}};if(name==='@capacitor/core')return {Capacitor:{isNativePlatform:()=>ios,getPlatform:()=>ios?'ios':'web'}};if(name==='./privateWorkerVault')return {loadWorkerVault:async()=>vault,writeWorkerVault:async workers=>{vault=JSON.parse(JSON.stringify(workers))}};throw Error(name)},localStorage,JSON,Promise,Error,Array,Object};
 vm.runInNewContext(compiled.outputText,context,{filename:'secureDemoStore.js'});const m=moduleExports;
 (async()=>{
  assert.throws(()=>m.validateDemoSnapshot({attentions:[],workers:{},allergies:{},notifications:false}),/estructura/);
@@ -13,9 +13,13 @@ vm.runInNewContext(compiled.outputText,context,{filename:'secureDemoStore.js'});
  const initial=await m.loadDemoSnapshot();assert.equal(initial.attentions.length,1);assert.equal(legacy.size,0);assert.ok(data.has('prototype-snapshot-v1'));
  await m.writeDemoSnapshot({...initial,attentions:[{id:'demo-two'}]});const next=await m.loadDemoSnapshot();assert.equal(next.attentions[0].id,'demo-two');
  await Promise.all([m.writeDemoSnapshot({...next,attentions:[{id:'A'}]}),m.writeDemoSnapshot({...next,attentions:[{id:'B'}]})]);assert.equal((await m.loadDemoSnapshot()).attentions[0].id,'B','last write wins, ordered');
+ const roster=[{dni:'12345678',name:'PERSONA FICTICIA'}];
+ await m.writeDemoSnapshot({...next,workers:roster});
+ assert.equal(JSON.parse(data.get('prototype-snapshot-v1')).workers.length,0,'no large roster inside Keychain snapshot');
+ assert.equal((await m.loadDemoSnapshot()).workers.length,1,'encrypted file roster loaded after update');
  failSet=true;await assert.rejects(m.writeDemoSnapshot(next),/storage unavailable/);failSet=false;
  failGet=true;await assert.rejects(m.loadDemoSnapshot(),/iOS locked/);failGet=false;
- const last=await m.loadDemoSnapshot();assert.equal(last.attentions[0].id,'B','read failure never replaces secure state');
+ const last=await m.loadDemoSnapshot();assert.equal(last.attentions[0].id,'demo-two','read failure never replaces secure state');
  ios=false;await m.writeDemoSnapshot({...last,notifications:true});assert.equal(legacy.get('danper-reminders-enabled-v06'),'yes');assert.equal(m.readLegacyDemoSnapshot().notifications,true);
  console.log('PASS: native Keychain migration, serialized writes, fail closed and browser demo fallback');
 })().catch(e=>{console.error(e);process.exitCode=1});
