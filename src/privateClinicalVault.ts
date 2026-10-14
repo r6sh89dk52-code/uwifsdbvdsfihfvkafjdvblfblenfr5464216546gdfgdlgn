@@ -45,7 +45,7 @@ async function key(){
  }
  const bytes=fromB64(raw);
  if(bytes.length!==32)throw Error('Clave clínica incorrecta. No se sobrescribirá.');
- return crypto.subtle.importKey('raw',bytes,{name:'AES-GCM'},false,['encrypt','decrypt']);
+ return crypto.subtle.importKey('raw',bytes.buffer as ArrayBuffer,{name:'AES-GCM'},false,['encrypt','decrypt']);
 }
 function validPath(s:string){return /^danper\/clinical\/clinical-[a-f0-9-]+\.enc$/.test(s)}
 async function decode(path:string,k:CryptoKey):Promise<unknown>{
@@ -58,7 +58,7 @@ async function decode(path:string,k:CryptoKey):Promise<unknown>{
  if(pack.v!==1||typeof pack.iv!=='string'||typeof pack.data!=='string')throw Error('Formato clínico cifrado incompatible.');
  const iv=fromB64(pack.iv),cipher=fromB64(pack.data);
  if(iv.length!==12||cipher.length<16||cipher.length>MAX_CIPHER)throw Error('Longitud de archivo clínico incorrecta.');
- const clear=await crypto.subtle.decrypt({name:'AES-GCM',iv},k,cipher);
+ const clear=await crypto.subtle.decrypt({name:'AES-GCM',iv:iv.buffer as ArrayBuffer},k,cipher.buffer as ArrayBuffer);
  if(clear.byteLength>MAX_CLEAR)throw Error('El archivo clínico supera el límite seguro.');
  return JSON.parse(new TextDecoder().decode(clear)) as unknown;
 }
