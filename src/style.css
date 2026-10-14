@@ -351,3 +351,8 @@ html,body,#root{width:100%;min-width:0}
 .hapticSettings input{width:20px;height:20px;accent-color:#e3182d}
 .hapticSettings .hint{margin:0}
 .app .toast{max-width:min(92vw,440px)}
+
+.safeExportPanel{display:grid;gap:12px;min-width:0}
+.safeExportPanel label{display:grid;gap:6px;min-width:0;overflow-wrap:anywhere}
+.safeExportPanel input{box-sizing:border-box;width:100%;min-width:0;font-size:16px}
+.safeExportPanel button{min-height:44px}
