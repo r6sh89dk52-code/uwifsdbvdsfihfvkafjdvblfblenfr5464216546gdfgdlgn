@@ -351,3 +351,12 @@ html,body,#root{width:100%;min-width:0}
 .hapticSettings input{width:20px;height:20px;accent-color:#e3182d}
 .hapticSettings .hint{margin:0}
 .app .toast{max-width:min(92vw,440px)}
+
+/* Portable encrypted backup / recovery controls */
+.backupPanel{display:grid;gap:12px;min-width:0}
+.backupPanel .backupLabel{display:flex;flex-direction:column;gap:7px;min-width:0;overflow-wrap:anywhere}
+.backupPanel input[type=password],.backupPanel input[type=file]{box-sizing:border-box;display:block;max-width:100%;width:100%;min-width:0;font-size:16px}
+.backupPanel input[type=file]{padding:12px 8px;overflow:hidden}
+.backupPanel button{min-height:44px}
+.backupPanel .backupPreview{border:1px solid var(--border,#45454d);border-radius:15px;padding:14px;overflow-wrap:anywhere}
+.backupPanel hr{width:100%;border:0;border-top:1px solid #474750;margin:10px 0}
