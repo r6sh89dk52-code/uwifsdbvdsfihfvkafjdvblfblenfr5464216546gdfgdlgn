@@ -90,3 +90,26 @@ export async function writeClinicalVault(value:unknown):Promise<void>{
  if(await SecureStorage.getItem(POINTER)!==path)throw Error('No se confirmó la generación clínica.');
  knownPath=path;knownContent=serialized;
 }
+
+/** Stage encrypted clinical data without changing its active generation. */
+export async function stageClinicalRestore(value:unknown):Promise<string>{
+ if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Respaldo clínico inválido.');
+ const serialized=JSON.stringify(value);
+ if(new TextEncoder().encode(serialized).byteLength>MAX_CLEAR)throw Error('Respaldo clínico demasiado grande.');
+ const k=await key(),iv=crypto.getRandomValues(new Uint8Array(12));
+ const ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,new TextEncoder().encode(serialized)));
+ const path=DIR+'/clinical-'+crypto.randomUUID()+'.enc';
+ await ensureFolder();
+ await Filesystem.writeFile({path,directory:Directory.Data,encoding:Encoding.UTF8,data:JSON.stringify({v:1,iv:b64(iv),data:b64(ciphertext)})});
+ const actual=await decode(path,k);
+ if(JSON.stringify(actual)!==serialized)throw Error('No se pudo verificar el respaldo clínico preparado.');
+ return path;
+}
+/** Idempotent finalization for interrupted journaled restoration. */
+export async function activateClinicalRestore(path:string):Promise<void>{
+ const state=await decode(path,await key());
+ await SecureStorage.setItem(POINTER,path);
+ if(await SecureStorage.getItem(POINTER)!==path)throw Error('No se confirmó la referencia clínica restaurada.');
+ knownPath=path;
+ knownContent=JSON.stringify(state);
+}
