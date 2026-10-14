@@ -8,7 +8,7 @@ let failFile=false;
 const SecureStorage={async getItem(k){return keychain.get(k)??null},async setItem(k,v){keychain.set(k,v)}};
 const Filesystem={
  async mkdir(){},
- async readFile({path}){if(!files.has(path))throw Error('file missing');return{data:files.get(path)}},
+ async readFile({path}){if(!files.has(path))throw Error("'readFile' failed because file does not exist.");return{data:files.get(path)}},
  async writeFile({path,data}){if(failFile)throw Error('disk full');files.set(path,data)}
 };
 const context={module:{exports:{}},require(name){
@@ -18,7 +18,7 @@ const context={module:{exports:{}},require(name){
 },crypto:{subtle:webcrypto.subtle,getRandomValues:(a)=>webcrypto.getRandomValues(a),randomUUID},atob:s=>Buffer.from(s,'base64').toString('latin1'),btoa:s=>Buffer.from(s,'latin1').toString('base64'),TextEncoder,TextDecoder,Uint8Array,JSON,Error,Array,Promise,String,Number};
 context.exports=context.module.exports;
 vm.runInNewContext(result.outputText,context,{filename:'privateWorkerVault.js'});
-const {loadWorkerVault,writeWorkerVault}=context.module.exports;
+const {loadWorkerVault,writeWorkerVault,restoreMissingWorkerVault,workerVaultRecoveryRequired}=context.module.exports;
 (async()=>{
  assert.equal(await loadWorkerVault(),null);
  const rows=Array.from({length:9635},(_,i)=>({dni:String(10000000+i),name:'TRABAJADOR FICTICIO '+i,sex:i%2?'M':'F'}));
@@ -45,5 +45,23 @@ const {loadWorkerVault,writeWorkerVault}=context.module.exports;
  await assert.rejects(loadWorkerVault(),'corruption must fail, never reset to empty');
  files.set(path,saved);
  assert.equal((await loadWorkerVault()).length,100);
+ // Real iPhone regression: old Keychain reference still exists after
+ // an upgrade but the referenced Documents directory was not preserved.
+ const originalPointer=keychain.get('workers-v1-file');
+ files.delete(originalPointer);
+ await assert.rejects(loadWorkerVault(),error=>error.name==='MissingWorkerVaultError');
+ assert.equal(workerVaultRecoveryRequired(),true);
+ await assert.rejects(writeWorkerVault([]),/no está disponible/);
+ assert.equal(keychain.get('workers-v1-file'),originalPointer,'the missing pointer is never automatically overwritten');
+ failFile=true;
+ await assert.rejects(restoreMissingWorkerVault([]),/disk full/);
+ failFile=false;
+ assert.equal(keychain.get('workers-v1-file'),originalPointer,'failed explicit restore retains missing pointer');
+ await restoreMissingWorkerVault([]);
+ const recoveredPointer=keychain.get('workers-v1-file');
+ assert.notEqual(recoveredPointer,originalPointer);
+ assert.equal(workerVaultRecoveryRequired(),false);
+ assert.equal((await loadWorkerVault()).length,0);
+ assert.ok(JSON.parse(keychain.get('workers-v1-missing-file-references')).includes(originalPointer),'old reference kept for forensics');
  console.log('PASS: on-device AES-GCM encryption of 9635 fictitious workers, Keychain pointer, rollback and fail-closed tamper detection.');
 })().catch(error=>{console.error(error);process.exitCode=1});
