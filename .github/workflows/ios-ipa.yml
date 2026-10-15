@@ -47,6 +47,7 @@ jobs:
           npx cap add ios
           npx cap sync ios
           node scripts/install-ios-gesture.mjs
+          node scripts/install-ios-access-lock.mjs
       - name: Generar IPA sin firmar
         run: bash scripts/build-ios-ipa.sh
       - name: Verificar IPA y recursos
@@ -54,7 +55,7 @@ jobs:
       - name: Adjuntar IPA descargable
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER-Salud-Movil-iPhone-v0.16.2
+          name: DANPER-Salud-Movil-iPhone-v0.21.1-DIAGNOSTICO-TECLADO-IOS-EXPERIMENTAL
           path: |
             outputs/*.ipa
             outputs/*.sha256
