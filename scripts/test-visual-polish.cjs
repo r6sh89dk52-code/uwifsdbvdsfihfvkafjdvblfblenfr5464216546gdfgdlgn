@@ -17,7 +17,7 @@ assert(main.includes('<DanperBrandLogo/>'),'official transparent logo in header'
 assert(kardex.includes('useLayoutEffect(()=>'),'Kardex submodule scroll reset');
 assert(kardex.includes('},[section]);'),'submodule change dependency');
 assert(!kardex.includes('kardexMenuLabel'),'no redundant duplicate Kardex navigation');
-assert(kardex.includes('Tu Kardex, paso a paso'),'four guided links retained');
+assert(kardex.includes('¿Qué necesitas hacer?'),'four guided links retained');
 assert(kardex.includes("navigate('inventory')"));
 assert(kardex.includes("navigate('movements')"));
 assert(kardex.includes("navigate('deliveries')"));
