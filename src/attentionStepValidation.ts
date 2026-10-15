@@ -37,7 +37,7 @@ export function validateClinicalStage(step:ClinicalStage,a:ClinicalValidationInp
    if(!a.category||!ctx.validCategories.includes(a.category)){
      add('clinical-category','Selecciona una categoría de atención: enfermedad, accidente u otra.');
    }else if(SYSTEM_REQUIRED_CATEGORIES.some(c=>c===a.category)){
-     if(!a.system||!(ctx.validSystems.includes(a.system)||a.system==='NO APLICA'))add('clinical-system','Selecciona el sistema afectado o marca expresamente «No aplica».');
+     if(!a.system||!ctx.validSystems.includes(a.system))add('clinical-system','Selecciona el sistema afectado del catálogo oficial.');
      if(a.system==='OSTEOMUSCULAR'&&!a.segment.trim())add('clinical-segment','Especifica el segmento osteomuscular afectado.');
    }
    if(!a.diagnosis.trim())add('clinical-diagnosis','Escribe el diagnóstico presuntivo o comentario clínico.');
