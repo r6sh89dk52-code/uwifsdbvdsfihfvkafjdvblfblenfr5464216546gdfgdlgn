@@ -2,8 +2,9 @@ import {useMemo,useState} from 'react';
 import {ArrowDownCircle,ClipboardCheck,PackageOpen,RefreshCw} from 'lucide-react';
 import {countPhysicalUnits,type StockLot} from './inventoryRules';
 import {kardexCatalog} from './kardexCatalog';
-import products from './products.json';
-import {activeCatalogMapping,type CatalogMappingEvent} from './reconciliationRules';
+import {type CatalogMappingEvent} from './reconciliationRules';
+import {reviewedAssociations} from './reviewedKardexAssociations';
+import KardexProductSearch from './KardexProductSearch';
 import {postStockMovement,suggestFEFOLot,type StockLedger,type StockCommand,type MovementKind} from './kardexMovements';
 
 type Props={ledger:StockLedger;mappings:CatalogMappingEvent[];onChange:(value:StockLedger)=>void};
@@ -11,7 +12,7 @@ const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).f
 function numberValue(v:string){return v.trim()===''?Number.NaN:Number(v.replace(',','.'))}
 function label(l:StockLot){return l.name+(l.lot?' — lote '+l.lot:' — sin lote')+(l.expires?' · vence '+l.expires:'')}
 function changedName(kind:MovementKind){return kind==='extraordinary'?'Ingreso extraordinario':kind==='use'?'Consumo de prueba':'Ajuste auditado'}
-export default function KardexMovementsPanel({ledger,mappings,onChange}:Props){
+export default function KardexMovementsPanel({ledger,onChange}:Props){
  const [kind,setKind]=useState<MovementKind>('extraordinary');
  const [productCode,setProductCode]=useState('');
  const [lotId,setLotId]=useState('');
@@ -25,10 +26,7 @@ export default function KardexMovementsPanel({ledger,mappings,onChange}:Props){
  const [reason,setReason]=useState('');
  const [error,setError]=useState('');
  const [historyLimit,setHistoryLimit]=useState(15);
- const coded=useMemo(()=>new Set(products.filter(p=>{
-  const mapping=activeCatalogMapping(mappings,p.code);
-  return mapping?.clinicalName===p.name&&kardexCatalog.some(k=>k.id===mapping.kardexCode&&k.name===mapping.kardexName);
- }).map(p=>activeCatalogMapping(mappings,p.code)!.kardexCode)),[mappings]);
+ const coded=useMemo(()=>new Set(reviewedAssociations.map(p=>p.kardexCode)),[]);
  const available=useMemo(()=>Array.from(new Map<string,string>(ledger.lots.filter(x=>kardexCatalog.some(p=>p.id===x.code)&&(kind!=='use'||coded.has(x.code))).map(x=>[x.code,x.name] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'es')),[ledger.lots,kind,coded]);
  const matching=useMemo(()=>ledger.lots.filter(x=>x.code===productCode).sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')),[ledger.lots,productCode]);
  const fefo=suggestFEFOLot(ledger.lots,productCode);
@@ -79,7 +77,7 @@ export default function KardexMovementsPanel({ledger,mappings,onChange}:Props){
    {(['extraordinary','use','adjustment'] as MovementKind[]).map(v=><button key={v} type="button" className={kind===v?'selected':''} onClick={()=>selectKind(v)}>{changedName(v)}</button>)}
   </div>
   {available.length===0?<p className="kardexEmpty">Registra primero un inventario inicial para habilitar movimientos.</p>:<>
-   <label>Producto con inventario<select value={productCode} onChange={e=>chooseProduct(e.target.value)}><option value="">Seleccionar producto…</option>{available.map(([code,name])=><option key={code} value={code}>{name}</option>)}</select></label>
+   <KardexProductSearch label="Producto con inventario" value={productCode} onChange={chooseProduct} products={available.map(([id,name])=>({id,name,group:kardexCatalog.find(p=>p.id===id)?.group}))}/>
    {matching.length>0&&<label>Lote / vencimiento<select value={lotId} onChange={e=>chooseLot(e.target.value)}>{matching.map(x=><option value={x.id} key={x.id}>{label(x)} · {fmt(countPhysicalUnits(x))} {x.catalogUnit}</option>)}</select></label>}
    {selected&&<>
     <p className="kardexPreview">Saldo actual: <strong>{fmt(countPhysicalUnits(selected))} {selected.catalogUnit}</strong> · {selected.sealedContainers} cerrados · {fmt(selected.openedRemaining)} abiertos restantes</p>
