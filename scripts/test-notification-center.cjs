@@ -45,10 +45,12 @@ const nativeModule=load('src/nativeReminders.ts',{
  '@capacitor/local-notifications':{LocalNotifications},
  './draftRules':rules,'./notificationCenterRules':center,'./inventoryRules':inventory
 });
-const draftInputs=Array.from({length:65},(_,i)=>({id:'worker-private-id-'+i,updatedAt:Date.now()-10000}));
+const draftInputs=Array.from({length:40},(_,i)=>({id:'worker-private-id-'+i,updatedAt:Date.now()-10000}));
 const expiryDate=exp(20);
 const plan=nativeModule.planLocalNotifications({drafts:draftInputs,lots:[lot('x',expiryDate),lot('y',expiryDate)]});
-assert.equal(plan.length,center.LOCAL_NOTICE_LIMIT,'iOS pending cap must be respected');
+assert.equal(plan.length,41,'40 drafts and one grouped expiry date');
+const capPlan=nativeModule.planLocalNotifications({drafts:Array.from({length:90},(_,i)=>({id:'large-'+i,updatedAt:Date.now()})),lots:[]});
+assert.equal(capPlan.length,center.LOCAL_NOTICE_LIMIT,'iOS pending cap must be respected');
 assert.equal(plan.filter(x=>x.extra.kind==='danper-stock-expiry').length,1,'same expiry date grouped');
 assert.ok(plan.every(x=>!x.title.includes('private-id')&&!x.body.includes('private-id')&&!x.body.includes('Producto')));
 (async()=>{
