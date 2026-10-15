@@ -49,7 +49,7 @@ const ambulatory=read('src/AmbulatoryExportPanel.tsx');
 assert(ambulatory.includes('DANPER_WORKSITES.map(p='));
 assert(!ambulatory.includes('templateLayout.subdivisions.map(p='));
 assert(ambulatory.includes('otherSiteVisits.length>0'),'report must show excluded other-site visits');
-assert(ambulatory.includes("buildAmbulatoryRows(siteVisits,ledger,start,end"),'site-specific calculation');
+assert(ambulatory.includes("buildAmbulatoryRows(attentions,ledger,start,end,{perVisitSubdivision:true"),"consolidated report with exact per-row site");
 assert(ambulatory.includes('||withoutSite.length>0||busy'),'do not export with unknown site');
 assert(ambulatory.includes('no se asignarán códigos por suposición.'));
 const store=read('src/secureDemoStore.ts');
