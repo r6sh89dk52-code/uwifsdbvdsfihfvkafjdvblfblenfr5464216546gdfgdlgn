@@ -12,7 +12,7 @@ const css=read('src/stageC.css');
 const core=read('src/cohesiveExperience.css');
 const check=(source,arr,name)=>arr.forEach(token=>assert(source.includes(token),name+': missing '+token));
 check(workspace,[
- 'Tu Kardex, paso a paso',
+ '¿Qué necesitas hacer?',
  'onClick={()=>navigate(\'inventory\')}','onClick={()=>navigate(\'movements\')}',
  'onClick={()=>navigate(\'deliveries\')}','onClick={()=>navigate(\'reports\')}',
  'ledger.movements.length','ledger.lots.length===0',
@@ -46,8 +46,8 @@ check(daily,[
 ],'Official daily reports');
 check(ambulatory,[
  'stageCProgress','stageCExportStep',
- '1</span> Configurar corte y subdivisión','2</span> Revisar datos disponibles',
- '3</span> Generar y compartir Excel',
+ '1</span> Elegir período y lugar de reporte','2</span> Comprobar atenciones y existencias',
+ '3</span> Crear archivo y compartir',
  'buildAmbulatoryRows(attentions,ledger,start,end',
  'sharedMonthlyReconciliation(ledger,result.data)',
  'exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data)',
