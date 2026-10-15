@@ -12,3 +12,18 @@
  .workerProfileHelper p{margin:0}
  .workerProfileHelper button{width:100%}
 }
+
+/* Verified organizational unit suggestions. Limit height instead of dumping lists. */
+.officialAreaField{position:relative;min-width:0}
+.officialAreaField>label{display:flex;flex-direction:column;gap:7px}
+.officialAreaField textarea{width:100%;min-height:74px;resize:vertical}
+.officialAreaSuggestions{position:relative;margin-top:6px;max-height:236px;overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--panel,var(--surface,#242429));box-shadow:0 12px 30px #0002;z-index:4}
+.officialAreaSuggestions button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:12px 14px;text-align:left;background:transparent;border:none;border-bottom:1px solid var(--line);color:inherit;min-height:58px}
+.officialAreaSuggestions button:last-child{border-bottom:0}
+.officialAreaSuggestions button:focus-visible,.officialAreaSuggestions button:hover{background:rgba(228,24,45,.1)}
+.officialAreaSuggestions strong{font-weight:650;font-size:.92rem;overflow-wrap:anywhere}
+.officialAreaSuggestions small{opacity:.78;font-size:.78rem;overflow-wrap:anywhere}
+.officialAreaKnown,.officialAreaCustom{margin:7px 0 0;font-size:.78rem;line-height:1.45;overflow-wrap:anywhere}
+.officialAreaKnown{color:var(--muted,var(--text-secondary,#9ea0a5))}
+.officialAreaCustom{color:var(--muted,var(--text-secondary,#9ea0a5))}
+@media(max-width:420px){.workerClinicalFields .officialAreaField{grid-column:1/-1}}
