@@ -2,20 +2,33 @@ const fs=require('fs');const ts=require('typescript');const assert=require('node
 const source=fs.readFileSync('src/secureDemoStore.ts','utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
 const diagnostics=compiled.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error);assert.equal(diagnostics.length,0,'Syntax errors');
-let data=new Map(),legacy=new Map(),ios=true,failGet=false,failSet=false;
+let data=new Map(),legacy=new Map(),ios=true,failGet=false,failSet=false,vault=null,vaultMissing=false,clinical=null;
+class MissingWorkerVaultError extends Error{}
 const SecureStorage={async setKeyPrefix(){},async setSynchronize(sync){assert.equal(sync,false)},async setDefaultKeychainAccess(){},async getItem(k){if(failGet)throw Error('iOS locked');return data.get(k)??null},async setItem(k,v){if(failSet)throw Error('storage unavailable');data.set(k,v)}};
 const localStorage={getItem:k=>legacy.get(k)??null,setItem:(k,v)=>legacy.set(k,v),removeItem:k=>legacy.delete(k)};
-const moduleExports={};const context={exports:moduleExports,module:{exports:moduleExports},require(name){if(name==='@aparajita/capacitor-secure-storage')return {SecureStorage,KeychainAccess:{whenUnlockedThisDeviceOnly:1}};if(name==='@capacitor/core')return {Capacitor:{isNativePlatform:()=>ios,getPlatform:()=>ios?'ios':'web'}};throw Error(name)},localStorage,JSON,Promise,Error,Array,Object};
+const moduleExports={};const context={exports:moduleExports,module:{exports:moduleExports},require(name){if(name==='@aparajita/capacitor-secure-storage')return {SecureStorage,KeychainAccess:{whenUnlockedThisDeviceOnly:1}};if(name==='@capacitor/core')return {Capacitor:{isNativePlatform:()=>ios,getPlatform:()=>ios?'ios':'web'}};if(name==='./portableBackup')return {decryptPortableBackup:async()=>{throw Error('not used')}};if(name==='./privateClinicalVault')return {loadClinicalVault:async()=>clinical,writeClinicalVault:async state=>{clinical=JSON.parse(JSON.stringify(state))}};if(name==='./privateWorkerVault')return {MissingWorkerVaultError,workerVaultRecoveryRequired:()=>vaultMissing,loadWorkerVault:async()=>{if(vaultMissing)throw new MissingWorkerVaultError('file does not exist');return vault},writeWorkerVault:async workers=>{if(vaultMissing)throw new MissingWorkerVaultError('missing');vault=JSON.parse(JSON.stringify(workers))}};throw Error(name)},localStorage,JSON,Promise,Error,Array,Object};
 vm.runInNewContext(compiled.outputText,context,{filename:'secureDemoStore.js'});const m=moduleExports;
 (async()=>{
  assert.throws(()=>m.validateDemoSnapshot({attentions:[],workers:{},allergies:{},notifications:false}),/estructura/);
  legacy.set('danper-etapa-a-demo-v1',JSON.stringify([{id:'demo-one'}]));
- const initial=await m.loadDemoSnapshot();assert.equal(initial.attentions.length,1);assert.equal(legacy.size,0);assert.ok(data.has('prototype-snapshot-v1'));
+ await assert.rejects(m.loadDemoSnapshot(),e=>e.name==='ClinicalMigrationRequiredError','pre-existing data must not migrate silently');const initial=await m.loadDemoSnapshot(true);assert.equal(initial.attentions.length,1);assert.equal(legacy.size,0);assert.equal(data.get('prototype-snapshot-v1'),JSON.stringify({format:'encrypted-clinical-v1',version:2}));assert.equal(clinical.attentions[0].id,'demo-one');
  await m.writeDemoSnapshot({...initial,attentions:[{id:'demo-two'}]});const next=await m.loadDemoSnapshot();assert.equal(next.attentions[0].id,'demo-two');
  await Promise.all([m.writeDemoSnapshot({...next,attentions:[{id:'A'}]}),m.writeDemoSnapshot({...next,attentions:[{id:'B'}]})]);assert.equal((await m.loadDemoSnapshot()).attentions[0].id,'B','last write wins, ordered');
+ const roster=[{dni:'12345678',name:'PERSONA FICTICIA'}];
+ await m.writeDemoSnapshot({...next,workers:roster});
+ assert.equal(clinical.workers.length,0,'no roster in encrypted clinical state');
+ assert.equal((await m.loadDemoSnapshot()).workers.length,1,'encrypted file roster loaded after update');
  failSet=true;await assert.rejects(m.writeDemoSnapshot(next),/storage unavailable/);failSet=false;
  failGet=true;await assert.rejects(m.loadDemoSnapshot(),/iOS locked/);failGet=false;
- const last=await m.loadDemoSnapshot();assert.equal(last.attentions[0].id,'B','read failure never replaces secure state');
+ const last=await m.loadDemoSnapshot();assert.equal(last.attentions[0].id,'demo-two','read failure never replaces secure state');
+ vaultMissing=true;
+ const orphan=await m.loadDemoSnapshot();
+ assert.equal(orphan.attentions[0].id,'demo-two','lost file must not hide clinical Keychain snapshot');
+ assert.equal(orphan.workers.length,0);
+ assert.equal(m.workerVaultRecoveryRequired(),true);
+ await assert.rejects(m.writeDemoSnapshot(orphan),err=>err instanceof MissingWorkerVaultError,'orphan pointer blocks automatic writes');
+ assert.equal(clinical.attentions[0].id,'demo-two','no hidden overwrite of clinical state');
+ vaultMissing=false;
  ios=false;await m.writeDemoSnapshot({...last,notifications:true});assert.equal(legacy.get('danper-reminders-enabled-v06'),'yes');assert.equal(m.readLegacyDemoSnapshot().notifications,true);
  console.log('PASS: native Keychain migration, serialized writes, fail closed and browser demo fallback');
 })().catch(e=>{console.error(e);process.exitCode=1});

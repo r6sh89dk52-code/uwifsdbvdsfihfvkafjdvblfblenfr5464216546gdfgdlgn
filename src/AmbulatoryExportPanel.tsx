@@ -1,84 +1,96 @@
-import {useMemo,useState,useRef} from 'react';
+import {useMemo,useRef,useState} from 'react';
 import {FileSpreadsheet,Share2} from 'lucide-react';
 import {type StockLedger} from './kardexMovements';
 import {buildAmbulatoryRows,type ExportVisit} from './ambulatoryRows';
 import {exportAmbulatoryWorkbook} from './ambulatoryExcel';
 import {shareXlsx} from './shareKardexFile';
 import templateLayout from './ambulatoryTemplate.json';
+import {findOfficialArea} from './organizationDirectory';
+import {validDanperWorksite} from './danperWorksites';
 import {type CatalogMappingEvent,type DeliveryIncident} from './reconciliationRules';
-import AmbulatoryReconciliationPanel from './AmbulatoryReconciliationPanel';
-import {reconcileAmbulatoryReport,type ReconciliationEvent} from './ambulatoryReconciliation';
-const iso=(d:Date)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-function weekStart(){const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d)}
-type Props={attentions:ExportVisit[];ledger:StockLedger;mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];reconciliation:ReconciliationEvent[];onReconciliation:(next:ReconciliationEvent[])=>void};
-export default function AmbulatoryExportPanel({attentions,ledger,mappings,incidents,reconciliation,onReconciliation}:Props){
- const[start,setStart]=useState(weekStart),[end,setEnd]=useState(()=>iso(new Date()));
- const[template,setTemplate]=useState<Uint8Array|null>(null),[templateName,setTemplateName]=useState('');
- const[busy,setBusy]=useState(false),[error,setError]=useState(''),[subdivision,setSubdivision]=useState(''),[done,setDone]=useState('');
- const selection=useRef(0),exporting=useRef(false);
-
- const result=useMemo(()=>{try{return{data:buildAmbulatoryRows(attentions,ledger,start,end,{subdivision,mappings,incidents}),error:''}}
-  catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo preparar la exportación.'}}},[attentions,ledger,start,end,subdivision,mappings,incidents]);
- const materialState=useMemo(()=>{
-  if(!result.data||!subdivision)return {data:null,error:''};
-  try{return {data:reconcileAmbulatoryReport(result.data,reconciliation,subdivision),error:''}}
-  catch(e){return {data:null,error:e instanceof Error?e.message:'No se pudo conciliar el período.'}}
- },[result.data,reconciliation,subdivision]);
- const material=materialState.data,reconciliationFault=materialState.error;
- async function select(file?:File){
-  const token=++selection.current;
-  setError('');setDone('');setTemplate(null);setTemplateName('');
-  if(!file)return;
-  if(!file.name.toLowerCase().endsWith('.xlsx')||file.size>20_000_000){setError('Selecciona el libro original XLSX de 10 hojas (máximo 20 MB).');return}
-  try{const buffer=new Uint8Array(await file.arrayBuffer());if(token===selection.current){setTemplate(buffer);setTemplateName(file.name)}}
-  catch{if(token===selection.current)setError('No se pudo leer el archivo seleccionado.');}
- }
+import {type ReconciliationEvent} from './ambulatoryReconciliation';
+import {currentReportMonth,reportMonth,sharedMonthlyReconciliation} from './sharedInventoryReports';
+type Props={attentions:ExportVisit[];ledger:StockLedger;mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];
+ reconciliation:ReconciliationEvent[];onReconciliation:(next:ReconciliationEvent[])=>void};
+/** 10-sheet reviewed template is already sanitized in ambulatoryTemplate.json.
+ * Never require the employee to upload the historical workbook.
+ */
+const internalTemplate=()=>{
+ const encoded=atob(templateLayout.zipBase64);
+ return Uint8Array.from(encoded,c=>c.charCodeAt(0));
+};
+export default function AmbulatoryExportPanel({attentions,ledger,mappings,incidents,reconciliation}:Props){
+ const [month,setMonth]=useState(currentReportMonth);
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState('');
+ const exporting=useRef(false);
+ const period=useMemo(()=>reportMonth(month),[month]);
+ const {start,end}=period;
+ // One report and one physical ledger. Site is written per row for the official organizational formulas.
+ const withoutSite=useMemo(()=>attentions.filter(a=>a.status==='saved'&&a.date>=start&&a.date<=end&&!validDanperWorksite(a.worker.site)),[attentions,start,end]);
+ const unlinkedAreas=useMemo(()=>attentions.filter(a=>{
+  if(a.status!=='saved'||a.date<start||a.date>end||!validDanperWorksite(a.worker.site))return false;
+  try{return !findOfficialArea(a.worker.site,a.worker.area||'')}catch{return true}
+ }),[attentions,start,end]);
+ const result=useMemo(()=>{try{return{data:buildAmbulatoryRows(attentions,ledger,start,end,{perVisitSubdivision:true,mappings,incidents}),error:''}}
+  catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo preparar el informe.'}}},[attentions,ledger,start,end,mappings,incidents]);
+ const shared=useMemo(()=>{if(!result.data)return{data:null,error:''};
+  try{return{data:sharedMonthlyReconciliation(ledger,result.data),error:''}}
+  catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo reconstruir el inventario compartido.'}}},[result.data,ledger]);
  async function exportBook(){
-  if(!template||!result.data||exporting.current)return;
+  if(!result.data||!shared.data||exporting.current)return;
   exporting.current=true;setBusy(true);setError('');setDone('');
   try{
-   if(result.data.blockers.length)throw Error('Resuelve primero las entregas pendientes de conciliación.');
+   if(result.data.blockers.length)throw Error('Verifica las entregas pendientes antes de exportar.');
+   if(withoutSite.length)throw Error('Completa la sede de las atenciones del período antes de generar el Excel consolidado.');
    await new Promise<void>(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
-   if(subdivision&&!material)throw Error(reconciliationFault||'Conciliación pendiente o inválida.');
-   const bytes=exportAmbulatoryWorkbook(template,result.data,material||undefined);
-   const name='DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+'.xlsx';
-   await shareXlsx(name,bytes,'Indicador Ambulatorio DANPER');
-   setDone('Excel preparado. Completa su guardado en la hoja de compartir o en Descargas.');
-  }catch(e){setError(e instanceof Error?e.message:'No se pudo exportar el libro de Excel.');}
-  finally{exporting.current=false;setBusy(false)}
+   const bytes=exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data);
+   await shareXlsx('DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+'.xlsx',bytes,'Indicador Ambulatorio DANPER');
+   setDone('Libro de diez hojas generado. Finaliza el guardado en Archivos o comparte la copia.');
+  }catch(e){setError(e instanceof Error?e.message:'No fue posible generar el libro oficial.')}
+  finally{setBusy(false);exporting.current=false}
  }
  return <section className="panel ambulatoryExport">
-  <h3><FileSpreadsheet size={18}/>Indicador ambulatorio · Libro Excel original</h3>
-  <p className="hint">Exportación local para registros ficticios. Selecciona el libro original de diez hojas; DANPER creará una copia sin el padrón histórico ni los vínculos externos.</p>
-  <fieldset disabled={busy}><div className="fields two">
-   <label>Desde<input type="date" value={start} onChange={e=>setStart(e.target.value)}/></label>
-   <label>Hasta<input type="date" value={end} onChange={e=>setEnd(e.target.value)}/></label>
+  <h3><FileSpreadsheet size={18}/>Generar Indicador Ambulatorio</h3>
+  <p className="hint">Esta herramienta crea el archivo Excel oficial de diez hojas con las atenciones y consumos del período elegido. <strong>No tienes que adjuntar ninguna plantilla:</strong> ya está integrada en la aplicación. El Kardex de Enfermería se controla diariamente, por separado.</p>
+  <div className="stageCProgress" aria-label="Generar Indicador Ambulatorio: tres etapas">
+   <span><b>1</b> Configurar</span><span><b>2</b> Revisar</span><span><b>3</b> Compartir</span>
   </div>
-  <label>Subdivisión de las atenciones del período<select value={subdivision} onChange={e=>setSubdivision(e.target.value)}><option value="">Seleccionar subdivisión</option>{templateLayout.subdivisions.map(p=><option key={p[1]} value={p[0]}>{p[0]}</option>)}</select></label>
-  <p className="hint">Comprueba que todas las atenciones del período correspondan a esta subdivisión. El área de cada trabajador se conserva como unidad organizativa; su código queda vacío si no coincide con el catálogo original.</p>
-  <label>Plantilla oficial · Indicador Ambulatorio (10 hojas)
-   <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e=>{void select(e.target.files?.[0])}}/>
-  </label></fieldset>
-  {template&&<p className="hint">Plantilla seleccionada: {templateName}</p>}
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">1</span> Elegir período</h4>
+   <p className="hint"><strong>Un único reporte para ambas sedes:</strong> el período comprende desde el día 9 de un mes hasta el 8 del siguiente. Todas las atenciones del Fundo y de Planta La Venturosa se incluyen juntas. Cada fila conserva su sede para que Excel calcule los códigos oficiales.</p>
+  <div className="fields two">
+   <label>Mes en que empieza el reporte (día 9)<input type="month" className="ambulatoryMonthInput" value={month} min="2020-01" max="2099-12" onChange={e=>{if(e.target.value)setMonth(e.target.value);setError('');setDone('')}}/></label>
+   <label>Fechas que incluirá este Excel<input readOnly aria-label="Período mensual oficial" value={period.label}/></label>
+  </div>
+  <p className="hint"><strong>Kardex único:</strong> todas las entregas de ambas sedes descuentan del mismo inventario físico. No se calculan ni exportan stocks separados.</p>
+  <p className="hint">El reporte incluye del día 9 al día 8 siguiente. Solo las entregas confirmadas se reflejan como consumo en la hoja CONSUMOS. No se duplican registros ni se generan movimientos por exportar.</p>
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">2</span> Comprobar atenciones y existencias</h4>
+   <p className="stageCStatus" role="status">{result.error||shared.error?'Hay errores que revisar':withoutSite.length?'Hay atenciones sin sede confirmada':result.data?.blockers.length?'Existen entregas pendientes':shared.data?.warnings.length?'Hay advertencias de saldo para revisar':'Datos consolidados. Comprueba los recuentos antes de exportar.'}</p>
+  <p className="hint" role="status">El archivo incluye las diez hojas originales. Se comprueban las atenciones, el inventario que puede conciliarse y las entregas pendientes. Los saldos no conocidos quedan sin informar; jamás se rellenan como cero automáticamente.</p>
   {result.data&&<div className="kardexStats">
    <div><strong>{result.data.visits}</strong><span>Atenciones</span></div>
-   <div><strong>{result.data.lines.length}</strong><span>Filas CONSUMOS</span></div>
-   <div><strong>{result.data.linkedDeliveries}</strong><span>Entregas verificadas</span></div>
+   <div><strong>{result.data.lines.length}</strong><span>Filas de consumo</span></div>
+   <div><strong>{shared.data?.openingConfirmed||0}</strong><span>Materiales conciliados</span></div>
   </div>}
-  {result.data?.blockers.length?<div className="kardexError" role="alert">
-   <strong>Conciliaciones pendientes: {result.data.blockers.length}</strong>
-   <ul>{result.data.blockers.slice(0,8).map((x,i)=><li key={i}>{x}</li>)}</ul>
-   <p>La exportación queda bloqueada hasta verificar las cantidades. No se inventarán consumos.</p>
-  </div>:null}
-  {material&&<p className="hint">Conciliación: {material.openingConfirmed}/432 saldos iniciales, {material.receiptsConfirmed} ingresos y {material.countConfirmed}/432 recuentos. Ingresos revisados: {material.reviewed?'sí':'no'}.</p>}
-  {reconciliationFault&&<p className="kardexError" role="alert">{reconciliationFault}</p>}
-  {result.data?.warnings.length?<div className="hint" role="status"><ul>{result.data.warnings.map((x,i)=><li key={i}>{x}</li>)}</ul></div>:null}
-  {(result.error||error)&&<p role="alert" className="kardexError">{result.error||error}</p>}
+  {unlinkedAreas.length>0&&<p className="stageCStatus" role="status">{unlinkedAreas.length} atenciones tienen un área libre o sin coincidencia en @uo. Podrás exportarlas con el nombre de área registrado; la unidad organizativa quedará sin código automático cuando no exista una equivalencia oficial.</p>}
+  {withoutSite.length>0&&<div className="kardexError" role="alert">Hay {withoutSite.length} atenciones sin sede identificada en este período. Revisa esas fichas antes de exportar: no se asignarán códigos por suposición.</div>}
+  {result.data?.blockers.length?<div className="kardexError" role="alert"><strong>Entregas pendientes: {result.data.blockers.length}</strong>
+   <ul>{result.data.blockers.slice(0,8).map((x,i)=><li key={i}>{x}</li>)}</ul></div>:null}
+  {shared.data&&<p className="hint">Existencias calculadas desde el inventario único para {shared.data.openingConfirmed} códigos oficiales. Los demás permanecen sin saldo informado; un dato pendiente nunca se convierte en cero. CONTEO físico no se inventa.</p>}
+  {shared.data?.warnings.length?<details className="kardexPreviewDetails"><summary>Revisar saldos y advertencias ({shared.data.warnings.length})</summary><ul>{shared.data.warnings.slice(0,40).map((x,i)=><li key={i} className="hint">{x}</li>)}</ul></details>:null}
+  {reconciliation.length>0&&<div className="warning">Hay {reconciliation.length} registros del módulo de conciliación antiguo. Se conservan para auditoría, pero no se duplican ni se trasladan automáticamente al inventario físico. Requieren revisión antes de considerarlos equivalentes.</div>}
+  {(result.error||shared.error||error)&&<p className="kardexError" role="alert">{result.error||shared.error||error}</p>}
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">3</span> Crear archivo y compartir</h4>
+   <p className="hint">Al pulsar el botón se crea un archivo .xlsx de diez hojas y se abre la opción para guardarlo en Archivos, enviarlo por correo o compartirlo. No se modifica el Kardex ni el historial.</p>
   <div className="kardexActions"><button type="button" className="workerPrimary"
-   disabled={!template||!result.data||result.data.blockers.length>0||busy||Boolean(reconciliationFault)}
-   onClick={()=>{void exportBook()}}><Share2 size={18}/>{busy?'Preparando Excel…':'Exportar las 10 hojas y compartir'}</button></div>
-  {result.data&&<AmbulatoryReconciliationPanel plan={result.data} events={reconciliation} onChange={onReconciliation} subdivision={subdivision} start={start} end={end}/>}
-  {done&&<p role="status" className="hint">{done}</p>}
-  <p className="hint">El archivo conservará las diez hojas y los 432 materiales oficiales. Los saldos no conciliados permanecen vacíos y señalados como pendientes. No modifica el inventario ni crea nuevas entregas.</p>
+   disabled={!result.data||!shared.data||result.data.blockers.length>0||withoutSite.length>0||busy}
+   onClick={()=>void exportBook()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel (10 hojas) y compartir'}</button></div>
+  {done&&<p className="hint" role="status">{done}</p>}
+  <p className="hint">La exportación solo lee datos locales; no modifica el stock, las atenciones, los lotes ni el historial. Revisa el contenido antes de compartirlo.</p>
+  </div>
  </section>;
 }
