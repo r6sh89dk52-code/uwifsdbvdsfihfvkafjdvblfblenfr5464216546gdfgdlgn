@@ -35,7 +35,7 @@ assert(main.indexOf('Sede del trabajador')<main.indexOf('OfficialAreaField class
 assert(main.indexOf('<label className="workerFieldSite">Sede<select')<main.indexOf('OfficialAreaField site={workerForm.site}'),
  'site must appear above area autocomplete in staff profile');
 const rows=fs.readFileSync('src/ambulatoryRows.ts','utf8');
-assert(rows.includes("const cells:ExportValue[]=[subdivision,a.worker.area||'','',''"),'area text must survive if no official code');
+assert(rows.includes("const cells:ExportValue[]=[rowSubdivision,a.worker.area||'','',''"),'area text must survive if no official code');
 const book=fs.readFileSync('src/ambulatoryExcel.ts','utf8');
 assert(book.includes("VLOOKUP(CONCATENATE(VLOOKUP(A${row},'@subuo'!"),'original official organization codes still come from verified source');
 assert(book.includes("IFERROR("),'unknown org code must not be fabricated');
