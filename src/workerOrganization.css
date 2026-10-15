@@ -1,0 +1,14 @@
+/* Stage D: safe worker profile completion and stored site identity. */
+.page-register .workerFieldSite{grid-column:1/-1}
+.page-workers .workerFieldSite{grid-column:1/-1}
+.workerProfileHelper{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:10px}
+.workerProfileHelper p{flex:1;min-width:170px}
+.workerProfileHelper .workerSecondary{max-width:100%;min-height:44px}
+.workerManualCheck{display:flex!important;align-items:flex-start;gap:10px;padding:11px;border:1px solid var(--line);border-radius:13px;background:var(--bg);line-height:1.55!important;font-size:13px!important}
+.workerManualCheck input{flex:0 0 auto;width:19px;height:19px;margin:1px 0 0;accent-color:#e3182d}
+.historyActions button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:420px){
+ .workerProfileHelper{display:grid;grid-template-columns:1fr}
+ .workerProfileHelper p{margin:0}
+ .workerProfileHelper button{width:100%}
+}
