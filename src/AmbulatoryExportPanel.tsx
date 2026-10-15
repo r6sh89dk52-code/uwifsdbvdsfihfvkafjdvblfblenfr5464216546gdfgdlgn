@@ -44,12 +44,22 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
  return <section className="panel ambulatoryExport">
   <h3><FileSpreadsheet size={18}/>Indicador ambulatorio · Libro oficial de diez hojas</h3>
   <p className="hint">El formato original depurado ya está integrado en la aplicación. No debes importar ningún Excel. El Indicador cierra el día 9; el Kardex de Enfermería continúa calculando sus saldos diariamente.</p>
+  <div className="stageCProgress" aria-label="Generar Indicador Ambulatorio: tres etapas">
+   <span><b>1</b> Configurar</span><span><b>2</b> Revisar</span><span><b>3</b> Compartir</span>
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">1</span> Configurar corte y subdivisión</h4>
+   <p className="hint">Selecciona el período y la subdivisión correspondientes al reporte.</p>
   <div className="fields two">
    <label>Mes de inicio del corte (día 9)<input type="month" className="ambulatoryMonthInput" value={month} min="2020-01" max="2099-12" onChange={e=>{if(e.target.value)setMonth(e.target.value);setError('');setDone('')}}/></label>
    <label>Período mensual oficial<input readOnly aria-label="Período mensual oficial" value={period.label}/></label>
   </div>
   <label>Subdivisión del informe<select value={subdivision} onChange={e=>setSubdivision(e.target.value)}><option value="">Seleccionar subdivisión</option>{templateLayout.subdivisions.map(p=><option key={p[1]} value={p[0]}>{p[0]}</option>)}</select></label>
   <p className="hint">El período va del día 9 hasta el día 8 del mes siguiente, sin duplicar el día 9. Los consumos proceden de entregas confirmadas y se registran en la hoja CONSUMOS.</p>
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">2</span> Revisar datos disponibles</h4>
+   <p className="stageCStatus" role="status">{!subdivision?'Pendiente: seleccionar subdivisión':result.error||shared.error?'Hay errores que revisar':result.data?.blockers.length?'Existen entregas pendientes':shared.data?.warnings.length?'Hay advertencias de saldo para revisar':'Datos calculados. Comprueba los recuentos antes de exportar.'}</p>
   <p className="hint" role="status">Plantilla interna lista: diez hojas originales, 432 materiales, 30 columnas de CONSUMOS y sus tablas y fórmulas verificadas.</p>
   {result.data&&<div className="kardexStats">
    <div><strong>{result.data.visits}</strong><span>Atenciones</span></div>
@@ -62,10 +72,15 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
   {shared.data?.warnings.length?<details className="kardexPreviewDetails"><summary>Revisar saldos y advertencias ({shared.data.warnings.length})</summary><ul>{shared.data.warnings.slice(0,40).map((x,i)=><li key={i} className="hint">{x}</li>)}</ul></details>:null}
   {reconciliation.length>0&&<div className="warning">Hay {reconciliation.length} registros del módulo de conciliación antiguo. Se conservan para auditoría, pero no se duplican ni se trasladan automáticamente al inventario físico. Requieren revisión antes de considerarlos equivalentes.</div>}
   {(result.error||shared.error||error)&&<p className="kardexError" role="alert">{result.error||shared.error||error}</p>}
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">3</span> Generar y compartir Excel</h4>
+   <p className="hint">Solo se habilita cuando el período, la subdivisión y las entregas requeridas permiten preparar el libro.</p>
   <div className="kardexActions"><button type="button" className="workerPrimary"
    disabled={!subdivision||!result.data||!shared.data||result.data.blockers.length>0||busy}
    onClick={()=>void exportBook()}><Share2 size={18}/>{busy?'Preparando Excel…':'Exportar las diez hojas y compartir'}</button></div>
   {done&&<p className="hint" role="status">{done}</p>}
   <p className="hint">Sólo datos ficticios. La exportación no altera stock, atenciones, lotes ni historial.</p>
+  </div>
  </section>;
 }
