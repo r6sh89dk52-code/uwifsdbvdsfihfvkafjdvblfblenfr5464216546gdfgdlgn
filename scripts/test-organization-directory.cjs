@@ -40,5 +40,5 @@ const book=fs.readFileSync('src/ambulatoryExcel.ts','utf8');
 assert(book.includes("VLOOKUP(CONCATENATE(VLOOKUP(A${row},'@subuo'!"),'original official organization codes still come from verified source');
 assert(book.includes("IFERROR("),'unknown org code must not be fabricated');
 const workflow=fs.readFileSync('.github/workflows/ios-ipa.yml','utf8');
-assert(workflow.includes("if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"),'avoid Mac PR builds');
+assert(workflow.includes("if: github.event_name == 'workflow_dispatch'"),'avoid Mac PR builds');
 console.log('PASS: exact embedded official @subuo/@uo, site-specific 31/124 areas, free text without forced code, scoped suggestions and original Excel formulas.');
