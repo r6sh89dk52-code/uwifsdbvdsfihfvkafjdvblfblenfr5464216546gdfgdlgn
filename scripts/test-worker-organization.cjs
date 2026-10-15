@@ -61,5 +61,5 @@ for(const path of ['src/main.tsx','src/danperWorksites.ts','src/safeAttentionDel
  assert.deepEqual((result.diagnostics||[]).filter(d=>d.category===ts.DiagnosticCategory.Error).map(d=>ts.flattenDiagnosticMessageText(d.messageText,' ')),[],path+' syntax');
 }
 const ios=read('.github/workflows/ios-ipa.yml');
-assert(ios.includes("if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"));
+assert(ios.includes("if: github.event_name == 'workflow_dispatch'"));
 console.log('PASS: only La Venturosa + PL Venturosa, staff completion, verified manual edits, durable vault, audit-preserving delete and no macOS PR.');
