@@ -53,7 +53,7 @@ check(ambulatory,[
  'exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data)',
  'result.data.blockers.length>0','disabled={!subdivision',
  "subdivision",
- "No debes importar ningún Excel",
+ "No tienes que adjuntar ninguna plantilla",
  "shareXlsx("
 ],'Official ambulatory workbook');
 check(app,["import './stageC.css';","import './cohesiveExperience.css'"],'Styles integration');
