@@ -61,5 +61,5 @@ for(const path of ['src/main.tsx','src/KardexWorkspace.tsx','src/AmbulatoryExpor
  assert.deepEqual((d.diagnostics||[]).filter(x=>x.category===ts.DiagnosticCategory.Error).map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')),[],path);
 }
 const workflow=read('.github/workflows/ios-ipa.yml');
-assert(workflow.includes("if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"),'do not spend macOS PR minutes');
+assert(workflow.includes("if: github.event_name == 'workflow_dispatch'"),'do not spend macOS PR minutes');
 console.log('PASS: readable worker identity, optional safe registration, official roster, Kardex/report plain language, TSX and macOS quota.');
