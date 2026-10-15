@@ -23,10 +23,11 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
  const exporting=useRef(false);
  const period=useMemo(()=>reportMonth(month),[month]);
  const {start,end}=period;
- const siteConflicts=useMemo(()=>attentions.filter(a=>a.status==='saved'&&a.date>=start&&a.date<=end&&Boolean(subdivision)&&Boolean(a.worker.site)&&a.worker.site!==subdivision),[attentions,start,end,subdivision]);
+ const otherSiteVisits=useMemo(()=>attentions.filter(a=>a.status==='saved'&&a.date>=start&&a.date<=end&&Boolean(subdivision)&&Boolean(a.worker.site)&&a.worker.site!==subdivision),[attentions,start,end,subdivision]);
  const withoutSite=useMemo(()=>attentions.filter(a=>a.status==='saved'&&a.date>=start&&a.date<=end&&!a.worker.site),[attentions,start,end]);
- const result=useMemo(()=>{try{return{data:buildAmbulatoryRows(attentions,ledger,start,end,{subdivision,mappings,incidents}),error:''}}
-  catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo preparar el informe.'}}},[attentions,ledger,start,end,subdivision,mappings,incidents]);
+ const siteVisits=useMemo(()=>subdivision?attentions.filter(a=>a.status!=='saved'||a.worker.site===subdivision):attentions,[attentions,subdivision]);
+ const result=useMemo(()=>{try{return{data:buildAmbulatoryRows(siteVisits,ledger,start,end,{subdivision,mappings,incidents}),error:''}}
+  catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo preparar el informe.'}}},[siteVisits,ledger,start,end,subdivision,mappings,incidents]);
  const shared=useMemo(()=>{if(!result.data)return{data:null,error:''};
   try{return{data:sharedMonthlyReconciliation(ledger,result.data),error:''}}
   catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo reconstruir el inventario.'}}},[result.data,ledger]);
@@ -36,7 +37,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
   try{
    if(result.data.blockers.length)throw Error('Verifica las entregas pendientes antes de exportar.');
    if(!subdivision)throw Error('Selecciona primero una sede.');
-   if(siteConflicts.length||withoutSite.length)throw Error('Revisa la sede de las atenciones antes de generar el Excel.');
+   if(withoutSite.length)throw Error('Completa la sede de todas las atenciones del período antes de generar el Excel.');
    await new Promise<void>(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
    const bytes=exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data);
    await shareXlsx('DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+'.xlsx',bytes,'Indicador Ambulatorio DANPER');
@@ -69,7 +70,8 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <div><strong>{result.data.lines.length}</strong><span>Filas de consumo</span></div>
    <div><strong>{shared.data?.openingConfirmed||0}</strong><span>Materiales conciliados</span></div>
   </div>}
-  {(siteConflicts.length>0||withoutSite.length>0)&&<div className="kardexError" role="alert">Revisa las sedes del período: {siteConflicts.length} atenciones pertenecen a otra sede y {withoutSite.length} no tienen sede informada. Corrige la ficha o la atención antes de exportar; no se asignarán códigos por suposición.</div>}
+  {otherSiteVisits.length>0&&<p className="stageCStatus" role="status">Este archivo incluirá únicamente las atenciones de {subdivision}. Las {otherSiteVisits.length} atenciones de la otra sede se excluyen expresamente; para exportarlas, genera un segundo reporte seleccionando su sede.</p>}
+  {withoutSite.length>0&&<div className="kardexError" role="alert">Hay {withoutSite.length} atenciones sin sede identificada en este período. Revisa esas fichas antes de exportar: no se asignarán códigos por suposición.</div>}
   {result.data?.blockers.length?<div className="kardexError" role="alert"><strong>Entregas pendientes: {result.data.blockers.length}</strong>
    <ul>{result.data.blockers.slice(0,8).map((x,i)=><li key={i}>{x}</li>)}</ul></div>:null}
   {shared.data&&<p className="hint">Existencias calculadas desde el inventario único para {shared.data.openingConfirmed} códigos oficiales. Los demás permanecen sin saldo informado; un dato pendiente nunca se convierte en cero. CONTEO físico no se inventa.</p>}
@@ -81,7 +83,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <h4><span className="stageCIndex">3</span> Crear archivo y compartir</h4>
    <p className="hint">Al pulsar el botón se crea un archivo .xlsx de diez hojas y se abre la opción para guardarlo en Archivos, enviarlo por correo o compartirlo. No se modifica el Kardex ni el historial.</p>
   <div className="kardexActions"><button type="button" className="workerPrimary"
-   disabled={!subdivision||!result.data||!shared.data||result.data.blockers.length>0||siteConflicts.length>0||withoutSite.length>0||busy}
+   disabled={!subdivision||!result.data||!shared.data||result.data.blockers.length>0||withoutSite.length>0||busy}
    onClick={()=>void exportBook()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel (10 hojas) y compartir'}</button></div>
   {done&&<p className="hint" role="status">{done}</p>}
   <p className="hint">Sólo datos ficticios. La exportación no altera stock, atenciones, lotes ni historial.</p>
