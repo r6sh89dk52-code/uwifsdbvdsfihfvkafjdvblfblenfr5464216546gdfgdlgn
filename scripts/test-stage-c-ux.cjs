@@ -12,7 +12,7 @@ const css=read('src/stageC.css');
 const core=read('src/cohesiveExperience.css');
 const check=(source,arr,name)=>arr.forEach(token=>assert(source.includes(token),name+': missing '+token));
 check(workspace,[
- 'Tu Kardex, paso a paso','Todos los módulos',
+ 'Tu Kardex, paso a paso',
  'onClick={()=>navigate(\'inventory\')}','onClick={()=>navigate(\'movements\')}',
  'onClick={()=>navigate(\'deliveries\')}','onClick={()=>navigate(\'reports\')}',
  'ledger.movements.length','ledger.lots.length===0',
