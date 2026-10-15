@@ -19,7 +19,7 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
  const [deliveryTab,setDeliveryTab]=useState<'confirm'|'incidents'>('confirm');
  function navigate(next:Section){feedback('selection');setSection(next)}
  // Also reset the Kardex *submodule* scroll after React mounts it.
- useLayoutEffect(()=>{document.scrollingElement?.scrollTo({top:0,behavior:'instant'});const frame=requestAnimationFrame(()=>window.scrollTo(0,0));return()=>cancelAnimationFrame(frame)},[section]);
+ useLayoutEffect(()=>{document.scrollingElement?.scrollTo({top:0,behavior:'auto'});const frame=requestAnimationFrame(()=>window.scrollTo(0,0));return()=>cancelAnimationFrame(frame)},[section]);
  return <div className="kardexWorkspace">
   {section==='home'?<>
    <div className="pageHead"><button type="button" onClick={onExit} aria-label="Volver al inicio"><ArrowLeft/></button><div><span>GESTIÓN DE EXISTENCIAS</span><h2>Kardex</h2><small>Control físico de existencias de prueba</small></div></div>
