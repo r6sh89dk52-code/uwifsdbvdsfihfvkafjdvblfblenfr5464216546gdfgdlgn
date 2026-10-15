@@ -11,6 +11,16 @@ PLIST="ios/App/App/Info.plist"
 /usr/libexec/PlistBuddy -c "Print :NSFaceIDUsageDescription" "$PLIST" >/dev/null 2>&1 || \
   /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string DANPER Salud Movil utiliza Face ID para proteger registros de salud ocupacional en este iPhone." "$PLIST"
 node scripts/apply-ios-icon.mjs
+# Copy the official DANPER logo into the native iOS asset catalog before Xcode.
+# A UIKit welcome screen cannot rely on a Vite-hashed URL in WKWebView.
+LOGO="src/branding/danper-logo-oficial.png"
+[ -f "$LOGO" ] || { echo 'ERROR: falta el logotipo oficial DANPER'; exit 4; }
+IMAGESET="ios/App/App/Assets.xcassets/DanperWordmark.imageset"
+mkdir -p "$IMAGESET"
+cp "$LOGO" "$IMAGESET/danper-logo.png"
+cat > "$IMAGESET/Contents.json" <<'DANPER_ASSET'
+{"images":[{"filename":"danper-logo.png","idiom":"universal"}],"info":{"author":"xcode","version":1}}
+DANPER_ASSET
 mkdir -p outputs
 xcodebuild \
   -workspace ios/App/App.xcworkspace \
