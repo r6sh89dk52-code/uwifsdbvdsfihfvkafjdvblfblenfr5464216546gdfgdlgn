@@ -1,0 +1,250 @@
+/*
+ * DANPER Salud Móvil · Coherent Experience
+ * Native welcome and web workspace share the same visual language.
+ * This stylesheet is deliberately PRESENTATIONAL: no clinical data or exports.
+ */
+.app{
+  --design-red:#e3182d;
+  --design-red-dark:#ac1227;
+  --design-ink:var(--text,#24252c);
+  --design-muted:var(--muted,#777b85);
+  --design-card:var(--surface,#fff);
+  --design-page:var(--bg,#f7f7f9);
+  --design-outline:var(--line,#e6e6eb);
+  --design-soft:#f1f1f4;
+  --design-shadow:0 4px 22px rgba(11,15,27,.045);
+  --design-tap:52px;
+  background:var(--design-page);
+  color:var(--design-ink);
+  -webkit-font-smoothing:antialiased;
+}
+html[data-theme='dark'] .app{
+  --design-soft:#2d2d32;
+  --design-shadow:0 7px 24px rgba(0,0,0,.10);
+}
+@media(prefers-color-scheme:dark){
+  html[data-theme='auto'] .app{
+    --design-soft:#2d2d32;
+    --design-shadow:0 7px 24px rgba(0,0,0,.10);
+  }
+}
+/* Native DANPER color continues seamlessly into the application workspace. */
+.app .brand{
+  background:var(--design-red);
+  padding-left:18px;
+  padding-right:18px;
+  box-shadow:0 5px 20px rgba(126,14,31,.10);
+}
+.app .brandmark{min-width:0}
+.app .brandmark small{color:#fff;opacity:.92}
+.app .headIcon{min-width:44px;min-height:44px;border-radius:14px}
+.app .headIcon:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.app main{min-height:calc(100dvh - 140px)}
+.app .sectionTop .eyebrow,.app .pageHead span,.app .eyebrow{
+  color:var(--design-red);
+  letter-spacing:1.4px;
+  font-size:10px;
+  font-weight:850;
+}
+.app .sectionTop h2,.app .pageHead h2{
+  font-size:clamp(22px,6vw,27px);
+  line-height:1.22;
+  letter-spacing:-.75px;
+}
+.app .panel,
+.app .workerCard,
+.app .historyEntry,
+.app .kardexSectionGrid button,
+.app .kardexLot,
+.app .empty{
+  background:var(--design-card);
+  border:1px solid var(--design-outline);
+  box-shadow:var(--design-shadow);
+}
+.app .panel{border-radius:20px}
+.app .panel h3,.app .kardexSectionHeader h3{
+  font-size:16px;
+  line-height:1.4;
+  letter-spacing:-.25px;
+  font-weight:760;
+}
+.app .panel h3 svg,
+.app .sectionTop svg,
+.app .kardexSectionGrid button svg{color:var(--design-red)}
+.app .hint{font-size:12px;line-height:1.55}
+.app .pageHead>button{
+  min-width:44px;
+  min-height:44px;
+  border-radius:14px;
+}
+.app :where(.primary,.workerPrimary,.hero,.secondary,.workerSecondary,.addAnother,.kardexActions button){
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+.app :where(.primary,.workerPrimary,.kardexActions .primary){
+  background:var(--design-red);
+  color:#fff;
+  border-radius:13px;
+}
+.app .panel :where(input:not([type=checkbox]):not([type=radio]),textarea,select){
+  min-height:48px;
+  border-radius:13px;
+  border-color:var(--design-outline);
+  font-size:16px!important;
+}
+.app .panel :where(input:not([type=checkbox]):not([type=radio]),textarea,select):focus-visible{
+  outline:2px solid rgba(227,24,45,.48);
+  outline-offset:1px;
+}
+.app :where(.primary,.secondary,.workerPrimary,.workerSecondary,.modes button):focus-visible{
+  outline:3px solid rgba(227,24,45,.55);
+  outline-offset:2px;
+}
+.app :where(.empty,.kardexEmpty){
+  border-radius:18px;
+  line-height:1.55;
+  padding:24px 16px;
+}
+.app .warning,.app .pendingInfo{
+  border-radius:15px;
+  font-size:12px;
+  line-height:1.5;
+}
+.app .demoNotice{background:rgba(227,24,45,.075);border-color:rgba(227,24,45,.22)}
+.app .demoNotice summary{font-size:12px}
+
+/* Home: clean entry point, clear hierarchy, less administrative density. */
+.page-home .greeting{margin:4px 0 17px}
+.page-home .greeting h1{font-size:clamp(25px,7vw,30px);letter-spacing:-1px;line-height:1.13}
+.page-home .greeting .eyebrow{margin-bottom:7px}
+.page-home .greeting p{font-size:12px;line-height:1.5;color:var(--design-muted)}
+.page-home .pulse{border-radius:20px;background:#fce9ec;color:var(--design-red)}
+.page-home .hero{
+  background:linear-gradient(115deg,var(--design-red) 0%,#bd0c26 100%);
+  box-shadow:0 11px 25px rgba(162,13,39,.18);
+  border-radius:23px;
+  min-height:130px;
+  padding:19px 20px;
+  transition:filter 170ms ease,transform 170ms ease;
+}
+.page-home .hero h2{font-size:27px}
+.page-home .hero p{font-size:13px}
+.page-home .hero:active{filter:brightness(.96)}
+.page-home .stats{gap:9px;margin:15px 0 23px}
+.page-home .stats>div{padding:16px 4px 14px;border:1px solid var(--design-outline);box-shadow:var(--design-shadow)}
+.page-home .stats strong{font-size:26px;line-height:1}
+.page-home .stats span{font-size:11px;line-height:1.4}
+.page-home>main>h3,.page-home main>h3{font-size:18px;letter-spacing:-.4px;margin:20px 0 12px}
+.page-home .tiles{gap:10px}
+.page-home .tiles button{
+  min-height:112px;
+  border:1px solid var(--design-outline);
+  background:var(--design-card);
+  border-radius:19px;
+  padding:15px;
+  box-shadow:var(--design-shadow);
+  gap:8px;
+  transition:border-color 170ms ease,transform 170ms ease;
+}
+.page-home .tiles button:active{border-color:var(--design-red)}
+.page-home .tiles strong{font-size:15px;line-height:1.2}
+.page-home .tiles span{font-size:12px;line-height:1.4}
+.page-home .tiles button svg{width:24px;height:24px}
+
+/* Attention remains a 4-step workflow; do not re-expand the full form. */
+.page-register .registerProgress{margin-top:10px;margin-bottom:9px}
+.page-register .registerProgress strong{font-size:12px}
+.page-register .registerSteps{gap:7px}
+.page-register .registerSteps button{
+  min-height:45px;
+  border-radius:15px;
+  padding:8px 12px 8px 9px;
+}
+.page-register .registerSteps button.selected{background:rgba(227,24,45,.12)}
+.page-register .registerMiniSummary,.page-register .registerAllergyCheckpoint{border-radius:17px}
+.page-register .registerDock{
+  border-radius:17px 17px 0 0;
+  box-shadow:0 -9px 28px rgba(0,0,0,.06);
+  background:var(--design-card);
+}
+.page-register .registerDock button{min-height:47px;border-radius:13px}
+.page-register .clinicalReview{box-shadow:var(--design-shadow)}
+.page-register .clinicalAlertDialog{box-shadow:0 26px 65px rgba(0,0,0,.25)}
+
+/* Personnel: full-width touch targets, easier scanning of names and DNI. */
+.page-workers .workerCard{border-radius:18px;margin-bottom:9px}
+.page-workers .workerCardSelect{min-height:76px;padding:12px 14px}
+.page-workers .workerCardSelect strong{font-size:14px;line-height:1.35}
+.page-workers .workerCardSelect small{font-size:12px}
+.page-workers .workerEdit{height:48px;width:48px;border-radius:14px}
+.page-workers .results button{padding:12px 14px;min-height:46px}
+.page-workers .workerActions button{border-radius:13px}
+
+/* History: informational cards rather than heavy administrative rows. */
+.page-history .historyEntry{border-radius:19px;margin:10px 0;overflow:hidden}
+.page-history .history{display:flex;gap:12px;min-height:77px;padding:14px}
+.page-history .history strong{font-size:14px;line-height:1.35}
+.page-history .history small,.page-history .history span{font-size:12px;line-height:1.35}
+.page-history .historyIcon{border-radius:14px}
+.page-history .historyActions{padding:10px 12px}
+.page-history .historyActions button{min-height:40px}
+
+/* Kardex: same cards, typography, and actions as the clinical interface. */
+.page-kardex .kardexSectionGrid{gap:10px}
+.page-kardex .kardexSectionGrid button{min-height:122px;border-radius:20px;padding:16px 14px}
+.page-kardex .kardexSectionGrid button strong{font-size:16px}
+.page-kardex .kardexSectionGrid button span{font-size:12px}
+.page-kardex .kardexStats>div{border:1px solid var(--design-outline);box-shadow:var(--design-shadow)}
+.page-kardex .kardexLot{border-radius:18px}
+.page-kardex .kardexActions button{min-height:48px}
+.page-kardex .kardexSubtabs button{min-height:48px;border-radius:13px}
+
+/* Ambulatory export: readable guided steps without touching workbook logic. */
+.page-ambulatory .panel{padding:17px}
+.page-ambulatory .panel :where(button,select,input[type=date]){min-height:46px}
+.page-ambulatory .previewStats>div{border-radius:15px}
+.page-ambulatory .exportStatus,.page-ambulatory .kardexPreview{border-radius:17px}
+
+/* Settings: consistent density, real iOS-sized appearance selection. */
+.page-settings .sectionTop{margin-bottom:18px}
+.page-settings .panel{padding:18px 16px;margin:12px 0}
+.page-settings .modes{gap:9px}
+.page-settings .modes button{
+  border-radius:14px;min-height:48px;
+  font-size:13px;font-weight:700;
+  background:var(--design-soft);
+}
+.page-settings .modes .selected{background:rgba(227,24,45,.09);border-color:var(--design-red)}
+.page-settings .hapticSettings label{min-height:44px}
+.page-settings details>summary{min-height:48px;line-height:1.4;cursor:pointer}
+.page-settings .panel>p{line-height:1.55}
+
+/* Navigation remains fixed in safe area; visibly consistent across every module. */
+.app .appTabBar{
+  border-color:var(--design-outline);
+  background:var(--design-card);
+  box-shadow:0 -6px 25px rgba(0,0,0,.035);
+}
+.app .appTabBar button{min-height:53px;min-width:62px}
+.app .appTabBar button.active{color:var(--design-red)}
+.app .appTabBar button.active svg{background:rgba(227,24,45,.10)}
+.app .appTabBar button:focus-visible{outline:2px solid var(--design-red);outline-offset:-2px;border-radius:13px}
+@media(max-width:375px){
+  .app main{padding:15px 12px 35px}
+  .app .panel{padding:14px 13px}
+  .page-home .hero{padding:17px}
+  .page-home .tiles button{padding:13px}
+  .page-register .registerDock button{font-size:12px}
+}
+@media(prefers-reduced-motion:no-preference){
+  @keyframes danperUnifiedEnter{
+    from{opacity:.76;transform:translate3d(0,7px,0)}
+    to{opacity:1;transform:translate3d(0,0,0)}
+  }
+  .app main> :where(.greeting,.sectionTop,.pageHead){animation:danperUnifiedEnter 180ms ease-out both}
+  .page-home .tiles button:active{transform:scale(.984)}
+  .page-home .hero:active{transform:scale(.989)}
+}
+@media(prefers-reduced-motion:reduce){
+  .app :where(.hero,.tiles button,.panel,.workerCard,.historyEntry){animation:none!important;transition:none!important;transform:none!important}
+}

@@ -1,0 +1,48 @@
+/*
+ * v0.21.1 · iOS WKWebView keyboard-aware diagnosis suggestions.
+ * The original suggestions remain inline and selectable. Only reveal/scroll behavior changes.
+ */
+.page-register .diagnosisSuggestions{
+  max-height:208px;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-padding-top:34px;
+  border:1px solid var(--ui-line,var(--line,#3a3a40));
+  border-radius:14px;
+  position:relative;
+  z-index:1;
+  margin-top:7px;
+  margin-bottom:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.10);
+}
+.page-register .diagnosisSuggestions>span{
+  display:block;
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:var(--ui-surface-soft,var(--bg));
+  font-size:11px;
+}
+.page-register .diagnosisSuggestions button{
+  display:block;
+  min-height:46px;
+  width:100%;
+  padding:11px 13px;
+  font-size:14px;
+  line-height:1.4;
+  text-align:left;
+  overflow-wrap:anywhere;
+  color:var(--text);
+  background:var(--ui-surface,var(--surface));
+}
+.page-register .diagnosisSuggestions button:active{background:var(--ui-accent-soft)}
+/* Reserve scrollable space only while editing. Without this, iOS reaches the end
+   of the document before the suggestions can clear the software keyboard. */
+.page-register .diagnosisKeyboardScrollRoom{height:0;pointer-events:none;flex:none}
+.page-register:has([data-clinical-field="clinical-diagnosis"] textarea:focus) .diagnosisKeyboardScrollRoom{
+  height:min(46vh,410px);
+}
+@media(prefers-reduced-motion:reduce){
+  .page-register .diagnosisSuggestions,.page-register .diagnosisKeyboardScrollRoom{scroll-behavior:auto!important;transition:none!important}
+}

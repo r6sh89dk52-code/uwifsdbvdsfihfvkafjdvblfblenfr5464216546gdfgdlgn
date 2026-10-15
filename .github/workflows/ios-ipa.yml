@@ -1,20 +1,13 @@
 name: DANPER Salud Movil - IPA de pruebas
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'scripts/**'
-      - 'package*.json'
-      - 'capacitor.config.ts'
-      - '.github/workflows/**'
   workflow_dispatch:
 permissions:
   contents: read
+# macOS runners consume a limited Actions quota. Do not run on a PR.
+# One manual build is launched only after Linux validation and user approval.
 jobs:
   ipa:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 50
     steps:
@@ -47,6 +40,7 @@ jobs:
           npx cap add ios
           npx cap sync ios
           node scripts/install-ios-gesture.mjs
+          node scripts/install-ios-access-lock.mjs
       - name: Generar IPA sin firmar
         run: bash scripts/build-ios-ipa.sh
       - name: Verificar IPA y recursos
@@ -54,7 +48,7 @@ jobs:
       - name: Adjuntar IPA descargable
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER-Salud-Movil-iPhone-v0.16.2
+          name: DANPER-Salud-Movil-iPhone-v0.21.10-BUILD-220-PRUEBAS-CIERRE
           path: |
             outputs/*.ipa
             outputs/*.sha256

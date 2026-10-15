@@ -1,0 +1,112 @@
+/* DANPER 0.21.6 — readable patient identity and plain-language inventory reconciliation.
+ * No changes to clinical validation, ledger or XLSX templates. */
+.page-register .workerClinicalFields{
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:0 11px;
+ align-items:start;
+}
+.page-register .workerClinicalFields>label{
+ min-width:0;
+ overflow-wrap:break-word;
+}
+.page-register .workerClinicalFields .workerFieldDni,
+.page-register .workerClinicalFields .workerFieldFull{grid-column:1 / -1}
+.page-register .workerClinicalFields textarea{
+ display:block;
+ width:100%;
+ min-width:0;
+ min-height:62px;
+ max-height:105px;
+ padding:11px 12px;
+ font-size:16px!important;
+ line-height:1.4;
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+ overflow-y:auto;
+ resize:vertical;
+ -webkit-overflow-scrolling:touch;
+}
+.page-register .workerClinicalFields .workerFieldDni input{max-width:100%}
+@media(max-width:430px){
+ .page-register .workerClinicalFields .workerFieldArea,
+ .page-register .workerClinicalFields .workerFieldLabor{grid-column:1 / -1}
+ .page-register .workerClinicalFields textarea{min-height:58px;max-height:98px}
+}
+/* Centered, accessible two-action alert for a completed DNI not in the directory. */
+.workerDiscoveryOverlay{
+ position:fixed;
+ inset:0;
+ z-index:1400;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ padding:calc(16px + env(safe-area-inset-top,0px)) 18px calc(16px + env(safe-area-inset-bottom,0px));
+ background:rgba(7,8,13,.67);
+}
+.workerDiscoveryDialog{
+ display:grid;
+ gap:12px;
+ width:min(100%,410px);
+ max-height:90dvh;
+ overflow-y:auto;
+ border:1px solid var(--line,#ddd);
+ border-radius:23px;
+ padding:22px 19px;
+ background:var(--surface,#fff);
+ color:var(--text,#222);
+ box-shadow:0 18px 58px rgba(0,0,0,.25);
+}
+.workerDiscoveryIcon{
+ width:52px;height:52px;
+ border-radius:17px;
+ display:grid;place-items:center;
+ color:#e3182d;background:rgba(227,24,45,.10);
+}
+.workerDiscoveryDialog h3{font-size:19px;margin:0;line-height:1.25}
+.workerDiscoveryDialog p{font-size:14px;line-height:1.48;margin:0;color:var(--text,#222)}
+.workerDiscoveryDialog .workerDiscoveryCaution{
+ background:rgba(227,24,45,.07);border:1px solid rgba(227,24,45,.24);
+ border-radius:12px;padding:10px;color:var(--text,#222);font-size:12px;
+}
+.workerDiscoveryActions{
+ display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,.85fr);
+ gap:9px;margin-top:6px;
+}
+.workerDiscoveryActions button{
+ display:flex;justify-content:center;align-items:center;
+ min-height:51px;
+ min-width:0;border-radius:13px;
+ padding:10px 8px;
+ font-size:13px;
+ font-weight:750;
+}
+.workerDiscoveryActions button:focus-visible{outline:3px solid #e3182d;outline-offset:3px}
+@media(max-width:335px){
+ .workerDiscoveryActions{grid-template-columns:1fr}
+}
+.reconciliationExplainer{
+ display:grid;gap:9px;
+ border:1px solid var(--line,#ddd);
+ border-radius:17px;
+ background:var(--bg,#f7f7f8);
+ padding:14px;
+ margin:12px 0 18px;
+}
+.reconciliationExplainer strong{font-size:14px;line-height:1.35;color:var(--text,#222)}
+.reconciliationExplainer p{margin:0 0 5px;font-size:12px;line-height:1.55;color:var(--muted,#777)}
+.reconciliationSectionTitle{
+ display:grid;gap:4px;
+ margin:18px 0 12px;
+ padding-top:13px;
+ border-top:1px solid var(--line,#ddd);
+}
+.reconciliationSectionTitle strong{font-size:15px;color:var(--text,#222)}
+.reconciliationSectionTitle span{font-size:12px;color:var(--muted,#777);line-height:1.45}
+.page-kardex .kardexGuideSteps button{min-height:94px}
+.page-kardex .kardexGuideSteps button small{overflow-wrap:anywhere}
+.page-ambulatory .stageCExportStep>.hint{font-size:12px;line-height:1.6}
+.page-ambulatory .stageCExportStep strong{font-weight:750}
+@media(prefers-reduced-motion:reduce){
+ .workerDiscoveryDialog,.workerDiscoveryOverlay{animation:none!important;transition:none!important}
+}

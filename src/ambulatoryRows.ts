@@ -1,13 +1,13 @@
 /** Read-only export. Never infer R from clinical quantities or alter stock. */
 import products from './products.json';
-import template from './ambulatoryTemplate.json';
+import {validDanperWorksite} from './danperWorksites';
 import {validateStockLedger,postStockMovement,type StockLedger,type StockMovement} from './kardexMovements';
 import {type CatalogMappingEvent,type DeliveryIncident,validateMappingEvents,validateDeliveryIncidents} from './reconciliationRules';
 import {procedureDetail} from './procedureRules';
 import {isReviewedAssociation} from './reviewedKardexAssociations';
 export type ExportVisit={
  id:string;status:'draft'|'saved';date:string;time:string;
- worker:{dni:string;name:string;area:string;labor:string;sex:string;age:string|number;ubigeo:string};
+ worker:{dni:string;name:string;area:string;labor:string;sex:string;age:string|number;ubigeo:string;site?:string};
  category:string;system:string;segment:string;diagnosis:string;
  items:{id:string;code:string;name:string;unit:string;quantity:number;procedure:string}[];
  permission:string;workStatus:string;permissionTime:string;blueBandage:boolean;returned:boolean;photoSent:boolean;
@@ -16,7 +16,7 @@ export type ExportVisit={
 export type ExportValue=string|number;
 export type ExportLine={id:string;cells:ExportValue[]};
 export type ExportPlan={lines:ExportLine[];warnings:string[];blockers:string[];start:string;end:string;visits:number;linkedDeliveries:number};
-export type ExportOptions={subdivision?:string;mappings?:CatalogMappingEvent[];incidents?:DeliveryIncident[]};
+export type ExportOptions={subdivision?:string;perVisitSubdivision?:boolean;mappings?:CatalogMappingEvent[];incidents?:DeliveryIncident[]};
 const productMap=new Map(products.map(p=>[p.code,p]));
 const frequencies=['PRIMERA','SEGUNDA','TERCERA','CUARTA','QUINTA'];
 export function validExportDate(v:string):boolean{
@@ -56,10 +56,16 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
  const frequencyCount=new Map<string,number>(),deliveryMap=new Map<string,StockMovement>();
  for(const m of valid.movements)if(m.dispenseRef)deliveryMap.set(JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]),m);
  const subdivision=options.subdivision||'';
- if(subdivision&&!template.subdivisions.some(p=>p[0]===subdivision))throw Error('Subdivisión no verificada en el libro original.');
- if(!subdivision&&ordered.length)blockers.push('Selecciona la subdivisión de estas atenciones para completar A y C.');
+ const perVisitSubdivision=options.perVisitSubdivision===true;
+ if(perVisitSubdivision&&subdivision)throw Error('No combines una sede fija con el modo de ambas sedes.');
+ if(subdivision&&!validDanperWorksite(subdivision))throw Error('Subdivisión no verificada: solo se admiten las dos sedes oficiales.');
+ if(!subdivision&&!perVisitSubdivision&&ordered.length)blockers.push('Selecciona la subdivisión de estas atenciones para completar A y C.');
  for(const a of ordered){
   if(!a.worker||!/^\d{8}$/.test(a.worker.dni)||!a.worker.name?.trim()||!a.diagnosis?.trim())throw Error('Atención con datos obligatorios incompletos.');
+  const rowSubdivision=perVisitSubdivision?(a.worker.site||''):subdivision;
+  if(perVisitSubdivision&&!validDanperWorksite(rowSubdivision))blockers.push('Atención sin sede oficial: '+a.id.slice(0,8));
+  if(!perVisitSubdivision&&subdivision&&a.worker.site&&a.worker.site!==subdivision)
+   throw Error('La atención pertenece a otra sede y no puede mezclarse en este reporte.');
   const time=excelTime(a.time),permissionTime=excelTime(a.permissionTime,true);
   if(a.responsibleDni&&!/^\d{8}$/.test(a.responsibleDni))throw Error('DNI de responsable inválido.');
   if(!Array.isArray(a.items))throw Error('Artículos de atención incompatibles.');
@@ -90,7 +96,7 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
     }
    }else procedure=(a.standaloneProcedures||[]).join(' / ');
    const rawAge=String(a.worker.age),age=Number(rawAge);
-   const cells:ExportValue[]=[subdivision,a.worker.area||'','','',a.worker.labor||'',excelDate(a.date),time,
+   const cells:ExportValue[]=[rowSubdivision,a.worker.area||'','','',a.worker.labor||'',excelDate(a.date),time,
     a.worker.dni,a.worker.name,/^\d{1,3}$/.test(rawAge)&&age<=120?age:'',a.worker.sex||'',a.worker.ubigeo||'',
     a.category||'',a.system||'',a.segment||'',code,name,quantity,count<=5?frequencies[count-1]:'REVISAR',procedure,
     item?procedureDetail(procedure):'',a.permission||'',a.workStatus||'',permissionTime,a.blueBandage?'SI':'NO',a.returned?'SI':'NO',a.photoSent?'SI':'NO',a.responsibleDni||'',a.responsible||'',a.diagnosis];
