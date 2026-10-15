@@ -16,7 +16,7 @@ const ts=require('typescript');
  assert(foreground.includes('if danperAuthUnlocked'),'successful auth while inactive is preserved');
  assert(foreground.includes('!danperAuthAttemptInFlight'),'no duplicate Face ID while modal is open');
  assert(!foreground.includes('danperAttemptAuthentication()'),'resume shows welcome without automatic Face ID');
- assert(assembled.includes('button.setTitle("Ingresar", for: .normal)'),'visible intentional sign-in control');
+ assert(assembled.includes('button.setTitle("Ingresar con Face ID", for: .normal)'),'visible intentional sign-in control');
  assert(assembled.includes('button.addTarget(self, action: #selector(danperUnlockTapped(_:))'),'button must launch native auth');
  assert(assembled.includes('private func danperUnlockTapped'),'native button bound');
  assert(assembled.includes('danperAttemptAuthentication()\n    }\n\n    private func danperSetLockMessage'),'tapping starts authentication');
