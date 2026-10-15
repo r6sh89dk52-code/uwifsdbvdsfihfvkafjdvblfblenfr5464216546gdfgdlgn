@@ -49,12 +49,12 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
   </div>
   <div className="stageCExportStep">
    <h4><span className="stageCIndex">1</span> Elegir período y lugar de reporte</h4>
-   <p className="hint"><strong>Período:</strong> las atenciones se agrupan desde el día 9 de un mes hasta el día 8 del siguiente. <strong>Subdivisión:</strong> es el área o agrupación administrativa que aparece en el formato oficial; selecciona la que corresponda al reporte que estás preparando.</p>
+   <p className="hint"><strong>Período:</strong> las atenciones se agrupan desde el día 9 de un mes hasta el día 8 del siguiente. <strong>Sede o fundo:</strong> selecciona la ubicación oficial a la que pertenece tu reporte. Por ejemplo, LA VENTUROSA o CHEPEN. Son opciones integradas del Excel; no debes escribirlas ni adjuntar archivos.</p>
   <div className="fields two">
    <label>Mes en que empieza el reporte (día 9)<input type="month" className="ambulatoryMonthInput" value={month} min="2020-01" max="2099-12" onChange={e=>{if(e.target.value)setMonth(e.target.value);setError('');setDone('')}}/></label>
    <label>Fechas que incluirá este Excel<input readOnly aria-label="Período mensual oficial" value={period.label}/></label>
   </div>
-  <label>Área / subdivisión oficial<select value={subdivision} onChange={e=>setSubdivision(e.target.value)}><option value="">Seleccionar área / subdivisión</option>{templateLayout.subdivisions.map(p=><option key={p[1]} value={p[0]}>{p[0]}</option>)}</select></label>
+  <label>Sede o fundo del reporte<select value={subdivision} onChange={e=>setSubdivision(e.target.value)}><option value="">Seleccionar sede o fundo</option>{templateLayout.subdivisions.map(p=><option key={p[1]} value={p[0]}>{p[0]}</option>)}</select></label>
   <p className="hint">El reporte incluye del día 9 al día 8 siguiente. Solo las entregas confirmadas se reflejan como consumo en la hoja CONSUMOS. No se duplican registros ni se generan movimientos por exportar.</p>
   </div>
   <div className="stageCExportStep">
