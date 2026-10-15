@@ -11,7 +11,7 @@ const native=get('scripts/install-ios-access-lock.mjs');
 const action=get('.github/workflows/ios-ipa.yml');
 assert(main.includes('useLayoutEffect(()=>{'),'reset must occur after render and before paint');
 assert(main.includes('},[page]);'),'top-level view navigation reset');
-assert(main.includes('window.scrollTo({top:0,left:0,behavior:\'instant\'})'),'jump without noticeable animation');
+assert(main.includes('window.scrollTo({top:0,left:0,behavior:\'auto\'})'),'jump without noticeable animation');
 assert(main.includes('window.cancelAnimationFrame(frame)'),'avoid animation-frame leak');
 assert(main.includes('<DanperBrandLogo/>'),'official transparent logo in header');
 assert(kardex.includes('useLayoutEffect(()=>'),'Kardex submodule scroll reset');
