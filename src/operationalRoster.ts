@@ -42,7 +42,13 @@ export function prepareOfficialRoster(current:readonly OperationalWorker[],offic
   if(replacement){
    present.add(row.dni);
    // Authoritative identity comes from PERSONAL, not from mixed demo records.
-   return {...replacement,source:'imported' as const,rosterStatus:'official' as const};
+   // Retain only explicitly saved local corrections to location/job fields,
+   // while official identity and DNI still come from the imported roster.
+   const corrected=typeof row.localCorrectionAt==='number'&&Number.isSafeInteger(row.localCorrectionAt)&&row.localCorrectionAt>0;
+   return {...replacement,source:corrected?'manual' as const:'imported' as const,
+    rosterStatus:'official' as const,
+    ...(corrected?{area:row.area||replacement.area,labor:row.labor||replacement.labor,
+      site:row.site||replacement.site,localCorrectionAt:row.localCorrectionAt}:{})};
   }
   // Manual verification is only trusted if explicitly performed AFTER this feature exists.
   return {...row,rosterStatus:row.rosterStatus==='verified'?'verified' as const:'excluded' as const};
