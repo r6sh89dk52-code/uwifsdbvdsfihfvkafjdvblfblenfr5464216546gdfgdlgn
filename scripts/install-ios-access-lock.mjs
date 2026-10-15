@@ -12,7 +12,7 @@ export function installAccessInAppDelegate(source){
  if(source.includes(ACCESS_MARKER))return source;
  if(!source.includes('class AppDelegate:')||!source.includes('import Capacitor')||!source.includes(notificationAnchor))
   throw new Error('AppDelegate.swift incompatible: primero instalar el gesto nativo.');
- let output=source.replace('import Capacitor','import Capacitor\nimport LocalAuthentication');
+ let output=source.replace('import Capacitor','import Capacitor\nimport LocalAuthentication\nimport CoreImage');
  const lifecycle=`\n        NotificationCenter.default.addObserver(self, selector: #selector(danperAuthWindowVisible(_:)), name: UIWindow.didBecomeVisibleNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(danperAuthWillResign(_:)), name: UIApplication.willResignActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(danperAuthDidBecomeActive(_:)), name: UIApplication.didBecomeActiveNotification, object: nil)
@@ -75,6 +75,33 @@ extension AppDelegate {
             .filter { $0.rootViewController is CAPBridgeViewController }
     }
 
+
+    // Official asset is a square PNG with a baked red background.
+    // Crop its authentic script glyphs and turn the red into transparent alpha.
+    // No third-party logo, replacement font or extra binary dependency.
+    private func danperCleanWordmark() -> UIImage? {
+        guard let original = UIImage(named: "DanperWordmark"),
+              let source = original.cgImage else { return nil }
+        let width = CGFloat(source.width)
+        let height = CGFloat(source.height)
+        let crop = CGRect(x: width * 0.094,
+                          y: height * 0.37,
+                          width: width * 0.83,
+                          height: height * 0.30).integral
+        guard let trimmed = source.cropping(to: crop),
+              let matrix = CIFilter(name: "CIColorMatrix") else { return nil }
+        matrix.setValue(CIImage(cgImage: trimmed), forKey: kCIInputImageKey)
+        let none = CIVector(x: 0, y: 0, z: 0, w: 0)
+        matrix.setValue(none, forKey: "inputRVector")
+        matrix.setValue(none, forKey: "inputGVector")
+        matrix.setValue(none, forKey: "inputBVector")
+        matrix.setValue(CIVector(x: 0, y: 0.56, z: 0.56, w: 0), forKey: "inputAVector")
+        matrix.setValue(CIVector(x: 1, y: 1, z: 1, w: -0.10), forKey: "inputBiasVector")
+        guard let clean = matrix.outputImage,
+              let rendered = CIContext().createCGImage(clean, from: clean.extent) else { return nil }
+        return UIImage(cgImage: rendered, scale: original.scale, orientation: .up)
+    }
+
     private func danperAddLockOverlay(to window: UIWindow) {
         // Fully opaque UIKit cover is installed before displaying any WKWebView.
         // The protected web app never renders visibly until LocalAuthentication succeeds.
@@ -104,14 +131,14 @@ extension AppDelegate {
         ])
 
         let brand = UIView()
-        brand.backgroundColor = red
+        brand.backgroundColor = .clear
         brand.layer.cornerRadius = 25
         brand.layer.cornerCurve = .continuous
         brand.clipsToBounds = true
         brand.translatesAutoresizingMaskIntoConstraints = false
-        brand.heightAnchor.constraint(equalToConstant: 142).isActive = true
+        brand.heightAnchor.constraint(equalToConstant: 106).isActive = true
 
-        let brandWordmark = UIImageView(image: UIImage(named: "DanperWordmark"))
+        let brandWordmark = UIImageView(image: danperCleanWordmark())
         brandWordmark.contentMode = .scaleAspectFit
         brandWordmark.translatesAutoresizingMaskIntoConstraints = false
         brand.addSubview(brandWordmark)
@@ -132,8 +159,8 @@ extension AppDelegate {
         brand.addSubview(brandSub)
         NSLayoutConstraint.activate([
             brandWordmark.centerXAnchor.constraint(equalTo: brand.centerXAnchor),
-            brandWordmark.centerYAnchor.constraint(equalTo: brand.centerYAnchor, constant: -13),
-            brandWordmark.heightAnchor.constraint(equalToConstant: 88),
+            brandWordmark.centerYAnchor.constraint(equalTo: brand.centerYAnchor, constant: -12),
+            brandWordmark.heightAnchor.constraint(equalToConstant: 70),
             brandWordmark.widthAnchor.constraint(equalTo: brand.widthAnchor, multiplier: 0.77),
             brandWordmark.widthAnchor.constraint(lessThanOrEqualToConstant: 230),
             brandFallback.centerXAnchor.constraint(equalTo: brand.centerXAnchor),
@@ -143,13 +170,13 @@ extension AppDelegate {
         ])
 
         let healthCircle = UIView()
-        healthCircle.backgroundColor = red.withAlphaComponent(0.11)
+        healthCircle.backgroundColor = UIColor.white.withAlphaComponent(0.15)
         healthCircle.layer.cornerRadius = 43
         healthCircle.translatesAutoresizingMaskIntoConstraints = false
         healthCircle.widthAnchor.constraint(equalToConstant: 86).isActive = true
         healthCircle.heightAnchor.constraint(equalToConstant: 86).isActive = true
         let healthImage = UIImageView(image: UIImage(systemName: "cross.case.fill"))
-        healthImage.tintColor = red
+        healthImage.tintColor = .white
         healthImage.contentMode = .scaleAspectFit
         healthImage.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 42, weight: .medium)
         healthImage.translatesAutoresizingMaskIntoConstraints = false
@@ -165,7 +192,7 @@ extension AppDelegate {
         heading.font = UIFont.preferredFont(forTextStyle: .largeTitle)
         heading.adjustsFontForContentSizeCategory = true
         heading.numberOfLines = 0
-        heading.textColor = .label
+        heading.textColor = .white
 
         let department = UILabel()
         department.text = "Departamento de Salud"
@@ -173,7 +200,7 @@ extension AppDelegate {
         department.font = UIFont.preferredFont(forTextStyle: .title3)
         department.adjustsFontForContentSizeCategory = true
         department.numberOfLines = 0
-        department.textColor = .label
+        department.textColor = .white
 
         let message = UILabel()
         message.tag = danperNativeLockTag + 1
@@ -185,13 +212,13 @@ extension AppDelegate {
         message.numberOfLines = 0
 
         let button = UIButton(type: .system)
-        button.setTitle("Ingresar", for: .normal)
+        button.setTitle("Ingresar con Face ID", for: .normal)
         button.setImage(UIImage(systemName: "faceid"), for: .normal)
         button.tintColor = .white
         button.semanticContentAttribute = .forceRightToLeft
         button.setTitleColor(.white, for: .normal)
         button.backgroundColor = red
-        button.layer.cornerRadius = 16
+        button.layer.cornerRadius = 22
         button.layer.cornerCurve = .continuous
         button.titleLabel?.font = UIFont.preferredFont(forTextStyle: .headline)
         button.titleLabel?.adjustsFontForContentSizeCategory = true
@@ -208,39 +235,78 @@ extension AppDelegate {
         security.adjustsFontForContentSizeCategory = true
         security.numberOfLines = 0
 
-        let stack = UIStackView(arrangedSubviews: [brand, healthCircle, heading, department, message, button, security])
-        stack.axis = .vertical
-        stack.alignment = .center
-        stack.spacing = 14
-        stack.setCustomSpacing(26, after: brand)
-        stack.setCustomSpacing(15, after: healthCircle)
-        stack.setCustomSpacing(4, after: heading)
-        stack.setCustomSpacing(22, after: message)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(stack)
+        // Bank-inspired arrangement: DANPER red hero above, quiet access surface below.
+        // Both sections scroll safely on smaller iPhones and with Dynamic Type.
+        let hero = UIView()
+        hero.backgroundColor = red
+        let lower = UIView()
+        lower.backgroundColor = .systemBackground
+        lower.layer.cornerRadius = 34
+        lower.layer.cornerCurve = .continuous
+        lower.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        let heroStack = UIStackView(arrangedSubviews: [brand, healthCircle, heading, department])
+        heroStack.axis = .vertical
+        heroStack.alignment = .center
+        heroStack.spacing = 14
+        heroStack.setCustomSpacing(17, after: brand)
+        heroStack.setCustomSpacing(21, after: healthCircle)
+        heroStack.setCustomSpacing(3, after: heading)
+        heroStack.translatesAutoresizingMaskIntoConstraints = false
+        hero.addSubview(heroStack)
+        let actionStack = UIStackView(arrangedSubviews: [message, button, security])
+        actionStack.axis = .vertical
+        actionStack.alignment = .center
+        actionStack.spacing = 17
+        actionStack.setCustomSpacing(22, after: message)
+        actionStack.setCustomSpacing(12, after: button)
+        actionStack.translatesAutoresizingMaskIntoConstraints = false
+        lower.addSubview(actionStack)
+        let sections = UIStackView(arrangedSubviews: [hero, lower])
+        sections.axis = .vertical
+        sections.spacing = -29
+        sections.distribution = .fill
+        sections.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(sections)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: content.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -24),
-            stack.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 410),
-            stack.topAnchor.constraint(greaterThanOrEqualTo: content.safeAreaLayoutGuide.topAnchor, constant: 34),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.safeAreaLayoutGuide.bottomAnchor, constant: -34),
-            stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            brand.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            heading.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            department.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            message.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            button.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            security.widthAnchor.constraint(equalTo: stack.widthAnchor)
+            sections.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            sections.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            sections.topAnchor.constraint(equalTo: content.topAnchor),
+            sections.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            hero.heightAnchor.constraint(greaterThanOrEqualToConstant:400),
+            hero.heightAnchor.constraint(equalTo: content.heightAnchor, multiplier: 0.57),
+            lower.heightAnchor.constraint(greaterThanOrEqualToConstant:310),
+            heroStack.leadingAnchor.constraint(greaterThanOrEqualTo: hero.leadingAnchor, constant:25),
+            heroStack.trailingAnchor.constraint(lessThanOrEqualTo: hero.trailingAnchor, constant:-25),
+            heroStack.centerXAnchor.constraint(equalTo: hero.centerXAnchor),
+            heroStack.centerYAnchor.constraint(equalTo: hero.centerYAnchor, constant:20),
+            heroStack.topAnchor.constraint(greaterThanOrEqualTo: hero.topAnchor, constant:69),
+            heroStack.bottomAnchor.constraint(lessThanOrEqualTo: hero.bottomAnchor, constant:-48),
+            heroStack.widthAnchor.constraint(lessThanOrEqualToConstant:410),
+            brand.widthAnchor.constraint(equalTo: heroStack.widthAnchor),
+            heading.widthAnchor.constraint(equalTo: heroStack.widthAnchor),
+            department.widthAnchor.constraint(equalTo: heroStack.widthAnchor),
+            actionStack.leadingAnchor.constraint(equalTo: lower.leadingAnchor, constant:26),
+            actionStack.trailingAnchor.constraint(equalTo: lower.trailingAnchor, constant:-26),
+            actionStack.centerYAnchor.constraint(equalTo: lower.centerYAnchor, constant:8),
+            actionStack.topAnchor.constraint(greaterThanOrEqualTo: lower.topAnchor, constant:54),
+            actionStack.bottomAnchor.constraint(lessThanOrEqualTo: lower.bottomAnchor, constant:-35),
+            button.widthAnchor.constraint(equalTo: actionStack.widthAnchor),
+            message.widthAnchor.constraint(equalTo: actionStack.widthAnchor),
+            security.widthAnchor.constraint(equalTo: actionStack.widthAnchor)
         ])
         window.addSubview(lockView)
         window.bringSubviewToFront(lockView)
-        // Decorative micro-animation, not an animation that delays access.
+        // Calm breathing CTA, 1.0 -> 1.025 -> 1.0. Accessibility stays respected.
         if !UIAccessibility.isReduceMotionEnabled {
-            healthCircle.alpha = 0.65
-            UIView.animate(withDuration: 0.45, delay: 0.10, options: [.curveEaseOut, .allowUserInteraction], animations: {
+            healthCircle.alpha = 0.6
+            UIView.animate(withDuration: 0.42, delay: 0.1, options: [.curveEaseOut, .allowUserInteraction], animations: {
                 healthCircle.alpha = 1
             })
+            UIView.animate(withDuration: 1.75, delay: 0.65,
+                           options: [.curveEaseInOut, .autoreverse, .repeat, .allowUserInteraction],
+                           animations: {
+                button.transform = CGAffineTransform(scaleX: 1.025, y: 1.025)
+            }, completion: nil)
         }
     }
 
