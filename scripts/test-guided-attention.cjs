@@ -8,7 +8,7 @@ const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
 const result=ts.transpileModule(s,{fileName:'main.tsx',reportDiagnostics:true,compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,moduleResolution:ts.ModuleResolutionKind.Bundler,resolveJsonModule:true}});
 const errors=result.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error);
 assert.deepEqual(errors.map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')),[],'JSX must remain parseable');
-assert.equal(pkg.version,'0.21.8');
+assert.equal(pkg.version,'0.21.9');
 assert(s.includes('const[registerStep,setRegisterStep]=useState<ClinicalStage>(0)'),'4-step state');
 assert(s.includes('setRegisterStep(0);setActive(v);'),'each new or resumed attention begins at worker');
 assert(s.includes('function selectRegisterStep(step:ClinicalStage)'),'stage switch');
