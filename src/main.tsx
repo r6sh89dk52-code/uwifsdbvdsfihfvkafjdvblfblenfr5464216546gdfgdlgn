@@ -14,10 +14,10 @@ function App(){const [att,setAtt]=useState<Attention[]>(()=>isNativeSecureStore(
    if(focused instanceof HTMLElement&&focused.matches('input,textarea,select'))focused.blur();
    const root=document.scrollingElement;
    if(root)root.scrollTop=0;
-   window.scrollTo({top:0,left:0,behavior:'instant'});
+   window.scrollTo({top:0,left:0,behavior:'auto'});
    const frame=window.requestAnimationFrame(()=>{
      if(root)root.scrollTop=0;
-     window.scrollTo({top:0,left:0,behavior:'instant'});
+     window.scrollTo({top:0,left:0,behavior:'auto'});
    });
    return()=>window.cancelAnimationFrame(frame);
  },[page]);const[registerStep,setRegisterStep]=useState<ClinicalStage>(0);const[stepAlert,setStepAlert]=useState<ClinicalFieldIssue[]|null>(null);const stepAlertButton=useRef<HTMLButtonElement|null>(null);const[mode,setMode]=useState<'auto'|'light'|'dark'>('auto');const[hapticsOn,setHapticsOn]=useState(hapticsEnabled);const[savingAttention,setSavingAttention]=useState(false);const[savingWorker,setSavingWorker]=useState(false);const[query,setQuery]=useState('');const[workerQuery,setWorkerQuery]=useState('');const[workerForm,setWorkerForm]=useState<Worker|null>(null);const[workerReturn,setWorkerReturn]=useState<'home'|'register'>('home');const[editingDni,setEditingDni]=useState<string|null>(null);const[diagnosisSuggestionsVisible,setDiagnosisSuggestionsVisible]=useState(false);const diagnosisInputRef=useRef<HTMLTextAreaElement|null>(null);const diagnosisSuggestionsRef=useRef<HTMLDivElement|null>(null);const[workers,setWorkers]=useState<Worker[]>(()=>isNativeSecureStore()?[]:readLegacyDemoSnapshot().workers as Worker[]);const[ledger,setLedger]=useState<StockLedger>(()=>{
