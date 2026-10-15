@@ -1,5 +1,5 @@
 /** No clinical records or real employee names are bundled in this module. */
-export type WorkerRecord={dni:string;name:string;area:string;labor:string;sex:string;age:string;ubigeo:string;source?:'manual'|'imported'};
+export type WorkerRecord={dni:string;name:string;area:string;labor:string;sex:string;age:string;ubigeo:string;source?:'manual'|'imported';site?:string;localCorrectionAt?:number};
 export type ImportStats={total:number;valid:number;invalidDni:number;withoutName:number;duplicates:number;sexInvalid:number;sexMissing:number;sexConflicts:number;nameConflicts:number};
 export type ImportResult={workers:WorkerRecord[];stats:ImportStats};
 export type MergeStats={added:number;merged:number;manualPreserved:number;nameConflicts:number;sexConflicts:number};
