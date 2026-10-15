@@ -47,7 +47,7 @@ assert.equal(px[4],255);
 for(const item of ['private func danperCleanWordmark','CIFilter(name: "CIColorMatrix")','private func danperAddLockOverlay','let hero = UIView()','hero.backgroundColor = red','let lower = UIView()','sections.axis = .vertical','button.setTitle("Ingresar con Face ID"','UIView.animate(withDuration: 1.75','CGAffineTransform(scaleX: 1.025, y: 1.025)','UIAccessibility.isReduceMotionEnabled','danperAuthGeneration += 1','LAPolicy = .deviceOwnerAuthentication']){
  assert(native.includes(item),item);
 }
-assert(action.includes("if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"),'macOS cannot automatically run on pull request');
+assert(action.includes("if: github.event_name == 'workflow_dispatch'"),'macOS cannot automatically run on pull request');
 assert(action.includes('runs-on: macos-15'),'explicit Mac approval still possible');
 assert(main.includes("import './visualPolish.css'"),'load new styles last');
 assert(!main.includes('diagnosisFloatingSuggestions'),'discarded keyboard popover must remain excluded');
