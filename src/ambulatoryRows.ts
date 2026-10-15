@@ -58,7 +58,7 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
  const subdivision=options.subdivision||'';
  const perVisitSubdivision=options.perVisitSubdivision===true;
  if(perVisitSubdivision&&subdivision)throw Error('No combines una sede fija con el modo de ambas sedes.');
- if(subdivision&&!validDanperWorksite(subdivision))throw Error('Solo se admiten las dos sedes verificadas.');
+ if(subdivision&&!validDanperWorksite(subdivision))throw Error('Subdivisión no verificada: solo se admiten las dos sedes oficiales.');
  if(!subdivision&&!perVisitSubdivision&&ordered.length)blockers.push('Selecciona la subdivisión de estas atenciones para completar A y C.');
  for(const a of ordered){
   if(!a.worker||!/^\d{8}$/.test(a.worker.dni)||!a.worker.name?.trim()||!a.diagnosis?.trim())throw Error('Atención con datos obligatorios incompletos.');
