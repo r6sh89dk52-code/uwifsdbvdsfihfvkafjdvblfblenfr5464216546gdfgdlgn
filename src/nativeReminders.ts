@@ -1,7 +1,7 @@
 import {Capacitor} from '@capacitor/core';
 import {LocalNotifications} from '@capacitor/local-notifications';
 import {notificationId,reminderDueAt} from './draftRules';
-import {activeStockLot,expiryNotificationId,expiryReminderAt,LOCAL_NOTICE_LIMIT,type AttentionForNotices} from './notificationCenterRules';
+import {activeStockLot,expiryNotificationId,expiryReminderAt,LOCAL_NOTICE_LIMIT} from './notificationCenterRules';
 import {type StockLot} from './inventoryRules';
 
 export type DraftReminder={id:string;updatedAt:number};
