@@ -16,7 +16,7 @@ const ordered=[
   {start:'{registerStep===0&&<><section id="attention-worker"',title:'Trabajador'},
   {start:'{registerStep===1&&<><section className="panel allergyPanel"',title:'Alergias'},
   {start:'{registerStep===2&&<><section className="panel"><h3><ClipboardList',title:'Procedimientos'},
-  {start:'{registerStep===3&&<><section id="attention-result"',title:'Resultado'}
+  {start:'{registerStep===3&&<><div className="clinicalReview"',title:'Resultado'}
 ];
 let prev=0;
 for(const o of ordered){
