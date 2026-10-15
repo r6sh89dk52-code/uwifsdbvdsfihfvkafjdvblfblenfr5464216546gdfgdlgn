@@ -27,7 +27,7 @@ for(const piece of ['OfficialAreaField className="workerFieldArea"','site={activ
   'validDanperWorksite(w.site)','workerNeedsProfileSave(w:Worker)']){
  assert(main.includes(piece),'registration integration: '+piece);
 }
-for(const piece of ['suggestOfficialAreas(site,value,5)','onChange(e.target.value)','onClick={()=>{onChange(item.area)','Área libre: se guardará tal como la escribiste','match.group']){
+for(const piece of ['suggestOfficialAreas(site,value,5)','onChange(e.target.value)','onClick={()=>{onChange(item.area)','Área libre: se guardará tal como la escribiste','match.group','suggestionScrollDelta','window.visualViewport']){
  assert(ui.includes(piece),'suggestion interface: '+piece);
 }
 const rows=fs.readFileSync('src/ambulatoryRows.ts','utf8');
