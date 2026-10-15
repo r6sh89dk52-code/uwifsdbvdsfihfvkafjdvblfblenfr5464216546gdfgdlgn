@@ -50,7 +50,7 @@ const workspace=read('src/KardexWorkspace.tsx');
 for(const t of ['¿Qué necesitas hacer?','Inventario físico','Entradas y salidas','Entrega de insumos','Exportar Kardex',"navigate('inventory')","navigate('movements')","navigate('deliveries')","navigate('reports')"])assert(workspace.includes(t),'Kardex clarity missing '+t);
 assert(!workspace.includes('kardexSectionGrid'),'Kardex no duplicate tiles');
 const report=read('src/AmbulatoryExportPanel.tsx');
-for(const t of ['No tienes que adjuntar ninguna plantilla','Elegir período y lugar de reporte','Sede o fundo del reporte','Comprobar atenciones y existencias','Generar Excel (10 hojas) y compartir','sharedMonthlyReconciliation(ledger,result.data)','exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data)','result.data.blockers.length>0'])assert(report.includes(t),'report UI must preserve contract: '+t);
+for(const t of ['No tienes que adjuntar ninguna plantilla','Elegir período','Kardex único','Comprobar atenciones y existencias','Generar Excel (10 hojas) y compartir','sharedMonthlyReconciliation(ledger,result.data)','exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data)','result.data.blockers.length>0'])assert(report.includes(t),'report UI must preserve contract: '+t);
 const returnPanel=read('src/ReconciliationPanel.tsx');
 for(const t of ['Revisar productos y devoluciones','¿Qué significa una equivalencia?','¿Qué significa una incidencia?','sin modificar existencias','recordDeliveryIncident(ledger,incidents'])assert(returnPanel.includes(t),'reconciliation wording must retain audit logic: '+t);
 for(const path of ['src/main.tsx','src/KardexWorkspace.tsx','src/AmbulatoryExportPanel.tsx','src/ReconciliationPanel.tsx']){
