@@ -32,7 +32,7 @@ for(const value of [
  'workerNeedsProfileSave','workerDetailsMissing(w)',
  'validDanperWorksite(w.site)','setWorkerProfileAlert(profile)',
  'function editActiveWorkerProfile()','setWorkerForm({...emptyWorker,...existing,...active.worker})',
- 'workerReturn===\\'register\\'','Guardar ficha y volver a atención',
+ "workerReturn==='register'",'Guardar ficha y volver a atención',
  'localCorrectionAt:Date.now()','writeDemoSnapshot(snapshot)',
  'workerManualCheck','verifiedManualWorker','rosterStatus:existingStatus',
  'Sede del trabajador','Sede<select','DANPER_WORKSITES.map(site=',
@@ -40,7 +40,7 @@ for(const value of [
  'async function deleteSavedAttention',
  'eliminación bloqueada','Eliminar atención',
  "import './workerOrganization.css'"
-]){assert(main.includes(value.replaceAll("\\'","'")),'missing UI contract: '+value);}
+]){assert(main.includes(value),'missing UI contract: '+value);}
 assert(worker.includes('site?:string'));
 assert(worker.includes('localCorrectionAt?:number'));
 assert(roster.includes("source:corrected?'manual'"),'re-import must retain local changes');
