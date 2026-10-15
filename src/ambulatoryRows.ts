@@ -15,8 +15,8 @@ export type ExportVisit={
 };
 export type ExportValue=string|number;
 export type ExportLine={id:string;cells:ExportValue[]};
-export type ExportPlan={lines:ExportLine[];warnings:string[];blockers:string[];start:string;end:string;visits:number;linkedDeliveries:number};
-export type ExportOptions={subdivision?:string;perVisitSubdivision?:boolean;mappings?:CatalogMappingEvent[];incidents?:DeliveryIncident[]};
+export type ExportPlan={lines:ExportLine[];warnings:string[];blockers:string[];start:string;end:string;visits:number;linkedDeliveries:number;provisional?:boolean;pendingDeliveries?:number};
+export type ExportOptions={subdivision?:string;perVisitSubdivision?:boolean;mappings?:CatalogMappingEvent[];incidents?:DeliveryIncident[];allowPendingDeliveries?:boolean};
 const productMap=new Map(products.map(p=>[p.code,p]));
 const frequencies=['PRIMERA','SEGUNDA','TERCERA','CUARTA','QUINTA'];
 export function validExportDate(v:string):boolean{
@@ -52,7 +52,7 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
  }
  const ordered=selected.filter(v=>v.date>=start&&v.date<=end).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)||a.id.localeCompare(b.id));
  const lines:ExportLine[]=[],warnings:string[]=[],blockers:string[]=[];
- let linkedDeliveries=0;
+ let linkedDeliveries=0,pendingDeliveries=0;
  const frequencyCount=new Map<string,number>(),deliveryMap=new Map<string,StockMovement>();
  for(const m of valid.movements)if(m.dispenseRef)deliveryMap.set(JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]),m);
  const subdivision=options.subdivision||'';
@@ -82,7 +82,13 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
     if(!Number.isInteger(item.quantity)||item.quantity<=0||!item.procedure?.trim())throw Error('Cantidad clínica o procedimiento inválido.');
     code=p.code;name=p.name;procedure=item.procedure;
     const m=deliveryMap.get(JSON.stringify([a.id,item.id]));
-    if(!m)blockers.push('Cantidad sin entrega conciliada: '+a.id.slice(0,8)+' / '+item.code);
+    if(!m){
+     if(options.allowPendingDeliveries===true){
+      // PROVISIONAL ONLY: no stock movement exists, so R must stay unknown.
+      // Clinical item/code are retained but no physical quantity is inferred.
+      pendingDeliveries++;
+     }else blockers.push('Cantidad sin entrega conciliada: '+a.id.slice(0,8)+' / '+item.code);
+    }
     else{
      const ref=m.dispenseRef!;
      if(ref.clinicalCode!==item.code||ref.clinicalName.trim()!==item.name.trim()||ref.clinicalUnit.trim()!==item.unit.trim()||ref.clinicalQuantity!==item.quantity)
@@ -106,6 +112,10 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
    if(lines.length>10000)throw Error('El prototipo admite hasta 10 000 filas por exportación.');
   }
  }
+ if(options.allowPendingDeliveries===true){
+  warnings.push('BORRADOR PROVISIONAL: '+pendingDeliveries+' productos utilizados sin entrega física confirmada. La columna R queda vacía para esas filas; NO equivale a consumo conciliado.');
+ }
  warnings.push('CONTEO, INGRESOS y saldos: pendientes de conciliación. Solo los consumos confirmados corresponden al período.');
- return {lines,warnings:[...new Set(warnings)],blockers:[...new Set(blockers)],start,end,visits:ordered.length,linkedDeliveries};
+ return {lines,warnings:[...new Set(warnings)],blockers:[...new Set(blockers)],start,end,visits:ordered.length,linkedDeliveries,
+  ...(options.allowPendingDeliveries===true?{provisional:true,pendingDeliveries}:{})};
 }
