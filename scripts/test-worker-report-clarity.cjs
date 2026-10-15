@@ -35,7 +35,7 @@ for(const needle of [
  "officialRosterActive(workers as OperationalWorker[])",
  "workerClinicalFields",
  '<textarea rows={2} value={active.worker.name}',
- '<textarea rows={2} value={active.worker.area}',
+ 'OfficialAreaField className="workerFieldArea" site={active.worker.site}',
  '<textarea rows={2} value={active.worker.labor}',
  "setUnknownWorkerDni(null)",
  "import './workerAndReportClarity.css'"
