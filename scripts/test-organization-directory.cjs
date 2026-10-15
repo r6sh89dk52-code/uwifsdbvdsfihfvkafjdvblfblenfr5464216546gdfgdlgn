@@ -30,6 +30,10 @@ for(const piece of ['OfficialAreaField className="workerFieldArea"','site={activ
 for(const piece of ['suggestOfficialAreas(site,value,5)','onChange(e.target.value)','onClick={()=>{onChange(item.area)','Área libre: se guardará tal como la escribiste','match.group','suggestionScrollDelta','window.visualViewport']){
  assert(ui.includes(piece),'suggestion interface: '+piece);
 }
+assert(main.indexOf('Sede del trabajador')<main.indexOf('OfficialAreaField className="workerFieldArea"'),
+ 'site must appear above dependent area suggestions in clinical form');
+assert(main.indexOf('<label className="workerFieldSite">Sede<select')<main.indexOf('OfficialAreaField site={workerForm.site}'),
+ 'site must appear above area autocomplete in staff profile');
 const rows=fs.readFileSync('src/ambulatoryRows.ts','utf8');
 assert(rows.includes("const cells:ExportValue[]=[subdivision,a.worker.area||'','',''"),'area text must survive if no official code');
 const book=fs.readFileSync('src/ambulatoryExcel.ts','utf8');
