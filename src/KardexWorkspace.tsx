@@ -1,6 +1,6 @@
-import {useState} from 'react';
+import {useLayoutEffect,useState} from 'react';
 import {feedback} from './nativeHaptics';
-import {ArrowLeft,ArrowLeftRight,ClipboardCheck,FileSpreadsheet,PackageSearch} from 'lucide-react';
+import {ArrowLeft} from 'lucide-react';
 import KardexPanel from './KardexPanel';
 import KardexMovementsPanel from './KardexMovementsPanel';
 import KardexDailyExport from './KardexDailyExport';
@@ -17,7 +17,9 @@ const names:Record<Section,string>={home:'Kardex de Enfermería',inventory:'Inve
 export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attentions,mappings,incidents,onChange,onMappings,onIncidents,responsible}:Props){
  const [section,setSection]=useState<Section>('home');
  const [deliveryTab,setDeliveryTab]=useState<'confirm'|'incidents'>('confirm');
- function navigate(next:Section){feedback('selection');setSection(next);window.scrollTo({top:0,behavior:'auto'})}
+ function navigate(next:Section){feedback('selection');setSection(next)}
+ // Also reset the Kardex *submodule* scroll after React mounts it.
+ useLayoutEffect(()=>{document.scrollingElement?.scrollTo({top:0,behavior:'instant'});const frame=requestAnimationFrame(()=>window.scrollTo(0,0));return()=>cancelAnimationFrame(frame)},[section]);
  return <div className="kardexWorkspace">
   {section==='home'?<>
    <div className="pageHead"><button type="button" onClick={onExit} aria-label="Volver al inicio"><ArrowLeft/></button><div><span>GESTIÓN DE EXISTENCIAS</span><h2>Kardex</h2><small>Control físico de existencias de prueba</small></div></div>
@@ -32,13 +34,7 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
      <button type="button" onClick={()=>navigate('reports')}><span className="stageCIndex">4</span><strong>Generar Kardex</strong><small>Excel diario o por período</small></button>
     </div>
    </div>
-   <div className="kardexMenuLabel"><strong>Todos los módulos</strong><span>Elige un acceso directo</span></div>
-   <div className="kardexSectionGrid">
-    <button type="button" onClick={()=>navigate('inventory')}><PackageSearch/><strong>Inventario</strong><span>Existencias, lotes y vencimientos</span></button>
-    <button type="button" onClick={()=>navigate('movements')}><ArrowLeftRight/><strong>Movimientos</strong><span>Ingresos, consumos, ajustes e historial</span></button>
-    <button type="button" onClick={()=>navigate('deliveries')}><ClipboardCheck/><strong>Entregas</strong><span>Confirmaciones clínicas e incidencias</span></button>
-    <button type="button" onClick={()=>navigate('reports')}><FileSpreadsheet/><strong>Reportes</strong><span>Excel oficial del Kardex diario</span></button>
-   </div>
+
   </>:<>
    <div className="kardexSectionHeader"><button type="button" onClick={()=>navigate('home')}><ArrowLeft size={17}/> Kardex</button><h3>{names[section]}</h3></div>
    {section==='inventory'&&<KardexPanel ledger={ledger} mappings={mappings} onChange={onChange} responsible={responsible} onOpenIndicator={onOpenIndicator}/>}
