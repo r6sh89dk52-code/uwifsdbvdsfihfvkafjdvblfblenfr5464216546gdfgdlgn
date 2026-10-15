@@ -26,12 +26,12 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
    <p className="hint">Control de existencias, lotes, movimientos y reportes. Solo utilizar datos ficticios.</p>
    <div className="kardexStats"><div><strong>{kardexMainCount}</strong><span>Productos oficiales</span></div><div><strong>{ledger.lots.filter(l=>/^E-/.test(l.code)).length}</strong><span>Lotes registrados</span></div></div>
    <div className="kardexGuide" aria-label="Ruta de trabajo sugerida">
-    <div className="kardexGuideIntro"><strong>Tu Kardex, paso a paso</strong><span>Accede al módulo que necesites. La ruta es orientativa, no obliga a crear movimientos ni a inventar saldos.</span></div>
+    <div className="kardexGuideIntro"><strong>¿Qué necesitas hacer?</strong><span>Elige una opción. No es necesario completar todas en orden; ninguna crea movimientos por sí sola.</span></div>
     <div className="kardexGuideSteps">
-     <button type="button" onClick={()=>navigate('inventory')}><span className="stageCIndex">1</span><strong>Registrar existencias</strong><small>{ledger.lots.length===0?'Sin lotes cargados':'Consultar productos y lotes'}</small></button>
-     <button type="button" onClick={()=>navigate('movements')}><span className="stageCIndex">2</span><strong>Revisar movimientos</strong><small>{ledger.movements.length} movimiento(s) auditados</small></button>
-     <button type="button" onClick={()=>navigate('deliveries')}><span className="stageCIndex">3</span><strong>Confirmar entregas</strong><small>Vinculación clínica y lotes</small></button>
-     <button type="button" onClick={()=>navigate('reports')}><span className="stageCIndex">4</span><strong>Generar Kardex</strong><small>Excel diario o por período</small></button>
+     <button type="button" onClick={()=>navigate('inventory')}><span className="stageCIndex">1</span><strong>Inventario físico</strong><small>{ledger.lots.length===0?'Sin lotes cargados':'Consultar productos y lotes'}</small></button>
+     <button type="button" onClick={()=>navigate('movements')}><span className="stageCIndex">2</span><strong>Entradas y salidas</strong><small>{ledger.movements.length} registro(s) de movimiento</small></button>
+     <button type="button" onClick={()=>navigate('deliveries')}><span className="stageCIndex">3</span><strong>Entrega de insumos</strong><small>Asocia productos a una atención y confirma el lote</small></button>
+     <button type="button" onClick={()=>navigate('reports')}><span className="stageCIndex">4</span><strong>Exportar Kardex</strong><small>Genera un archivo Excel de existencias</small></button>
     </div>
    </div>
 
@@ -41,7 +41,7 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
    {section==='movements'&&<KardexMovementsPanel ledger={ledger} mappings={mappings} onChange={onChange}/>}
    {section==='reports'&&<KardexDailyExport ledger={ledger} responsible={responsible}/>}
    {section==='deliveries'&&<>
-    <div className="kardexSubtabs"><button type="button" className={deliveryTab==='confirm'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('confirm')}}>Confirmar entrega</button><button type="button" className={deliveryTab==='incidents'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('incidents')}}>Incidencias y equivalencias</button></div>
+    <div className="kardexSubtabs"><button type="button" className={deliveryTab==='confirm'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('confirm')}}>Confirmar entrega</button><button type="button" className={deliveryTab==='incidents'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('incidents')}}>Revisar devoluciones</button></div>
     {deliveryTab==='confirm'?<AttentionDeliveryPanel attentions={attentions} ledger={ledger} mappings={mappings} onChange={onChange}/>:<ReconciliationPanel attentions={attentions} ledger={ledger} mappings={mappings} incidents={incidents} onMappings={onMappings} onIncidents={onIncidents}/>}
    </>}
   </>}
