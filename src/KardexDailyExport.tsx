@@ -68,6 +68,11 @@ export default function KardexDailyExport({ledger,responsible}:Props){
  return <section className="panel kardexDaily">
   <h3><FileSpreadsheet size={18}/>Kardex · Excel oficial de Enfermería</h3>
   <p className="hint">Reportes diarios, semanales o de rango personalizado con el mismo inventario físico. El Kardex no utiliza el corte mensual del Indicador.</p>
+  <div className="stageCProgress" aria-label="Generar Kardex: tres etapas">
+   <span><b>1</b> Período</span><span><b>2</b> Vista previa</span><span><b>3</b> Compartir</span>
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">1</span> Elegir fechas y modalidad</h4>
   <label>Modalidad de reporte<select value={mode} onChange={e=>{setMode(e.target.value as 'daily'|'weekly'|'custom');setCounts({});setPreviewPage(0)}}><option value="daily">Diario</option><option value="weekly">Semanal</option><option value="custom">Rango personalizado</option></select></label>
   <div className="fields two">
    {mode!=='custom'?<label>{mode==='weekly'?'Día de la semana a consultar':'Fecha del reporte'}<input type="date" value={date} max={localDate()} onChange={e=>{setDate(e.target.value);setCounts({});setPreviewPage(0);setError('')}}/></label>:<>
@@ -79,6 +84,10 @@ export default function KardexDailyExport({ledger,responsible}:Props){
   {mode!=='daily'&&<p className="hint">Reporte consolidado del {from} al {to} (ambos incluidos). No se duplica el saldo inicial entre días.</p>}
   <p className="hint" role="status">{templateStatus==='ready'?'Plantilla oficial interna preparada. No es necesario importar ningún Excel.':templateStatus==='loading'?'Preparando el formato oficial del Kardex…':'Formato original interno pendiente de integración.'}</p>
   <p className="hint">Responsable: {responsible}. El cálculo se realiza por día completo. En modo diario el turno identifica el reporte, sin filtrar horas.</p>
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">2</span> Revisar el Kardex y recuentos</h4>
+   <p className="stageCStatus" role="status">{templateStatus!=='ready'?'Preparando la plantilla oficial':result.error?'Corrige los datos del período':result.report?.warnings.length?'Hay observaciones pendientes':mode==='daily'&&!turn?'Falta seleccionar el turno':'Vista previa lista. El recuento físico es opcional y no se inventa.'}</p>
   {result.error&&<p className="kardexError" role="alert">{result.error}</p>}
   {result.report&&<>
    <div className="kardexStats"><div><strong>98</strong><span>Enfermeras</span></div><div><strong>{result.report.warnings.length}</strong><span>Observaciones</span></div></div>
@@ -104,7 +113,12 @@ export default function KardexDailyExport({ledger,responsible}:Props){
    </details>
   </>}
   {error&&<p className="kardexError" role="alert">{error}</p>}
+  </div>
+  <div className="stageCExportStep">
+   <h4><span className="stageCIndex">3</span> Exportar el Excel oficial</h4>
+   <p className="hint">El archivo conserva el formato oficial de Enfermería y puede compartirse desde iOS.</p>
   <div className="kardexActions"><button type="button" className="workerPrimary" disabled={!result.report?.exportable||!template||(mode==='daily'&&!turn)||busy} onClick={()=>void exportReport()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel y compartir'}</button></div>
   <p className="hint">Datos ficticios. No se modifica el historial de atenciones, inventario ni movimientos al exportar. F/S se calcula únicamente a partir de los recuentos físicos introducidos; no se inventan saldos pendientes.</p>
+  </div>
  </section>;
 }
