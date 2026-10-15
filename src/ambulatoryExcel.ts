@@ -238,13 +238,9 @@ export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,mat
      }
      if(i===4){
       if(data.opening!==undefined)editCell(doc,'D'+row,data.opening);
-      const pending=[
-       data.opening===undefined?'STOCK INICIAL PENDIENTE':'',
-       data.receipts===undefined?'INGRESOS NO VERIFICADOS':'',
-       data.count===undefined?'CONTEO PENDIENTE':'',
-       data.difference!==undefined&&data.difference!==0?'DIFERENCIA POR REVISAR':''
-      ].filter(Boolean);
-      editCell(doc,'M'+row,pending.length?pending.join(' · '):'CONCILIADO');
+      // RESU column M is the original COMENTARIO field. It remains
+      // blank so the user can justify monthly requests after export.
+      // Reconciliation warnings belong in the app, never in this column.
      }
     }
    }
@@ -256,7 +252,8 @@ export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,mat
    }
    if(i===4){
     editCell(doc,'E1',plan.start+' AL '+plan.end);
-    if(!material)for(const r of direct(all(doc,'sheetData')[0],'row'))if(Number(r.getAttribute('r'))>=3)editCell(doc,'M'+r.getAttribute('r'),'STOCK INICIAL, INGRESOS Y CONTEO PENDIENTES');
+    // Preserve M3:M434 as empty, manually editable COMENTARIO cells.
+    // Keep formula-bearing columns E, F, G, H, I, J and L unchanged.
    }
   }
   if(i===5){

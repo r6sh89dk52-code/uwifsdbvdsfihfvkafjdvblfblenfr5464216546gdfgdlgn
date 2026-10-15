@@ -86,6 +86,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
   <div className="stageCExportStep">
    <h4><span className="stageCIndex">3</span> Crear archivo y compartir</h4>
    <p className="hint">Al pulsar el botón se crea un archivo .xlsx de diez hojas y se abre la opción para guardarlo en Archivos, enviarlo por correo o compartirlo. No se modifica el Kardex ni el historial.</p>
+   <p className="hint"><strong>Después de exportar:</strong> en RESU puedes escribir la proyección mensual en K y justificar tu pedido en M (COMENTARIO). Las columnas F (Consumos), G (Stock final), J (Diferencia) y L (Requerimiento) conservan sus fórmulas; no las reemplaces por valores manuales.</p>
   <div className="kardexActions"><button type="button" className="workerPrimary"
    disabled={!result.data||!shared.data||result.data.blockers.length>0||withoutSite.length>0||busy}
    onClick={()=>void exportBook()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel (10 hojas) y compartir'}</button></div>
