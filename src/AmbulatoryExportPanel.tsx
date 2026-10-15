@@ -36,16 +36,25 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
  const shared=useMemo(()=>{if(!result.data)return{data:null,error:''};
   try{return{data:sharedMonthlyReconciliation(ledger,result.data),error:''}}
   catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo reconstruir el inventario compartido.'}}},[result.data,ledger]);
- async function exportBook(){
+ // Only missing physical confirmations can be provisionally reported.
+ // Never bypass invalid worker site, tampered ledger, unreviewed mapping or incident.
+ const canDraft=Boolean(result.data&&shared.data&&!withoutSite.length&&result.data.blockers.length>0&&
+  result.data.blockers.every(message=>message.startsWith('Cantidad sin entrega conciliada: ')));
+ async function exportBook(provisional=false){
   if(!result.data||!shared.data||exporting.current)return;
+  if(provisional&&!canDraft)return;
+  if(provisional&&!window.confirm('EXCEL PROVISIONAL — hay entregas sin confirmar. El libro incluirá las atenciones y productos, pero dejará VACÍA la columna R donde falta conciliación. No calcula stock inicial desconocido, no resta cantidades ni confirma entregas. NO utilizar como reporte final de consumo. ¿Generar borrador?'))return;
   exporting.current=true;setBusy(true);setError('');setDone('');
   try{
-   if(result.data.blockers.length)throw Error('Verifica las entregas pendientes antes de exportar.');
+   const plan=provisional?buildAmbulatoryRows(attentions,ledger,start,end,{perVisitSubdivision:true,mappings,incidents,allowPendingDeliveries:true}):result.data;
+   if(plan.blockers.length)throw Error('Verifica las entregas pendientes antes de exportar.');
    if(withoutSite.length)throw Error('Completa la sede de las atenciones del período antes de generar el Excel consolidado.');
+   const reconciled=provisional?sharedMonthlyReconciliation(ledger,plan):shared.data;
    await new Promise<void>(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
-   const bytes=exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data);
-   await shareXlsx('DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+'.xlsx',bytes,'Indicador Ambulatorio DANPER');
-   setDone('Libro de diez hojas generado. Finaliza el guardado en Archivos o comparte la copia.');
+   const bytes=exportAmbulatoryWorkbook(internalTemplate(),plan,reconciled);
+   const suffix=provisional?'_PROVISIONAL_PENDIENTE_CONCILIACION':'';
+   await shareXlsx('DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+suffix+'.xlsx',bytes,'Indicador Ambulatorio DANPER');
+   setDone(provisional?'BORRADOR PROVISIONAL generado (10 hojas). Faltan entregas por conciliar; verifica la columna R antes de un envío oficial.':'Libro de diez hojas generado. Finaliza el guardado en Archivos o comparte la copia.');
   }catch(e){setError(e instanceof Error?e.message:'No fue posible generar el libro oficial.')}
   finally{setBusy(false);exporting.current=false}
  }
@@ -89,7 +98,12 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <p className="hint"><strong>Después de exportar:</strong> en RESU puedes escribir la proyección mensual en K y justificar tu pedido en M (COMENTARIO). Las columnas F (Consumos), G (Stock final), J (Diferencia) y L (Requerimiento) conservan sus fórmulas; no las reemplaces por valores manuales.</p>
   <div className="kardexActions"><button type="button" className="workerPrimary"
    disabled={!result.data||!shared.data||result.data.blockers.length>0||withoutSite.length>0||busy}
-   onClick={()=>void exportBook()}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel (10 hojas) y compartir'}</button></div>
+   onClick={()=>void exportBook(false)}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel (10 hojas) y compartir'}</button></div>
+  {canDraft&&<div className="warning" role="status"><strong>Exportación provisional disponible</strong>
+    <p>Puedes descargar las diez hojas con los medicamentos e insumos registrados. Las cantidades de CONSUMOS!R quedarán vacías para las entregas aún no confirmadas. Se conservarán los saldos desconocidos sin convertirlos en cero y no se descontará ningún producto.</p>
+    <p><strong>El archivo se marcará PROVISIONAL y no sustituye la conciliación ni el reporte definitivo.</strong></p>
+    <button type="button" className="workerSecondary wide" disabled={busy} onClick={()=>void exportBook(true)}><FileSpreadsheet size={18}/> Generar borrador provisional (con advertencia)</button>
+  </div>}
   {done&&<p className="hint" role="status">{done}</p>}
   <p className="hint">La exportación solo lee datos locales; no modifica el stock, las atenciones, los lotes ni el historial. Revisa el contenido antes de compartirlo.</p>
   </div>
