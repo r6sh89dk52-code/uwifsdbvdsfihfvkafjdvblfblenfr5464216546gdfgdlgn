@@ -23,6 +23,16 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
    <div className="pageHead"><button type="button" onClick={onExit} aria-label="Volver al inicio"><ArrowLeft/></button><div><span>GESTIÓN DE EXISTENCIAS</span><h2>Kardex</h2><small>Control físico de existencias de prueba</small></div></div>
    <p className="hint">Control de existencias, lotes, movimientos y reportes. Solo utilizar datos ficticios.</p>
    <div className="kardexStats"><div><strong>{kardexMainCount}</strong><span>Productos oficiales</span></div><div><strong>{ledger.lots.filter(l=>/^E-/.test(l.code)).length}</strong><span>Lotes registrados</span></div></div>
+   <div className="kardexGuide" aria-label="Ruta de trabajo sugerida">
+    <div className="kardexGuideIntro"><strong>Tu Kardex, paso a paso</strong><span>Accede al módulo que necesites. La ruta es orientativa, no obliga a crear movimientos ni a inventar saldos.</span></div>
+    <div className="kardexGuideSteps">
+     <button type="button" onClick={()=>navigate('inventory')}><span className="stageCIndex">1</span><strong>Registrar existencias</strong><small>{ledger.lots.length===0?'Sin lotes cargados':'Consultar productos y lotes'}</small></button>
+     <button type="button" onClick={()=>navigate('movements')}><span className="stageCIndex">2</span><strong>Revisar movimientos</strong><small>{ledger.movements.length} movimiento(s) auditados</small></button>
+     <button type="button" onClick={()=>navigate('deliveries')}><span className="stageCIndex">3</span><strong>Confirmar entregas</strong><small>Vinculación clínica y lotes</small></button>
+     <button type="button" onClick={()=>navigate('reports')}><span className="stageCIndex">4</span><strong>Generar Kardex</strong><small>Excel diario o por período</small></button>
+    </div>
+   </div>
+   <div className="kardexMenuLabel"><strong>Todos los módulos</strong><span>Elige un acceso directo</span></div>
    <div className="kardexSectionGrid">
     <button type="button" onClick={()=>navigate('inventory')}><PackageSearch/><strong>Inventario</strong><span>Existencias, lotes y vencimientos</span></button>
     <button type="button" onClick={()=>navigate('movements')}><ArrowLeftRight/><strong>Movimientos</strong><span>Ingresos, consumos, ajustes e historial</span></button>
