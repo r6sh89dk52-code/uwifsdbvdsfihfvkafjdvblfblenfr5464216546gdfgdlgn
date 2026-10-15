@@ -20,10 +20,21 @@ export function syncNativeDraftNotifications(drafts:DraftReminder[],enabled:bool
   if(ours.length)await LocalNotifications.cancel({notifications:ours});
   if(!enabled)return;
   const permission=await LocalNotifications.checkPermissions();if(permission.display!=='granted')return;
-  const now=Date.now();const notifications=drafts.filter(d=>reminderDueAt(d.updatedAt)>now+1000).map(d=>({
-   id:notificationId(d.id),title:'DANPER Salud',
+  const now=Date.now();
+  // iOS may limit the number of pending local notifications. Schedule
+  // the 50 nearest *valid* draft deadlines and never expose worker data.
+  const byNotificationId=new Map<number,{id:number;due:number}>();
+  for(const draft of drafts){
+   if(typeof draft.id!=='string'||!draft.id||!Number.isFinite(draft.updatedAt))continue;
+   const due=reminderDueAt(draft.updatedAt);
+   if(!Number.isFinite(due)||due<=now+1000)continue;
+   const id=notificationId(draft.id),previous=byNotificationId.get(id);
+   if(!previous||due<previous.due)byNotificationId.set(id,{id,due});
+  }
+  const notifications=[...byNotificationId.values()].sort((a,b)=>a.due-b.due||a.id-b.id).slice(0,50).map(d=>({
+   id:d.id,title:'DANPER Salud',
    body:'Tienes una atención pendiente por completar.',
-   schedule:{at:new Date(reminderDueAt(d.updatedAt))},
+   schedule:{at:new Date(d.due)},
    extra:{kind:'danper-draft-reminder'}
   }));
   if(notifications.length)await LocalNotifications.schedule({notifications});
