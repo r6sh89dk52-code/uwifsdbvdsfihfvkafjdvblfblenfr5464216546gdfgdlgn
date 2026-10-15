@@ -6,9 +6,9 @@ const ts=require('typescript');
 const src=fs.readFileSync('src/attentionStepValidation.ts','utf8');
 const code=ts.transpileModule(src,{fileName:'attentionStepValidation.ts',reportDiagnostics:true,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}); 
 assert.equal((code.diagnostics||[]).filter(x=>x.category===ts.DiagnosticCategory.Error).length,0);
-const exports={};
-vm.runInNewContext(code.outputText,{exports});
-const {validateClinicalStage,validClinicalDate,validClinicalTime,findFirstIncompleteStage,findFirstInvalidStage}=exports;
+const mockExports={};
+vm.runInNewContext(code.outputText,{exports:mockExports});
+const {validateClinicalStage,validClinicalDate,validClinicalTime,findFirstIncompleteStage,findFirstInvalidStage}=mockExports;
 const sample=()=>({
  worker:{dni:'12345678',name:'PERSONA FICTICIA'},
  date:'2026-10-14',time:'18:30',
