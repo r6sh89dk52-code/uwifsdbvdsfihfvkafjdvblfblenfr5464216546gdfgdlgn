@@ -57,7 +57,7 @@ assert(store.includes('writeWorkerVault(safe.workers)'));
 assert(store.includes('writeClinicalVault({...safe,workers:[]})'));
 for(const path of ['src/main.tsx','src/danperWorksites.ts','src/safeAttentionDeletion.ts','src/AmbulatoryExportPanel.tsx','src/workerRules.ts','src/operationalRoster.ts']){
  const result=ts.transpileModule(read(path),{fileName:path,reportDiagnostics:true,
-  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX,resolveJsonModule:true}});
+  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX,moduleResolution:ts.ModuleResolutionKind.Bundler,resolveJsonModule:true}});
  assert.deepEqual((result.diagnostics||[]).filter(d=>d.category===ts.DiagnosticCategory.Error).map(d=>ts.flattenDiagnosticMessageText(d.messageText,' ')),[],path+' syntax');
 }
 const ios=read('.github/workflows/ios-ipa.yml');
