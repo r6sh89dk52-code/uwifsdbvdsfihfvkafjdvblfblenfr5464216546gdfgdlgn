@@ -29,7 +29,7 @@ assert.equal(removal('a','saved',[{dispenseRef:{attentionId:'b'}}]).allowed,true
 assert.equal(removal('a','saved',[{dispenseRef:{attentionId:'a'}}]).allowed,false);
 const main=read('src/main.tsx'),worker=read('src/workerRules.ts'),roster=read('src/operationalRoster.ts');
 for(const value of [
- 'workerNeedsProfileSave','workerDetailsMissing(active.worker)',
+ 'workerNeedsProfileSave','workerDetailsMissing(w)',
  'validDanperWorksite(w.site)','setWorkerProfileAlert(profile)',
  'function editActiveWorkerProfile()','setWorkerForm({...emptyWorker,...existing,...active.worker})',
  'workerReturn===\\'register\\'','Guardar ficha y volver a atención',
@@ -38,7 +38,7 @@ for(const value of [
  'Sede del trabajador','Sede<select','DANPER_WORKSITES.map(site=',
  'canDeleteUnlinkedAttention(target.id,target.status,ledger.movements)',
  'async function deleteSavedAttention',
- 'Eliminación','Eliminar atención',
+ 'eliminación bloqueada','Eliminar atención',
  "import './workerOrganization.css'"
 ]){assert(main.includes(value.replaceAll("\\'","'")),'missing UI contract: '+value);}
 assert(worker.includes('site?:string'));
@@ -49,7 +49,7 @@ const ambulatory=read('src/AmbulatoryExportPanel.tsx');
 assert(ambulatory.includes('DANPER_WORKSITES.map(p='));
 assert(!ambulatory.includes('templateLayout.subdivisions.map(p='));
 assert(ambulatory.includes('siteConflicts.length>0||withoutSite.length>0||busy'));
-assert(ambulatory.includes('No se asignarán códigos por suposición')===false||true);
+assert(ambulatory.includes('no se asignarán códigos por suposición.'));
 const store=read('src/secureDemoStore.ts');
 assert(store.includes('writeWorkerVault(safe.workers)'));
 assert(store.includes('writeClinicalVault({...safe,workers:[]})'));
