@@ -7,7 +7,7 @@ import {procedureDetail} from './procedureRules';
 import {isReviewedAssociation} from './reviewedKardexAssociations';
 export type ExportVisit={
  id:string;status:'draft'|'saved';date:string;time:string;
- worker:{dni:string;name:string;area:string;labor:string;sex:string;age:string|number;ubigeo:string};
+ worker:{dni:string;name:string;area:string;labor:string;sex:string;age:string|number;ubigeo:string;site?:string};
  category:string;system:string;segment:string;diagnosis:string;
  items:{id:string;code:string;name:string;unit:string;quantity:number;procedure:string}[];
  permission:string;workStatus:string;permissionTime:string;blueBandage:boolean;returned:boolean;photoSent:boolean;
