@@ -46,9 +46,17 @@ function integrity(bytes,rows,reconciled=false){
  assert.equal(all(t,'calculatedColumnFormula').length,2,'only verified organization formulas');
  for(const col of [8,9,10,16,28])assert.equal(all(columns[col],'calculatedColumnFormula').length,0,'must not overwrite current plan data');
  for(const sheet of [2,3,4])assert.equal(all(doc(parts,`xl/worksheets/sheet${sheet}.xml`),'row').length,434);
+ const summary=doc(parts,'xl/worksheets/sheet4.xml');
+ assert.equal(value(cell(summary,'M2')),'COMENTARIO','original manual column title survives');
+ for(let row=3;row<=434;row++){
+  assert.equal(value(cell(summary,'M'+row)),'','manual comment must be empty for all 432 materials at row '+row);
+  assert.equal(value(cell(summary,'K'+row)),'','monthly projection remains an editable blank');
+  for(const col of ['E','F','G','H','I','J','L'])
+   assert.equal(all(cell(summary,col+row),'f').length,1,'formula missing in RESU!'+col+row);
+ }
  if(!reconciled){
   assert.equal(value(cell(doc(parts,'xl/worksheets/sheet4.xml'),'D3')),'');
-  assert.equal(value(cell(doc(parts,'xl/worksheets/sheet4.xml'),'M3')),'STOCK INICIAL, INGRESOS Y CONTEO PENDIENTES');
+  assert.equal(value(cell(doc(parts,'xl/worksheets/sheet4.xml'),'M3')),'','manual COMENTARIO field must be blank');
  }
  const gui=doc(parts,'xl/worksheets/sheet7.xml');for(const c of all(gui,'c'))if(/^[TU][2-9]\d*$|^[TU]1\d+$/.test(c.getAttribute('r')))assert.equal(value(c),'');
  return parts;
@@ -144,8 +152,10 @@ test('audited CONTEO INGRESOS RESU preserve original sheet and zero vs blank',()
  assert.equal(value(cell(summary,'D3')),'10');
  assert.equal(value(cell(summary,'D4')),'0');
  assert.equal(value(cell(summary,'D5')),'');
- assert.ok(value(cell(summary,'M3')).includes('DIFERENCIA'));
- assert.equal(value(cell(summary,'M4')),'CONCILIADO');
+ assert.equal(value(cell(summary,'M3')),'','reconciliation warnings cannot overwrite manual comment');
+ assert.equal(value(cell(summary,'M4')),'','manual comment stays free even when reconciled');
+ assert.ok(all(cell(summary,'J3'),'f')[0].textContent.includes('FALTANTE'),'J discrepancy status remains formula-driven');
+ assert.ok(all(cell(summary,'L3'),'f')[0].textContent.includes('K3-G3'),'L request remains K projection minus G final stock');
  assert.ok(all(cell(summary,'F3'),'f')[0].textContent.includes('SUMIF'));
 });
 // Private-input audit is optional locally and never needed by CI or bundled in IPA.
