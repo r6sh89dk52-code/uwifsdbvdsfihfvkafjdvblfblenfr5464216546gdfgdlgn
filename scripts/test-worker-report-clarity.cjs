@@ -41,7 +41,8 @@ for(const needle of [
  "import './workerAndReportClarity.css'"
 ])assert(main.includes(needle),'attention UI missing: '+needle);
 assert(main.includes('workerInRoster:workerList.some'),'official validation must stay active');
-assert(main.includes("rosterStatus:(previous as OperationalWorker|undefined)?.rosterStatus??'pending'"),'manual entry may not become official');
+assert(main.includes("verificationRequired&&!verifiedManualWorker"),'unverified manual entries must be blocked by official roster');
+assert(main.includes("rosterStatus:existingStatus==='official'?'official' as const"),'official status may only be kept for an already official worker');
 for(const needle of ['.workerClinicalFields','grid-column:1 / -1','.workerDiscoveryOverlay','z-index:1400','.workerDiscoveryActions','max-height:90dvh','.reconciliationExplainer','.stageCExportStep']){
  assert(style.includes(needle),'styles missing '+needle);
 }
