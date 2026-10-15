@@ -16,6 +16,7 @@ const fmt=(v:number)=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:3}).f
 export default function KardexPanel({ledger,onChange,onOpenIndicator}:Props){
  const lots=ledger.lots;
  const[search,setSearch]=useState('');
+ const[entryOpen,setEntryOpen]=useState(lots.length===0);
  const[selectedId,setSelectedId]=useState('');
  const[editId,setEditId]=useState<string|null>(null);
  const[lot,setLot]=useState('');
@@ -52,13 +53,14 @@ export default function KardexPanel({ledger,onChange,onOpenIndicator}:Props){
  }
  function startEdit(l:StockLot){
    if(ledger.movements.some(x=>x.lotId===l.id)){setProblem('Este lote ya tiene movimientos. Usa Ajuste auditado en lugar de editar su saldo inicial.');return}
+   setEntryOpen(true);
    setEditId(l.id);setSelectedId(l.code);setLot(l.lot);setExpires(isoToDateInput(l.expires));
    const hasPackaging=l.container!=='unidad'||l.catalogUnit!=='UND'||l.unitsPerContainer!==1||l.sealedContainers>0||l.openedRemaining>0;
    setEntryMode(hasPackaging?'packed':'individual');setQuantity(String(countPhysicalUnits(l)));
    setContainer(l.container);setUnit(l.catalogUnit==='mL'?'mL':l.catalogUnit==='g'?'g':'UND');
    setCapacity(String(l.unitsPerContainer));setSealed(String(l.sealedContainers));
    setLoose(String(l.looseUnits));setOpened(String(l.openedRemaining));setProblem('');
-   document.getElementById('kardex-entry')?.scrollIntoView({behavior:'smooth',block:'start'});
+   window.requestAnimationFrame(()=>document.getElementById('kardex-entry')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}));
  }
  function save(){
    try{
@@ -94,8 +96,10 @@ export default function KardexPanel({ledger,onChange,onOpenIndicator}:Props){
    <div><strong>{kardexMainCount}</strong><span>Productos oficiales</span></div>
    <div><strong>{totals.lots}</strong><span>Lotes registrados</span></div>
   </div>
-  <section className="panel" id="kardex-entry">
-   <h3><Plus size={18}/>{editId?'Modificar recuento':'Registrar existencias'}</h3>
+  <section className="panel kardexEntryCard" id="kardex-entry">
+   <div className="kardexEntryHeading"><h3><Plus size={18}/>{editId?'Modificar recuento':'Registrar existencias'}</h3><button type="button" className="kardexEntryToggle" aria-expanded={entryOpen} aria-controls="kardex-entry-form" onClick={()=>setEntryOpen(v=>!v)}>{entryOpen?'Ocultar formulario':'Abrir formulario'}</button></div>
+   {!entryOpen&&<p className="hint">Elige «Abrir formulario» para registrar o modificar existencias, conservando los datos que ya escribiste.</p>}
+   <div id="kardex-entry-form" className="kardexEntryBody" hidden={!entryOpen}>
    <p className="hint">Los 98 materiales de Enfermería se conservan sin donados; el saldo inicial no informado queda pendiente.</p>
    <KardexProductSearch label="Producto oficial" value={selectedId} onChange={chooseProduct} products={kardexCatalog} disabled={Boolean(editId)}/>
    {selected&&<p className="hint">Formato oficial: {'KARDEX ENFERMERAS'} · fila {selected.sheetRow}. El número correlativo no es código de almacén.</p>}
@@ -128,8 +132,9 @@ export default function KardexPanel({ledger,onChange,onOpenIndicator}:Props){
    </>}
    {problem&&<p className="kardexError" role="alert">{problem}</p>}
    <div className="kardexActions"><button type="button" className="workerPrimary" onClick={save}><Check size={18}/>{editId?'Guardar cambio':'Agregar al inventario'}</button>{editId&&<button type="button" className="workerSecondary" onClick={reset}><X size={18}/>Cancelar</button>}</div>
+   </div>
   </section>
-  <section className="panel">
+  <section className="panel kardexInventoryList">
    <h3><ClipboardList size={18}/>Inventario registrado</h3>
    <div className="kardexFilter"><label className="kardexSearch"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o lote…"/></label>
    </div>
