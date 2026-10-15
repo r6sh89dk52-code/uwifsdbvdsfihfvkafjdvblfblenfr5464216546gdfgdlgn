@@ -1,0 +1,133 @@
+/*
+ * DANPER Salud Móvil · Etapa C — GUIA de inventario y reportes.
+ * Presentational only: no stock, ledger, accounting or XLSX business rules.
+ */
+.page-kardex .kardexGuide{
+  margin:18px 0 17px;
+  padding:17px 15px;
+  border-radius:21px;
+  border:1px solid var(--design-outline,var(--line));
+  background:var(--design-card,var(--surface));
+  box-shadow:var(--design-shadow);
+}
+.page-kardex .kardexGuideIntro{display:grid;gap:5px;margin-bottom:14px}
+.page-kardex .kardexGuideIntro strong{font-size:17px;letter-spacing:-.3px}
+.page-kardex .kardexGuideIntro span{font-size:12px;color:var(--muted);line-height:1.5}
+.page-kardex .kardexGuideSteps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.page-kardex .kardexGuideSteps button{
+ display:grid;
+ grid-template-columns:30px minmax(0,1fr);
+ grid-template-rows:auto auto;
+ align-items:start;
+ gap:2px 8px;
+ border:1px solid var(--design-outline,var(--line));
+ border-radius:14px;
+ padding:13px 10px;
+ min-height:90px;
+ background:var(--design-soft,var(--surface));
+ color:var(--text);
+ text-align:left;
+}
+.page-kardex .kardexGuideSteps button:focus-visible{outline:3px solid var(--ui-accent);outline-offset:2px}
+.page-kardex .kardexGuideSteps button strong{font-size:12px;line-height:1.35;grid-column:2;grid-row:1}
+.page-kardex .kardexGuideSteps button small{color:var(--muted);font-size:11px;line-height:1.4;grid-column:2;grid-row:2}
+.page-kardex .stageCIndex,.page-ambulatory .stageCIndex{
+ display:grid;place-items:center;flex:0 0 auto;
+ min-width:27px;width:27px;height:27px;
+ border-radius:10px;
+ font-size:13px;font-weight:800;
+ background:rgba(227,24,45,.12);
+ color:var(--ui-accent,#e3182d);
+}
+.page-kardex .kardexGuideSteps button .stageCIndex{grid-column:1;grid-row:1 / span 2}
+.page-kardex .kardexMenuLabel{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:4px 2px 10px}
+.page-kardex .kardexMenuLabel strong{font-size:15px}
+.page-kardex .kardexMenuLabel span{font-size:11px;color:var(--muted);text-align:right}
+.page-kardex .kardexSectionGrid{margin-top:0}
+/* The inventory form can be folded without unmounting its user-entered values. */
+.page-kardex .kardexEntryCard{scroll-margin-top:calc(90px + env(safe-area-inset-top,0px))}
+.page-kardex .kardexEntryHeading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.page-kardex .kardexEntryHeading h3{margin:0;flex:1;min-width:150px}
+.page-kardex .kardexEntryToggle{
+ color:var(--ui-accent,#e3182d);
+ background:var(--design-soft,var(--surface));
+ border:1px solid var(--design-outline,var(--line));
+ padding:10px 12px;
+ border-radius:12px;
+ min-height:44px;
+ font-weight:700;
+ font-size:12px;
+}
+.page-kardex .kardexEntryToggle:focus-visible{outline:3px solid var(--ui-accent);outline-offset:2px}
+.page-kardex .kardexEntryBody{padding-top:12px}
+.page-kardex .kardexEntryBody[hidden]{display:none!important}
+.page-kardex .kardexInventoryList .kardexLots{display:grid;gap:10px}
+.page-kardex .kardexInventoryList .kardexLot{margin:0}
+.page-kardex .kardexInventoryList .kardexLotHeader{align-items:flex-start}
+/* Both official exporters share the same predictable three-step experience. */
+.page-kardex .stageCProgress,.page-ambulatory .stageCProgress{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;
+ margin:15px 0 17px;
+}
+.page-kardex .stageCProgress>span,.page-ambulatory .stageCProgress>span{
+ display:flex;align-items:center;justify-content:center;gap:5px;
+ min-height:43px;
+ padding:7px 4px;
+ border-radius:12px;
+ font-size:11px;font-weight:650;
+ line-height:1.2;text-align:center;
+ color:var(--text);
+ background:var(--design-soft,var(--surface));
+ border:1px solid var(--design-outline,var(--line));
+}
+.page-kardex .stageCProgress b,.page-ambulatory .stageCProgress b{
+ display:grid;place-items:center;width:20px;height:20px;flex:0 0 20px;
+ font-size:11px;border-radius:7px;
+ background:rgba(227,24,45,.12);color:var(--ui-accent,#e3182d);
+}
+.page-kardex .stageCExportStep,.page-ambulatory .stageCExportStep{
+ min-width:0;
+ margin:13px 0;
+ padding:15px 13px;
+ background:var(--design-soft,var(--surface));
+ border:1px solid var(--design-outline,var(--line));
+ border-radius:17px;
+}
+.page-kardex .stageCExportStep h4,.page-ambulatory .stageCExportStep h4{
+ display:flex;align-items:center;gap:10px;
+ margin:0 0 12px;
+ color:var(--text);
+ font-size:14px;font-weight:750;line-height:1.38;
+}
+.page-kardex .stageCExportStep>.hint,.page-ambulatory .stageCExportStep>.hint{font-size:11px;line-height:1.5}
+.page-kardex .stageCExportStep :where(input,select),.page-ambulatory .stageCExportStep :where(input,select){max-width:100%}
+.page-kardex .stageCExportStep .kardexStats>div,.page-ambulatory .stageCExportStep .kardexStats>div{
+ background:var(--design-card,var(--surface));
+}
+.page-kardex .stageCExportStep .kardexPreviewDetails,.page-ambulatory .stageCExportStep .kardexPreviewDetails{
+ background:var(--design-card,var(--surface));
+ border-radius:13px;
+}
+.page-kardex .stageCStatus,.page-ambulatory .stageCStatus{
+ margin:5px 0 12px;
+ padding:10px 11px;
+ border:1px solid var(--design-outline,var(--line));
+ border-radius:12px;
+ background:var(--design-card,var(--surface));
+ color:var(--text);
+ font-size:12px;line-height:1.5;
+}
+.page-kardex .stageCExportStep .kardexActions,.page-ambulatory .stageCExportStep .kardexActions{margin-top:12px}
+.page-kardex .stageCExportStep .kardexActions button,.page-ambulatory .stageCExportStep .kardexActions button{min-height:48px}
+@media(max-width:365px){
+ .page-kardex .kardexGuideSteps{grid-template-columns:1fr}
+ .page-kardex .kardexGuideSteps button{min-height:66px}
+ .page-kardex .stageCProgress>span,.page-ambulatory .stageCProgress>span{font-size:10px;gap:3px}
+ .page-kardex .stageCExportStep,.page-ambulatory .stageCExportStep{padding:13px 10px}
+}
+@media(prefers-reduced-motion:no-preference){
+ .page-kardex .kardexGuideSteps button:active{transform:scale(.985);transition:transform .16s ease}
+}
+@media(prefers-reduced-motion:reduce){
+ .page-kardex .kardexGuideSteps button,.page-kardex .stageCExportStep{animation:none!important;transition:none!important}
+}

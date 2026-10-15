@@ -1,0 +1,111 @@
+/*
+ * DANPER Salud Móvil · v0.20.9 guided clinical attention
+ * One mounted section at a time; all clinical data and autosave remain owned by App.
+ */
+.page-register .registerProgress{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:6px 2px 8px;
+  color:var(--muted);
+  font-size:12px;
+}
+.page-register .registerProgress strong{color:var(--ui-accent);font-size:12px;letter-spacing:.2px}
+.page-register .registerProgress span{font-weight:700;color:var(--text)}
+.page-register .registerSteps{padding:3px 1px 12px;margin-bottom:1px;gap:7px}
+.page-register .registerSteps button{background:var(--ui-surface);border-color:var(--ui-line)}
+.page-register .registerSteps button.selected{
+  background:var(--ui-accent-soft);
+  color:var(--ui-accent);
+  border-color:var(--ui-accent);
+  box-shadow:inset 0 0 0 1px rgba(227,24,45,.14);
+}
+.page-register .registerSteps button.selected span{background:var(--ui-accent);color:#fff}
+.page-register .registerSteps button:not(.selected) span{color:var(--muted);background:var(--ui-surface-soft)}
+.page-register .registerMiniSummary{
+  display:flex;align-items:center;gap:9px;
+  border:1px solid var(--ui-line);
+  border-radius:15px;
+  background:var(--ui-surface);
+  padding:11px 12px;
+  margin:3px 0 15px;
+}
+.page-register .registerMiniSummary>svg{color:var(--ui-accent);flex:0 0 18px}
+.page-register .registerMiniSummary>div{flex:1;min-width:0;display:grid;gap:3px}
+.page-register .registerMiniSummary strong{
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:13px;line-height:1.2;
+}
+.page-register .registerMiniSummary span{
+  font-size:11px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.page-register .registerMiniSummary button{
+  flex:0 0 auto;min-height:40px;
+  border-radius:11px;
+  padding:8px 10px;
+  border:1px solid var(--ui-line);
+  background:var(--ui-surface-soft);
+  color:var(--text);font-size:12px;font-weight:720;
+}
+.page-register .registerAllergyCheckpoint{
+  display:flex;align-items:flex-start;gap:9px;
+  padding:13px;
+  border-radius:16px;
+  border:1px solid var(--allergy-border,var(--ui-line));
+  background:var(--allergy-pill,var(--ui-accent-soft));
+  margin:12px 0;
+}
+.page-register .registerAllergyCheckpoint>svg{color:var(--ui-accent);flex:0 0 20px}
+.page-register .registerAllergyCheckpoint>div{flex:1;min-width:0}
+.page-register .registerAllergyCheckpoint strong{font-size:13px;line-height:1.35;display:block}
+.page-register .registerAllergyCheckpoint p{font-size:12px;line-height:1.45;color:var(--muted);margin:5px 0 0;overflow-wrap:anywhere}
+.page-register .registerAllergyCheckpoint button{
+  align-self:center;flex:0 0 auto;
+  background:var(--ui-surface);border:1px solid var(--ui-line);
+  color:var(--text);
+  border-radius:11px;min-height:40px;
+  padding:7px 10px;font-size:12px;font-weight:750;
+}
+.page-register .registerAllergyCheckpoint.documented{border-width:2px}
+.page-register .registerDock{
+  display:flex;
+  grid-template-columns:none;
+  align-items:stretch;
+  gap:8px;
+  padding:9px 12px;
+}
+.page-register .registerDock button{
+  min-width:0;
+  flex:1 1 0;
+  padding:8px 5px;
+  font-size:12px;
+  white-space:normal;
+  line-height:1.25;
+}
+.page-register .registerDock button.primary{flex:1.35 1 0}
+.page-register #attention-worker,
+.page-register #attention-clinical,
+.page-register #attention-treatment,
+.page-register #attention-result{
+  scroll-margin-top:calc(88px + env(safe-area-inset-top,0px));
+}
+@media(max-width:365px){
+ .page-register .registerSteps button{padding:8px 10px 8px 8px}
+ .page-register .registerMiniSummary{padding:10px}
+ .page-register .registerDock{gap:5px;padding:8px}
+ .page-register .registerDock button{font-size:11px}
+}
+@media(prefers-reduced-motion:no-preference){
+ .page-register main>.panel,
+ .page-register main>.registerAllergyCheckpoint{
+   animation:danperViewIn 230ms cubic-bezier(.2,.8,.2,1) both;
+ }
+ .page-register .registerSteps button.selected{transition:background-color 180ms ease,border-color 180ms ease}
+}
+@media(prefers-reduced-motion:reduce){
+ .page-register main>.panel,
+ .page-register main>.registerAllergyCheckpoint{animation:none!important}
+ .page-register .registerSteps button.selected{transition:none!important}
+}

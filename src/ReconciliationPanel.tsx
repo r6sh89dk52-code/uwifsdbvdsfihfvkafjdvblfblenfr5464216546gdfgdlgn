@@ -28,10 +28,10 @@ export default function ReconciliationPanel({attentions,ledger,mappings,incident
   }catch(e){setFeedback(e instanceof Error?e.message:'No se pudo registrar la incidencia.')}
  }
  return <section className="panel reconciliationPanel">
-  <h3><ClipboardCheck size={18}/>Correspondencias oficiales aprobadas</h3>
-  <p className="hint">Se conservaron las 86 asociaciones revisadas. Ninguna selección descuenta stock automáticamente. Las dos llaves de tres vías utilizan el mismo código clínico, pero el lote se elige expresamente. NYLON AZUL 3/0 no está asociado.</p>
-  <p className="hint">{reviewedAssociations.length} asociaciones autorizadas. Las 12 referencias no asociadas siguen visibles en Kardex, sin habilitar consumos vinculados.</p>
-  <label>Atención guardada<select value={attentionId} onChange={e=>{setAttentionId(e.target.value);setItemId('');setFeedback('')}}><option value="">Seleccionar…</option>
+  <h3><ClipboardCheck size={18}/>Revisar productos y devoluciones</h3>
+  <p className="hint">Usa esta pantalla para comprobar qué producto del registro de atención corresponde al inventario de Enfermería y para dejar constancia de devoluciones o diferencias.</p><div className="reconciliationExplainer"><strong>¿Qué significa una equivalencia?</strong><p>El nombre o código de un insumo puede ser diferente entre el registro clínico y el Kardex. Solo las asociaciones aprobadas permiten relacionarlos. Elegir una equivalencia no descuenta existencias; para eso debes confirmar la entrega y seleccionar el lote.</p><strong>¿Qué significa una incidencia?</strong><p>Es una observación sobre una entrega que ya confirmaste, por ejemplo una devolución o diferencia detectada. Se documenta para auditoría, pero no aumenta automáticamente el stock utilizable.</p></div><p className="hint">Hay 86 asociaciones revisadas. Los productos no asociados siguen visibles, pero no permiten descuentos clínicos vinculados. Las dos llaves de tres vías usan un código clínico compartido y requieren elegir lote expresamente.</p>
+  <p className="hint">{reviewedAssociations.length} relaciones autorizadas. Hay 12 referencias sin asociación; estas se revisan por separado, sin inventar equivalencias.</p>
+  <div className="reconciliationSectionTitle"><strong>1. Consultar equivalencias</strong><span>Comprueba un producto de una atención ya guardada.</span></div><label>Atención guardada<select value={attentionId} onChange={e=>{setAttentionId(e.target.value);setItemId('');setFeedback('')}}><option value="">Seleccionar…</option>
    {attentions.filter(a=>a.status==='saved'&&a.items.length).map(a=><option key={a.id} value={a.id}>Atención {a.id.slice(0,8)}</option>)}</select></label>
   {attention&&<label>Producto de atención<select value={itemId} onChange={e=>{setItemId(e.target.value);setFeedback('')}}><option value="">Seleccionar…</option>
    {attention.items.map(i=><option key={i.id} value={i.id}>{i.name} · {i.code}</option>)}</select></label>}
@@ -39,8 +39,8 @@ export default function ReconciliationPanel({attentions,ledger,mappings,incident
    <>Kardex asociado: <strong>{verified.map(p=>p.kardexName+' ('+p.kardexCode+')').join(' / ')}</strong></>:
    <>Este producto no tiene correspondencia aprobada para consumos de Enfermería.</>}
    </p>}
-  <div className="kardexHistory"><h3><RotateCcw size={18}/>Devoluciones e incidencias</h3>
-   <p className="hint">Una devolución NO aumenta el stock utilizable; cualquier corrección física requiere ajuste auditado.</p>
+  <div className="kardexHistory"><h3><RotateCcw size={18}/>2. Registrar una devolución o incidencia</h3>
+   <p className="hint">Selecciona una entrega confirmada y explica lo ocurrido. Una devolución aquí solo se documenta: si cambia la existencia física, utiliza el ajuste auditado de Movimientos.</p>
    <label>Entrega confirmada<select value={incidentId} onChange={e=>{setIncidentId(e.target.value);setFeedback('')}}><option value="">Seleccionar…</option>
     {deliveryMoves.filter(m=>!incidents.some(i=>i.movementId===m.id)).map(m=><option key={m.id} value={m.id}>{m.name} · {m.quantity} {m.unit} · {m.id.slice(0,16)}</option>)}</select></label>
    {original&&<><label>Tipo<select value={incidentKind} onChange={e=>setIncidentKind(e.target.value as IncidentKind)}>

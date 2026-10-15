@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),ts=require('typescript');
+const code=ts.transpileModule(fs.readFileSync('src/kardexEntryRules.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const mod={exports:{}};new Function('module','exports',code)(mod,mod.exports);
+const {formatDateInput,parseDateInput,isoToDateInput,isIndividualNursingProduct}=mod.exports;
+assert.equal(formatDateInput('12102026'),'12/10/2026');
+assert.equal(formatDateInput('121026'),'12/10/26');
+assert.equal(formatDateInput('120'),'12/0');
+assert.equal(formatDateInput('12/10/2026'),'12/10/2026');
+assert.equal(parseDateInput('121026'),'2026-10-12');
+assert.equal(parseDateInput('12102026'),'2026-10-12');
+assert.equal(parseDateInput('29122027'),'2027-12-29');
+assert.equal(parseDateInput('29022028'),'2028-02-29');
+for(const s of ['31112026','29022027','32012026','00102026','121325','1234','abcd'])assert.equal(parseDateInput(s),null,s);
+assert.equal(isoToDateInput('2028-07-13'),'13/07/2028');
+for(const group of ['TABLETAS','AMPOLLAS','JERINGAS'])assert.equal(isIndividualNursingProduct({group}),true);
+assert.equal(isIndividualNursingProduct({group:'INSUMOS'}),false);
+console.log('PASS: Kardex units, 6/8 digit expiry entry, calendar leap days and invalid dates.');

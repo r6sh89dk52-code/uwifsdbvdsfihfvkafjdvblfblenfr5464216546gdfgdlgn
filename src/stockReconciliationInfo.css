@@ -1,0 +1,3 @@
+.kardexLinkingInfo{border:1px solid var(--line,#45454b);border-radius:12px;background:var(--surface,#252529);padding:13px;margin:14px 0}
+.kardexLinkingInfo strong{font-size:13px}.kardexLinkingInfo p{font-size:12px;line-height:1.5;color:var(--muted);margin:7px 0 12px}
+.kardexLinkingInfo button{width:100%;font-size:12px}
