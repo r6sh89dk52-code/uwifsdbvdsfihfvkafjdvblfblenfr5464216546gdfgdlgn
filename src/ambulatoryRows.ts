@@ -1,6 +1,5 @@
 /** Read-only export. Never infer R from clinical quantities or alter stock. */
 import products from './products.json';
-import template from './ambulatoryTemplate.json';
 import {validDanperWorksite} from './danperWorksites';
 import {validateStockLedger,postStockMovement,type StockLedger,type StockMovement} from './kardexMovements';
 import {type CatalogMappingEvent,type DeliveryIncident,validateMappingEvents,validateDeliveryIncidents} from './reconciliationRules';
