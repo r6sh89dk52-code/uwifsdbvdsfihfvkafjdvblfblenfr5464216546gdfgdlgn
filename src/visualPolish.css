@@ -1,0 +1,73 @@
+/*
+ * DANPER v0.21.5 visual polish: one brand color, consistent top alignment,
+ * compact Kardex overview, and responsive navigation. No data model changes.
+ */
+.app{
+ --danper-red:#e3182d;
+ --ui-header-height:59px;
+ scroll-padding-top:0;
+}
+html,body{scroll-padding-top:0;overscroll-behavior-x:none}
+.app .brand{
+ background:var(--danper-red)!important;
+ min-height:calc(59px + env(safe-area-inset-top,0px));
+ height:auto;
+ padding:calc(6px + env(safe-area-inset-top,0px)) 15px 7px;
+ box-shadow:0 3px 12px rgba(80,9,20,.08);
+}
+.app .brandmark{gap:8px;min-width:0;flex-wrap:nowrap;align-items:center}
+.app .brand-logo-crop{
+ display:flex;align-items:center;justify-content:flex-start;
+ position:relative;width:145px;height:51px;max-width:100%;
+ flex:0 1 145px;overflow:visible;
+}
+.app .brand-logo-crop img{
+ position:static!important;left:auto!important;top:auto!important;
+ width:145px!important;height:50px!important;max-width:100%!important;
+ display:block;object-fit:contain;
+}
+.app .brand-logo-fallback{
+ color:#fff;white-space:nowrap;
+ font-family:"Snell Roundhand","Brush Script MT",Georgia,serif;
+ font-size:34px;font-weight:700;font-style:italic;
+ letter-spacing:-1.5px;line-height:1;
+}
+.app .brandmark small{
+ color:#fff!important;
+ align-self:center;
+ margin:0;
+ font-size:10px;
+ font-weight:800;
+ letter-spacing:.7px;
+ white-space:nowrap;
+}
+.app .headIcon{min-width:43px;min-height:43px;border-radius:13px}
+.app main{padding-top:12px}
+.app .pageHead,.app .sectionTop{
+ margin-top:0!important;
+ margin-bottom:14px;
+}
+.page-home .greeting{margin-top:0}
+.page-kardex .kardexWorkspace .pageHead,
+.page-kardex .kardexSectionHeader{scroll-margin-top:0}
+.page-kardex .kardexStats{margin-top:12px;margin-bottom:14px}
+.page-kardex .kardexGuide{margin-top:12px;padding:15px 13px;border-radius:19px}
+.page-kardex .kardexGuideIntro{margin-bottom:10px}
+.page-kardex .kardexGuideSteps button{
+ min-height:82px;padding:11px 9px;
+}
+.page-kardex .kardexGuideSteps button strong{font-size:12px}
+.page-kardex .kardexGuideSteps button small{font-size:11px}
+/* Reset the navigation viewport's extra visible gap without disabling user scrolling. */
+.app .appTabBar{padding-bottom:calc(9px + env(safe-area-inset-bottom,0px))}
+.app main :where(.panel,.pageHead,.sectionTop):first-child{scroll-margin-top:0}
+@media(max-width:370px){
+ .app .brand{padding-left:12px;padding-right:12px}
+ .app .brand-logo-crop,.app .brand-logo-crop img{width:126px!important;flex-basis:126px}
+ .app .brandmark small{font-size:9px;letter-spacing:.35px}
+ .page-kardex .kardexGuideSteps{gap:7px}
+}
+@media(prefers-reduced-motion:reduce){
+ .app .brand-logo-crop,.app .brand-logo-crop img,
+ .page-kardex .kardexGuideSteps button{transition:none!important;animation:none!important}
+}
