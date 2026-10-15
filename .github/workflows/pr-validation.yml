@@ -1,7 +1,7 @@
 name: DANPER - validacion del codigo en PR
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/v0.21.10-build220-single-ipa]
   workflow_dispatch:
 permissions:
   contents: read
