@@ -1,0 +1,57 @@
+/* Unified DANPER iOS access + web design contract, demo-only data */
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const ts=require('typescript');
+(async()=>{
+ const {installGestureInAppDelegate}=await import('./install-ios-gesture.mjs');
+ const {installAccessInAppDelegate,ACCESS_MARKER}=await import('./install-ios-access-lock.mjs');
+ const fixture="import UIKit\nimport Capacitor\n@UIApplicationMain\nclass AppDelegate: UIResponder, UIApplicationDelegate {\n var window:UIWindow?\n func application(_ application:UIApplication,didFinishLaunchingWithOptions options:[UIApplication.LaunchOptionsKey:Any]?) -> Bool { return true }\n}";
+ const assembled=installAccessInAppDelegate(installGestureInAppDelegate(fixture));
+ assert(assembled.includes(ACCESS_MARKER),'still uses native lock');
+ assert.equal(installAccessInAppDelegate(assembled),assembled,'idempotent Swift patch');
+ const visible=assembled.split('private func danperAuthWindowVisible')[1]?.split('private func danperAuthWillResign')[0]||'';
+ assert(visible.includes('danperAddLockOverlay(to: window)'),'protected window is covered at launch');
+ assert(!visible.includes('danperAttemptAuthentication()'),'Face ID must not launch automatically at cold start');
+ const foreground=assembled.split('private func danperAuthDidBecomeActive')[1]?.split('private func danperAppWindows')[0]||'';
+ assert(foreground.includes('if danperAuthUnlocked'),'successful auth while inactive is preserved');
+ assert(foreground.includes('!danperAuthAttemptInFlight'),'no duplicate Face ID while modal is open');
+ assert(!foreground.includes('danperAttemptAuthentication()'),'resume shows welcome without automatic Face ID');
+ assert(assembled.includes('button.setTitle("Ingresar", for: .normal)'),'visible intentional sign-in control');
+ assert(assembled.includes('button.addTarget(self, action: #selector(danperUnlockTapped(_:))'),'button must launch native auth');
+ assert(assembled.includes('private func danperUnlockTapped'),'native button bound');
+ assert(assembled.includes('danperAttemptAuthentication()\n    }\n\n    private func danperSetLockMessage'),'tapping starts authentication');
+ assert(assembled.includes('LAPolicy = .deviceOwnerAuthentication'),'device passcode fallback must remain');
+ assert(assembled.includes('danperAuthGeneration += 1'),'background invalidates earlier authentication');
+ assert(assembled.includes('danperAuthContext?.invalidate()'),'invalidate old biometric attempts on real background');
+ assert(assembled.includes('guard generation == danperAuthGeneration else { return }'),'stale callbacks cannot unlock');
+ assert(assembled.includes('if success {'),'only LocalAuthentication success permits unlocking');
+ assert(assembled.includes('danperAuthUnlocked = true'),'native success state');
+ assert(assembled.includes('UIView(frame: window.bounds)'),'full-size privacy overlay');
+ assert(assembled.includes('lockView.backgroundColor = UIColor.systemBackground'),'opaque native privacy cover');
+ assert(assembled.includes('window.bringSubviewToFront(lockView)'),'lock remains on top');
+ assert(assembled.includes('UIImage(named: "DanperWordmark")'),'official logo embedded natively');
+ assert(assembled.includes('UIImage(systemName: "cross.case.fill")'),'health symbol');
+ assert(assembled.includes('Bienvenido'),'greeting on native welcome');
+ assert(assembled.includes('Departamento de Salud'),'department branding');
+ assert(assembled.includes('UIAccessibility.isReduceMotionEnabled'),'honor iOS reduced motion');
+ assert(assembled.includes('content.heightAnchor.constraint(greaterThanOrEqualTo: scroll.frameLayoutGuide.heightAnchor)'),'small iPhone scrolling');
+ assert(assembled.includes('Autenticación cancelada'),'auth cancellation stays on welcome');
+ const shell=fs.readFileSync('scripts/build-ios-ipa.sh','utf8');
+ assert(shell.includes('LOGO="src/branding/danper-logo-oficial.png"'),'must use official image');
+ assert(shell.includes('DanperWordmark.imageset'),'ship logo as compiled Xcode asset');
+ assert(shell.includes('DANPER_ASSET'),'asset Contents.json created');
+ assert(fs.existsSync('src/branding/danper-logo-oficial.png'),'official logo still in repository');
+ const main=fs.readFileSync('src/main.tsx','utf8');
+ const design=fs.readFileSync('src/cohesiveExperience.css','utf8');
+ assert(main.includes("import './cohesiveExperience.css'"),'shared styling imported');
+ assert(main.includes('<h1>Bienvenido, Felipe</h1>'),'post-auth greeting');
+ assert(!main.includes('diagnosisFloatingSuggestions'),'v0.21.2 portal is excluded by rollback');
+ const classes=['page-home','page-register','page-history','page-workers','page-settings','page-kardex','page-ambulatory'];
+ for(const className of classes)assert(design.includes('.'+className),'visual design missing '+className);
+ for(const s of ['.app .appTabBar','.app .brand','.app .panel','safe-area','prefers-reduced-motion:reduce']){
+   assert(design.includes(s)||fs.readFileSync('src/visualRefresh.css','utf8').includes(s),'system styling missing '+s);
+ }
+ const checks=ts.transpileModule(main,{fileName:'main.tsx',reportDiagnostics:true,compilerOptions:{module:ts.ModuleKind.ESNext,moduleResolution:ts.ModuleResolutionKind.Bundler,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,resolveJsonModule:true}});
+ assert.deepEqual((checks.diagnostics||[]).filter(x=>x.category===ts.DiagnosticCategory.Error).map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')),[],'TSX remains parseable');
+ console.log('PASS: native secure Welcome -> deliberate Face ID, rollback v0.21.1, iOS safe area and unified web UI.');
+})().catch(err=>{console.error(err);process.exitCode=1});
