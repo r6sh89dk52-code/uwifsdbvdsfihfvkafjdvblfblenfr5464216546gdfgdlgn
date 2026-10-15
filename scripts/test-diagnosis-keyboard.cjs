@@ -30,7 +30,7 @@ assert.equal(diagnosisPopoverPosition(viewport,input,{x:0,y:0},0),null,'no match
 const main=fs.readFileSync('src/main.tsx','utf8');
 const css=fs.readFileSync('src/diagnosisKeyboard.css','utf8');
 const required=[
- 'import{createRoot,createPortal}', 'diagnosisPopoverPosition(v,',
+ 'import{createRoot}from\'react-dom/client\';import{createPortal}from\'react-dom\'', 'diagnosisPopoverPosition(v,',
  'diagnosisInputClearance(input.bottom,popup.visibleTop)',
  'document.activeElement!==diagnosisInputRef.current',
  'diagnosisDropdownOpen&&diagnosisPopover&&createPortal(',
