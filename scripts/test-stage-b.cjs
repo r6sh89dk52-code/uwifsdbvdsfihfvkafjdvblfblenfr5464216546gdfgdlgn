@@ -51,7 +51,7 @@ assert(validClinicalTime('23:59'));assert(!validClinicalTime('24:00'));assert(!v
  a.category='ENFERMEDAD';a.system='';
  assert(has(validateClinicalStage(1,a,context()),'clinical-system'),'system required when relevant');
  a.system='NO APLICA';
- assert(!has(validateClinicalStage(1,a,context()),'clinical-system'),'express not-applicable is allowed');
+ assert(has(validateClinicalStage(1,a,context()),'clinical-system'),'unofficial system values are rejected');
  a.category='ACCIDENTE COMUN';a.system='';
  assert(has(validateClinicalStage(1,a,context()),'clinical-system'),'accident requires system selection');
  a.category='TOMA DE PRESIÓN ARTERIAL';
@@ -99,7 +99,7 @@ for(const s of [
  "category:'',system:''",
  '<option value="" disabled>Seleccionar categoría...</option>',
  '<option value="" disabled>Seleccionar sistema...</option>',
- '<option value="NO APLICA">No aplica (selección expresa)</option>',
+ 'Seleccionar sistema...',
  'findFirstIncompleteStage(registerStep,step,active,clinicalValidationContext())',
  'raiseStepIssues(findFirstInvalidStage(active,clinicalValidationContext()))',
  'role="alertdialog" aria-modal="true"',
