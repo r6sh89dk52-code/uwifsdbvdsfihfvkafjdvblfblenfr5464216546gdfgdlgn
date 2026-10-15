@@ -71,6 +71,9 @@ const privacy=n=>{
   assert.equal(n.schedule.at.getTime(),reminderDueAt(n.id===notificationId(b.id)?b.updatedAt:a.updatedAt));
  }
  assert.equal(pending.has(75),true,'unrelated notification survives scheduling');
+ await syncNativeDraftNotifications([a],true);
+ assert.equal(pending.has(notificationId(b.id)),false,'saved or deleted drafts must lose their pending notification');
+ assert.equal(pending.has(notificationId(a.id)),true,'remaining meaningful draft keeps its notification');
  const many=Array.from({length:90},(_,i)=>({id:'unique-draft-'+i,updatedAt:start-(90-i)*30000}));
  await syncNativeDraftNotifications(many,true);
  planned=actions.schedule.at(-1);
