@@ -16,6 +16,7 @@ export default function BackupSettingsPanel(){
  const native=Capacitor.isNativePlatform()&&Capacitor.getPlatform()==='ios';
  const [password,setPassword]=useState('');
  const [confirmation,setConfirmation]=useState('');
+ const [restorePassword,setRestorePassword]=useState('');
  const [busy,setBusy]=useState(false);
  const [status,setStatus]=useState('');
  const [error,setError]=useState('');
@@ -47,16 +48,16 @@ export default function BackupSettingsPanel(){
   if(file.size>42*1024*1024||!file.name.toLowerCase().endsWith('.danperbackup')){
    setError('Selecciona un respaldo .danperbackup válido de hasta 42 MB.');return;
   }
-  if(password.length<14){setError('Ingresa la contraseña del archivo antes de seleccionarlo.');return}
+  if(restorePassword.length<14){setError('Ingresa la contraseña del archivo antes de seleccionarlo.');return}
   setBusy(true);
   try{
    const current=validateDemoSnapshot(await loadDemoSnapshot());
    if(hasActiveRecords(current))throw Error('La base actual tiene registros. Por seguridad solo puede restaurarse en una instalación vacía; no se sobrescribirá.');
    const contents=await file.text();
-   const decoded=await decryptPortableBackup(contents,password);
+   const decoded=await decryptPortableBackup(contents,restorePassword);
    const data=validateDemoSnapshot(decoded);
    if(!Array.isArray(data.workers)||data.workers.length>30000)throw Error('Padrón del respaldo inválido.');
-   setPreview(data);setSourceName(file.name);
+   setPreview(data);setSourceName(file.name);setRestorePassword('');
    setStatus('Respaldo descifrado y examinado; todavía NO se modificó la base de datos.');
   }catch(err){
    setError(err instanceof Error?err.message:'No se pudo verificar el respaldo.');
@@ -69,7 +70,7 @@ export default function BackupSettingsPanel(){
   setBusy(true);setError('');setStatus('');
   try{
    await restoreEmptyDeviceFromBackup(preview);
-   setPreview(null);setPassword('');setConfirmation('');
+   setPreview(null);setPassword('');setConfirmation('');setRestorePassword('');
    setStatus('Restauración verificada. Reabriendo la aplicación.');
    feedback('success');
    window.location.reload();
@@ -82,7 +83,7 @@ export default function BackupSettingsPanel(){
   <h3>Respaldo y recuperación</h3>
   <p className="hint">Copia cifrada con contraseña independiente de Keychain: incluye trabajadores, atenciones, alergias, inventario, entregas y conciliaciones. No se envía a GitHub ni a un servidor.</p>
   {!native&&<p className="hint" role="status">Solo disponible en la aplicación nativa de iPhone. El navegador continúa siendo un entorno de pruebas.</p>}
-  <label className="backupLabel">Contraseña privada del respaldo
+  <label className="backupLabel">Nueva contraseña para crear respaldo
    <input type="password" autoComplete="off" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 14 caracteres" disabled={busy||!native}/>
   </label>
   <p className="hint">Guárdala fuera del iPhone: si la olvidas, ningún técnico podrá descifrar el respaldo.</p>
@@ -94,9 +95,13 @@ export default function BackupSettingsPanel(){
   </button>
   <hr/>
   <h4>Restaurar desde un respaldo</h4>
-  <p className="hint">Por seguridad no se mezclan ni sobrescriben bases existentes. Solo se permite recuperar en un iPhone con la base vacía y después de comprobar la contraseña.</p>
+  <p className="hint">Por seguridad no se mezclan ni sobrescriben bases existentes. Solo se permite recuperar en un iPhone con la base vacía y después de comprobar la contraseña del archivo.</p>
+  <label className="backupLabel">Contraseña del archivo que vas a restaurar
+   <input type="password" autoComplete="off" value={restorePassword} onChange={e=>{setRestorePassword(e.target.value);setPreview(null);setSourceName('');setError('');setStatus('')}} placeholder="Contraseña original del respaldo" disabled={busy||!native}/>
+  </label>
+  <p className="hint">Primero introduce la contraseña con la que creaste esa copia. Después selecciona el archivo cifrado; se verificará sin modificar tus datos.</p>
   <label className="backupLabel">Archivo de respaldo cifrado
-   <input type="file" accept=".danperbackup" disabled={!native||busy} onChange={e=>{const file=e.currentTarget.files?.[0];void inspectBackup(file);e.currentTarget.value=''}}/>
+   <input type="file" accept=".danperbackup" disabled={!native||busy||restorePassword.length<14} onChange={e=>{const file=e.currentTarget.files?.[0];void inspectBackup(file);e.currentTarget.value=''}}/>
   </label>
   {preview&&<div className="backupPreview">
    <strong>Respaldo verificado: {sourceName}</strong>
