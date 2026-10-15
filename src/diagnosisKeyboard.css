@@ -1,0 +1,71 @@
+/*
+ * v0.21.2 · Native-keyboard-safe diagnosis suggestions in an external portal.
+ * No ancestor transforms, panel overflow or fixed bottom nav can conceal options.
+ * The popup is positioned in document coordinates by visualViewport geometry.
+ */
+body > .diagnosisFloatingSuggestions{
+  position:absolute;
+  z-index:1100;
+  display:flex;
+  flex-direction:column;
+  box-sizing:border-box;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  background:var(--surface,#fff);
+  color:var(--text,#222);
+  border:1px solid var(--line,#ddd);
+  border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.23);
+  isolation:isolate;
+}
+body > .diagnosisFloatingSuggestions>span{
+  position:sticky;top:0;flex:0 0 auto;z-index:2;
+  display:block;
+  padding:11px 13px;
+  background:var(--surface,#fff);
+  color:var(--muted,#777);
+  border-bottom:1px solid var(--line,#ddd);
+  font-size:11px;
+  letter-spacing:.3px;
+}
+body > .diagnosisFloatingSuggestions>button{
+  display:block;flex:0 0 auto;width:100%;
+  min-height:48px;
+  text-align:left;
+  padding:10px 14px;
+  border:0;
+  border-bottom:1px solid var(--line,#ddd);
+  border-radius:0;
+  background:var(--surface,#fff);
+  color:var(--text,#222);
+  font-size:15px;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+  -webkit-tap-highlight-color:rgba(227,24,45,.10);
+}
+body > .diagnosisFloatingSuggestions>button:active{
+  background:rgba(227,24,45,.11)
+}
+body > .diagnosisFloatingSuggestions>button:last-child{border-bottom:0}
+/* The persistent actions and tab bar are *not* keyboard-aware and consumed
+   more than 100 CSS px of the already reduced visual viewport on iOS.
+   Hide them only while diagnosis is actually being edited. */
+.app.page-register.diagnosisKeyboardEditing .registerDock,
+.app.page-register.diagnosisKeyboardEditing .appTabBar{display:none!important}
+.app.page-register.diagnosisKeyboardEditing{
+  padding-bottom:16px;
+}
+.app.page-register.diagnosisKeyboardEditing [data-clinical-field="clinical-diagnosis"] textarea{
+  min-height:82px;
+  max-height:124px;
+  resize:none;
+}
+@media(prefers-reduced-motion:reduce){
+  body > .diagnosisFloatingSuggestions,
+  body > .diagnosisFloatingSuggestions>button{
+    scroll-behavior:auto!important;
+    transition:none!important;
+    animation:none!important;
+  }
+}

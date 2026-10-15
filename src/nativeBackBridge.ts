@@ -12,6 +12,10 @@ export function performNativeBack(doc:Document):'keyboard'|'page'|'home'|'noop'{
     focused.blur();
     return 'keyboard';
   }
+  // Kardex owns nested navigation. A swipe on Inventario, Movimientos,
+  // Entregas or Reportes must first return to its four-tile dashboard.
+  const nested=doc.querySelector<HTMLButtonElement>('.kardexSectionHeader > button');
+  if(nested && !nested.disabled){nested.click();return 'page'}
   const back=doc.querySelector<HTMLButtonElement>('.pageHead > button');
   if(back && !back.disabled){back.click();return 'page'}
   const home=doc.querySelector<HTMLButtonElement>('nav > button:first-child');
