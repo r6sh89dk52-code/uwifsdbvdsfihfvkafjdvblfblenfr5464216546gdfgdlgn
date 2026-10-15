@@ -178,12 +178,15 @@ function organizationFormula(column:number,row:number):string{
 }
 export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,material?:ReconciliationPlan):Uint8Array{
  if(plan.blockers.length)throw Error('Resuelve primero las entregas y datos pendientes de conciliación.');
+ if(plan.provisional===true&&(!Number.isSafeInteger(plan.pendingDeliveries)||!plan.pendingDeliveries||!plan.lines.some(l=>l.cells[15]!==''&&l.cells[17]==='')))
+  throw Error('El informe provisional exige consumos pendientes explícitos y cantidades sin certificar.');
  if(!validExportDate(plan.start)||!validExportDate(plan.end)||plan.start>plan.end||plan.lines.length>10000)throw Error('Plan de exportación inválido.');
  const ids=new Set<string>();
  for(const line of plan.lines){
   if(ids.has(line.id)||line.cells.length!==30)throw Error('Filas duplicadas o columnas incompatibles.');ids.add(line.id);
   const code=line.cells[15],qty=line.cells[17];
-  if(code!==''&&(!products.some(p=>p.code===code&&p.name===line.cells[16])||typeof qty!=='number'||!Number.isFinite(qty)||qty<0))throw Error('Material o cantidad no verificados.');
+  if(code!==''&&(!products.some(p=>p.code===code&&p.name===line.cells[16])||
+    !(plan.provisional===true&&qty==='')&&(typeof qty!=='number'||!Number.isFinite(qty)||qty<0)))throw Error('Material o cantidad no verificados.');
   if(code===''&&(line.cells[16]!==''||qty!==''))throw Error('Cantidad sin material.');
   for(const v of line.cells)if((typeof v!=='number'&&typeof v!=='string')||(typeof v==='number'&&!Number.isFinite(v))||(typeof v==='string'&&(v.length>32767||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v))))throw Error('Valor Excel incompatible.');
  }
