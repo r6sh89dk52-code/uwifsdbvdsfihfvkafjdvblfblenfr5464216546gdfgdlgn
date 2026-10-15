@@ -46,13 +46,13 @@ check(daily,[
 ],'Official daily reports');
 check(ambulatory,[
  'stageCProgress','stageCExportStep',
- '1</span> Elegir período y lugar de reporte','2</span> Comprobar atenciones y existencias',
+ '1</span> Elegir período','2</span> Comprobar atenciones y existencias',
  '3</span> Crear archivo y compartir',
- 'buildAmbulatoryRows(siteVisits,ledger,start,end',
+ 'buildAmbulatoryRows(attentions,ledger,start,end,{perVisitSubdivision:true',
  'sharedMonthlyReconciliation(ledger,result.data)',
  'exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data)',
- 'result.data.blockers.length>0','disabled={!subdivision',
- "subdivision",
+ 'result.data.blockers.length>0','disabled={!result.data',
+ 'Kardex único',
  "No tienes que adjuntar ninguna plantilla",
  "shareXlsx("
 ],'Official ambulatory workbook');
