@@ -48,7 +48,7 @@ check(ambulatory,[
  'stageCProgress','stageCExportStep',
  '1</span> Elegir período y lugar de reporte','2</span> Comprobar atenciones y existencias',
  '3</span> Crear archivo y compartir',
- 'buildAmbulatoryRows(attentions,ledger,start,end',
+ 'buildAmbulatoryRows(siteVisits,ledger,start,end',
  'sharedMonthlyReconciliation(ledger,result.data)',
  'exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data)',
  'result.data.blockers.length>0','disabled={!subdivision',
