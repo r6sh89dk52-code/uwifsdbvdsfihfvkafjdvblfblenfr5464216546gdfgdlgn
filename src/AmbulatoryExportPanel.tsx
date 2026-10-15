@@ -4,7 +4,7 @@ import {type StockLedger} from './kardexMovements';
 import {buildAmbulatoryRows,type ExportVisit} from './ambulatoryRows';
 import {exportAmbulatoryWorkbook} from './ambulatoryExcel';
 import {shareXlsx} from './shareKardexFile';
-import templateLayout from './ambulatoryTemplate.json';import {DANPER_WORKSITES} from './danperWorksites';
+import templateLayout from './ambulatoryTemplate.json';import {DANPER_WORKSITES} from './danperWorksites';import {findOfficialArea} from './organizationDirectory';
 import {type CatalogMappingEvent,type DeliveryIncident} from './reconciliationRules';
 import {type ReconciliationEvent} from './ambulatoryReconciliation';
 import {currentReportMonth,reportMonth,sharedMonthlyReconciliation} from './sharedInventoryReports';
@@ -26,6 +26,10 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
  const otherSiteVisits=useMemo(()=>attentions.filter(a=>a.status==='saved'&&a.date>=start&&a.date<=end&&Boolean(subdivision)&&Boolean(a.worker.site)&&a.worker.site!==subdivision),[attentions,start,end,subdivision]);
  const withoutSite=useMemo(()=>attentions.filter(a=>a.status==='saved'&&a.date>=start&&a.date<=end&&!a.worker.site),[attentions,start,end]);
  const siteVisits=useMemo(()=>subdivision?attentions.filter(a=>a.status!=='saved'||a.worker.site===subdivision):attentions,[attentions,subdivision]);
+ const unlinkedAreas=useMemo(()=>siteVisits.filter(a=>{
+  if(a.status!=='saved'||a.date<start||a.date>end||!subdivision)return false;
+  try{return !findOfficialArea(subdivision,a.worker.area||'')}catch{return true}
+ }),[siteVisits,start,end,subdivision]);
  const result=useMemo(()=>{try{return{data:buildAmbulatoryRows(siteVisits,ledger,start,end,{subdivision,mappings,incidents}),error:''}}
   catch(e){return{data:null,error:e instanceof Error?e.message:'No se pudo preparar el informe.'}}},[siteVisits,ledger,start,end,subdivision,mappings,incidents]);
  const shared=useMemo(()=>{if(!result.data)return{data:null,error:''};
@@ -71,6 +75,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <div><strong>{shared.data?.openingConfirmed||0}</strong><span>Materiales conciliados</span></div>
   </div>}
   {otherSiteVisits.length>0&&<p className="stageCStatus" role="status">Este archivo incluirá únicamente las atenciones de {subdivision}. Las {otherSiteVisits.length} atenciones de la otra sede se excluyen expresamente; para exportarlas, genera un segundo reporte seleccionando su sede.</p>}
+  {unlinkedAreas.length>0&&<p className="stageCStatus" role="status">{unlinkedAreas.length} atenciones tienen un área libre o sin coincidencia en @uo. Podrás exportarlas con el nombre de área registrado; la unidad organizativa quedará sin código automático cuando no exista una equivalencia oficial.</p>}
   {withoutSite.length>0&&<div className="kardexError" role="alert">Hay {withoutSite.length} atenciones sin sede identificada en este período. Revisa esas fichas antes de exportar: no se asignarán códigos por suposición.</div>}
   {result.data?.blockers.length?<div className="kardexError" role="alert"><strong>Entregas pendientes: {result.data.blockers.length}</strong>
    <ul>{result.data.blockers.slice(0,8).map((x,i)=><li key={i}>{x}</li>)}</ul></div>:null}
