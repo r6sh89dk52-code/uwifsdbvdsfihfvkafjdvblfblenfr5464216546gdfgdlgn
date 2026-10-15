@@ -51,7 +51,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    if(withoutSite.length)throw Error('Completa la sede de las atenciones del período antes de generar el Excel consolidado.');
    const reconciled=provisional?sharedMonthlyReconciliation(ledger,plan):shared.data;
    await new Promise<void>(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
-   const bytes=exportAmbulatoryWorkbook(internalTemplate(),plan,reconciled);
+   const bytes=provisional?exportAmbulatoryWorkbook(internalTemplate(),plan,reconciled):exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data);
    const suffix=provisional?'_PROVISIONAL_PENDIENTE_CONCILIACION':'';
    await shareXlsx('DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+suffix+'.xlsx',bytes,'Indicador Ambulatorio DANPER');
    setDone(provisional?'BORRADOR PROVISIONAL generado (10 hojas). Faltan entregas por conciliar; verifica la columna R antes de un envío oficial.':'Libro de diez hojas generado. Finaliza el guardado en Archivos o comparte la copia.');
