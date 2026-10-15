@@ -42,7 +42,7 @@ cp -R "$APP" "$TMP/Payload/"
 VERSION=$(node -p "require('./package.json').version")
 # Las versiones del IPA deben coincidir con la release, sin modificar el ejecutable.
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$TMP/Payload/App.app/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 211" "$TMP/Payload/App.app/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 213" "$TMP/Payload/App.app/Info.plist"
 FILENAME="DanperSaludMovil-v${VERSION}-SIN_FIRMAR.ipa"
 ( cd "$TMP" && /usr/bin/zip -qry "$OLDPWD/outputs/$FILENAME" Payload )
 ( cd outputs && shasum -a 256 "$FILENAME" > "$FILENAME.sha256" )
