@@ -10,6 +10,8 @@ assert.equal(DANPER_WORKSITES.length,2);
 assert.equal(db.areas['LA VENTUROSA'].length,31);
 assert.equal(db.areas['PLVENTUROSA'].length,124);
 assert.equal(findOfficialArea('LA VENTUROSA','SERVICIOS DE SALUD')?.code,'20000136');
+assert.equal(findOfficialArea('LA VENTUROSA','SERVICIOS DE SALUD')?.society,'1003');
+assert.equal(findOfficialArea('PLVENTUROSA','SERVICIOS DE SALUD')?.society,'1001');
 assert.equal(findOfficialArea('PLVENTUROSA','SERVICIOS DE SALUD')?.code,'20000066');
 assert.equal(findOfficialArea('LA VENTUROSA','  servicios de salud  ')?.code,'20000136');
 assert.equal(findOfficialArea('PLVENTUROSA','ÁREA PERSONALIZADA'),undefined);
