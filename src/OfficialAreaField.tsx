@@ -5,15 +5,12 @@ import {validDanperWorksite} from './danperWorksites';
 type Props={value:string;site?:string;onChange:(text:string)=>void;className?:string};
 export default function OfficialAreaField({value,site,onChange,className=''}:Props){
  const[focused,setFocused]=useState(false);
- const[failed,setFailed]=useState(false);
- const choices=useMemo(()=>{
-  try{return suggestOfficialAreas(site,value,5)}
-  catch{setFailed(true);return []}
+
+ const data=useMemo(()=>{
+  try{return {choices:suggestOfficialAreas(site,value,5),match:findOfficialArea(site,value),failed:false}}
+  catch{return {choices:[],match:undefined,failed:true}}
  },[site,value]);
- const match=useMemo(()=>{
-  try{return findOfficialArea(site,value)}
-  catch{return undefined}
- },[site,value]);
+ const{choices,match,failed}=data;
  const term=value.trim();
  return <div className={'officialAreaField '+className}>
   <label>Área
