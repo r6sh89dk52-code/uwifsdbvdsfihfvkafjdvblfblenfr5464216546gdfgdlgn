@@ -60,11 +60,11 @@ final class N1gClinicTests: XCTestCase {
     }
     func testThreeAllergyStatesAreExplicit() throws {
         var (c,id)=try prepared()
-        XCTAssertEqual(c.allergies["00000001"],.none)
+        XCTAssertEqual(c.allergies["00000001"],N1gAllergy.none)
         try c.reviewAllergy(.unknown,for:"00000001")
-        XCTAssertEqual(c.allergies["00000001"],.unknown)
+        XCTAssertEqual(c.allergies["00000001"],N1gAllergy.unknown)
         try c.reviewAllergy(.known,for:"00000001")
-        XCTAssertEqual(c.allergies["00000001"],.known)
+        XCTAssertEqual(c.allergies["00000001"],N1gAllergy.known)
         try c.saveDemo(id,at:200)
         XCTAssertEqual(c.physicalMovementsCreated,0)
     }
