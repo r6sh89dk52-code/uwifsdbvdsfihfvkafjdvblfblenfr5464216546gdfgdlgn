@@ -1,7 +1,7 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1f-lossless-fields-linux]
+    branches: [native/swiftui-n1g-clinical-workspace-linux]
     paths:
       - 'native-ios/**'
       - 'scripts/generate-native-compat-fixtures.cjs'
@@ -17,24 +17,26 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Swift
+      - name: Swift version
         run: swift --version
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Dependencies for synthetic TS fixtures
+      - name: Install TypeScript fixture deps
         run: npm ci --no-fund --ignore-scripts
-      - name: Generate only fictional backups, FEFO and clinical field snapshots
+      - name: Generate prior synthetic backup/clinical fixtures
         run: |
           mkdir -p "$RUNNER_TEMP/danper-n1-fixtures"
           echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-n1-fixtures" >> "$GITHUB_ENV"
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-native-compat-fixtures.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1e-clinical-fixtures.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1f-lossless-fixtures.cjs
-      - name: Swift tests of crypto, FEFO, recoverability and 1:1 field preservation
+      - name: Parse native SwiftUI sources (syntax ONLY; not iOS typechecking)
+        run: swiftc -frontend -parse native-ios/App/*.swift
+      - name: Test portable Swift core and fake shared-session clinic N1g
         run: cd native-ios && swift test --jobs 2
-      - name: No macOS or iOS IPA
+      - name: Assert no macOS or IPA
         run: |
           test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
-          echo "PASS N1f: Linux only, no IPA"
+          echo 'PASS N1g: Linux tests; no iOS build and no IPA'

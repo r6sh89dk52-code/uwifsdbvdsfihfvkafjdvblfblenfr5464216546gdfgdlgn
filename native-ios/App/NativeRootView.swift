@@ -4,8 +4,11 @@ import DanperCore
 private let danperRed = Color(red: 0.88, green: 0.09, blue: 0.16)
 
 struct NativeRootView: View {
+    @State private var clinic = N1gClinic()
+    @State private var selectedTab = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -31,7 +34,7 @@ struct NativeRootView: View {
                             Text("MIGRACIÓN SEGURA").foregroundStyle(danperRed)
                         }
                         StatusCard(icon: "person.text.rectangle", title: "Trabajadores y atenciones",
-                                   detail: "Modelo heredado inspeccionable. Edición desactivada hasta validar recuperación.")
+                                   detail: "Padrón ficticio, formulario SwiftUI y borradores en memoria. Ningún dato real se guarda.")
                         StatusCard(icon: "pills", title: "FEFO nativo",
                                    detail: "Motor Swift independiente con pruebas de lotes, vencimientos y envases.")
                         StatusCard(icon: "doc.zipper", title: "Respaldo cifrado",
@@ -44,30 +47,48 @@ struct NativeRootView: View {
                 .navigationTitle("Inicio")
             }
             .tabItem { Label("Inicio", systemImage: "house") }
+            .tag(0)
 
             NavigationStack {
-                AttentionPrototypeView()
-                    .navigationTitle("Atención")
+                N1gAttentionScreen(clinic: $clinic)
             }
             .tabItem { Label("Atención", systemImage: "cross.case") }
+            .tag(2)
 
             NavigationStack {
-                FEFOSandboxView()
-                    .navigationTitle("FEFO")
+                N1gRosterScreen(clinic: $clinic, selectedTab: $selectedTab)
             }
-            .tabItem { Label("FEFO", systemImage: "shippingbox") }
+            .tabItem { Label("Personal", systemImage: "person.2") }
+            .tag(1)
 
             NavigationStack {
-                BackupPreviewView()
-                    .navigationTitle("Respaldo")
+                N1gHistoryScreen(clinic: $clinic, selectedTab: $selectedTab)
             }
-            .tabItem { Label("Respaldo", systemImage: "lock.shield") }
+            .tabItem { Label("Borradores", systemImage: "doc.text") }
+            .tag(3)
 
             NavigationStack {
-                NativeStorageLabView()
-                    .navigationTitle("Almacén N1")
+                List {
+                    Section("Herramientas nativas") {
+                        NavigationLink {
+                            FEFOSandboxView().navigationTitle("FEFO")
+                        } label: { Label("FEFO ficticio", systemImage: "shippingbox") }
+                        NavigationLink {
+                            BackupPreviewView().navigationTitle("Respaldo")
+                        } label: { Label("Verificar respaldo · solo lectura", systemImage: "lock.shield") }
+                        NavigationLink {
+                            NativeStorageLabView().navigationTitle("Laboratorio")
+                        } label: { Label("Laboratorio N1 aislado", systemImage: "externaldrive") }
+                    }
+                    Section("Seguridad") {
+                        Text("N1g guarda simulaciones solo en memoria. La build 222 y sus registros no se modifican.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                .navigationTitle("Herramientas")
             }
-            .tabItem { Label("Laboratorio", systemImage: "externaldrive") }
+            .tabItem { Label("Más", systemImage: "square.grid.2x2") }
+            .tag(4)
         }
         .tint(danperRed)
     }
