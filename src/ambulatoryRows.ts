@@ -105,7 +105,9 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
     const movements=deliveryMap.get(JSON.stringify([a.id,item.id]))||[];
     if(!movements.length){
      if(options.allowPendingDeliveries===true){
-      // PROVISIONAL ONLY: no stock movement exists, so R must stay unknown.
+      // Provisional only: show the quantity actually declared in the
+      // clinical encounter; do not create or infer a physical Kardex issue.
+      quantity=item.quantity;
       pendingDeliveries++;
      }else blockers.push('Cantidad sin entrega conciliada: '+a.id.slice(0,8)+' / '+item.code);
     }else{
