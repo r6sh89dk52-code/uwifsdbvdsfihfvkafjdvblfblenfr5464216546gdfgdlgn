@@ -1,7 +1,7 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1r-xlsx-writer-lab-linux]
+    branches: [native/swiftui-n1s-complete-excel-and-container-gate]
     paths:
       - 'native-ios/**'
       - 'src/attentionStepValidation.ts'
@@ -13,6 +13,8 @@ on:
       - 'scripts/generate-n1q-reconciliation-fixtures.cjs'
       - 'scripts/generate-n1r-stored-xlsx-template.cjs'
       - 'scripts/test-n1r-native-xlsx.cjs'
+      - 'scripts/generate-n1s-official-excel-fixtures.cjs'
+      - 'scripts/test-n1s-full-native-workbooks.cjs'
       - '.github/workflows/native-swift-linux.yml'
   workflow_dispatch:
 permissions:
@@ -39,14 +41,17 @@ jobs:
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1p-excel-parity.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1q-reconciliation-fixtures.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1r-stored-xlsx-template.cjs
+          DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1s-official-excel-fixtures.cjs
       - name: Parse SwiftUI sources (syntax only; not UIKit/SwiftUI typecheck)
         run: swiftc -frontend -parse native-ios/App/*.swift
-      - name: Swift tests including N1r native Swift OOXML writer
+      - name: Swift tests including N1s both official full Excel workbooks and opening consent
         run: cd native-ios && swift test --jobs 2
       - name: Cross-verify native Swift XLSX against TypeScript A–AD
         run: DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/test-n1r-native-xlsx.cjs
+      - name: Compare both native Excel workbooks against TypeScript official originals
+        run: DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/test-n1s-full-native-workbooks.cjs
       - name: Guard zero macOS and no IPA generation
         run: |
           test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
-          echo 'PASS N1r: isolated encrypted staging + Swift tests, no IPA'
+          echo 'PASS N1s: isolated encrypted staging + Swift tests, no IPA'
