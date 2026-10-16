@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {zipSync,unzipSync}=require('fflate');
+const template=require('../src/ambulatoryTemplate.json');
+const root=process.env.DANPER_N1_FIXTURE_DIR;
+assert(root&&path.isAbsolute(root),'Synthetic fixture directory required');
+const source=Uint8Array.from(Buffer.from(template.zipBase64,'base64'));
+const entries=unzipSync(source);
+const names=Object.keys(entries);
+assert.equal(names.filter(n=>/^xl\/tables\/table\d+\.xml$/.test(n)).length,19);
+assert.equal(names.filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).length,10);
+assert.ok(entries['xl/workbook.xml']&&entries['xl/worksheets/sheet5.xml']);
+fs.writeFileSync(path.join(root,'n1r-sanitized-template-store.zip'),zipSync(entries,{level:0}));
+console.log('PASS N1r synthetic sanitized STORED-only template, '+names.length+' OOXML parts.');
