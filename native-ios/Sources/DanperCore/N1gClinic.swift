@@ -2,17 +2,17 @@ import Foundation
 
 /// In-memory ONLY mock clinical state. All people and clinical choices are fixed,
 /// fictional and not externally editable. Never writes to disk, Keychain or stock.
-public struct N1gWorker: Identifiable, Equatable, Sendable {
+public struct N1gWorker: Identifiable, Equatable, Codable, Sendable {
     public let id: String
     public let name: String
     public let site: String
     public let area: String
 }
-public enum N1gAllergy: String, CaseIterable, Sendable {
+public enum N1gAllergy: String, CaseIterable, Codable, Sendable {
     case unknown, none, known
 }
-public enum N1gVisitStatus: String, Sendable { case draft, saved }
-public struct N1gVisit: Identifiable, Equatable, Sendable {
+public enum N1gVisitStatus: String, Codable, Sendable { case draft, saved }
+public struct N1gVisit: Identifiable, Equatable, Codable, Sendable {
     public let id: UUID
     public var originID: UUID?
     public var status: N1gVisitStatus

@@ -149,7 +149,7 @@ public enum N1hClinicalValidator {
 
 /// Additional form details for N1g simulation; not a production model.
 /// Choices are closed fake demo options and never contain patient narratives.
-public struct N1hDemoFields: Equatable, Sendable {
+public struct N1hDemoFields: Equatable, Codable, Sendable {
     public var date = "2026-10-16"
     public var time = "08:25"
     public var system = ""
