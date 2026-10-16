@@ -128,7 +128,7 @@ public final class N1iEncryptedDemoDraftVault {
     public func load() throws -> N1gClinic? {
         try loadWithRevision()?.clinic
     }
-    public struct RecoveredDemo {
+    public struct RecoveredDemo: Sendable {
         public let clinic: N1gClinic
         public let revision: Int64
     }
