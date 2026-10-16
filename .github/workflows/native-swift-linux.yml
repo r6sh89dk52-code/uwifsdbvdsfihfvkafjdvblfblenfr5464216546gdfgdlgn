@@ -1,11 +1,12 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1e-clinical-stock-parity-linux]
+    branches: [native/swiftui-n1f-lossless-fields-linux]
     paths:
       - 'native-ios/**'
       - 'scripts/generate-native-compat-fixtures.cjs'
       - 'scripts/generate-n1e-clinical-fixtures.cjs'
+      - 'scripts/generate-n1f-lossless-fixtures.cjs'
       - '.github/workflows/native-swift-linux.yml'
   workflow_dispatch:
 permissions:
@@ -16,24 +17,24 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Verificar Swift
+      - name: Swift
         run: swift --version
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Preparar generadores TypeScript ficticios
+      - name: Dependencies for synthetic TS fixtures
         run: npm ci --no-fund --ignore-scripts
-      - name: Generar respaldo N1b y escenario clínico/Kardex original TS (solo ficticio)
+      - name: Generate only fictional backups, FEFO and clinical field snapshots
         run: |
           mkdir -p "$RUNNER_TEMP/danper-n1-fixtures"
           echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-n1-fixtures" >> "$GITHUB_ENV"
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-native-compat-fixtures.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1e-clinical-fixtures.cjs
-      - name: Probar Swift Crypto, journal, stock y consumo N1e
+          DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1f-lossless-fixtures.cjs
+      - name: Swift tests of crypto, FEFO, recoverability and 1:1 field preservation
         run: cd native-ios && swift test --jobs 2
-      - name: Comprobar ausencia de IPA y macOS
+      - name: No macOS or iOS IPA
         run: |
           test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
-          test ! -d native-ios/DANPERNative.xcodeproj
-          echo "PASS: 0 IPA, solo Linux, datasets ficticios locales"
+          echo "PASS N1f: Linux only, no IPA"
