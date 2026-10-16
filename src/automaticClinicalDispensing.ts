@@ -10,7 +10,7 @@
 import {type SavedClinicalAttention,postConfirmedAttentionDelivery,dispenseMovementId,alreadyDispensed,availableLots} from './attentionKardex';
 import {type StockLedger,type StockCommand,postStockMovement,postStockMovementsBatch,validateStockLedger} from './kardexMovements';
 import {reviewedAssociationsFor} from './reviewedKardexAssociations';
-import {countPhysicalUnits} from './inventoryRules';
+import {countPhysicalUnits,type StockLot} from './inventoryRules';
 
 /** Selected *inside* the attention, never in a separate Kardex confirmation screen. */
 export type InVisitPhysicalUse={lotId:string;quantity:number};
@@ -28,6 +28,15 @@ export type AutoDispenseResult={
  * which the current form does not capture. These remain pending, never guessed.
  */
 function individualUnit(unit:string):boolean{return ['UND','TBL','PAR'].includes(unit.trim().toUpperCase())}
+/** One-step stock that the audited engine can actually issue.
+ * A fractional 0.5 UND is not a whole tablet and must not prevent moving
+ * to a later FEFO lot that contains complete individual units.
+ */
+function availableAtNextIssue(l:StockLot):number{
+ const pack=l.container!=='unidad'||l.unitsPerContainer!==1||l.catalogUnit!=='UND';
+ return pack?(l.openedRemaining>0?l.openedRemaining:l.looseUnits>0?l.looseUnits:
+  l.sealedContainers>0?l.unitsPerContainer:0):countPhysicalUnits(l);
+}
 function limaDay(at:number):string{
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(at));
  const p=(type:string)=>parts.find(x=>x.type===type)?.value||'';
@@ -69,9 +78,16 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedA
   // an approved Kardex identity. It is NOT a second "confirm delivery" step.
   if(explicit!==undefined){
    if(!explicit||typeof explicit.lotId!=='string'||!explicit.lotId.trim()||
-     typeof explicit.quantity!=='number'||!Number.isFinite(explicit.quantity)||explicit.quantity<=0||
+     typeof explicit.quantity!=='number'||!Number.isFinite(explicit.quantity)||explicit.quantity<0||
      explicit.quantity>10000000)
     throw Error('Selecciona una existencia y una cantidad física válida dentro de la atención.');
+   // A product/presentation selection is NOT a second confirmation gate.
+   // A blank physical amount is represented as 0 by the current input.
+   // Save the documented clinical consumption without changing stock.
+   if(explicit.quantity===0){
+    pending('Cantidad física sin indicar: atención guardada con salida pendiente, sin descontar Kardex.');
+    continue;
+   }
   }
   if(!explicit&&allowedCodes.length!==1){
    pending('Varias presentaciones del Kardex: selecciona la utilizada en esta atención.');continue;
@@ -113,12 +129,12 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedA
   let remaining=physicalQuantity;
   let impossible='';
   while(remaining>0.00001){
-   const fefo=availableLots(probe.lots.filter(l=>chosen.some(c=>c.id===l.id)),code,at);
-   if(!fefo.length){impossible='No se encontró un lote FEFO disponible para completar el consumo.';break}
+   const fefo=availableLots(probe.lots.filter(l=>chosen.some(c=>c.id===l.id)),code,at)
+    .filter(l=>!unitCounted||Math.floor(availableAtNextIssue(l)+0.000001)>=1);
+   if(!fefo.length){impossible='No se encontró un lote FEFO con unidades completas disponibles.';break}
    const lot=fefo[0];
    const pack=lot.container!=='unidad'||lot.unitsPerContainer!==1||lot.catalogUnit!=='UND';
-   const room=pack?(lot.openedRemaining>0?lot.openedRemaining:lot.looseUnits>0?lot.looseUnits:
-     lot.sealedContainers>0?lot.unitsPerContainer:0):countPhysicalUnits(lot);
+   const room=availableAtNextIssue(lot);
    const available=unitCounted?Math.floor(room+0.000001):room;
    const amount=Math.round(Math.min(remaining,available)*1000)/1000;
    if(amount<=0){impossible='El remanente FEFO no admite una salida de unidades completas.';break}

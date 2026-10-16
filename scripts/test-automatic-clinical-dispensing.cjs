@@ -80,6 +80,16 @@ const {peruStockDate}=load('src/inventoryRules.ts');
 assert.equal(peruStockDate(Date.parse('2026-10-16T01:52:00Z')),'2026-10-15');
 
 
+// Fractional loose UND is not an issuable tablet. Continue to a later FEFO lot.
+const olderDecimal={...lot('fractional',0,0.5),expires:'2026-11-01'};
+const laterWhole={...lot('whole',1,2),expires:'2027-02-01'};
+const decimalIssue=run({lots:[olderDecimal,laterWhole],movements:[]},
+ a('next-full-lot',[item('tablet',p,1)]),date);
+assert.equal(decimalIssue.deducted,1);
+assert.equal(decimalIssue.pending,0);
+assert.equal(decimalIssue.ledger.movements[0].lotId,'whole');
+assert.equal(decimalIssue.ledger.lots[0].looseUnits,0.5);
+assert.equal(decimalIssue.ledger.lots[1].looseUnits,1);
 const depleted=run({lots:[lot('jan',0,1)],movements:[]},a('too-much',[item('i',p,100)]),date);
 assert.equal(depleted.pending,1);
 assert.equal(depleted.ledger.lots[0].looseUnits,1);
@@ -135,8 +145,10 @@ assert.equal(packagedExcel.lines[0].cells[17],1,'R 0+1 aggregated once');
 const absentBox=run({lots:[],movements:[]},a('absent',[boxLine]),date);
 assert.equal(absentBox.pending,1,'explicit past stock must never invent a present lot');
 assert.equal(absentBox.ledger.movements.length,0);
-assert.throws(()=>run({lots:[needleBoxLot],movements:[]},a('invalid-quantity',
- [{...boxLine,physicalUse:{lotId:'needle-pack',quantity:0}}]),date),/cantidad física válida/);
+const missingPhysical=run({lots:[needleBoxLot],movements:[]},a('no-physical-yet',
+ [{...boxLine,physicalUse:{lotId:'needle-pack',quantity:0}}]),date);
+assert.equal(missingPhysical.pending,1,'empty physical use saves visit without stock issue');
+assert.equal(missingPhysical.ledger.movements.length,0,'no stock moved for unverified package');
 // E-62 and E-63 share an official code, requiring precise selection in the encounter.
 const disambiguated=run({lots:[lot('x',0,20,'E-62'),lot('y',1,20,'E-63')],movements:[]},
  a('amb-selected',[{...item('amb',ambiguousProduct),physicalUse:{lotId:'y',quantity:1}}]),date);
