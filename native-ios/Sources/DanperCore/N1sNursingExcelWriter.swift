@@ -64,12 +64,36 @@ internal enum N1sNursingExcelWriter {
             guard let number=Int(address.drop(while:{$0.isLetter})),
                   (1...104).contains(number) else {throw N1sExcelError.invalidTemplate}
             let pattern="<row\\b[^>]*\\br=\""+String(number)+"\"[^>]*>.*?</row>"
-            guard let r=try firstRange(pattern,in:xml) else {
+            if let r=try firstRange(pattern,in:xml) {
+                let previous=String(xml[r])
+                // Maintain strictly increasing cell column order when a
+                // formerly blank nursing cell is inserted.
+                let col=String(address.prefix(while:{$0.isLetter}))
+                let cells=try match(#"<c\\b[^>]*\\br="([A-Z]+)[0-9]+""#,in:previous)
+                var insertion:String.Index?
+                for hit in cells {
+                    guard let captured=Range(hit.range(at:1),in:previous) else {continue}
+                    if String(previous[captured])>col {
+                        insertion=Range(hit.range,in:previous)?.lowerBound
+                        break
+                    }
+                }
+                var updated=previous
+                if let insertion {
+                    updated.insert(contentsOf:rendered,at:insertion)
+                }else if let closing=updated.range(of:"</row>",options:.backwards) {
+                    updated.insert(contentsOf:rendered,at:closing.lowerBound)
+                }else{throw N1sExcelError.invalidTemplate}
+                xml.replaceSubrange(r,with:updated)
+            }else if let closing=xml.range(of:"</sheetData>") {
+                // Some official templates omit blank metadata rows: unlike
+                // fabricating a stock count, creating an empty worksheet row
+                // for a known cell address is only structural.
+                xml.insert(contentsOf:"<row r=\\\"\\(number)\\\">\\(rendered)</row>",
+                           at:closing.lowerBound)
+            }else{
                 throw N1sExcelError.invalidTemplate
             }
-            let old=String(xml[r])
-            let changed=old.replacingOccurrences(of:"</row>",with:rendered+"</row>")
-            xml.replaceSubrange(r,with:changed)
         }
         return xml
     }
