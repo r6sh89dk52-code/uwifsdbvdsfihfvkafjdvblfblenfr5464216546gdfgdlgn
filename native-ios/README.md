@@ -46,3 +46,7 @@ El núcleo Swift ahora incluye verificación de respaldo AES-256-GCM compatible 
 ## N1c — Journal de generación persistente (solo Linux)
 
 El paquete Swift ahora incluye `N1DurableRestoreSandbox`, exclusivo de tests ficticios con `N1-CANARY|`, carpetas temporales, dos archivos por generación, hashes SHA256, diario persistente, un puntero de activación y reanudación tras interrupciones simuladas. **No almacena registros reales y no implementa aún restauración clínica.** Véase `docs/N1C_JOURNAL_LINUX.md`.
+
+## N1d — Ensayo de almacenamiento cifrado con generaciones recuperables (Linux)
+
+`N1EncryptedGenerationLab` cifra datos sintéticos con AES-256-GCM, autentica manifiestos con HMAC-SHA256, obliga a verificar dos dominios antes de activar un puntero único y valida reinicios/fallos. Las claves se suministran por fuera; no hay acceso a datos clínicos ni integración con iOS Keychain todavía. Revisa `docs/N1D_GENERACIONES_CIFRADAS.md`. No genera IPA.
