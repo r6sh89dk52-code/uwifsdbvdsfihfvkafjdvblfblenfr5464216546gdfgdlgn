@@ -13,7 +13,10 @@ function dateOnly(t:number){
  const value=(type:string)=>parts.find(x=>x.type===type)?.value||'';
  return value('year')+'-'+value('month')+'-'+value('day');
 }
-const packaged=(l:StockLot)=>l.container!=='unidad'||l.unitsPerContainer!==1||l.catalogUnit!=='UND';
+// Official nursing count is by catalog U.M., not by the storage container.
+ // A box of 20 UND tablets counts as 20 UND, not one issued CJA.
+const packaged=(l:StockLot)=>!['UND','TBL','PAR'].includes(l.catalogUnit.trim().toUpperCase())&&
+ (l.container!=='unidad'||l.unitsPerContainer!==1);
 const reportBalance=(l:StockLot)=>packaged(l)?l.sealedContainers:countPhysicalUnits(l);
 function dayMoves(moves:StockMovement[],date:string){return moves.filter(m=>dateOnly(m.at)===date)}
 function stateAtEnd(lot:StockLot,moves:StockMovement[],date:string):StockLot{
@@ -45,7 +48,8 @@ export function buildDailyReport(ledger:StockLedger,date:string,counts:Record<st
   const extraordinary=rnd(rowDay.filter(m=>m.kind==='extraordinary').reduce((n,m)=>{
    return n+(packaged(m.before)?m.sealedAdded:m.physicalChange);
   },0));
-  const consumed=rnd(rowDay.filter(m=>m.kind==='use').reduce((n,m)=>n+(packaged(m.before)?m.excelQuantity:m.quantity),0));
+  const consumed=rnd(rowDay.filter(m=>m.kind==='use').reduce((n,m)=>
+    n+(packaged(m.before)?m.excelQuantity:m.quantity),0));
   const adjustments=rowDay.filter(m=>m.kind==='adjustment');
   if(adjustments.length)warnings.push(p.name+': ajustes auditados del día pendientes de conciliación en el reporte');
   const total=rnd(initial+extraordinary);
