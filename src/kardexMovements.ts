@@ -2,7 +2,7 @@
  * Excel consumption for packaged supplies is 1 when a new container is opened,
  * 0 for later uses from that container. Physical consumption is tracked separately.
  */
-import {countPhysicalUnits,validateStockLot,validateStockLots,type StockLot} from './inventoryRules';
+import {countPhysicalUnits,peruStockDate,validateStockLot,validateStockLots,type StockLot} from './inventoryRules';
 
 export type MovementKind='extraordinary'|'use'|'adjustment';
 export type DispenseRef={
@@ -37,7 +37,7 @@ function amount(value:unknown,label:string,integer=false,allowZero=false){
 function validDispenseRef(ref:DispenseRef,id:string,kind:MovementKind,at:number){
  const split=ref.partIndex!==undefined||ref.partCount!==undefined;
  const validSplit=split&&Number.isSafeInteger(ref.partCount)&&Number.isSafeInteger(ref.partIndex)&&
-    ref.partCount!>=2&&ref.partCount!<=500&&ref.partIndex!>=1&&ref.partIndex!<=ref.partCount!;
+    ref.partCount! >= 2&&ref.partCount! <= 500&&ref.partIndex! >= 1&&ref.partIndex! <= ref.partCount!;
  const expected='ATT:'+ref.attentionId+':ITEM:'+ref.itemId+
    (split?':PART:'+ref.partIndex:'');
  if((split&&!validSplit)||kind!=='use'||id!==expected||
@@ -171,7 +171,7 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand,allowI
   after.sealedContainers+=sealedAdded;after.looseUnits=round(after.looseUnits+looseAdded);
   quantity=round(sealedAdded*before.unitsPerContainer+looseAdded);
  }else if(command.kind==='use'){
-  const day=new Date(command.at).toISOString().slice(0,10);
+  const day=peruStockDate(command.at);
   if(before.expires && before.expires < day)throw Error('Lote vencido: no está permitido registrar su uso.');
   quantity=amount(command.quantity,'Cantidad utilizada',!pack);
   quantity=round(quantity);
@@ -229,7 +229,7 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand,allowI
 
 /** FEFO ordering, expired lots excluded; products without known expiration come last. */
 export function suggestFEFOLot(lots:StockLot[],code:string,at:number=Date.now()):StockLot|undefined{
- const today=new Date(at).toISOString().slice(0,10);
+ const today=peruStockDate(at);
  return lots.filter(x=>x.code===code&&countPhysicalUnits(x)>0&&(!x.expires||x.expires>=today))
  .sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')||a.id.localeCompare(b.id))[0];
 }
