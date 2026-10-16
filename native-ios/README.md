@@ -106,3 +106,7 @@ Swift comprueba los 432 materiales, stock/ingresos/conteo, ausencia frente a cer
 
 ## N1r — escritura OOXML en Swift (laboratorio)
 El escritor Swift nativo genera un XLSX real con 10 hojas/19 tablas a partir de una plantilla saneada y almacenada (ZIP STORE) con filas CONSUMOS A–AD sintéticas. El formato completo y la conciliación de las demás hojas están pendientes. No forma parte aún de SwiftUI ni usa datos personales. Véase `docs/N1R_NATIVE_XLSX_WRITER_LAB.md`.
+
+
+## N1s — Implementación unificada de ambos Excel (laboratorio)
+Escritor Swift para las diez hojas del Indicador, con 432 productos, RESU/CONTEO/INGRESOS/CONSUMOS, y escritor independiente para Kardex de enfermeras con 98 ítems; ambos contrastados contra la exportación TypeScript con datos sintéticos. La aprobación de apertura de nuevo envase (1) frente a reutilización (0) considera contenido físico verificado: 100 mL solo equivalen a 100 usos si se registraron 1 mL por uso. Todavía sin acceso a registros clínicos ni IPA real.
