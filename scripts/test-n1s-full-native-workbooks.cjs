@@ -63,6 +63,9 @@ console.log('PASS N1s complete native indicator: 10 sheets, 19 tables, 432 mater
 const nn=open('n1s-nursing-native.xlsx'),tn=open('n1s-nursing-reference.xlsx');
 assert.ok(nn['xl/printerSettings/printerSettings2.bin']);
 const nm=cells(document(nn,2)),tm=cells(document(tn,2));
+console.log('N1s nursing diagnostic nonpatient XML row7:',Buffer.from(nn['xl/worksheets/sheet2.xml']).toString('utf8').match(/<row[^>]*r="7"[^>]*>[\s\S]*?<\/row>/)?.[0]?.slice(0,2200));
+console.log('N1s nursing parsed first refs:',[...nm.keys()].filter(k=>/^[D-J]7$/.test(k)));
+
 for(let row=7;row<=104;row++){
  for(const col of ['D','E','F','G','H','I','J']){
   const ref=col+row,source=tm.get(ref),target=nm.get(ref);
