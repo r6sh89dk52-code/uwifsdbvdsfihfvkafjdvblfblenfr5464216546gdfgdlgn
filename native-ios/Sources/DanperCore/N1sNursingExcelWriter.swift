@@ -29,6 +29,14 @@ internal enum N1sNursingExcelWriter {
               n.doubleValue.isFinite else{return nil}
         return n.doubleValue
     }
+    /// Excel numeric values are locale-independent XML: omit a trailing .0
+    /// for exact integral quantities while retaining fractions when needed.
+    private static func xlsxNumber(_ value:Double) -> String {
+        if value.rounded(.towardZero)==value && abs(value)<1_000_000_000_000 {
+            return String(Int64(value))
+        }
+        return String(value)
+    }
     /// Scope every mutation to ONE Excel row. Searching globally for <c>
     /// can overrun a self-closing cell and accidentally consume adjacent rows.
     private static func patch(_ source:String,address:String,
@@ -73,12 +81,12 @@ internal enum N1sNursingExcelWriter {
         if let formula {
             let f=try escape(formula)
             if let num=numeric(value) {
-                rendered=head+"><f>"+f+"</f><v>"+String(num)+"</v></c>"
+                rendered=head+"><f>"+f+"</f><v>"+xlsxNumber(num)+"</v></c>"
             }else {
                 rendered=head+"><f>"+f+"</f></c>"
             }
         }else if let num=numeric(value) {
-            rendered=head+"><v>"+String(num)+"</v></c>"
+            rendered=head+"><v>"+xlsxNumber(num)+"</v></c>"
         }else if let string=value as? String,!string.isEmpty {
             rendered=head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + (try escape(string)) + "</t></is></c>"
         }else {
