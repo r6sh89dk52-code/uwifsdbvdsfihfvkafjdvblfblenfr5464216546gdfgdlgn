@@ -1,7 +1,7 @@
 name: DANPER Native - Xcode Integration Audit (NO IPA)
 on:
   push:
-    branches: [native/swiftui-n1l-real-backup-audit-no-merge]
+    branches: [native/swiftui-n1m-real-clinical-stage-lab]
     paths:
       - 'native-ios/**'
       - '.github/workflows/native-swiftui-xcode-audit.yml'
@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: danper-native-n1l-xcode
+  group: danper-native-n1m-xcode
   cancel-in-progress: true
 jobs:
   xcode-audit:
