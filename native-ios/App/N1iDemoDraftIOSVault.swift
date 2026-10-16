@@ -74,16 +74,19 @@ actor N1iDemoDraftIOSVault {
         }
         return random
     }
-    func load() throws -> N1gClinic? {
+    // An actor serializes iPhone saves. The Swift core additionally rejects
+    // stale revisions, including after iOS terminates and the app restarts.
+    func loadWithRevision() throws -> N1iEncryptedDemoDraftVault.RecoveredDemo? {
         let folder=try location()
         let keyData=try key(at:folder)
-        return try N1iEncryptedDemoDraftVault(root:folder,keyData:keyData).load()
+        return try N1iEncryptedDemoDraftVault(root:folder,keyData:keyData).loadWithRevision()
     }
-    func save(_ clinic: N1gClinic) throws {
-        // Validate before Keychain or file system access.
+    func save(_ clinic: N1gClinic, revision: Int64) throws {
+        // Validate BEFORE asking Keychain or touching the disk.
         _ = try clinic.exportFictionalDrafts()
         let folder=try location()
         let keyData=try key(at:folder)
-        try N1iEncryptedDemoDraftVault(root:folder,keyData:keyData).save(clinic)
+        try N1iEncryptedDemoDraftVault(root:folder,keyData:keyData)
+            .save(clinic,revision:revision)
     }
 }

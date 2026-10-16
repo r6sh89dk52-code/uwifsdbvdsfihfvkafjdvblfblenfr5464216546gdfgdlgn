@@ -9,6 +9,7 @@ struct NativeRootView: View {
     @State private var demoReady = false
     @State private var demoStorageMessage = "Abriendo almacenamiento cifrado de pruebas…"
     @State private var writeTask: Task<Void, Never>?
+    @State private var demoClock = N1jRevisionClock()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -104,11 +105,15 @@ struct NativeRootView: View {
         .task {
             guard !demoReady else { return }
             do {
-                if let previous = try await N1iDemoDraftIOSVault.shared.load() {
-                    clinic = previous
-                    demoStorageMessage = "Sesión ficticia recuperada de un almacén cifrado independiente."
+                if let recovered = try await N1iDemoDraftIOSVault.shared.loadWithRevision() {
+                    // The authenticated revision is the first value the UI uses,
+                    // avoiding reset-to-zero and a stale overwrite after restart.
+                    demoClock = N1jRevisionClock(recoveredRevision:recovered.revision)
+                    clinic = recovered.clinic
+                    demoStorageMessage = "Simulación cifrada recuperada (revisión \(recovered.revision))."
                 } else {
-                    demoStorageMessage = "Almacén cifrado ficticio disponible. Los borradores se guardan automáticamente."
+                    demoClock = N1jRevisionClock()
+                    demoStorageMessage = "Almacén ficticio disponible: guardado cifrado por revisión."
                 }
                 demoReady = true
             } catch {
@@ -127,9 +132,18 @@ struct NativeRootView: View {
 
     private func scheduleDemoWrite(immediately: Bool = false) {
         guard demoReady else { return }
-        writeTask?.cancel()
-        // Capture a value-type snapshot before crossing actor boundaries.
+        // Capture clock and *value* synchronously. An older Task may already
+        // be running despite cancellation; the persisted revision blocks it
+        // from replacing a newer committed generation.
+        let revision: Int64
+        do { revision = try demoClock.capture() }
+        catch {
+            demoReady = false
+            demoStorageMessage = "Se agotaron las revisiones de prueba. Edición bloqueada."
+            return
+        }
         let snapshot = clinic
+        writeTask?.cancel()
         writeTask = Task {
             if !immediately {
                 do { try await Task.sleep(nanoseconds:650_000_000) }
@@ -137,10 +151,23 @@ struct NativeRootView: View {
             }
             guard !Task.isCancelled else { return }
             do {
-                try await N1iDemoDraftIOSVault.shared.save(snapshot)
-                demoStorageMessage = "Último estado FICTICIO guardado con cifrado en este iPhone."
+                try await N1iDemoDraftIOSVault.shared.save(snapshot,revision:revision)
+                if demoClock.isLatest(revision) {
+                    demoStorageMessage = "Borrador ficticio cifrado · revisión \(revision) confirmada."
+                }
+            } catch N1iEncryptedDemoDraftVault.Failure.staleRevision {
+                // Superseded background jobs must not show a success or
+                // overwrite a fresh UI status. A *latest* stale revision means
+                // another writer advanced the vault: stop rather than reset.
+                if demoClock.isLatest(revision) {
+                    demoReady = false
+                    demoStorageMessage = "Existe una revisión cifrada más nueva. Edición bloqueada."
+                }
             } catch {
-                demoStorageMessage = "No se pudo verificar el guardado de prueba. Revisa antes de cerrar."
+                if demoClock.isLatest(revision) {
+                    demoReady = false
+                    demoStorageMessage = "Falló el guardado cifrado de prueba. Edición bloqueada; no cierres sin revisar."
+                }
             }
         }
     }

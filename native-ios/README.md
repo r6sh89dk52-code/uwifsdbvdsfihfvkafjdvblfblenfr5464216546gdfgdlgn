@@ -70,3 +70,7 @@ Se agregaron sistemas/segmentos de evaluación, horario, permiso, procedimientos
 ## N1i — Borradores ficticios cifrados y recuperables
 
 El motor Swift incluye AES-256-GCM y puntero autenticado para guardar exclusivamente datos inventados. La interfaz de prueba incorpora un adaptador iOS a Keychain **separado**, guardado diferido de 650 ms y recuperación al abrir. La app de producción no se toca. Las pruebas Linux no sustituyen la compilación iOS con Xcode. Consultar docs/N1I_BORRADORES_CIFRADOS.md. Sin macOS ni IPA.
+
+## N1j — Guardado ficticio ordenado por revisión autenticada
+
+A partir de N1i, cada generación cifrada almacena una revisión v2 con HMAC. Revisión recuperada al iniciar, snapshots monotónicos, protección contra tareas retrasadas y diez regresiones Linux. La solicitud inmediata al pasar a segundo plano sigue siendo best-effort; requiere validación en Xcode/iPhone. Ver `docs/N1J_AUTOGUARDADO_REVISIONES.md`. Sin datos clínicos reales y sin IPA.
