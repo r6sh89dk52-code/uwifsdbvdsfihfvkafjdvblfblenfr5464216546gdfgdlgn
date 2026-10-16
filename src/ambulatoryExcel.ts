@@ -178,8 +178,16 @@ function organizationFormula(column:number,row:number):string{
 }
 export function exportAmbulatoryWorkbook(original:Uint8Array,plan:ExportPlan,material?:ReconciliationPlan):Uint8Array{
  if(plan.blockers.length)throw Error('Resuelve primero las entregas y datos pendientes de conciliación.');
- if(plan.provisional===true&&(!Number.isSafeInteger(plan.pendingDeliveries)||!plan.pendingDeliveries||!plan.lines.some(l=>l.cells[15]!==''&&l.cells[17]==='')))
-  throw Error('El informe provisional exige consumos pendientes explícitos y cantidades sin certificar.');
+ if(plan.provisional===true){
+  const unverified=plan.unverifiedLineIds;
+  if(!Number.isSafeInteger(plan.pendingDeliveries)||!plan.pendingDeliveries||
+     !Array.isArray(unverified)||unverified.length!==plan.pendingDeliveries||
+     new Set(unverified).size!==unverified.length||
+     unverified.some(id=>!plan.lines.some(l=>l.id===id&&l.cells[15]!==''&&
+      typeof l.cells[17]==='number'&&l.cells[17]>0)))
+   throw Error('El Excel provisional exige cantidades clínicas declaradas y filas pendientes identificadas.');
+ }else if(plan.unverifiedLineIds?.length)
+  throw Error('Los consumos pendientes no pueden presentarse como Excel oficial.');
  if(!validExportDate(plan.start)||!validExportDate(plan.end)||plan.start>plan.end||plan.lines.length>10000)throw Error('Plan de exportación inválido.');
  const ids=new Set<string>();
  for(const line of plan.lines){

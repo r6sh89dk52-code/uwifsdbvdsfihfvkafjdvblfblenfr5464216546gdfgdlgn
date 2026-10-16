@@ -26,7 +26,8 @@ validateStockLedger({lots:loadAgain.stockLots,movements:loadAgain.stockMovements
 const oldReport=buildAmbulatoryRows(loadAgain.attentions,
  {lots:loadAgain.stockLots,movements:loadAgain.stockMovements},
  '2026-10-09','2026-11-08',{perVisitSubdivision:true,allowPendingDeliveries:true});
-assert.deepEqual(oldReport.lines.map(x=>x.cells[17]),['',5],'past unlinked clinical use is never deducted retroactively');
+assert.deepEqual(oldReport.lines.map(x=>x.cells[17]),[1,5],'past recorded clinical use remains visible even though not physically debited');
+assert.equal(oldReport.unverifiedLineIds.length,1);
 const next=v('atencion-nueva',2);
 const posted=finalizeVisitAndPlanStock({lots:loadAgain.stockLots,movements:loadAgain.stockMovements},next,at+60000);
 assert.equal(posted.deducted,1);

@@ -43,7 +43,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
  async function exportBook(provisional=false){
   if(!result.data||!shared.data||exporting.current)return;
   if(provisional&&!canDraft)return;
-  if(provisional&&!window.confirm('EXCEL PROVISIONAL — hay entregas sin confirmar. El libro incluirá las atenciones y productos, pero dejará VACÍA la columna R donde falta conciliación. No calcula stock inicial desconocido, no resta cantidades ni confirma entregas. NO utilizar como reporte final de consumo. ¿Generar borrador?'))return;
+  if(provisional&&!window.confirm('EXCEL PROVISIONAL — se mostrarán en CONSUMOS!R las cantidades que registraste en las atenciones, incluso las antiguas SIN descuento físico confirmado. Esas cantidades son DECLARADAS, no certifican aperturas de cajas/frasco ni saldos de Kardex. El archivo NO debe presentarse como informe oficial de consumos conciliados. ¿Generar borrador?'))return;
   exporting.current=true;setBusy(true);setError('');setDone('');
   try{
    const plan=provisional?buildAmbulatoryRows(attentions,ledger,start,end,{perVisitSubdivision:true,mappings,incidents,allowPendingDeliveries:true}):result.data;
@@ -52,9 +52,9 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    const reconciled=provisional?sharedMonthlyReconciliation(ledger,plan):shared.data;
    await new Promise<void>(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
    const bytes=provisional?exportAmbulatoryWorkbook(internalTemplate(),plan,reconciled):exportAmbulatoryWorkbook(internalTemplate(),result.data,shared.data);
-   const suffix=provisional?'_PROVISIONAL_PENDIENTE_CONCILIACION':'';
+   const suffix=provisional?'_PROVISIONAL_PENDIENTE_CONCILIACION_CANTIDADES_DECLARADAS':'';
    await shareXlsx('DANPER_Indicador_Ambulatorio_'+start+'_al_'+end+suffix+'.xlsx',bytes,'Indicador Ambulatorio DANPER');
-   setDone(provisional?'BORRADOR PROVISIONAL generado (10 hojas). Faltan entregas por conciliar; verifica la columna R antes de un envío oficial.':'Libro de diez hojas generado. Finaliza el guardado en Archivos o comparte la copia.');
+   setDone(provisional?'BORRADOR PROVISIONAL generado (10 hojas). CONSUMOS!R incluye cantidades declaradas de las atenciones históricas que aún NO están descontadas del Kardex. No usar como cierre oficial.':'Libro de diez hojas generado. Finaliza el guardado en Archivos o comparte la copia.');
   }catch(e){setError(e instanceof Error?e.message:'No fue posible generar el libro oficial.')}
   finally{setBusy(false);exporting.current=false}
  }
@@ -72,7 +72,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <label>Fechas que incluirá este Excel<input readOnly aria-label="Período mensual oficial" value={period.label}/></label>
   </div>
   <p className="hint"><strong>Kardex único:</strong> todas las entregas de ambas sedes descuentan del mismo inventario físico. No se calculan ni exportan stocks separados.</p>
-  <p className="hint">El reporte incluye del día 9 al día 8 siguiente. Las salidas físicas verificadas se reflejan en CONSUMOS. Cuando una atención no tenga cantidad física sustentada, DANPER ofrecerá un borrador provisional sin inventar la columna R. No se duplican registros ni se generan movimientos por exportar.</p>
+  <p className="hint">El reporte incluye del día 9 al día 8 siguiente. Las salidas físicas verificadas se reflejan en CONSUMOS. Si una atención anterior no tiene salida física vinculada, el borrador provisional incluye la cantidad clínica que anotaste en R, identificándola como DECLARADA y no conciliada. Nunca se crean movimientos al exportar.</p>
   </div>
   <div className="stageCExportStep">
    <h4><span className="stageCIndex">2</span> Comprobar atenciones y existencias</h4>
@@ -100,8 +100,8 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    disabled={!result.data||!shared.data||(!canDraft&&result.data.blockers.length>0)||withoutSite.length>0||busy}
    onClick={()=>void exportBook(canDraft)}><Share2 size={18}/>{busy?'Preparando Excel…':canDraft?'Generar Excel provisional (10 hojas) y compartir':'Generar Excel (10 hojas) y compartir'}</button></div>
   {canDraft&&<div className="warning" role="status"><strong>Exportación provisional disponible</strong>
-    <p>Puedes descargar las diez hojas con los medicamentos e insumos registrados. Las cantidades de CONSUMOS!R quedarán vacías para las entregas aún no confirmadas. Se conservarán los saldos desconocidos sin convertirlos en cero y no se descontará ningún producto.</p>
-    <p><strong>El archivo se marcará PROVISIONAL y no sustituye la conciliación ni el reporte definitivo.</strong></p>
+    <p>Puedes descargar las diez hojas con los medicamentos e insumos registrados. En CONSUMOS!R aparecerán las cantidades que registraste en las atenciones anteriores. Las que no tienen un movimiento del Kardex son cantidades DECLARADAS y NO verificadas físicamente. No se modifican existencias ni se inventan saldos iniciales.</p>
+    <p><strong>IMPORTANTE:</strong> para FCO, CJA y PAQ, la cantidad declarada NO demuestra si se abrió un envase nuevo; por tanto no equivale al R oficial 1/0. El libro se marcará PROVISIONAL y no sustituye la conciliación ni el reporte definitivo.</p>
     <p>El único botón de exportación seleccionará automáticamente el modo provisional y pedirá tu confirmación. Cuando todas las salidas estén conciliadas, volverá a ofrecer el informe oficial sin pasos adicionales.</p>
   </div>}
   {done&&<p className="hint" role="status">{done}</p>}
