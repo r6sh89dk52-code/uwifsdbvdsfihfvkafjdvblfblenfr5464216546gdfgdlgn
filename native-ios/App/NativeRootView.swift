@@ -6,6 +6,10 @@ private let danperRed = Color(red: 0.88, green: 0.09, blue: 0.16)
 struct NativeRootView: View {
     @State private var clinic = N1gClinic()
     @State private var selectedTab = 0
+    @State private var demoReady = false
+    @State private var demoStorageMessage = "Abriendo almacenamiento cifrado de pruebas…"
+    @State private var writeTask: Task<Void, Never>?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -26,7 +30,10 @@ struct NativeRootView: View {
                             VStack(alignment: .leading, spacing: 9) {
                                 Label("SwiftUI real, sin WebView", systemImage: "checkmark.seal.fill")
                                     .font(.headline)
-                                Text("Esta instalación es independiente de la build 222. No importa ni altera registros automáticamente.")
+                                Text("Esta instalación es independiente de la build 222. Solo los borradores FICTICIOS se guardan en un almacén cifrado separado.")
+                                Text(demoStorageMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(demoReady ? .secondary : .orange)
                                 Text("Para utilizar datos clínicos reales faltan: restauración transaccional, validación de inventario y exportadores Excel nativos.")
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -51,18 +58,21 @@ struct NativeRootView: View {
 
             NavigationStack {
                 N1gRosterScreen(clinic: $clinic, selectedTab: $selectedTab)
+                    .disabled(!demoReady)
             }
             .tabItem { Label("Personal", systemImage: "person.2") }
             .tag(1)
 
             NavigationStack {
                 N1gAttentionScreen(clinic: $clinic)
+                    .disabled(!demoReady)
             }
             .tabItem { Label("Atención", systemImage: "cross.case") }
             .tag(2)
 
             NavigationStack {
                 N1gHistoryScreen(clinic: $clinic, selectedTab: $selectedTab)
+                    .disabled(!demoReady)
             }
             .tabItem { Label("Borradores", systemImage: "doc.text") }
             .tag(3)
@@ -81,7 +91,7 @@ struct NativeRootView: View {
                         } label: { Label("Laboratorio N1 aislado", systemImage: "externaldrive") }
                     }
                     Section("Seguridad") {
-                        Text("N1h guía la atención de prueba y conserva sus simulaciones solo en memoria. La build 222 y sus registros no se modifican.")
+                        Text("N1i cifra borradores de simulación en un almacén independiente. No se admiten datos reales. La build 222 y sus registros no se modifican.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -91,6 +101,48 @@ struct NativeRootView: View {
             .tag(4)
         }
         .tint(danperRed)
+        .task {
+            guard !demoReady else { return }
+            do {
+                if let previous = try await N1iDemoDraftIOSVault.shared.load() {
+                    clinic = previous
+                    demoStorageMessage = "Sesión ficticia recuperada de un almacén cifrado independiente."
+                } else {
+                    demoStorageMessage = "Almacén cifrado ficticio disponible. Los borradores se guardan automáticamente."
+                }
+                demoReady = true
+            } catch {
+                demoReady = false
+                demoStorageMessage = "Error de verificación del almacén de prueba. Edición bloqueada para evitar sobrescribir datos."
+            }
+        }
+        .onChange(of: clinic.visits) { _, _ in scheduleDemoWrite() }
+        .onChange(of: clinic.workers) { _, _ in scheduleDemoWrite() }
+        .onChange(of: clinic.allergies) { _, _ in scheduleDemoWrite() }
+        .onChange(of: clinic.activeDraftID) { _, _ in scheduleDemoWrite() }
+        .onChange(of: scenePhase) { _, next in
+            if next != .active { scheduleDemoWrite(immediately: true) }
+        }
+    }
+
+    private func scheduleDemoWrite(immediately: Bool = false) {
+        guard demoReady else { return }
+        writeTask?.cancel()
+        // Capture a value-type snapshot before crossing actor boundaries.
+        let snapshot = clinic
+        writeTask = Task {
+            if !immediately {
+                do { try await Task.sleep(nanoseconds:650_000_000) }
+                catch { return }
+            }
+            guard !Task.isCancelled else { return }
+            do {
+                try await N1iDemoDraftIOSVault.shared.save(snapshot)
+                demoStorageMessage = "Último estado FICTICIO guardado con cifrado en este iPhone."
+            } catch {
+                demoStorageMessage = "No se pudo verificar el guardado de prueba. Revisa antes de cerrar."
+            }
+        }
     }
 }
 
