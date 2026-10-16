@@ -89,6 +89,10 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedA
   }
   if(explicit&&unitCounted&&explicit.quantity!==item.quantity)
    throw Error('La cantidad física de UND/TBL/PAR debe coincidir con la cantidad clínica.');
+  if(!unitCounted&&explicit&&chosen.some(l=>l.container==='unidad'||l.unitsPerContainer<=1)){
+   pending('Presentación por envase sin capacidad interna verificada. No se puede deducir cuántas unidades o mL se utilizaron.');
+   continue;
+  }
   const physicalQuantity=explicit?explicit.quantity:item.quantity;
   const fefo=availableLots(chosen,explicit?chosen[0].code:allowedCodes[0],at);
   if(!explicit&&fefo.length>0&&countPhysicalUnits(fefo[0])<physicalQuantity){
