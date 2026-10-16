@@ -1,0 +1,33 @@
+name: DANPERNative
+options:
+  bundleIdPrefix: pe.danper.saludmovil.native
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  DanperCore:
+    path: .
+targets:
+  DANPERNative:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: App
+    dependencies:
+      - package: DanperCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview
+        PRODUCT_NAME: DANPERNative
+        SWIFT_VERSION: "5.9"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "DANPER Nativa Prueba"
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "DANPER Salud Móvil utiliza Face ID para restringir el acceso a la aplicación."
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
+        CODE_SIGN_STYLE: Manual
+    scheme:
+      testTargets: []

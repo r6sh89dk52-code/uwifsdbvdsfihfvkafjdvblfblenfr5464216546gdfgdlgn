@@ -1,0 +1,20 @@
+name: DANPER Native - Swift Core Linux
+on:
+  pull_request:
+    branches: [release/v0.21.12-build222-provisional-consumptions]
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/native-swift-linux.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  swift-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar Swift
+        run: swift --version
+      - name: Pruebas nativas puras (sin datos clínicos)
+        run: cd native-ios && swift test
