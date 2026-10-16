@@ -70,6 +70,10 @@ assert.equal(ambiguous.pending,1,'never choose between E-62/E-63');
 const needleBoxLot={...lot('needle-pack',0,0,'E-57'),container:'caja',catalogUnit:'CJA',
  unitsPerContainer:100,sealedContainers:1,looseUnits:0,openedRemaining:0};
 const boxLine={...item('needle',box),physicalUse:{lotId:'needle-pack',quantity:1}};
+const unverifiedPack={...needleBoxLot,unitsPerContainer:1};
+const unknownInner=run({lots:[unverifiedPack],movements:[]},a('unknown-inner',[boxLine]),date);
+assert.equal(unknownInner.pending,1,'no fake 1 mL / unit when package capacity is unverified');
+assert.equal(unknownInner.ledger.movements.length,0);
 const firstBox=run({lots:[needleBoxLot],movements:[]},a('first-needle',[boxLine]),date);
 assert.equal(firstBox.deducted,1,'in-form package details must be posted automatically');
 assert.equal(firstBox.ledger.movements[0].quantity,1,'one physical needle used');
