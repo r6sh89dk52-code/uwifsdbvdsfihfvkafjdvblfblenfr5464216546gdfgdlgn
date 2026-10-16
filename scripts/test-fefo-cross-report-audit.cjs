@@ -144,4 +144,26 @@ assert.equal(provisional.lines.length,5);
 assert.deepEqual(provisional.lines.map(x=>x.cells[17]),[5,1,0,12,'']);
 assert.equal(provisional.pendingDeliveries,1);
 assert.equal(JSON.stringify(state),JSON.stringify(pendingPlan.ledger),'pending output does not fabricate movements');
+
+// Fractional physical use (e.g., 0.5 mL) must not be confused with the
+// integer official package opening count. This is a real FCO/CJA edge case.
+const fractionalLots={lots:[
+ lot('frac-open',packK,'2026-10-18',{container:'caja',capacity:100,opened:0.25,unit:'CJA'}),
+ lot('frac-sealed',packK,'2027-03-01',{container:'caja',capacity:100,sealed:1,unit:'CJA'})
+],movements:[]};
+const fractionalVisit=attention('fractional-case','LA VENTUROSA','00000006',
+ [line('fractional-box',pack,1,{lotId:'frac-open',quantity:0.5})]);
+const fractionalOut=stock.finalizeVisitAndPlanStock(fractionalLots,fractionalVisit,t+14000);
+assert.equal(fractionalOut.deducted,1);
+assert.deepEqual(fractionalOut.ledger.movements.map(m=>m.quantity),[0.25,0.25]);
+assert.deepEqual(fractionalOut.ledger.movements.map(m=>m.excelQuantity),[0,1]);
+const fractionalIndicator=buildAmbulatoryRows([fractionalVisit],fractionalOut.ledger,
+ '2026-10-09','2026-11-08',{perVisitSubdivision:true});
+assert.equal(fractionalIndicator.lines.length,1);
+assert.equal(fractionalIndicator.lines[0].cells[17],1,'one opened box, not 0.5 box');
+assert.equal(buildDailyReport(fractionalOut.ledger,'2026-10-14').rows.find(r=>r.code==='E-57').consumed,1);
+assert.throws(()=>buildAmbulatoryRows([{...fractionalVisit,items:[
+ {...fractionalVisit.items[0],physicalUse:{lotId:'frac-open',quantity:0.75}}
+]}],fractionalOut.ledger,'2026-10-09','2026-11-08',{perVisitSubdivision:true}),
+/no coinciden/,'tampered physical amount cannot silently export');
 console.log('PASS: real 10-sheet Indicator and original 98-product nurse Kardex: FEFO cross-lot, UND-in-box, CJA R 0/1, 2 sites, one clinical row, exact stock and formula consistency.');
