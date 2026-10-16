@@ -43,7 +43,12 @@ final class N1iEncryptedDemoDraftTests: XCTestCase {
         XCTAssertEqual(reopened.activeDraft?.quantity,2)
         XCTAssertEqual(reopened.activeDraft?.detailed.system,"RESPIRATORIO")
         XCTAssertEqual(reopened.allergies["00000001"],N1gAllergy.none)
-        XCTAssertEqual(try reopened.exportFictionalDrafts(),try original.exportFictionalDrafts())
+        XCTAssertEqual(reopened.workers, original.workers)
+        XCTAssertEqual(reopened.visits, original.visits)
+        XCTAssertEqual(reopened.allergies, original.allergies)
+        XCTAssertEqual(reopened.activeDraftID, original.activeDraftID)
+        // JSON object-key order is not a clinical field: compare the
+        // fully decoded data model, not nondeterministic Dictionary bytes.
         XCTAssertEqual(reopened.physicalMovementsCreated,0)
     }
     func testSavedAndCorrectionRemainSeparateAfterRestart() throws {
