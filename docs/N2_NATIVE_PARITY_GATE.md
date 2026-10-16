@@ -13,3 +13,10 @@
 - Pruebas cruzadas reales de archivo con Microsoft Excel, protección local Face ID, segundo respaldo cifrado/restauración, condiciones de recuperación, instalación iPhone y comportamiento de SideStore.
 
 **No declarar que SwiftUI ha alcanzado build 222 solo porque sus tests de laboratorio pasen. No generar IPA, no fusionar main, no importar información real todavía.**
+
+## N2 — coordinación con revisiones AES-256-GCM (laboratorio exclusivamente)
+
+- `N2EncryptedClinicalJournal` guarda una generación cifrada y autenticada AES-256-GCM con manifiesto HMAC en una carpeta temporal aislada. El puntero activo se reemplaza atómicamente después de verificar la nueva generación; conserva generaciones previas.
+- `N2AtomicClinicalCoordinator` enlaza guardado de atención FEFO en memoria con revisión cifrada completa, detecta cambios incompatibles de la misma visita y reconoce reintentos idénticos tras una interrupción posterior a la actualización del puntero.
+- Pruebas sintéticas: inicio, revisión esperada, sobrescritura obsoleta, autenticidad, corrupción, fallos tras cifrado/diario/puntero y verificación de que el historial y el stock siempre están en una misma generación.
+- **Restricciones:** el directorio solo admite prefijo temporal `danper-n2-synthetic-`, la clave es externa al código, ninguna pantalla clínica real llama al coordinador. No se generan ni firman IPA, ni se leen respaldos reales. La ausencia de un `fsync` explícito y las verificaciones físicas de iOS aún pendientes impiden declarar durabilidad eléctrica de producción.
