@@ -127,7 +127,7 @@ export function validateStockLedger(value:StockLedger,allowIncompleteParts=false
  }
  return {lots,movements};
 }
-export function postStockMovement(ledger:StockLedger,command:StockCommand,allowIncompleteParts=false):StockLedger{
+function postStockMovementInternal(ledger:StockLedger,command:StockCommand,allowIncompleteParts=false):StockLedger{
  validCommand(command);
  const {lots,movements}=validateStockLedger(ledger,allowIncompleteParts);
  const existing=movements.find(x=>x.id===command.id);
@@ -234,11 +234,16 @@ export function suggestFEFOLot(lots:StockLot[],code:string,at:number=Date.now())
  .sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')||a.id.localeCompare(b.id))[0];
 }
 
+/** Public API cannot emit an incomplete multi-lot group. */
+export function postStockMovement(ledger:StockLedger,command:StockCommand):StockLedger{
+ return postStockMovementInternal(ledger,command);
+}
+
 /** All parts succeed or none is exposed. Intended for a single saved attention item. */
 export function postStockMovementsBatch(ledger:StockLedger,commands:StockCommand[]):StockLedger{
  if(!commands.length)throw Error('Entrega multilote sin movimientos.');
  validateStockLedger(ledger);
  let next=ledger;
- for(const command of commands)next=postStockMovement(next,command,true);
+ for(const command of commands)next=postStockMovementInternal(next,command,true);
  return validateStockLedger(next);
 }
