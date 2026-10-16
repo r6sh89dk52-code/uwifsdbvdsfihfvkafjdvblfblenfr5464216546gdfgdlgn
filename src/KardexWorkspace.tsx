@@ -30,7 +30,7 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
     <div className="kardexGuideSteps">
      <button type="button" onClick={()=>navigate('inventory')}><span className="stageCIndex">1</span><strong>Inventario físico</strong><small>{ledger.lots.length===0?'Sin lotes cargados':'Consultar productos y lotes'}</small></button>
      <button type="button" onClick={()=>navigate('movements')}><span className="stageCIndex">2</span><strong>Entradas y salidas</strong><small>{ledger.movements.length} registro(s) de movimiento</small></button>
-     <button type="button" onClick={()=>navigate('deliveries')}><span className="stageCIndex">3</span><strong>Revisar pendientes anteriores</strong><small>Solo para incidencias históricas; las nuevas atenciones se procesan al guardar</small></button>
+     <button type="button" onClick={()=>navigate('deliveries')}><span className="stageCIndex">3</span><strong>Revisar pendientes anteriores</strong><small>Entrega de insumos automática al guardar una atención; aquí solo se revisan excepciones históricas</small></button>
      <button type="button" onClick={()=>navigate('reports')}><span className="stageCIndex">4</span><strong>Exportar Kardex</strong><small>Genera un archivo Excel de existencias</small></button>
     </div>
    </div>
