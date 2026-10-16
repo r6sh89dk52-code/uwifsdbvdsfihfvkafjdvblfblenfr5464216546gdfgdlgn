@@ -34,7 +34,7 @@ private struct Envelope: Decodable {
 
 /// Read-only cross-platform backup verifier. No writes to Keychain or Files.
 enum PortableBackupInspector {
-    static func inspect(url: URL, password: String) throws -> SnapshotSummary {
+    static func inspect(url: URL, password: String) throws -> N1BackupManifest {
         guard password.count >= 14 && password.count <= 200 else {
             throw BackupInspectionError.invalidPasswordLength
         }
@@ -87,7 +87,7 @@ enum PortableBackupInspector {
               let snapshot = root["snapshot"] as? [String:Any]
         else { throw BackupInspectionError.invalidSnapshot }
         do {
-            return try LegacySnapshotReader.inspectDictionary(snapshot)
+            return try N1BackupAdmission.preview(data: JSONSerialization.data(withJSONObject: snapshot))
         } catch {
             throw BackupInspectionError.invalidSnapshot
         }

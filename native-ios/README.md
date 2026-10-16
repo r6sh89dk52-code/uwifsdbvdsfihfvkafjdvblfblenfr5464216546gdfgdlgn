@@ -34,3 +34,7 @@ El ejecutable de prueba se debe firmar con la identidad correspondiente antes de
 
 ## Criterio de aceptación
 No considerar la migración completa hasta que los test nativos y cruzados con la app heredada confirmen preservación exacta de cada consumo, stock/lote, historial, alergias, borradores, Kardex y Excel; no hay acceso a datos reales ni sobrescritura implícita.
+
+## Etapa N1a — almacenamiento aislado de prueba
+
+La pestaña «Laboratorio» comprueba escritura/lectura cifrada de **un contador ficticio** usando CryptoKit y Keychain independientes. No carga, importa ni modifica datos clínicos. El núcleo añade validación de colecciones del respaldo antes de una futura restauración. Detalles y condiciones en `docs/N1A_SEGURIDAD_Y_PENDIENTES.md`.

@@ -6,7 +6,7 @@ struct BackupPreviewView: View {
     @State private var password = ""
     @State private var isPickerOpen = false
     @State private var isInspecting = false
-    @State private var summary: SnapshotSummary?
+    @State private var summary: N1BackupManifest?
     @State private var error = ""
 
     var body: some View {
@@ -40,10 +40,14 @@ struct BackupPreviewView: View {
                 Section("Contenido comprobado · solo cantidades") {
                     LabeledContent("Trabajadores", value: "\(summary.workers)")
                     LabeledContent("Atenciones", value: "\(summary.attentions)")
-                    LabeledContent("Lotes", value: "\(summary.stockLots)")
-                    LabeledContent("Movimientos físicos", value: "\(summary.stockMovements)")
+                    LabeledContent("Alergias", value: "\(summary.allergies)")
+                    LabeledContent("Lotes", value: "\(summary.lots)")
+                    LabeledContent("Movimientos físicos", value: "\(summary.movements)")
+                    LabeledContent("Equivalencias", value: "\(summary.catalogMappings)")
+                    LabeledContent("Incidencias", value: "\(summary.deliveryIncidents)")
+                    LabeledContent("Conciliaciones", value: "\(summary.ambulatoryReconciliation)")
                     LabeledContent("Consumos clínicos sin movimiento vinculado",
-                                   value: "\(summary.unmappedAttentionConsumptions)")
+                                   value: "\(summary.unresolvedClinicalItems)")
                     Text("Verificar el respaldo no lo importa. No se realizó ninguna restauración.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("Ocultar resultado") { self.summary = nil }
