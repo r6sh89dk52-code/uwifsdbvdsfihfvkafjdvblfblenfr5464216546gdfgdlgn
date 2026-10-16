@@ -36,6 +36,6 @@ assert(css.includes('prefers-reduced-motion:reduce'),'iOS Reduce Motion preferen
 assert(base.includes('.registerDock'),'original save dock not removed');
 assert(main.includes('function save()'),'clinical save function remains');
 assert(main.includes('function patch('),'draft update function remains');
-assert(iosBuild.includes('CFBundleVersion 220'),'new iPhone build must be 220');
-assert(iosVerifier.includes("packed.CFBundleVersion,'220'"),'IPA verifier must require build 220');
-console.log('PASS: Stage A visual shell, accessible anchors, reduced motion, iOS safe areas, build 220 and preserved clinical action hooks.');
+assert(iosBuild.includes('CFBundleVersion 221'),'new iPhone build must be 220');
+assert(iosVerifier.includes("packed.CFBundleVersion,'221'"),'IPA verifier must require build 220');
+console.log('PASS: Stage A visual shell, accessible anchors, reduced motion, iOS safe areas, build 221 and preserved clinical action hooks.');
