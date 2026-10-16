@@ -285,6 +285,13 @@ internal enum N1qReconciliationParityAudit {
         let openings=events.filter{$0.kind=="opening" && $0.date==start}
         let counts=events.filter{$0.kind=="count" && $0.date==end}
         let receipts=events.filter{$0.kind=="receipt" && $0.date>=start && $0.date<=end}
+        var numberOfReceipts:[String:Int]=[:]
+        for receipt in receipts {
+            numberOfReceipts[receipt.code,default:0]+=1
+            guard numberOfReceipts[receipt.code]!<=4 else {
+                throw N1qAuditError.invalidEvents
+            }
+        }
         let countOpening=openings.count,countCount=counts.count,countReceipts=receipts.count
         var expectedWarnings:[String]=[]
         if !review {
