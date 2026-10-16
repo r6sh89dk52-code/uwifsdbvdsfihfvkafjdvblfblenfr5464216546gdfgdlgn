@@ -80,6 +80,16 @@ const {peruStockDate}=load('src/inventoryRules.ts');
 assert.equal(peruStockDate(Date.parse('2026-10-16T01:52:00Z')),'2026-10-15');
 
 
+// Fractional loose UND is not an issuable tablet. Continue to a later FEFO lot.
+const olderDecimal={...lot('fractional',0,0.5),expires:'2026-11-01'};
+const laterWhole={...lot('whole',1,2),expires:'2027-02-01'};
+const decimalIssue=run({lots:[olderDecimal,laterWhole],movements:[]},
+ a('next-full-lot',[item('tablet',p,1)]),date);
+assert.equal(decimalIssue.deducted,1);
+assert.equal(decimalIssue.pending,0);
+assert.equal(decimalIssue.ledger.movements[0].lotId,'whole');
+assert.equal(decimalIssue.ledger.lots[0].looseUnits,0.5);
+assert.equal(decimalIssue.ledger.lots[1].looseUnits,1);
 const depleted=run({lots:[lot('jan',0,1)],movements:[]},a('too-much',[item('i',p,100)]),date);
 assert.equal(depleted.pending,1);
 assert.equal(depleted.ledger.lots[0].looseUnits,1);
