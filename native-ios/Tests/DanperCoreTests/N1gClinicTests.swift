@@ -8,6 +8,7 @@ final class N1gClinicTests: XCTestCase {
         let id=c.newDraft(at:100)
         try c.edit(id,.worker("00000001"),at:101)
         try c.edit(id,.category("ENFERMEDAD"),at:102)
+        try c.edit(id,.system("RESPIRATORIO"),at:102)
         try c.edit(id,.diagnosis("CEFALEA FICTICIA"),at:103)
         try c.edit(id,.procedure("OBSERVACION"),at:104)
         try c.reviewAllergy(.none,for:"00000001")
@@ -50,6 +51,7 @@ final class N1gClinicTests: XCTestCase {
         let d=other.newDraft(at:1)
         try other.edit(d,.worker("00000001"),at:2)
         try other.edit(d,.category("ENFERMEDAD"),at:3)
+        try other.edit(d,.system("RESPIRATORIO"),at:3)
         try other.edit(d,.diagnosis("CEFALEA FICTICIA"),at:4)
         try other.edit(d,.procedure("OBSERVACION"),at:5)
         XCTAssertThrowsError(try other.saveDemo(d,at:6)) { e in
