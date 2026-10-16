@@ -9,7 +9,7 @@ export type ExportVisit={
  id:string;status:'draft'|'saved';date:string;time:string;
  worker:{dni:string;name:string;area:string;labor:string;sex:string;age:string|number;ubigeo:string;site?:string};
  category:string;system:string;segment:string;diagnosis:string;
- items:{id:string;code:string;name:string;unit:string;quantity:number;procedure:string}[];
+ items:{id:string;code:string;name:string;unit:string;quantity:number;procedure:string;physicalUse?:{lotId:string;quantity:number}}[];
  permission:string;workStatus:string;permissionTime:string;blueBandage:boolean;returned:boolean;photoSent:boolean;
  responsible:string;responsibleDni:string;standaloneProcedures?:string[];
 };
@@ -43,7 +43,12 @@ function auditedQuantity(m:StockMovement):number{
  const replayRef=split?{
   attentionId:ref.attentionId,itemId:ref.itemId,
   clinicalCode:ref.clinicalCode,clinicalName:ref.clinicalName,
-  clinicalUnit:ref.clinicalUnit,clinicalQuantity:m.quantity,confirmedAt:ref.confirmedAt
+  clinicalUnit:ref.clinicalUnit,
+  // UND/TBL/PAR parts must validate their own integer quantity; liquids and
+  // packaged supplies retain the integer clinical count while a physical part
+  // can correctly be a fractional mL or an internal supply unit.
+  clinicalQuantity:['UND','TBL','PAR'].includes(ref.clinicalUnit.trim().toUpperCase())
+   ?m.quantity:ref.clinicalQuantity,confirmedAt:ref.confirmedAt
  }:ref;
  const replayId=split?'ATT:'+ref.attentionId+':ITEM:'+ref.itemId:m.id;
  const replay=postStockMovement({lots:[m.before],movements:[]},{id:replayId,lotId:m.lotId,at:m.at,
@@ -115,6 +120,15 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
       if(incidents.some(i=>i.movementId===m.id))
        blockers.push('Entrega con devolución o discrepancia pendiente de conciliación: '+item.code);
       issued+=auditedQuantity(m);
+     }
+     // For a physical split of CJA/FCO/PAQ, clinical quantity may be
+     // 1 package while the internal amount is fractional mL. Verify the sum
+     // against the quantity explicitly recorded inside the attention.
+     if(movements.length>1&&!['UND','TBL','PAR'].includes(item.unit.trim().toUpperCase())){
+      const actual=Math.round(movements.reduce((n,m)=>n+m.quantity,0)*1000)/1000;
+      if(!item.physicalUse||!Number.isFinite(item.physicalUse.quantity)||
+         actual!==Math.round(item.physicalUse.quantity*1000)/1000)
+       throw Error('Las partes físicas del envase no coinciden con la atención registrada.');
      }
      quantity=Math.round(issued*1000)/1000;
      linkedDeliveries++; // physical group, not lot-part count
