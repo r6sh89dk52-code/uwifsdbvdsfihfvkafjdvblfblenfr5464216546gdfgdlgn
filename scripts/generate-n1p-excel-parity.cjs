@@ -87,4 +87,4 @@ assert.deepEqual(second.plan.lines.map(x=>x.cells[18]),
 assert.deepEqual(second.plan.lines.map(x=>x.cells[17]),[2,1,'','','','','']);
 assert.equal(second.plan.pendingDeliveries,2);
 assert.deepEqual(second.plan.lines.slice(0,2).map(x=>x.cells[20]),['-','INSUMOS']);
-console.log('PASS N1p: TypeScript official 10 sheets, 432 materials, 19 tables, 30 columns; synthetic stock R [5,1,0,12,1000], frequencies and pending verified.');
+console.log('PASS N1p: TypeScript official 10 sheets, 432 materials, 19 tables, 30 columns; synthetic R in Excel row order:',JSON.stringify(original.plan.lines.map(row=>row.cells[17])),'; frequencies and pending verified.');
