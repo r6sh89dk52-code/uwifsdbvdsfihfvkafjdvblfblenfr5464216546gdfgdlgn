@@ -50,6 +50,8 @@ const visits=[
  attention('fundo-reuse','LA VENTUROSA','00000003',[line('box-1',pack,1,{lotId:'later-sealed-box',quantity:1})]),
  attention('planta-tablet-carton','PLVENTUROSA','00000004',[line('unit-carton',unit,12)])
 ];
+// Real attentions have distinct clock times; Excel always sorts chronologically.
+visits.forEach((v,i)=>{v.time=['08:25','09:15','10:10','11:45'][i]});
 let state=original;const outcomes=[];
 for(let i=0;i<visits.length;i++){
  const result=stock.finalizeVisitAndPlanStock(state,visits[i],t+i*2000);
