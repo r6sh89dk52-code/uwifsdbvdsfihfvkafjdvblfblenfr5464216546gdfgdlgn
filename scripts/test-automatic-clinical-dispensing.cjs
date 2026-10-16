@@ -46,6 +46,16 @@ const depleted=run({lots:[lot('jan',0,1)],movements:[]},a('too-much',[item('i',p
 assert.equal(depleted.pending,1);
 assert.equal(depleted.ledger.lots[0].looseUnits,1);
 assert.equal(depleted.ledger.movements.length,0,'no negative stock');
+const sealed={...lot('sealed',0,0),container:'caja',catalogUnit:'UND',unitsPerContainer:20,sealedContainers:2};
+const open=run({lots:[sealed],movements:[]},a('first-open',[item('open-item',p,2)]),date);
+assert.equal(open.deducted,1,'first unit dispense auto-opens a known sealed unit box');
+assert.equal(open.ledger.lots[0].sealedContainers,1);
+assert.equal(open.ledger.lots[0].openedRemaining,18);
+assert.equal(open.ledger.movements[0].excelQuantity,2,'UND accounting stays 2, not 1 package');
+const reuse=run(open.ledger,a('second-open',[item('reuse-item',p,2)]),date+2000);
+assert.equal(reuse.deducted,1);
+assert.equal(reuse.ledger.lots[0].openedRemaining,16);
+assert.equal(reuse.ledger.movements[1].excelQuantity,2);
 const boxed=run({lots:[lot('box',0,2,'E-57')],movements:[]},a('boxed',[item('needle',box)]),date);
 assert.equal(boxed.pending,1,'a CJA must never be assumed to mean one needle without physical inner quantity');
 const ambiguousProduct=products.find(x=>x.code==='16024400');
