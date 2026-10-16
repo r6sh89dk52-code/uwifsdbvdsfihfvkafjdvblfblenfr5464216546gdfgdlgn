@@ -1,7 +1,7 @@
 name: DANPER - validacion del codigo en PR
 on:
   pull_request:
-    branches: [main, release/v0.21.10-build220-single-ipa, fix/v0.21.10-provisional-export-unverified-stock, fix/v0.21.10-integrated-clinical-dispensing, prep/v0.21.11-build221-upgrade-safe-linux]
+    branches: [main, release/v0.21.10-build220-single-ipa, fix/v0.21.10-provisional-export-unverified-stock, fix/v0.21.10-integrated-clinical-dispensing, prep/v0.21.11-build221-upgrade-safe-linux, fix/v0.21.11-provisional-show-clinical-consumption]
   workflow_dispatch:
 permissions:
   contents: read
