@@ -58,3 +58,7 @@ El paquete Swift ahora incluye `N1DurableRestoreSandbox`, exclusivo de tests fic
 ## N1f — Comprobación 1:1 de campos de atención, padrón y alergias
 
 Fingerprint semántico completo JSON: protege borradores parciales, correcciones, alergias unknown/none/known y extensiones desconocidas sin reescribir registros. Pruebas Linux generadas desde esquemas originales TS y datos ficticios. Consultar docs/N1F_PRESERVACION_CAMPOS.md. Sin IPA ni restauración real.
+
+## N1g — SwiftUI real: padrón, atención y borradores ficticios
+
+Implementación de UI SwiftUI de cinco pestañas y estado compartido de sesión `N1gClinic`, exclusiva de personas ficticias y sin persistencia clínica. Reglas de corrección, alergias y guardado simulado comprobadas en Linux; solo sintaxis de SwiftUI validada en Linux, **compilación real iOS pendiente**. Ver `docs/N1G_PANTALLAS_SWIFTUI.md`. No se genera IPA.
