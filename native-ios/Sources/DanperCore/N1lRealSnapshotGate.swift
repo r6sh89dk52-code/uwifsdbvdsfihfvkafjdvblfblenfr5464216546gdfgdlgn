@@ -9,7 +9,7 @@ public enum N1lDestinationState: String, Sendable {
 }
 public enum N1lImportRestriction: String, Equatable, Sendable {
     case notEmpty, destinationNotVerified, fictionalRecords, unresolvedCorrections
-    case sourceIdentityNotConfirmed, importerNotEnabled
+    case sourceIdentityNotConfirmed, importerNotEnabled, missingRosterReferences
 }
 public struct N1lSourceAudit: Sendable {
     public let manifest: N1BackupManifest
@@ -127,6 +127,7 @@ public enum N1lRealSnapshotGate {
         }
         if markedWorkers > 0 || markedClinical > 0 { restrictions.append(.fictionalRecords) }
         if dangling > 0 { restrictions.append(.unresolvedCorrections) }
+        if missingRoster > 0 { restrictions.append(.missingRosterReferences) }
         let structurallyEligible = destination == .verifiedEmpty &&
             markedWorkers == 0 && markedClinical == 0 &&
             dangling == 0 && missingRoster == 0
