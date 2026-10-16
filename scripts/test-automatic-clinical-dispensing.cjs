@@ -65,6 +65,43 @@ const ambiguousProduct=products.find(x=>x.code==='16024400');
 assert(ambiguousProduct);
 const ambiguous=run({lots:[lot('x',0,20,'E-62'),lot('y',1,20,'E-63')],movements:[]},a('amb',[item('amb',ambiguousProduct)]),date);
 assert.equal(ambiguous.pending,1,'never choose between E-62/E-63');
+// Physical evidence for CJA/FCO is captured within the clinical item, not in Kardex.
+const needleBoxLot={...lot('needle-pack',0,0,'E-57'),container:'caja',catalogUnit:'CJA',
+ unitsPerContainer:100,sealedContainers:1,looseUnits:0,openedRemaining:0};
+const boxLine={...item('needle',box),physicalUse:{lotId:'needle-pack',quantity:1}};
+const firstBox=run({lots:[needleBoxLot],movements:[]},a('first-needle',[boxLine]),date);
+assert.equal(firstBox.deducted,1,'in-form package details must be posted automatically');
+assert.equal(firstBox.ledger.movements[0].quantity,1,'one physical needle used');
+assert.equal(firstBox.ledger.movements[0].excelQuantity,1,'R=1 for first opening of a box');
+assert.equal(firstBox.ledger.lots[0].openedRemaining,99);
+const nextBox=run(firstBox.ledger,a('second-needle',[{...boxLine,id:'needle-next'}]),date+1000);
+assert.equal(nextBox.deducted,1);
+assert.equal(nextBox.ledger.movements[1].excelQuantity,0,'R=0 when using already-open box');
+assert.equal(nextBox.ledger.lots[0].openedRemaining,98);
+const absentBox=run({lots:[],movements:[]},a('absent',[boxLine]),date);
+assert.equal(absentBox.pending,1,'explicit past stock must never invent a present lot');
+assert.equal(absentBox.ledger.movements.length,0);
+assert.throws(()=>run({lots:[needleBoxLot],movements:[]},a('invalid-quantity',
+ [{...boxLine,physicalUse:{lotId:'needle-pack',quantity:0}}]),date),/cantidad física válida/);
+// E-62 and E-63 share an official code, requiring precise selection in the encounter.
+const disambiguated=run({lots:[lot('x',0,20,'E-62'),lot('y',1,20,'E-63')],movements:[]},
+ a('amb-selected',[{...item('amb',ambiguousProduct),physicalUse:{lotId:'y',quantity:1}}]),date);
+assert.equal(disambiguated.deducted,1,'in-visit exact stock row resolves ambiguous official codes');
+assert.equal(disambiguated.ledger.movements[0].lotId,'y');
+assert.equal(disambiguated.ledger.lots[0].looseUnits,20,'must never subtract from wrong E-62 row');
+assert.equal(disambiguated.ledger.lots[1].looseUnits,19);
+const missingChoice=run({lots:[lot('x',0,20,'E-62')],movements:[]},
+ a('missing-choice',[{...item('amb',ambiguousProduct),physicalUse:{lotId:'absent',quantity:1}}]),date);
+assert.equal(missingChoice.pending,1);
+assert.equal(missingChoice.ledger.movements.length,0);
+const ui=require('node:fs').readFileSync('src/main.tsx','utf8');
+assert.match(ui,/<ClinicalStockChoice item=\{i\}/,'in-form physical selection');
+assert.match(ui,/stockLots:result.ledger.lots,stockMovements:result.ledger.movements/,
+ 'visit plus physical movement must be persisted as one encrypted snapshot');
+assert.match(ui,/await writeDemoSnapshot\(snapshot\)/,'persistence before marking saved');
+const inline=require('node:fs').readFileSync('src/ClinicalStockChoice.tsx','utf8');
+assert.match(inline,/Cantidad física utilizada/);
+assert.match(inline,/Sin identificar/);
 const amp=run({lots:[],movements:[]},a('amp',[item('amp',needle)]),date);
 assert.equal(amp.pending,1);
 const exportPlan=buildAmbulatoryRows([one],noStock.ledger,'2026-10-09','2026-11-08',{perVisitSubdivision:true,allowPendingDeliveries:true});
