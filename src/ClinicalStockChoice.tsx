@@ -13,33 +13,41 @@ export function ClinicalStockChoice({item,ledger,onChange,locked=false}:Props){
  const manualNeeded=!unitCounted||allowed.length>1;
  const eligible=ledger.lots.filter(l=>associations.some(a=>a.kardexCode===l.code&&a.kardexName===l.name)&&
    (!unitCounted||(item.unit.toUpperCase()==='PAR'?l.catalogUnit.toUpperCase()==='PAR':['UND','TBL'].includes(l.catalogUnit.toUpperCase()))));
- const candidates=eligible.filter(l=>availableLots(eligible,l.code).some(x=>x.id===l.id));
- const selected=candidates.find(x=>x.id===item.physicalUse?.lotId);
- if(locked)return <p className="hint" role="status">Salida física vinculada a Kardex: no puede cambiarse desde esta atención.</p>;
- if(!allowed.length)return <p className="hint" role="status">Sin equivalencia física autorizada. La atención se guarda, pero no se inventará un movimiento.</p>;
- if(!manualNeeded){
-  return <p className="hint">Descuento automático desde el inventario disponible, según FEFO. Si falta saldo, la atención quedará registrada y se informará la diferencia.</p>;
+ const groups=new Map<string,typeof eligible[number]>();
+ // A dropdown entry represents a verified product *variant*, NOT a specific lot.
+ for(const l of eligible){
+  const best=availableLots(eligible,l.code).find(a=>a.name===l.name);
+  if(best)groups.set(l.code+'|'+l.name,best);
  }
- if(!candidates.length)return <p className="hint" role="status">Sin existencias verificables para esta presentación. El consumo se guardará como pendiente, sin descontar saldos inexistentes.</p>;
- return <div className="clinicalPhysicalChoice" aria-label={'Existencia utilizada de '+item.name}>
-  <p className="hint">Datos físicos de esta atención (opcional si todavía no se conocen). Al pulsar Guardar se descuenta directamente; no se vuelve a confirmar en Kardex.</p>
-  <label>Existencia o presentación utilizada
-   <select value={selected?.id||''} onChange={e=>{
-    const id=e.target.value;
-    if(!id){onChange(undefined);return}
-    const lot=candidates.find(l=>l.id===id);
-    if(!lot)return;
-    onChange({lotId:id,quantity:unitCounted?item.quantity:0});
+ const variants=[...groups.values()];
+ const chosen=variants.find(l=>eligible.some(e=>e.id===item.physicalUse?.lotId&&e.code===l.code&&e.name===l.name));
+ const autoVariant=variants.length===1?variants[0]:undefined;
+ const choice=chosen||autoVariant;
+ const stockForChoice=choice?eligible.filter(l=>l.code===choice.code&&l.name===choice.name):[];
+ const total=stockForChoice.reduce((n,l)=>n+countPhysicalUnits(l),0);
+ if(locked)return <p className="hint" role="status">Salida física ya vinculada al Kardex: no puede cambiarse desde esta atención.</p>;
+ if(!allowed.length)return <p className="hint" role="status">Sin equivalencia de Kardex autorizada. El uso clínico se conserva, sin movimiento físico ficticio.</p>;
+ if(!manualNeeded)return <p className="hint">FEFO automático: DANPER descontará primero el lote vigente más próximo a vencer y continuará con los siguientes. No necesitas elegir un lote.</p>;
+ if(!variants.length)return <p className="hint" role="status">No hay inventario compatible y disponible. La atención se guarda, con salida física pendiente.</p>;
+ return <div className="clinicalPhysicalChoice" aria-label={'Presentación utilizada de '+item.name}>
+  <p className="hint">DANPER selecciona automáticamente los lotes por FEFO. Aquí solo identificas la presentación y la cantidad física realmente utilizada cuando el catálogo no la determina.</p>
+  {variants.length>1&&<label>Presentación física usada
+   <select value={chosen?.code||''} onChange={e=>{
+    const variant=variants.find(l=>l.code===e.target.value);
+    onChange(variant?{lotId:variant.id,quantity:unitCounted?item.quantity:0}:undefined);
    }}>
-    <option value="">Sin identificar (consumo clínico pendiente)</option>
-    {candidates.map(l=><option key={l.id} value={l.id}>{l.name} · {l.lot?'lote '+l.lot:'lote no identificado'} · {countPhysicalUnits(l)} unidades internas disponibles</option>)}
+    <option value="">Presentación pendiente de identificar</option>
+    {variants.map(l=><option key={l.code} value={l.code}>{l.name} · {l.code}</option>)}
    </select>
-  </label>
-  {selected&&<><label>Cantidad física utilizada {unitCounted?'(unidades)':'(unidades internas o mL, según la ficha del producto)'}
-   <input type="number" inputMode="decimal" step={unitCounted?'1':'0.001'} min="0" max="10000000"
-    value={item.physicalUse?.quantity||''} onChange={e=>onChange({lotId:selected.id,quantity:e.target.value===''?0:Number(e.target.value)})}
-    aria-label={'Cantidad física utilizada de '+item.name} />
-  </label>
-  <p className="hint">Indica lo realmente utilizado, no la cantidad que contiene una caja o frasco completo. Las aperturas se calculan con el remanente registrado. Si el dato no es seguro, selecciona «Sin identificar».</p></>}
+  </label>}
+  {choice&&<><p className="hint">Existencia total disponible de esta presentación: {total} unidades físicas. El orden de salida se decidirá por vencimiento.</p>
+   {!unitCounted&&<label>Cantidad física utilizada (unidades internas o mL según la ficha)
+    <input type="number" inputMode="decimal" step="0.001" min="0" max="10000000"
+     value={item.physicalUse?.quantity||''}
+     onChange={e=>onChange({lotId:chosen?.id||autoVariant!.id,quantity:e.target.value===''?0:Number(e.target.value)})}
+     aria-label={'Cantidad física utilizada de '+item.name}/>
+   </label>}
+   <p className="hint">No introduzcas el tamaño de toda la caja o frasco, sino la cantidad utilizada. Si no lo sabes, puedes guardar la atención con consumo pendiente y sin descuento.</p>
+  </>}
  </div>;
 }
