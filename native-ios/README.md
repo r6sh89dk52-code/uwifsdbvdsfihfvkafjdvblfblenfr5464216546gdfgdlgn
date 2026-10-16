@@ -74,3 +74,7 @@ El motor Swift incluye AES-256-GCM y puntero autenticado para guardar exclusivam
 ## N1j — Guardado ficticio ordenado por revisión autenticada
 
 A partir de N1i, cada generación cifrada almacena una revisión v2 con HMAC. Revisión recuperada al iniciar, snapshots monotónicos, protección contra tareas retrasadas y diez regresiones Linux. La solicitud inmediata al pasar a segundo plano sigue siendo best-effort; requiere validación en Xcode/iPhone. Ver `docs/N1J_AUTOGUARDADO_REVISIONES.md`. Sin datos clínicos reales y sin IPA.
+
+## N1k — Auditoría SwiftUI/Xcode y bienvenida profesional
+
+La introducción nativa de primer inicio solicita voluntariamente notificaciones y biometría, permite omitirlas y explica el acceso local a archivos. El acceso a respaldo cifrado real es **solo lectura**; no hay migración de pacientes todavía. Se audita la compilación Xcode sin firma en simulador y dispositivo genérico, sin generar IPA ni sustituir la build 222. Detalles: `docs/N1K_AUDITORIA_XCODE_ONBOARDING.md`.
