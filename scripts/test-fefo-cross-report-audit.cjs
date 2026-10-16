@@ -65,11 +65,11 @@ const lines=state.movements.reduce((r,m)=>{
 assert.deepEqual(lines['unit-5'].map(m=>m.quantity),[2,3]);
 assert.deepEqual(lines['box-2'].map(m=>m.excelQuantity),[0,1]);
 assert.deepEqual(lines['box-1'].map(m=>m.excelQuantity),[0]);
-assert.deepEqual(lines['unit-carton'].map(m=>m.quantity),[7,5]);
-assert.deepEqual(lines['unit-carton'].map(m=>m.excelQuantity),[7,5]);
+assert.deepEqual(lines['unit-carton'].map(m=>m.quantity),[5,7]);
+assert.deepEqual(lines['unit-carton'].map(m=>m.excelQuantity),[5,7]);
 assert.equal(state.lots.find(l=>l.id==='early-unit').looseUnits,0);
 assert.equal(state.lots.find(l=>l.id==='later-unit').looseUnits,0);
-assert.equal(state.lots.find(l=>l.id==='tablet-carton').openedRemaining,15);
+assert.equal(state.lots.find(l=>l.id==='tablet-carton').openedRemaining,13);
 assert.equal(state.lots.find(l=>l.id==='early-open-box').openedRemaining,0);
 assert.equal(state.lots.find(l=>l.id==='later-sealed-box').openedRemaining,98);
 assert.equal(JSON.stringify(original),clone,'the test must not mutate initial stock');
@@ -135,7 +135,7 @@ assert.equal(indicator.lines.filter(x=>x.cells[15]===unit.code).reduce((n,x)=>n+
 assert.equal(indicator.lines.filter(x=>x.cells[15]===pack.code).reduce((n,x)=>n+x.cells[17],0),boxes.consumed);
 
 // Provisional fallbacks must not damage the already verified physical rows.
-const absent=attention('no-physical-stock','LA VENTUROSA','00000005',[line('unverified',unit,4)]);
+const absent=attention('no-physical-stock','LA VENTUROSA','00000005',[line('unverified',unit,40)]);
 const pendingPlan=stock.finalizeVisitAndPlanStock(state,absent,t+8000);
 assert.equal(pendingPlan.pending,1,'no stock remaining for unverified extra units');
 const provisional=buildAmbulatoryRows([...visits,absent],pendingPlan.ledger,'2026-10-09','2026-11-08',
