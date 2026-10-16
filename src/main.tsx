@@ -251,7 +251,7 @@ async function save(){
   const result=alreadySaved?{
    ledger,deducted:0,pending:confirmed.items.filter(i=>!ledger.movements.some(m=>
     m.dispenseRef?.attentionId===confirmed.id&&m.dispenseRef.itemId===i.id)).length
-  }:finalizeVisitAndPlanStock(ledger,confirmed,confirmed.updatedAt);
+  }:finalizeVisitAndPlanStock(ledger,confirmed,confirmed.updatedAt,{requireOpeningApproval:true});
   // Single encrypted snapshot: visit, physical stock and audit movements.
   const snapshot={...snapshotRef.current,attentions:next,stockLots:result.ledger.lots,stockMovements:result.ledger.movements};
   await writeDemoSnapshot(snapshot);
