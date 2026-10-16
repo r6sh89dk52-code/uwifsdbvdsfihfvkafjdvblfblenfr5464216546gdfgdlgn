@@ -24,7 +24,12 @@ export type AutoDispenseResult={
  * which the current form does not capture. These remain pending, never guessed.
  */
 function individualUnit(unit:string):boolean{return ['UND','TBL','PAR'].includes(unit.trim().toUpperCase())}
-export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:SavedClinicalAttention,at:number):AutoDispenseResult{
+function limaDay(at:number):string{
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(at));
+ const p=(type:string)=>parts.find(x=>x.type===type)?.value||'';
+ return p('year')+'-'+p('month')+'-'+p('day');
+}
+export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:SavedClinicalAttention & {date?:string},at:number):AutoDispenseResult{
  if(!visit||visit.status!=='saved'||!visit.id?.trim())throw Error('La atención debe estar finalizada.');
  if(!Number.isSafeInteger(at)||at<=0)throw Error('Hora de entrega inválida.');
  let current=validateStockLedger(ledger);
@@ -44,6 +49,11 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:SavedClinical
   }
   if(alreadyDispensed(current,visit.id,item.id))
     throw Error('Identificador de entrega inconsistente.');
+  if(visit.date && visit.date!==limaDay(at)){
+   results.push({itemId:item.id,clinicalCode:item.code,outcome:'pending',
+    reason:'La fecha clínica difiere del día del guardado. No se descuenta stock actual por un consumo histórico.'});
+   continue;
+  }
   const associations=reviewedAssociationsFor(item.code).filter(x=>
     x.clinicalName===item.name&&x.clinicalUnit===item.unit);
   const uniqueCodes=[...new Set(associations.map(x=>x.kardexCode))];
