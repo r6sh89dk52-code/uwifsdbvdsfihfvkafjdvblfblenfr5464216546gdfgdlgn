@@ -42,3 +42,7 @@ La pestaña «Laboratorio» comprueba escritura/lectura cifrada de **un contador
 ## Etapa N1b (Linux exclusivamente; sin IPA)
 
 El núcleo Swift ahora incluye verificación de respaldo AES-256-GCM compatible con la generación TypeScript mediante Apple Swift Crypto. Las pruebas Linux producen archivos **ficticios** temporales desde `src/portableBackup.ts` y comparan autenticidad, digest de texto claro, estructura, daños y contraseña incorrecta. El simulador de restauración es puramente de pruebas; **no permite importar trabajadores o atenciones reales**. Consultar `docs/N1B_COMPATIBILIDAD_LINUX.md`.
+
+## N1c — Journal de generación persistente (solo Linux)
+
+El paquete Swift ahora incluye `N1DurableRestoreSandbox`, exclusivo de tests ficticios con `N1-CANARY|`, carpetas temporales, dos archivos por generación, hashes SHA256, diario persistente, un puntero de activación y reanudación tras interrupciones simuladas. **No almacena registros reales y no implementa aún restauración clínica.** Véase `docs/N1C_JOURNAL_LINUX.md`.
