@@ -82,3 +82,7 @@ La introducción nativa de primer inicio solicita voluntariamente notificaciones
 ## N1l — Solo fuente real, sin mezclar datos ficticios
 
 Se amplió la lectura local del `.danperbackup` con auditoría completa de **nueve colecciones** (padrón, atenciones, alergias, avisos, lotes, movimientos, equivalencias, incidencias, conciliaciones); recuento de borradores/correcciones y vínculos pendientes. Bloqueo de destino ocupado o desconocido, marcadores ficticios reconocibles y duplicados. **No existe importador ni escritura de datos reales en N1l**: revisar `docs/N1L_PLAN_CERO_MEZCLAS.md`. El inspector nunca almacena registros reales ni mezcla con N1g. El cifrado no permite distinguir ficticios sin marcadores; un origen combinado requiere depuración de procedencia humana antes de migrar.
+
+## N1m — Bóveda de preparación cifrada con origen único
+
+Se añadió almacenamiento cifrado independiente de preparación de la base auténtica de build 222, pero todavía **sin conexión al selector ni activación clínica**. Incluye recibo HMAC, verificación de hashes y conservación 1:1, reanudación tras interrupciones sin mezclar fuentes y un servicio Keychain independiente. Sigue siendo una etapa de preparación sin instalación y sin IPA. Ver `docs/N1M_BOVEDA_STAGING_REAL.md`.
