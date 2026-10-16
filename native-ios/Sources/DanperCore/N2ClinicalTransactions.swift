@@ -216,25 +216,25 @@ public enum N2NativeClinicalTransaction {
                     probe.first(where:{$0["id"] as? String == entry["id"] as? String})
                 }.filter{(total($0) ?? 0)>0}
                 guard let before=available.first else{canPlan=false;break}
-                let pack=(before["container"] as? String)!="unidad" ||
+                let pack=(before["container"] as? String) != "unidad" ||
                          number(before["unitsPerContainer"]) != 1 ||
-                         (before["catalogUnit"] as? String)!="UND"
+                         (before["catalogUnit"] as? String) != "UND"
                 let opened=number(before["openedRemaining"]) ?? 0
                 let loose=number(before["looseUnits"]) ?? 0
                 let sealed=number(before["sealedContainers"]) ?? 0
                 let cap=number(before["unitsPerContainer"]) ?? 1
                 let room=pack ? (opened>0 ? opened : loose>0 ? loose : sealed>0 ? cap:0) :
                     (total(before) ?? 0)
-                let take=triple(min(rest,individual ? floor(room+0.000001):room))
+                let take:Double=triple(Swift.min(rest,individual ? floor(room+0.000001):room))
                 if take<=0 {canPlan=false;break}
                 var after=before
                 var open=false
                 var r=individual ? take : 0.0
                 if !pack {
                     var left=take
-                    let looseTake=min(loose,left)
+                    let looseTake:Double=Swift.min(loose,left)
                     after["looseUnits"]=triple(loose-looseTake);left=triple(left-looseTake)
-                    let sealedTake=min(sealed,left)
+                    let sealedTake:Double=Swift.min(sealed,left)
                     after["sealedContainers"]=Int(sealed-sealedTake);left=triple(left-sealedTake)
                     if left>0 {after["openedRemaining"]=triple(opened-left)}
                 }else if opened>0 {
@@ -249,7 +249,7 @@ public enum N2NativeClinicalTransaction {
                 }else {canPlan=false;break}
                 after["updatedAt"]=at
                 guard (total(after) ?? -1)>=0,
-                      triple((total(after) ?? 0)-(total(before) ?? 0)) == -take else {
+                      triple((total(after) ?? 0)-(total(before) ?? 0)) == (0.0 - take) else {
                     canPlan=false;break
                 }
                 if let idx=probe.firstIndex(where:{$0["id"] as? String == before["id"] as? String}) {

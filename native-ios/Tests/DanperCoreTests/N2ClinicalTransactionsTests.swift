@@ -57,7 +57,7 @@ final class N2ClinicalTransactionsTests: XCTestCase {
         let next=try XCTUnwrap(JSONSerialization.jsonObject(with:output.snapshot) as? [String:Any])
         XCTAssertEqual(Set(next.keys),Set(original.keys))
         XCTAssertEqual(next["allergies"] as? [String:String], original["allergies"] as? [String:String])
-        XCTAssertEqual(next["catalogMappings"] as? [[String:Any]] ?? [], [])
+        XCTAssertEqual((next["catalogMappings"] as? [[String:Any]])?.count,0)
         let repeated=try N2NativeClinicalTransaction.retryCurrentSavedVisit(
             snapshot:output.snapshot,visitID:"n2-new",
             approvedCatalog:read("n2-reviewed-approved.json"),at:time())
