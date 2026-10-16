@@ -29,71 +29,102 @@ internal enum N1sNursingExcelWriter {
               n.doubleValue.isFinite else{return nil}
         return n.doubleValue
     }
+    /// Scope every mutation to ONE Excel row. Searching globally for <c>
+    /// can overrun a self-closing cell and accidentally consume adjacent rows.
     private static func patch(_ source:String,address:String,
                               value:Any?,formula:String?=nil) throws -> String {
-        let rx="<c\\b[^>]*\\br=\"" + NSRegularExpression.escapedPattern(for:address) + "\"[^>]*(?:/>|>.*?</c>)"
-        var xml=source
-        let current=try firstRange(rx,in:xml)
-        var existingStyle=""
-        if let current {
-            let tag=String(xml[current])
+        guard let number=Int(address.drop(while:{$0.isLetter})),
+              (1...104).contains(number) else {throw N1sExcelError.invalidTemplate}
+        let prefix=String(address.prefix(while:{$0.isLetter}))
+        let rowPattern="<row\\b[^>]*\\br=\""+String(number)+"\"[^>]*>.*?</row>"
+        let rowMatches=try match(rowPattern,in:source)
+        guard rowMatches.count<=1 else {throw N1sExcelError.invalidTemplate}
+        let originalRow:String
+        var replaceRange:Range<String.Index>?
+        if let rowMatch=rowMatches.first,let range=Range(rowMatch.range,in:source) {
+            originalRow=String(source[range])
+            replaceRange=range
+        }else {
+            originalRow="<row r=\"\(number)\"></row>"
+            replaceRange=nil
+        }
+        let cellPattern=#"<c\b[^>]*\br="([A-Z]+[0-9]+)"[^>]*(?:/>|>.*?</c>)"#
+        let existing=try match(cellPattern,in:originalRow)
+        var positions:[(reference:String,range:Range<String.Index>)]=[]
+        for match in existing {
+            guard let full=Range(match.range,in:originalRow),
+                  let capture=Range(match.range(at:1),in:originalRow) else {
+                throw N1sExcelError.invalidTemplate
+            }
+            positions.append((reference:String(originalRow[capture]),range:full))
+        }
+        let hit=positions.filter{$0.reference==address}
+        guard hit.count<=1 else {throw N1sExcelError.invalidTemplate}
+        var preservedStyle=""
+        if let old=hit.first {
+            let tag=String(originalRow[old.range])
             if let m=try match(#"\bs="([^"]+)""#,in:tag).first,
-               let r=Range(m.range(at:1),in:tag) {
-                existingStyle=" s=\""+String(tag[r])+"\""
+               let range=Range(m.range(at:1),in:tag) {
+                preservedStyle=" s=\""+String(tag[range])+"\""
             }
         }
-        let head="<c r=\""+address+"\""+existingStyle
+        let head="<c r=\"\(address)\""+preservedStyle
         let rendered:String
         if let formula {
             let f=try escape(formula)
             if let num=numeric(value) {
-                rendered=head+"><f>"+f+"</f><v>"+(num.rounded()==num && abs(num)<1_000_000_000_000 ? String(Int64(num)) : String(num))+"</v></c>"
+                rendered=head+"><f>"+f+"</f><v>"+String(num)+"</v></c>"
             }else {
                 rendered=head+"><f>"+f+"</f></c>"
             }
         }else if let num=numeric(value) {
-            rendered=head+"><v>"+(num.rounded()==num && abs(num)<1_000_000_000_000 ? String(Int64(num)) : String(num))+"</v></c>"
+            rendered=head+"><v>"+String(num)+"</v></c>"
         }else if let string=value as? String,!string.isEmpty {
             rendered=head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + (try escape(string)) + "</t></is></c>"
         }else {
             rendered=head+"/>"
         }
-        if let current {
-            xml.replaceSubrange(current,with:rendered)
-        }else{
-            guard let number=Int(address.drop(while:{$0.isLetter})),
-                  (1...104).contains(number) else {throw N1sExcelError.invalidTemplate}
-            let pattern="<row\\b[^>]*\\br=\""+String(number)+"\"[^>]*>.*?</row>"
-            if let r=try firstRange(pattern,in:xml) {
-                let previous=String(xml[r])
-                // Maintain strictly increasing cell column order when a
-                // formerly blank nursing cell is inserted.
-                let col=String(address.prefix(while:{$0.isLetter}))
-                let cells=try match(#"<c\b[^>]*\br="([A-Z]+)[0-9]+""#,in:previous)
-                var insertion:String.Index?
-                for hit in cells {
-                    guard let captured=Range(hit.range(at:1),in:previous) else {continue}
-                    if String(previous[captured])>col {
-                        insertion=Range(hit.range,in:previous)?.lowerBound
-                        break
-                    }
+        var updated=originalRow
+        if let old=hit.first {
+            updated.replaceSubrange(old.range,with:rendered)
+        }else {
+            // Official workbook may omit completely blank cells: keep ordering
+            // and never steal characters from another row.
+            let targetColumn=prefix.unicodeScalars.reduce(0){$0*26+Int($1.value)-64}
+            var insert: String.Index?
+            for candidate in positions {
+                let p=String(candidate.reference.prefix(while:{$0.isLetter}))
+                let n=p.unicodeScalars.reduce(0){$0*26+Int($1.value)-64}
+                if n>targetColumn {
+                    insert=candidate.range.lowerBound
+                    break
                 }
-                var updated=previous
-                if let insertion {
-                    updated.insert(contentsOf:rendered,at:insertion)
-                }else if let closing=updated.range(of:"</row>",options:.backwards) {
-                    updated.insert(contentsOf:rendered,at:closing.lowerBound)
-                }else{throw N1sExcelError.invalidTemplate}
-                xml.replaceSubrange(r,with:updated)
-            }else if let closing=xml.range(of:"</sheetData>") {
-                // Some official templates omit blank metadata rows: unlike
-                // fabricating a stock count, creating an empty worksheet row
-                // for a known cell address is only structural.
-                xml.insert(contentsOf:"<row r=\"\(number)\">\(rendered)</row>",
-                           at:closing.lowerBound)
-            }else{
-                throw N1sExcelError.invalidTemplate
             }
+            if insert==nil {
+                insert=updated.range(of:"</row>",options:.backwards)?.lowerBound
+            }
+            guard let at=insert else {throw N1sExcelError.invalidTemplate}
+            updated.insert(contentsOf:rendered,at:at)
+        }
+        var xml=source
+        if let replaceRange {
+            xml.replaceSubrange(replaceRange,with:updated)
+        }else {
+            // Insert a genuinely missing blank row in numeric order.
+            let rowStartPattern=#"<row\b[^>]*\br="([0-9]+)""#
+            let existingRows=try match(rowStartPattern,in:xml)
+            var target: String.Index?
+            for entry in existingRows {
+                guard let valueRange=Range(entry.range(at:1),in:xml),
+                      let n=Int(xml[valueRange]) else {continue}
+                if n>number {
+                    target=Range(entry.range,in:xml)?.lowerBound
+                    break
+                }
+            }
+            if target==nil {target=xml.range(of:"</sheetData>")?.lowerBound}
+            guard let at=target else {throw N1sExcelError.invalidTemplate}
+            xml.insert(contentsOf:updated,at:at)
         }
         return xml
     }
