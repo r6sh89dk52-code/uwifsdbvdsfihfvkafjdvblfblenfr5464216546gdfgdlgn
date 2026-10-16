@@ -63,11 +63,15 @@ public enum LegacySnapshotReader {
             var itemIDs = Set<String>()
             for item in items {
                 guard let itemID = item["id"] as? String, !itemID.isEmpty,
-                      itemIDs.insert(itemID).inserted,
-                      let qty = item["quantity"] as? NSNumber,
-                      qty.doubleValue > 0, qty.doubleValue.isFinite
+                      itemIDs.insert(itemID).inserted
                 else { throw LegacySnapshotError.invalidClinicalItem }
                 if (attention["status"] as? String) == "saved" {
+                    // Saved clinical consumptions must be numeric and positive.
+                    // Draft items may intentionally contain 0, missing quantity
+                    // or a partially typed procedure; NEVER discard the draft.
+                    guard let qty = item["quantity"] as? NSNumber,
+                          qty.doubleValue > 0, qty.doubleValue.isFinite
+                    else { throw LegacySnapshotError.invalidClinicalItem }
                     clinicalItems += 1
                     consumedKeys.insert(id + "\u{001F}" + itemID)
                 }
