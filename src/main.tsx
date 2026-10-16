@@ -241,8 +241,14 @@ async function save(){
    if(!confirmed.items.some(i=>i.id===ref.itemId&&i.code===ref.clinicalCode&&i.name===ref.clinicalName&&i.unit===ref.clinicalUnit&&i.quantity===ref.clinicalQuantity&&(!i.physicalUse||(i.physicalUse.lotId===move.lotId&&i.physicalUse.quantity===move.quantity))))
     throw Error('No se puede modificar un producto con entrega física vinculada. Se requiere una corrección auditada.');
   }
+  // Never retroactively auto-consume for an attention already saved previously,
+  // including same-day corrections or double-taps after a successful save.
+  const alreadySaved=att.some(a=>a.status==='saved'&&a.id===confirmed.id);
+  const result=alreadySaved?{
+   ledger,deducted:0,pending:confirmed.items.filter(i=>!ledger.movements.some(m=>
+    m.dispenseRef?.attentionId===confirmed.id&&m.dispenseRef.itemId===i.id)).length
+  }:finalizeVisitAndPlanStock(ledger,confirmed,confirmed.updatedAt);
   // Single encrypted snapshot: visit, physical stock and audit movements.
-  const result=finalizeVisitAndPlanStock(ledger,confirmed,confirmed.updatedAt);
   const snapshot={...snapshotRef.current,attentions:next,stockLots:result.ledger.lots,stockMovements:result.ledger.movements};
   await writeDemoSnapshot(snapshot);
   snapshotRef.current=snapshot;setAtt(next);setLedger(result.ledger);setActive(confirmed);setPage('history');
