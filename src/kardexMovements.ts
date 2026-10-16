@@ -9,7 +9,7 @@ export type DispenseRef={
  attentionId:string;itemId:string;clinicalCode:string;clinicalName:string;
  clinicalUnit:string;clinicalQuantity:number;confirmedAt:number;
  /** For one clinical item split into several auditable FEFO lot issues. Legacy records omit both. */
- partIndex?:number;partCount?:number;
+ partIndex?:number;partCount?:number;physicalTotal?:number;
 };
 export type StockMovement={
  id:string;lotId:string;code:string;name:string;unit:string;at:number;
@@ -36,7 +36,9 @@ function amount(value:unknown,label:string,integer=false,allowZero=false){
 }
 function validDispenseRef(ref:DispenseRef,id:string,kind:MovementKind,at:number){
  const split=ref.partIndex!==undefined||ref.partCount!==undefined;
- const validSplit=split&&Number.isSafeInteger(ref.partCount)&&Number.isSafeInteger(ref.partIndex)&&
+ const validSplit=split&&typeof ref.physicalTotal==='number'&&Number.isFinite(ref.physicalTotal)&&
+   ref.physicalTotal>0&&ref.physicalTotal<=10000000&&Number.isSafeInteger(Math.round(ref.physicalTotal*1000))&&
+   Number.isSafeInteger(ref.partCount)&&Number.isSafeInteger(ref.partIndex)&&
     ref.partCount! >= 2&&ref.partCount! <= 500&&ref.partIndex! >= 1&&ref.partIndex! <= ref.partCount!;
  const expected='ATT:'+ref.attentionId+':ITEM:'+ref.itemId+
    (split?':PART:'+ref.partIndex:'');
@@ -94,16 +96,19 @@ export function validateStockMovements(v:unknown,allowIncompleteParts=false):Sto
    return (ref.partCount!==undefined)!==split||ref.clinicalCode!==first.clinicalCode||
     ref.clinicalName!==first.clinicalName||ref.clinicalUnit!==first.clinicalUnit||
     ref.clinicalQuantity!==first.clinicalQuantity||ref.confirmedAt!==first.confirmedAt||
-    (split&&ref.partCount!==first.partCount);
+    (split&&(ref.partCount!==first.partCount||ref.physicalTotal!==first.physicalTotal));
   }))throw Error('Inconsistencia entre partes de una misma atención.');
   if(split){
    if(!allowIncompleteParts && group.length!==first.partCount)
     throw Error('La entrega FEFO multilote está incompleta.');
    const counted=['UND','TBL','PAR'].includes(first.clinicalUnit.trim().toUpperCase());
-   const total=group.reduce((n,m)=>n+m.quantity,0);
-   if(counted&&(!Number.isInteger(total)||total>first.clinicalQuantity||
-     (!allowIncompleteParts&&total!==first.clinicalQuantity)))
-    throw Error('La cantidad sumada de los lotes no coincide con la atención.');
+   const total=round(group.reduce((n,m)=>n+m.quantity,0));
+   // Fractional mL for FCO/CJA/PAQ must reconcile to the original physical
+   // amount, not to the integer number of clinical containers.
+   if(!Number.isFinite(first.physicalTotal)||total>first.physicalTotal!||
+      (!allowIncompleteParts&&total!==first.physicalTotal)||
+      (counted&&(!Number.isInteger(total)||first.physicalTotal!==first.clinicalQuantity)))
+    throw Error('La cantidad física total de los lotes no coincide con la atención.');
   }else if(group.length!==1)throw Error('Una entrega antigua no puede duplicarse.');
  }
  return validated;
