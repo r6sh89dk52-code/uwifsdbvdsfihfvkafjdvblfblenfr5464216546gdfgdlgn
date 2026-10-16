@@ -35,7 +35,20 @@ function excelTime(v:string,optional=false):ExportValue{
 function auditedQuantity(m:StockMovement):number{
  if(m.kind!=='use'||!m.dispenseRef)throw Error('El movimiento no es una entrega confirmada.');
  // Replay on a disposable state to validate R=1/0 and both lot snapshots.
- const replay=postStockMovement({lots:[m.before],movements:[]},{id:m.id,lotId:m.lotId,at:m.at,kind:'use',description:m.description,quantity:m.quantity,allowOpen:m.openedNewContainer,dispenseRef:m.dispenseRef}).movements[0];
+ // The complete split has already been checked by validateStockLedger.
+ // To verify an individual physical part, replay it as an isolated synthetic
+ // single-piece clinical issue. The original part identity is NEVER rewritten.
+ const ref=m.dispenseRef!;
+ const split=ref.partCount!==undefined;
+ const replayRef=split?{
+  attentionId:ref.attentionId,itemId:ref.itemId,
+  clinicalCode:ref.clinicalCode,clinicalName:ref.clinicalName,
+  clinicalUnit:ref.clinicalUnit,clinicalQuantity:m.quantity,confirmedAt:ref.confirmedAt
+ }:ref;
+ const replayId=split?'ATT:'+ref.attentionId+':ITEM:'+ref.itemId:m.id;
+ const replay=postStockMovement({lots:[m.before],movements:[]},{id:replayId,lotId:m.lotId,at:m.at,
+  kind:'use',description:m.description,quantity:m.quantity,allowOpen:m.openedNewContainer,
+  dispenseRef:replayRef}).movements[0];
  if(JSON.stringify(replay.after)!==JSON.stringify(m.after)||replay.excelQuantity!==m.excelQuantity||replay.physicalChange!==m.physicalChange||m.sealedAdded!==0||m.looseAdded!==0)
   throw Error('Cantidad R o apertura incompatible con la entrega auditada.');
  return m.excelQuantity;
