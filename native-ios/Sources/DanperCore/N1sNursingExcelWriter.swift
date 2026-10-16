@@ -69,7 +69,7 @@ internal enum N1sNursingExcelWriter {
                 // Maintain strictly increasing cell column order when a
                 // formerly blank nursing cell is inserted.
                 let col=String(address.prefix(while:{$0.isLetter}))
-                let cells=try match(#"<c\\b[^>]*\\br="([A-Z]+)[0-9]+""#,in:previous)
+                let cells=try match(#"<c\b[^>]*\br="([A-Z]+)[0-9]+""#,in:previous)
                 var insertion:String.Index?
                 for hit in cells {
                     guard let captured=Range(hit.range(at:1),in:previous) else {continue}
@@ -89,7 +89,7 @@ internal enum N1sNursingExcelWriter {
                 // Some official templates omit blank metadata rows: unlike
                 // fabricating a stock count, creating an empty worksheet row
                 // for a known cell address is only structural.
-                xml.insert(contentsOf:"<row r=\\\"\\(number)\\\">\\(rendered)</row>",
+                xml.insert(contentsOf:"<row r=\"\(number)\">\(rendered)</row>",
                            at:closing.lowerBound)
             }else{
                 throw N1sExcelError.invalidTemplate
