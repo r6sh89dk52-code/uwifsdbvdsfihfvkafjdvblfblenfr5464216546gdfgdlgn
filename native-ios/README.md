@@ -86,3 +86,7 @@ Se amplió la lectura local del `.danperbackup` con auditoría completa de **nue
 ## N1m — Bóveda de preparación cifrada con origen único
 
 Se añadió almacenamiento cifrado independiente de preparación de la base auténtica de build 222, pero todavía **sin conexión al selector ni activación clínica**. Incluye recibo HMAC, verificación de hashes y conservación 1:1, reanudación tras interrupciones sin mezclar fuentes y un servicio Keychain independiente. Sigue siendo una etapa de preparación sin instalación y sin IPA. Ver `docs/N1M_BOVEDA_STAGING_REAL.md`.
+
+
+## N1n — Preparación de respaldo cifrado inactivo
+«Más → Preparar respaldo cifrado» requiere aprobación explícita y contraseña local para guardar una sola fuente completa en staging N1m. Sin activación clínica ni IPA. Ver `docs/N1N_PREPARACION_RESPALDO_INACTIVO.md`.
