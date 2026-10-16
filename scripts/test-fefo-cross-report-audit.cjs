@@ -146,7 +146,8 @@ assert.equal(pendingPlan.pending,1,'no stock remaining for unverified extra unit
 const provisional=buildAmbulatoryRows([...visits,absent],pendingPlan.ledger,'2026-10-09','2026-11-08',
  {perVisitSubdivision:true,allowPendingDeliveries:true});
 assert.equal(provisional.lines.length,5);
-assert.deepEqual(provisional.lines.map(x=>x.cells[17]),[5,1,0,12,'']);
+assert.deepEqual(provisional.lines.map(x=>x.cells[17]),[5,1,0,12,40]);
+assert.deepEqual(provisional.unverifiedLineIds,[provisional.lines[4].id]);
 assert.equal(provisional.pendingDeliveries,1);
 assert.equal(JSON.stringify(state),JSON.stringify(pendingPlan.ledger),'pending output does not fabricate movements');
 
