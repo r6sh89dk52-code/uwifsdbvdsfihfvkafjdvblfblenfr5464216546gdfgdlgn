@@ -57,7 +57,7 @@ function manifest(snapshot,id) {
  return result;
 }
 const original=manifest(source,'stock');
-assert.deepEqual(original.plan.lines.map(r=>r.cells[17]),[5,1,0,12,1000]);
+assert.deepEqual(original.plan.lines.map(r=>r.cells[17]),[5,1000,1,0,12]);
 assert.equal(original.plan.pendingDeliveries,1);
 assert.equal(original.plan.linkedDeliveries,4);
 // A second independently exercised frequency/2-items/blank-row scenario.
