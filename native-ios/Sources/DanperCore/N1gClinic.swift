@@ -43,7 +43,7 @@ public enum N1gError: Error, Equatable {
          invalidChoice, incompleteWorker, incompleteEvaluation,
          allergyNotReviewed, correctionNeedsAudit, invalidQuantity
 }
-public struct N1gClinic {
+public struct N1gClinic: Sendable {
     public static let categories = ["ENFERMEDAD","ACCIDENTE COMUN","ACCIDENTE DE TRABAJO","MATERNIDAD"]
     public static let diagnoses = ["CEFALEA FICTICIA","MALESTAR FICTICIO","CONTROL FICTICIO"]
     public static let procedures = ["OBSERVACION","CONTROL","TRATAMIENTO ORAL","CURACION FICTICIA"]
@@ -57,10 +57,10 @@ public struct N1gClinic {
     private static let names = ["PERSONA FICTICIA UNO","PERSONA FICTICIA DOS",
          "PERSONA FICTICIA TRES","PERSONA FICTICIA CUATRO",
          "PERSONA FICTICIA CINCO","PERSONA FICTICIA SEIS"]
-    public private(set) var workers: [N1gWorker]
-    public private(set) var visits: [N1gVisit] = []
-    public private(set) var allergies: [String:N1gAllergy] = [:]
-    public private(set) var activeDraftID: UUID?
+    public internal(set) var workers: [N1gWorker]
+    public internal(set) var visits: [N1gVisit] = []
+    public internal(set) var allergies: [String:N1gAllergy] = [:]
+    public internal(set) var activeDraftID: UUID?
     public var physicalMovementsCreated: Int { 0 } // No stock mutation API, ever.
 
     public init() {
