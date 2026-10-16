@@ -90,3 +90,7 @@ Se añadió almacenamiento cifrado independiente de preparación de la base aut�
 
 ## N1n — Preparación de respaldo cifrado inactivo
 «Más → Preparar respaldo cifrado» requiere aprobación explícita y contraseña local para guardar una sola fuente completa en staging N1m. Sin activación clínica ni IPA. Ver `docs/N1N_PREPARACION_RESPALDO_INACTIVO.md`.
+
+
+## N1o — ensayo de transacción cifrada sin activación clínica
+Cifrado, journal y recuperación para nueve colecciones **solo con fixtures sintéticos** y directorios temporales aislados. No está conectado al iPhone ni al respaldo real. Véase `docs/N1O_TRANSACCION_CIFRADA_INACTIVA.md`.
