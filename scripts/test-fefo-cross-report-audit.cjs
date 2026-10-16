@@ -7,6 +7,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
 const {load,visit,parse,all,value}=require('./ambulatory-test-helpers.cjs');
 const {unzipSync,strFromU8}=require('fflate');
 const products=require('../src/products.json');
+const embeddedIndicator=require('../src/ambulatoryTemplate.json');
 const cat=load('src/kardexCatalog.ts').kardexCatalog;
 const stock=load('src/automaticClinicalDispensing.ts');
 const ledgerRules=load('src/kardexMovements.ts');
@@ -100,10 +101,11 @@ assert.equal(nurseRange.exportable,true,nurseRange.warnings.join('; '));
 assert.deepEqual(nurseRange.rows.filter(r=>r.code==='E-22'||r.code==='E-57').map(r=>r.consumed),[17,1]);
 
 const officialIndicator=unzipSync(exportAmbulatoryWorkbook(
- new Uint8Array(fs.readFileSync('scripts/fixtures/ambulatory-empty.xlsx')),
+ new Uint8Array(Buffer.from(embeddedIndicator.zipBase64,'base64')),
  indicator,sharedMonthlyReconciliation(state,indicator)));
 const book=parse(strFromU8(officialIndicator['xl/workbook.xml']));
-assert.equal(all(book,'sheet').length,10);
+assert.deepEqual(all(book,'sheet').map(x=>x.getAttribute('name')),embeddedIndicator.sheets,
+ 'the delivered app must embed the exact original ten-sheet template');
 const consumeXml=parse(strFromU8(officialIndicator['xl/worksheets/sheet5.xml']));
 const icell=ref=>all(consumeXml,'c').find(c=>c.getAttribute('r')===ref);
 for(let i=0;i<4;i++){
