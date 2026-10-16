@@ -138,6 +138,7 @@ assert.equal(indicator.lines.filter(x=>x.cells[15]===pack.code).reduce((n,x)=>n+
 
 // Provisional fallbacks must not damage the already verified physical rows.
 const absent=attention('no-physical-stock','LA VENTUROSA','00000005',[line('unverified',unit,40)]);
+absent.time='12:30';
 const pendingPlan=stock.finalizeVisitAndPlanStock(state,absent,t+8000);
 assert.equal(pendingPlan.pending,1,'no stock remaining for unverified extra units');
 const provisional=buildAmbulatoryRows([...visits,absent],pendingPlan.ledger,'2026-10-09','2026-11-08',
