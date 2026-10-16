@@ -36,6 +36,15 @@ jobs:
           grep -q 'INFOPLIST_KEY_NSFaceIDUsageDescription' native-ios/project.yml
           test -f native-ios/App/NativeFirstRunOnboarding.swift
           test -f native-ios/App/Assets.xcassets/BrandLogo.imageset/danper-logo.png
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assemble isolated synthetic N1s workbook templates for iPhone preview
+        run: |
+          npm ci --no-fund --ignore-scripts
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          test -f native-ios/App/N1sDemoResources/n1s-indicator-plan.json
+          test -f native-ios/App/N1sDemoResources/n1s-nursing-plan.json
       - name: Generate native Xcode project and official icon
         working-directory: native-ios
         run: |
@@ -62,6 +71,8 @@ jobs:
               exit 1
             }
           test -d "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n1s-indicator-plan.json"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n1s-nursing-template-store.zip"
           echo 'PASS: real Xcode SwiftUI/iOS Simulator compilation (no installation).'
       - name: Compile for generic iPhone with signing disabled (no archive)
         working-directory: native-ios

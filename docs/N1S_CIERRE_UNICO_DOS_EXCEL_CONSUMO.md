@@ -29,3 +29,9 @@ La fuente de verdad del contraste es el código TypeScript existente en `src/amb
 5. Solo entonces habilitar exportación clínica y firmar una IPA. No fusionar ni sustituir la **build222** durante estas comprobaciones.
 
 **Escritores Swift actuales: solo laboratorio con datos ficticios; ningún permiso de restauración clínica.**
+## N1s — Puente iOS de exportación sintética
+
+- `N1sDemoExportBridge` exige marcador explícito de manifiesto ficticio; nunca utiliza datos clínicos, respaldo cifrado ni ledger real.
+- `N1sDemoExportView` (SwiftUI) genera los dos libros XLSX nativos únicamente con cuatro recursos saneados construidos por `scripts/prepare-n1s-ios-demo-resources.cjs`; utiliza la hoja Compartir de iOS y elimina el directorio temporal al cerrar la hoja.
+- El empaquetado Xcode/macOS crea los recursos sintéticos en CI y comprueba que se hayan integrado al ejecutable. No se registran binarios generados en el repositorio ni se publica IPA.
+- Puerta clínica pendiente: crear libro desde movimientos reales conciliados en un repositorio nativo transaccional, pruebas de restauración de datos sensibles, Excel de escritorio e iPhone físico. No sustituir la build 222.

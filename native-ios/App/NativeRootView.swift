@@ -66,7 +66,7 @@ struct NativeRootView: View {
                     StatusCard(icon:"pills",title:"FEFO nativo",
                         detail:"Reglas Swift probadas en Linux con inventario ficticio.")
                     StatusCard(icon:"tablecells",title:"Indicador y Kardex",
-                        detail:"El formato oficial y la conciliación clínica siguen pendientes de migración.")
+                        detail:"Los dos libros se generan con datos ficticios; falta validar el uso clínico en iPhone.")
                 }
                 .padding()
             }
@@ -139,6 +139,9 @@ struct NativeRootView: View {
                     NavigationLink {
                         N1nInactivePreparationView()
                     } label: { Label("Preparar respaldo cifrado · inactivo",systemImage:"lock.doc") }
+                    NavigationLink {
+                        N1sDemoExportView()
+                    } label: { Label("Exportar dos Excel ficticios",systemImage:"tablecells") }
                     NavigationLink {
                         NativeStorageLabView().navigationTitle("Laboratorio")
                     } label: { Label("Laboratorio N1 aislado",systemImage:"externaldrive") }

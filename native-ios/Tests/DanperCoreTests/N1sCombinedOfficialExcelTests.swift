@@ -154,4 +154,28 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
             base:fixture("n1s-nursing-template-store.zip"),
             manifest:JSONSerialization.data(withJSONObject:input)))
     }
+    func testBundledDemoOnlyGateRejectsAnyUnmarkedClinicalPlan() throws {
+        for kind in N1sDemoWorkbookKind.allCases {
+            let prefix = kind == .indicator ? "n1s-indicator" : "n1s-nursing"
+            let base = try fixture(prefix + "-template-store.zip")
+            let original = try fixture(prefix + "-plan.json")
+            XCTAssertThrowsError(try N1sDemoExportBridge.create(kind,
+                                    base: base, manifest: original)) {
+                XCTAssertEqual($0 as? N1sDemoExportError, .nonDemoManifest)
+            }
+            var parsed = try manifest(prefix + "-plan.json")
+            parsed["demoFixtureOnly"] = true
+            parsed["demoFixtureTag"] = "DANPER_N1S_SYNTHETIC_2026"
+            parsed["demoKind"] = kind.rawValue
+            let marked = try JSONSerialization.data(withJSONObject: parsed)
+            let result = try N1sDemoExportBridge.create(kind,base:base,manifest:marked)
+            XCTAssertTrue(result.starts(with:[0x50,0x4B,0x03,0x04]))
+            parsed["demoKind"] = "different"
+            let wrong = try JSONSerialization.data(withJSONObject: parsed)
+            XCTAssertThrowsError(try N1sDemoExportBridge.create(kind,
+                                    base: base, manifest: wrong)) {
+                XCTAssertEqual($0 as? N1sDemoExportError, .nonDemoManifest)
+            }
+        }
+    }
 }
