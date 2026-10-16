@@ -72,7 +72,7 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <label>Fechas que incluirá este Excel<input readOnly aria-label="Período mensual oficial" value={period.label}/></label>
   </div>
   <p className="hint"><strong>Kardex único:</strong> todas las entregas de ambas sedes descuentan del mismo inventario físico. No se calculan ni exportan stocks separados.</p>
-  <p className="hint">El reporte incluye del día 9 al día 8 siguiente. Solo las entregas confirmadas se reflejan como consumo en la hoja CONSUMOS. No se duplican registros ni se generan movimientos por exportar.</p>
+  <p className="hint">El reporte incluye del día 9 al día 8 siguiente. Las salidas físicas verificadas se reflejan en CONSUMOS. Cuando una atención no tenga cantidad física sustentada, DANPER ofrecerá un borrador provisional sin inventar la columna R. No se duplican registros ni se generan movimientos por exportar.</p>
   </div>
   <div className="stageCExportStep">
    <h4><span className="stageCIndex">2</span> Comprobar atenciones y existencias</h4>
@@ -97,12 +97,12 @@ export default function AmbulatoryExportPanel({attentions,ledger,mappings,incide
    <p className="hint">Al pulsar el botón se crea un archivo .xlsx de diez hojas y se abre la opción para guardarlo en Archivos, enviarlo por correo o compartirlo. No se modifica el Kardex ni el historial.</p>
    <p className="hint"><strong>Después de exportar:</strong> en RESU puedes escribir la proyección mensual en K y justificar tu pedido en M (COMENTARIO). Las columnas F (Consumos), G (Stock final), J (Diferencia) y L (Requerimiento) conservan sus fórmulas; no las reemplaces por valores manuales.</p>
   <div className="kardexActions"><button type="button" className="workerPrimary"
-   disabled={!result.data||!shared.data||result.data.blockers.length>0||withoutSite.length>0||busy}
-   onClick={()=>void exportBook(false)}><Share2 size={18}/>{busy?'Preparando Excel…':'Generar Excel (10 hojas) y compartir'}</button></div>
+   disabled={!result.data||!shared.data||(!canDraft&&result.data.blockers.length>0)||withoutSite.length>0||busy}
+   onClick={()=>void exportBook(canDraft)}><Share2 size={18}/>{busy?'Preparando Excel…':canDraft?'Generar Excel provisional (10 hojas) y compartir':'Generar Excel (10 hojas) y compartir'}</button></div>
   {canDraft&&<div className="warning" role="status"><strong>Exportación provisional disponible</strong>
     <p>Puedes descargar las diez hojas con los medicamentos e insumos registrados. Las cantidades de CONSUMOS!R quedarán vacías para las entregas aún no confirmadas. Se conservarán los saldos desconocidos sin convertirlos en cero y no se descontará ningún producto.</p>
     <p><strong>El archivo se marcará PROVISIONAL y no sustituye la conciliación ni el reporte definitivo.</strong></p>
-    <button type="button" className="workerSecondary wide" disabled={busy} onClick={()=>void exportBook(true)}><FileSpreadsheet size={18}/> Generar borrador provisional (con advertencia)</button>
+    <p>El único botón de exportación seleccionará automáticamente el modo provisional y pedirá tu confirmación. Cuando todas las salidas estén conciliadas, volverá a ofrecer el informe oficial sin pasos adicionales.</p>
   </div>}
   {done&&<p className="hint" role="status">{done}</p>}
   <p className="hint">La exportación solo lee datos locales; no modifica el stock, las atenciones, los lotes ni el historial. Revisa el contenido antes de compartirlo.</p>

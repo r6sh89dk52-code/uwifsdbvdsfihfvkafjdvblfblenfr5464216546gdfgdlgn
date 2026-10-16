@@ -9,7 +9,7 @@ export type ExportVisit={
  id:string;status:'draft'|'saved';date:string;time:string;
  worker:{dni:string;name:string;area:string;labor:string;sex:string;age:string|number;ubigeo:string;site?:string};
  category:string;system:string;segment:string;diagnosis:string;
- items:{id:string;code:string;name:string;unit:string;quantity:number;procedure:string}[];
+ items:{id:string;code:string;name:string;unit:string;quantity:number;procedure:string;physicalUse?:{lotId:string;quantity:number}}[];
  permission:string;workStatus:string;permissionTime:string;blueBandage:boolean;returned:boolean;photoSent:boolean;
  responsible:string;responsibleDni:string;standaloneProcedures?:string[];
 };
@@ -35,7 +35,25 @@ function excelTime(v:string,optional=false):ExportValue{
 function auditedQuantity(m:StockMovement):number{
  if(m.kind!=='use'||!m.dispenseRef)throw Error('El movimiento no es una entrega confirmada.');
  // Replay on a disposable state to validate R=1/0 and both lot snapshots.
- const replay=postStockMovement({lots:[m.before],movements:[]},{id:m.id,lotId:m.lotId,at:m.at,kind:'use',description:m.description,quantity:m.quantity,allowOpen:m.openedNewContainer,dispenseRef:m.dispenseRef}).movements[0];
+ // The complete split has already been checked by validateStockLedger.
+ // To verify an individual physical part, replay it as an isolated synthetic
+ // single-piece clinical issue. The original part identity is NEVER rewritten.
+ const ref=m.dispenseRef!;
+ const split=ref.partCount!==undefined;
+ const replayRef=split?{
+  attentionId:ref.attentionId,itemId:ref.itemId,
+  clinicalCode:ref.clinicalCode,clinicalName:ref.clinicalName,
+  clinicalUnit:ref.clinicalUnit,
+  // UND/TBL/PAR parts must validate their own integer quantity; liquids and
+  // packaged supplies retain the integer clinical count while a physical part
+  // can correctly be a fractional mL or an internal supply unit.
+  clinicalQuantity:['UND','TBL','PAR'].includes(ref.clinicalUnit.trim().toUpperCase())
+   ?m.quantity:ref.clinicalQuantity,confirmedAt:ref.confirmedAt
+ }:ref;
+ const replayId=split?'ATT:'+ref.attentionId+':ITEM:'+ref.itemId:m.id;
+ const replay=postStockMovement({lots:[m.before],movements:[]},{id:replayId,lotId:m.lotId,at:m.at,
+  kind:'use',description:m.description,quantity:m.quantity,allowOpen:m.openedNewContainer,
+  dispenseRef:replayRef}).movements[0];
  if(JSON.stringify(replay.after)!==JSON.stringify(m.after)||replay.excelQuantity!==m.excelQuantity||replay.physicalChange!==m.physicalChange||m.sealedAdded!==0||m.looseAdded!==0)
   throw Error('Cantidad R o apertura incompatible con la entrega auditada.');
  return m.excelQuantity;
@@ -53,8 +71,11 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
  const ordered=selected.filter(v=>v.date>=start&&v.date<=end).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)||a.id.localeCompare(b.id));
  const lines:ExportLine[]=[],warnings:string[]=[],blockers:string[]=[];
  let linkedDeliveries=0,pendingDeliveries=0;
- const frequencyCount=new Map<string,number>(),deliveryMap=new Map<string,StockMovement>();
- for(const m of valid.movements)if(m.dispenseRef)deliveryMap.set(JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]),m);
+ const frequencyCount=new Map<string,number>(),deliveryMap=new Map<string,StockMovement[]>();
+ for(const m of valid.movements)if(m.dispenseRef){
+  const key=JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]);
+  deliveryMap.set(key,[...(deliveryMap.get(key)||[]),m]);
+ }
  const subdivision=options.subdivision||'';
  const perVisitSubdivision=options.perVisitSubdivision===true;
  if(perVisitSubdivision&&subdivision)throw Error('No combines una sede fija con el modo de ambas sedes.');
@@ -81,24 +102,36 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
     if(!p||p.name.trim()!==item.name?.trim()||p.unit.trim()!==item.unit?.trim())throw Error('Material o unidad no verificados: '+item.code);
     if(!Number.isInteger(item.quantity)||item.quantity<=0||!item.procedure?.trim())throw Error('Cantidad clínica o procedimiento inválido.');
     code=p.code;name=p.name;procedure=item.procedure;
-    const m=deliveryMap.get(JSON.stringify([a.id,item.id]));
-    if(!m){
+    const movements=deliveryMap.get(JSON.stringify([a.id,item.id]))||[];
+    if(!movements.length){
      if(options.allowPendingDeliveries===true){
       // PROVISIONAL ONLY: no stock movement exists, so R must stay unknown.
-      // Clinical item/code are retained but no physical quantity is inferred.
       pendingDeliveries++;
      }else blockers.push('Cantidad sin entrega conciliada: '+a.id.slice(0,8)+' / '+item.code);
-    }
-    else{
-     const ref=m.dispenseRef!;
-     if(ref.clinicalCode!==item.code||ref.clinicalName.trim()!==item.name.trim()||ref.clinicalUnit.trim()!==item.unit.trim()||ref.clinicalQuantity!==item.quantity)
-      throw Error('La atención fue modificada después de confirmar la entrega.');
-     // The official Indicator code and the nursing Kardex stock code are
-     // independent catalogs. Only explicit user-reviewed pairs are valid.
-     if(m.code!==item.code&&!isReviewedAssociation(item.code,m.code))
-      blockers.push('Falta correspondencia aprobada entre el material y el lote: '+item.code);
-     if(incidents.some(i=>i.movementId===m.id))blockers.push('Entrega con devolución o discrepancia pendiente de conciliación: '+item.code);
-     quantity=auditedQuantity(m);linkedDeliveries++;
+    }else{
+     let issued=0;
+     for(const m of movements){
+      const ref=m.dispenseRef!;
+      if(ref.clinicalCode!==item.code||ref.clinicalName.trim()!==item.name.trim()||
+        ref.clinicalUnit.trim()!==item.unit.trim()||ref.clinicalQuantity!==item.quantity)
+       throw Error('La atención fue modificada después de confirmar la entrega.');
+      if(m.code!==item.code&&!isReviewedAssociation(item.code,m.code))
+       blockers.push('Falta correspondencia aprobada entre el material y el lote: '+item.code);
+      if(incidents.some(i=>i.movementId===m.id))
+       blockers.push('Entrega con devolución o discrepancia pendiente de conciliación: '+item.code);
+      issued+=auditedQuantity(m);
+     }
+     // For a physical split of CJA/FCO/PAQ, clinical quantity may be
+     // 1 package while the internal amount is fractional mL. Verify the sum
+     // against the quantity explicitly recorded inside the attention.
+     if(movements.length>1&&!['UND','TBL','PAR'].includes(item.unit.trim().toUpperCase())){
+      const actual=Math.round(movements.reduce((n,m)=>n+m.quantity,0)*1000)/1000;
+      if(!item.physicalUse||!Number.isFinite(item.physicalUse.quantity)||
+         actual!==Math.round(item.physicalUse.quantity*1000)/1000)
+       throw Error('Las partes físicas del envase no coinciden con la atención registrada.');
+     }
+     quantity=Math.round(issued*1000)/1000;
+     linkedDeliveries++; // physical group, not lot-part count
     }
    }else procedure=(a.standaloneProcedures||[]).join(' / ');
    const rawAge=String(a.worker.age),age=Number(rawAge);

@@ -15,6 +15,15 @@ export type StockLot={
   updatedAt:number;
 };
 const validKinds:ContainerKind[]=['unidad','caja','frasco','paquete','blister','otro'];
+/** Stock is operated in Peru; midnight UTC must never make a valid local lot expire early. */
+export function peruStockDate(timestamp:number):string{
+ if(!Number.isSafeInteger(timestamp)||timestamp<=0)throw Error('Fecha de stock inválida.');
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Lima',
+  year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(timestamp));
+ const part=(key:string)=>parts.find(x=>x.type===key)?.value||'';
+ return part('year')+'-'+part('month')+'-'+part('day');
+}
+
 const round=(n:number)=>Math.round((n+Number.EPSILON)*1000)/1000;
 function nonnegative(v:unknown,key:string,whole:boolean){
   if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>10000000||(whole&&!Number.isInteger(v)))

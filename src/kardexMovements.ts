@@ -2,12 +2,14 @@
  * Excel consumption for packaged supplies is 1 when a new container is opened,
  * 0 for later uses from that container. Physical consumption is tracked separately.
  */
-import {countPhysicalUnits,validateStockLot,validateStockLots,type StockLot} from './inventoryRules';
+import {countPhysicalUnits,peruStockDate,validateStockLot,validateStockLots,type StockLot} from './inventoryRules';
 
 export type MovementKind='extraordinary'|'use'|'adjustment';
 export type DispenseRef={
  attentionId:string;itemId:string;clinicalCode:string;clinicalName:string;
  clinicalUnit:string;clinicalQuantity:number;confirmedAt:number;
+ /** For one clinical item split into several auditable FEFO lot issues. Legacy records omit both. */
+ partIndex?:number;partCount?:number;physicalTotal?:number;
 };
 export type StockMovement={
  id:string;lotId:string;code:string;name:string;unit:string;at:number;
@@ -33,7 +35,14 @@ function amount(value:unknown,label:string,integer=false,allowZero=false){
  return value;
 }
 function validDispenseRef(ref:DispenseRef,id:string,kind:MovementKind,at:number){
- if(kind!=='use'||id!=='ATT:'+ref.attentionId+':ITEM:'+ref.itemId||
+ const split=ref.partIndex!==undefined||ref.partCount!==undefined;
+ const validSplit=split&&typeof ref.physicalTotal==='number'&&Number.isFinite(ref.physicalTotal)&&
+   ref.physicalTotal>0&&ref.physicalTotal<=10000000&&Number.isSafeInteger(Math.round(ref.physicalTotal*1000))&&
+   Number.isSafeInteger(ref.partCount)&&Number.isSafeInteger(ref.partIndex)&&
+    ref.partCount! >= 2&&ref.partCount! <= 500&&ref.partIndex! >= 1&&ref.partIndex! <= ref.partCount!;
+ const expected='ATT:'+ref.attentionId+':ITEM:'+ref.itemId+
+   (split?':PART:'+ref.partIndex:'');
+ if((split&&!validSplit)||kind!=='use'||id!==expected||
    ![ref.attentionId,ref.itemId,ref.clinicalCode,ref.clinicalName,ref.clinicalUnit].every(x=>typeof x==='string'&&x.trim().length>0)||
    !Number.isInteger(ref.clinicalQuantity)||ref.clinicalQuantity<=0||
    !Number.isSafeInteger(ref.confirmedAt)||ref.confirmedAt!==at)
@@ -46,11 +55,12 @@ function validCommand(c:StockCommand){
  if(typeof c.description!=='string'||c.description.trim().length<3||c.description.length>250)
    throw Error('Indica un motivo de al menos 3 caracteres (máximo 250).');
 }
-export function validateStockMovements(v:unknown):StockMovement[]{
+export function validateStockMovements(v:unknown,allowIncompleteParts=false):StockMovement[]{
  if(!Array.isArray(v)||v.length>maxMoves)throw Error('Historial de movimientos incompatible o demasiado grande.');
  const ids=new Set<string>();
  const links=new Set<string>();
- return v.map(raw=>{
+ const groups=new Map<string,StockMovement[]>();
+ const validated=v.map(raw=>{
   if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Movimiento inválido.');
   const m=raw as StockMovement;
   if(typeof m.id!=='string'||!m.id.trim()||typeof m.lotId!=='string'||!m.lotId.trim()||ids.has(m.id)||
@@ -62,8 +72,10 @@ export function validateStockMovements(v:unknown):StockMovement[]{
   if(m.dispenseRef){
     validDispenseRef(m.dispenseRef,m.id,m.kind,m.at);
     const pair=JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]);
-    if(links.has(pair))throw Error('Dos movimientos vinculados al mismo producto de atención.');
-    links.add(pair);
+    const idKey=pair+':'+(m.dispenseRef.partIndex??'legacy');
+    if(links.has(idKey))throw Error('Dos movimientos duplicados vinculados a un producto de atención.');
+    links.add(idKey);
+    groups.set(pair,[...(groups.get(pair)||[]),m]);
   }
   for(const key of ['quantity','sealedAdded','looseAdded','excelQuantity','physicalChange'] as const)
    if(typeof m[key]!=='number'||!Number.isFinite(m[key]))throw Error('Cantidad corrupta de un movimiento.');
@@ -74,11 +86,38 @@ export function validateStockMovements(v:unknown):StockMovement[]{
   ids.add(m.id);
   return {...m,before,after};
  });
+ // The group of physical movements is indivisible. Never accept a partial
+ // multi-lot commit into clinical/stock persistence or a restored backup.
+ for(const group of groups.values()){
+  const first=group[0].dispenseRef!;
+  const split=first.partCount!==undefined;
+  if(group.some(m=>{
+   const ref=m.dispenseRef!;
+   return (ref.partCount!==undefined)!==split||ref.clinicalCode!==first.clinicalCode||
+    ref.clinicalName!==first.clinicalName||ref.clinicalUnit!==first.clinicalUnit||
+    ref.clinicalQuantity!==first.clinicalQuantity||ref.confirmedAt!==first.confirmedAt||
+    (split&&(ref.partCount!==first.partCount||ref.physicalTotal!==first.physicalTotal));
+  }))throw Error('Inconsistencia entre partes de una misma atención.');
+  if(split){
+   if(!allowIncompleteParts && group.length!==first.partCount)
+    throw Error('La entrega FEFO multilote está incompleta.');
+   const counted=['UND','TBL','PAR'].includes(first.clinicalUnit.trim().toUpperCase());
+   const total=round(group.reduce((n,m)=>n+m.quantity,0));
+   // Fractional mL for FCO/CJA/PAQ must reconcile to the original physical
+   // amount, not to the integer number of clinical containers.
+   if(!Number.isFinite(first.physicalTotal)||total>first.physicalTotal!||
+      (!allowIncompleteParts&&total!==first.physicalTotal)||
+      (counted&&(!Number.isInteger(total)||first.physicalTotal!==first.clinicalQuantity)))
+    throw Error('La cantidad física total de los lotes no coincide con la atención.');
+  }else if(group.length!==1)throw Error('Una entrega antigua no puede duplicarse.');
+ }
+ return validated;
 }
+
 /** Detect corrupted or overwritten stock history before allowing further writes. */
-export function validateStockLedger(value:StockLedger):StockLedger{
+export function validateStockLedger(value:StockLedger,allowIncompleteParts=false):StockLedger{
  const lots=validateStockLots(value.lots);
- const movements=validateStockMovements(value.movements);
+ const movements=validateStockMovements(value.movements,allowIncompleteParts);
  const last=new Map<string,StockLot>();
  for(const move of movements){
   const previous=last.get(move.lotId);
@@ -93,9 +132,9 @@ export function validateStockLedger(value:StockLedger):StockLedger{
  }
  return {lots,movements};
 }
-export function postStockMovement(ledger:StockLedger,command:StockCommand):StockLedger{
+function postStockMovementInternal(ledger:StockLedger,command:StockCommand,allowIncompleteParts=false):StockLedger{
  validCommand(command);
- const {lots,movements}=validateStockLedger(ledger);
+ const {lots,movements}=validateStockLedger(ledger,allowIncompleteParts);
  const existing=movements.find(x=>x.id===command.id);
  if(existing){
    if(existing.lotId!==command.lotId||existing.kind!==command.kind||existing.at!==command.at||
@@ -124,7 +163,10 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
   const compatible=clinicalUnit==='PAR'?stockUnit==='PAR':
    stockUnit==='UND'||stockUnit==='TBL';
   if(!compatible)throw Error('Unidad física incompatible: medicamento individual requiere conteo en UND/TBL o PAR, no un frasco/caja contabilizado como envase.');
-  if(!Number.isInteger(command.quantity)||command.quantity!==command.dispenseRef!.clinicalQuantity)
+  if(typeof command.quantity!=='number'||!Number.isInteger(command.quantity)||
+   (command.dispenseRef!.partCount===undefined
+    ?command.quantity!==command.dispenseRef!.clinicalQuantity
+    :command.quantity>command.dispenseRef!.clinicalQuantity))
    throw Error('Cantidad física individual diferente de la cantidad entregada en la atención.');
  }
  if(command.kind==='extraordinary'){
@@ -134,7 +176,7 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
   after.sealedContainers+=sealedAdded;after.looseUnits=round(after.looseUnits+looseAdded);
   quantity=round(sealedAdded*before.unitsPerContainer+looseAdded);
  }else if(command.kind==='use'){
-  const day=new Date(command.at).toISOString().slice(0,10);
+  const day=peruStockDate(command.at);
   if(before.expires && before.expires < day)throw Error('Lote vencido: no está permitido registrar su uso.');
   quantity=amount(command.quantity,'Cantidad utilizada',!pack);
   quantity=round(quantity);
@@ -192,7 +234,23 @@ export function postStockMovement(ledger:StockLedger,command:StockCommand):Stock
 
 /** FEFO ordering, expired lots excluded; products without known expiration come last. */
 export function suggestFEFOLot(lots:StockLot[],code:string,at:number=Date.now()):StockLot|undefined{
- const today=new Date(at).toISOString().slice(0,10);
+ const today=peruStockDate(at);
  return lots.filter(x=>x.code===code&&countPhysicalUnits(x)>0&&(!x.expires||x.expires>=today))
  .sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')||a.id.localeCompare(b.id))[0];
+}
+
+/** Public API cannot emit an incomplete multi-lot group. */
+export function postStockMovement(ledger:StockLedger,command:StockCommand):StockLedger{
+ // Only the batch API can build a multi-part group. A public single command
+ // must not return a state containing an incomplete physical delivery.
+ return validateStockLedger(postStockMovementInternal(ledger,command));
+}
+
+/** All parts succeed or none is exposed. Intended for a single saved attention item. */
+export function postStockMovementsBatch(ledger:StockLedger,commands:StockCommand[]):StockLedger{
+ if(!commands.length)throw Error('Entrega multilote sin movimientos.');
+ validateStockLedger(ledger);
+ let next=ledger;
+ for(const command of commands)next=postStockMovementInternal(next,command,true);
+ return validateStockLedger(next);
 }

@@ -42,8 +42,8 @@ export default function AttentionDeliveryPanel({attentions,ledger,onChange}:Prop
   }catch(error){setMessage(error instanceof Error?error.message:'No se pudo descontar el producto.')}
  }
  return <section className="panel attentionDelivery">
-  <h3><PackageCheck size={18}/>Entrega vinculada a una atención</h3>
-  <p className="hint">Solo datos ficticios. Este proceso es voluntario después de guardar la atención. Solo se permiten las 86 asociaciones aprobadas. La equivalencia no genera entregas automáticas: selecciona el lote y confirma las cantidades.</p>
+  <h3><PackageCheck size={18}/>Conciliación de entregas anteriores</h3>
+  <p className="hint">Las nuevas atenciones descuentan automáticamente existencias físicas verificables al finalizar. Utiliza esta pantalla únicamente para aclarar registros anteriores pendientes. Solo se permiten las 86 asociaciones aprobadas. La equivalencia no genera entregas automáticas: selecciona el lote y confirma las cantidades.</p>
   <label>Atención confirmada
    <select value={attentionId} onChange={e=>chooseAttention(e.target.value)}>
     <option value="">Seleccionar una atención guardada…</option>
