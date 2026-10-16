@@ -2,83 +2,129 @@ import SwiftUI
 import UniformTypeIdentifiers
 import DanperCore
 
+/// N1l never exposes restored patient data; only source counts and flags.
+/// The demo clinic is NOT the destination for a future real import.
 struct BackupPreviewView: View {
     @State private var password = ""
-    @State private var isPickerOpen = false
-    @State private var isInspecting = false
-    @State private var summary: N1BackupManifest?
-    @State private var error = ""
+    @State private var filePicker = false
+    @State private var inspecting = false
+    @State private var audit: N1lSourceAudit?
+    @State private var errorMessage = ""
 
     var body: some View {
         Form {
-            Section {
-                Label("Solo lectura, sin restauración", systemImage: "lock.shield.fill")
-                    .font(.headline)
-                    .foregroundStyle(.green)
-                Text("Esta pantalla verifica el respaldo .danperbackup de la build 222 con su contraseña original. Solo muestra recuentos; no guarda los pacientes ni modifica Keychain, lotes o atenciones.")
-                    .font(.footnote)
-                Text("No compartas la contraseña ni el respaldo en el chat ni en GitHub.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
-            Section("Verificar una copia existente") {
-                SecureField("Contraseña de tu respaldo", text: $password)
-                    .textContentType(.password)
-                Button {
-                    summary = nil
-                    error = ""
-                    isPickerOpen = true
-                } label: {
-                    Label(isInspecting ? "Verificando…" : "Seleccionar respaldo cifrado",
-                          systemImage: "doc.badge.gearshape")
-                }
-                .disabled(password.count < 14 || isInspecting)
-                if !error.isEmpty {
-                    Text(error).foregroundStyle(.red).font(.footnote)
-                }
-            }
-            if let summary {
-                Section("Contenido comprobado · solo cantidades") {
-                    LabeledContent("Trabajadores", value: "\(summary.workers)")
-                    LabeledContent("Atenciones", value: "\(summary.attentions)")
-                    LabeledContent("Alergias", value: "\(summary.allergies)")
-                    LabeledContent("Lotes", value: "\(summary.lots)")
-                    LabeledContent("Movimientos físicos", value: "\(summary.movements)")
-                    LabeledContent("Equivalencias", value: "\(summary.catalogMappings)")
-                    LabeledContent("Incidencias", value: "\(summary.deliveryIncidents)")
-                    LabeledContent("Conciliaciones", value: "\(summary.ambulatoryReconciliation)")
-                    LabeledContent("Consumos clínicos sin movimiento vinculado",
-                                   value: "\(summary.unresolvedClinicalItems)")
-                    Text("Verificar el respaldo no lo importa. No se realizó ninguna restauración.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                    Button("Ocultar resultado") { self.summary = nil }
-                }
+            introduction
+            verificationControls
+            if let audit {
+                sourceSection(audit)
+                recordSection(audit)
+                warningSection(audit)
             }
         }
-        .fileImporter(isPresented: $isPickerOpen, allowedContentTypes: [.item],
-                      allowsMultipleSelection: false) { result in
+        .fileImporter(isPresented:$filePicker,
+                      allowedContentTypes:[.item],
+                      allowsMultipleSelection:false) { result in
             switch result {
             case .failure:
-                error = "No se pudo abrir el selector de archivos."
+                errorMessage = "No se pudo abrir el selector de archivos."
             case .success(let urls):
                 guard let url = urls.first else { return }
                 let pass = password
                 password = ""
-                isInspecting = true
-                Task.detached(priority: .userInitiated) {
-                    let output = Result { try PortableBackupInspector.inspect(url: url, password: pass) }
+                inspecting = true
+                Task.detached(priority:.userInitiated) {
+                    let result = Result { try PortableBackupInspector.audit(url:url,password:pass) }
                     await MainActor.run {
-                        isInspecting = false
-                        switch output {
-                        case .success(let checked):
-                            summary = checked
-                            error = ""
+                        inspecting = false
+                        switch result {
+                        case .success(let report):
+                            audit = report
+                            errorMessage = ""
                         case .failure(let problem):
-                            summary = nil
-                            error = problem.localizedDescription
+                            audit = nil
+                            errorMessage = problem.localizedDescription
                         }
                     }
                 }
             }
+        }
+    }
+
+    private var introduction: some View {
+        Section {
+            Label("Inspección real · sin restauración",systemImage:"lock.shield.fill")
+                .font(.headline).foregroundStyle(.green)
+            Text("Selecciona una copia cifrada de la build 222 desde tu propio iPhone. Esta pantalla NO modifica la aplicación anterior ni suma trabajadores o atenciones ficticias.")
+            Text("La contraseña y los registros se procesan únicamente en el dispositivo. No compartas el respaldo ni la contraseña en GitHub o el chat.")
+                .font(.footnote).foregroundStyle(.secondary)
+        } header: { Text("Fuente única: build 222") }
+    }
+
+    private var verificationControls: some View {
+        Section("Auditar copia cifrada") {
+            SecureField("Contraseña de respaldo (mínimo 14 caracteres)",text:$password)
+                .textContentType(.password)
+            Button {
+                audit = nil
+                errorMessage = ""
+                filePicker = true
+            } label: {
+                Label(inspecting ? "Inspeccionando…" : "Seleccionar respaldo .danperbackup",
+                      systemImage:"doc.badge.gearshape")
+            }
+            .disabled(password.count < 14 || inspecting)
+            if !errorMessage.isEmpty {
+                Text(errorMessage).foregroundStyle(.red).font(.footnote)
+            }
+        }
+    }
+
+    private func sourceSection(_ report:N1lSourceAudit) -> some View {
+        Section("Trabajadores y clínica") {
+            LabeledContent("Trabajadores",value:"\(report.manifest.workers)")
+            LabeledContent("Atenciones totales",value:"\(report.manifest.attentions)")
+            LabeledContent("Atenciones guardadas",value:"\(report.saved)")
+            LabeledContent("Borradores",value:"\(report.drafts)")
+            LabeledContent("Correcciones",value:"\(report.corrections)")
+            LabeledContent("Alergias documentadas",value:"\(report.allergyKnown)")
+            LabeledContent("Niega alergias",value:"\(report.allergyNone)")
+            LabeledContent("Alergias desconocidas",value:"\(report.allergyUnknown)")
+            LabeledContent("Atenciones sin coincidencia en padrón",
+                           value:"\(report.missingRosterReferences)")
+            LabeledContent("Correcciones sin original",
+                           value:"\(report.danglingCorrections)")
+        }
+    }
+
+    private func recordSection(_ report:N1lSourceAudit) -> some View {
+        Section("Inventario, consumos y conciliación") {
+            LabeledContent("Lotes",value:"\(report.manifest.lots)")
+            LabeledContent("Movimientos físicos",value:"\(report.manifest.movements)")
+            LabeledContent("Equivalencias",value:"\(report.manifest.catalogMappings)")
+            LabeledContent("Incidencias",value:"\(report.manifest.deliveryIncidents)")
+            LabeledContent("Conciliaciones",value:"\(report.manifest.ambulatoryReconciliation)")
+            LabeledContent("Consumos clínicos aún sin vínculo físico",
+                           value:"\(report.unresolvedClinicalConsumptions)")
+            Text("Los consumos sin vínculo no deben eliminarse automáticamente: conservaremos sus asociaciones y estado de verificación hasta conciliarlos.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private func warningSection(_ report:N1lSourceAudit) -> some View {
+        Section("Prevención de mezclas") {
+            let demo = report.obviousDemoWorkerMarkers + report.obviousDemoClinicalMarkers
+            LabeledContent("Marcadores ficticios reconocidos",value:"\(demo)")
+            if demo > 0 {
+                Label("Hay indicios explícitos de registros ficticios. Este respaldo necesita depuración y verificación antes de una migración.",systemImage:"exclamationmark.shield")
+                    .foregroundStyle(.orange)
+            }
+            Text("El cifrado garantiza autenticidad del archivo, NO prueba que todos sus registros sean reales. Algunos ficticios pueden no tener marcador.")
+                .font(.footnote)
+            Text("Destino nativo: sin verificar. Restauración DESHABILITADA. El único modo futuro admitido será una base clínica nativa vacía con reemplazo íntegro desde UNA sola fuente auditada; nunca una unión con simulaciones.")
+                .font(.footnote).foregroundStyle(.secondary)
+            Label("No se importó, eliminó ni modificó ningún registro.",systemImage:"checkmark.shield")
+                .foregroundStyle(.green)
+            Button("Cerrar resultados") { audit = nil }
         }
     }
 }
