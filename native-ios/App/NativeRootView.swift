@@ -137,6 +137,9 @@ struct NativeRootView: View {
                         BackupPreviewView().navigationTitle("Respaldo")
                     } label: { Label("Inspección de respaldo real · solo lectura",systemImage:"lock.shield") }
                     NavigationLink {
+                        N1nInactivePreparationView()
+                    } label: { Label("Preparar respaldo cifrado · inactivo",systemImage:"lock.doc") }
+                    NavigationLink {
                         NativeStorageLabView().navigationTitle("Laboratorio")
                     } label: { Label("Laboratorio N1 aislado",systemImage:"externaldrive") }
                 }
