@@ -79,7 +79,11 @@ function fixture(mode,log){
  });
  for(let row=3;row<=434;row++){
   for(const [name,columns] of Object.entries(formulas))
-   for(const col of columns)assert.ok(f(name,col+row),'missing formula '+name+'!'+col+row);
+   for(const col of columns){
+    if(name==='ingresos'&&col==='X'&&!material.reviewed)
+      assert.equal(f(name,col+row),'','Unreviewed receipts must keep total X blank');
+    else assert.ok(f(name,col+row),'missing formula '+name+'!'+col+row);
+   }
  }
  const physicalCells=interesting.map(code=>{
   const row=byCode[code];
