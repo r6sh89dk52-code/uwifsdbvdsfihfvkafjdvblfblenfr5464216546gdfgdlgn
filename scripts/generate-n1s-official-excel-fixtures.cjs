@@ -45,6 +45,18 @@ assert.equal(nursingRows.length,98);
 const nursing={date:'2026-10-13',rows:nursingRows,shift:'MAÑANA',responsible:'OPERADOR FICTICIO'};
 fs.writeFileSync(path.join(root,'n1s-nursing-plan.json'),JSON.stringify(nursing));
 const nursingBase=new Uint8Array(fs.readFileSync('public/internal/kardex-template.bin'));
+const nursingParts=unzipSync(nursingBase);
+const nursingXML=Buffer.from(nursingParts['xl/worksheets/sheet2.xml']).toString('utf8');
+const nursingBook=Buffer.from(nursingParts['xl/workbook.xml']).toString('utf8');
+const rows=Array.from(nursingXML.matchAll(/<row\\b[^>]*\\br="(\\d+)"/g),m=>Number(m[1]));
+console.log('N1s nursing source structural checks:',JSON.stringify({
+ sheets:nursingBook.includes('KARDEX ENFERMERAS'),
+ merge:nursingXML.includes('<mergeCells'),
+ product104:nursingXML.includes('C104'),
+ print:!!nursingParts['xl/printerSettings/printerSettings2.bin'],
+ row3:rows.includes(3),row7:rows.includes(7),row104:rows.includes(104),
+ numberRows:rows.length,distinctRows:new Set(rows).size
+}));
 fs.writeFileSync(path.join(root,'n1s-nursing-template-store.zip'),
  zipSync(unzipSync(nursingBase),{level:0}));
 const legacy=exportOfficialKardex(nursingBase,{date:nursing.date,rows:nursing.rows,exportable:true,warnings:[]},
