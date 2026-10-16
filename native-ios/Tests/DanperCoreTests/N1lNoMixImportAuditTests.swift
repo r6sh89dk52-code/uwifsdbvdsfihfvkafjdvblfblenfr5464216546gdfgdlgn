@@ -60,8 +60,8 @@ final class N1lNoMixImportAuditTests: XCTestCase {
     }
     func testCannotImportOrMergeIntoExistingDemoOrRealOrUnknown() throws {
         let original=try unmarked()
-        for mode:N1lDestinationState in [
-            .containsDemonstration,.containsClinicalData,.uncertain
+        for mode in [
+            N1lDestinationState.containsDemonstration,.containsClinicalData,.uncertain
         ] {
             let s=try N1lRealSnapshotGate.audit(original,destination:mode)
             XCTAssertFalse(s.isStructurallyEligibleForReview)
@@ -152,6 +152,6 @@ final class N1lNoMixImportAuditTests: XCTestCase {
             XCTAssertEqual(audit.manifest.workers,2)
             XCTAssertEqual(audit.manifest.attentions,3)
         }
-        XCTAssertEqual(try src,unmarked())
+        XCTAssertEqual(src,try unmarked())
     }
 }
