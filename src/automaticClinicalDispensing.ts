@@ -13,7 +13,7 @@ import {reviewedAssociationsFor} from './reviewedKardexAssociations';
 import {countPhysicalUnits} from './inventoryRules';
 
 /** Selected *inside* the attention, never in a separate Kardex confirmation screen. */
-export type InVisitPhysicalUse={lotId:string;quantity:number};
+export type InVisitPhysicalUse={lotId:string;quantity:number;confirmNewContainer?:boolean};
 export type InVisitClinicalLine=SavedClinicalAttention['items'][number]&{physicalUse?:InVisitPhysicalUse};
 export type InVisitSavedAttention=Omit<SavedClinicalAttention,'items'>&{items:InVisitClinicalLine[];date?:string};
 export type AutoOutcome='already-linked'|'deducted'|'pending';
@@ -33,7 +33,7 @@ function limaDay(at:number):string{
  const p=(type:string)=>parts.find(x=>x.type===type)?.value||'';
  return p('year')+'-'+p('month')+'-'+p('day');
 }
-export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedAttention,at:number):AutoDispenseResult{
+export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedAttention,at:number,options:{requireOpeningApproval?:boolean}={}):AutoDispenseResult{
  if(!visit||visit.status!=='saved'||!visit.id?.trim())throw Error('La atención debe estar finalizada.');
  if(!Number.isSafeInteger(at)||at<=0)throw Error('Hora de entrega inválida.');
  let current=validateStockLedger(ledger);
@@ -135,6 +135,14 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedA
   if(impossible||remaining>0.00001){
    pending('Reparto FEFO no verificable: '+(impossible||'cantidad pendiente')+'. No se realizó descuento.');
    continue;
+  }
+  // Saving the clinical attention is the one and only dispensing confirmation.
+  // A new bottle/box is different: operator approval is required IN the visit.
+  // Without approval clinical consumption remains recorded, stock unchanged.
+  if(options.requireOpeningApproval===true&&parts.some(p=>p.open)&&
+     explicit?.confirmNewContainer!==true){
+    pending('Se requiere autorizar dentro de la atención la apertura de un nuevo frasco o caja. Sin autorización no se descuenta stock.');
+    continue;
   }
   // Every physical part carries the same clinical identity and part count.
   // Old single-lot references remain fully backwards compatible.
