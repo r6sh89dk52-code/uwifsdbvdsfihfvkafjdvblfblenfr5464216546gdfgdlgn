@@ -47,12 +47,12 @@ internal enum N1sNursingExcelWriter {
         if let formula {
             let f=try escape(formula)
             if let num=numeric(value) {
-                rendered=head+"><f>"+f+"</f><v>"+String(format:"%.12g",num)+"</v></c>"
+                rendered=head+"><f>"+f+"</f><v>"+(num.rounded()==num && abs(num)<1_000_000_000_000 ? String(Int64(num)) : String(num))+"</v></c>"
             }else {
                 rendered=head+"><f>"+f+"</f></c>"
             }
         }else if let num=numeric(value) {
-            rendered=head+"><v>"+String(format:"%.12g",num)+"</v></c>"
+            rendered=head+"><v>"+(num.rounded()==num && abs(num)<1_000_000_000_000 ? String(Int64(num)) : String(num))+"</v></c>"
         }else if let string=value as? String,!string.isEmpty {
             rendered=head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + (try escape(string)) + "</t></is></c>"
         }else {
