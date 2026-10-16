@@ -11,14 +11,21 @@ struct DANPERNativeApp: App {
     @State private var authenticated = false
     @State private var unlocking = false
     @State private var authError = ""
+    @AppStorage("danper.native.onboarding.v1.finished") private var onboardingFinished = false
 
     var body: some Scene {
         WindowGroup {
             ZStack {
-                NativeRootView()
-                    .opacity(authenticated && scenePhase == .active ? 1 : 0)
-                    .accessibilityHidden(!authenticated || scenePhase != .active)
-                if !authenticated || scenePhase != .active {
+                if onboardingFinished && authenticated && scenePhase == .active {
+                    NativeRootView()
+                        .transition(.opacity)
+                } else if !onboardingFinished {
+                    NativeFirstRunOnboarding {
+                        onboardingFinished = true
+                        authError = ""
+                    }
+                    .transition(.opacity)
+                } else {
                     VStack(spacing: 24) {
                         Spacer()
                         Image("BrandLogo")
@@ -53,7 +60,7 @@ struct DANPERNativeApp: App {
                         .disabled(unlocking)
                         .padding(.horizontal, 25)
                         Spacer()
-                        Text("Datos reales: no habilitados en esta versión de prueba")
+                        Text("Todavía es una versión nativa de evaluación; los respaldos reales se inspeccionan solo con tu autorización.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -62,7 +69,7 @@ struct DANPERNativeApp: App {
                 }
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .background {
+                if phase != .active {
                     // Require fresh device authentication after backgrounding.
                     authenticated = false
                 }
