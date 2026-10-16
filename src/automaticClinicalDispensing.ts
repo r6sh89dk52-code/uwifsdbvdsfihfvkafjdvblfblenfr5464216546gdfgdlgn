@@ -64,7 +64,8 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:SavedClinical
     const next=postConfirmedAttentionDelivery(current,visit,{
      itemId:item.id,lotId:lot.id,physicalQuantity:item.quantity,
      confirmIdentity:true,confirmUnits:true,confirmDelivery:true,
-     openNewContainer:false,timestamp:at
+     openNewContainer:(lot.container!=='unidad'||lot.unitsPerContainer!==1||lot.catalogUnit!=='UND')&&
+             lot.openedRemaining===0&&lot.looseUnits===0&&lot.sealedContainers>0&&item.quantity<=lot.unitsPerContainer,timestamp:at
     });
     current=next;results.push({itemId:item.id,clinicalCode:item.code,outcome:'deducted',reason:'Salida física registrada automáticamente con FEFO.'});
     posted=true;break;
