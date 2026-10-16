@@ -47,9 +47,9 @@ final class N1pExcelParityTests:XCTestCase {
         let expected=try changed("stock"){root in
             var plan=root["plan"] as! [String:Any]
             var rows=plan["lines"] as! [[String:Any]]
-            var cells=rows[2]["cells"] as! [Any]
+            var cells=rows[3]["cells"] as! [Any]
             cells[17]=1
-            rows[2]["cells"]=cells
+            rows[3]["cells"]=cells
             plan["lines"]=rows
             root["plan"]=plan
         }
