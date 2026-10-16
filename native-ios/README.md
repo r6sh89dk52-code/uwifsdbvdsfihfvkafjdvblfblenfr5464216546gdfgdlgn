@@ -54,3 +54,7 @@ El paquete Swift ahora incluye `N1DurableRestoreSandbox`, exclusivo de tests fic
 ## N1e — Validación de paridad clínica y Kardex (solo lectura, Linux)
 
 `N1eLegacyClinicalAudit` verifica los consumos, stock por lotes y grupos FEFO conforme a las reglas originales TS, conservando `R=0` frente a `R=nil`. Pruebas generadas sintéticamente por código TS de la build 222, sin pacientes reales y sin IPA. Ver `docs/N1E_PARIDAD_CLINICA_STOCK.md`.
+
+## N1f — Comprobación 1:1 de campos de atención, padrón y alergias
+
+Fingerprint semántico completo JSON: protege borradores parciales, correcciones, alergias unknown/none/known y extensiones desconocidas sin reescribir registros. Pruebas Linux generadas desde esquemas originales TS y datos ficticios. Consultar docs/N1F_PRESERVACION_CAMPOS.md. Sin IPA ni restauración real.
