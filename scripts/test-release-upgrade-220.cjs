@@ -23,7 +23,7 @@ assert(verify.includes("packed.CFBundleIdentifier,'pe.danper.saludmovil.prototip
 assert(workflow.includes('on:\n  workflow_dispatch:'),'macOS needs one explicit manual launch');
 assert(!/^  (?:push|pull_request):/m.test(workflow),'macOS may not run automatically from push or PR');
 assert(workflow.includes('runs-on: macos-15'));
-assert(workflow.includes('DANPER-Salud-Movil-iPhone-v0.21.12-BUILD-222-CANDIDATO-NO-PUBLICADO'));
+assert(workflow.includes('DANPER-Salud-Movil-iPhone-v0.21.12-BUILD-222-CONSUMOS-HISTORICOS-PROVISIONALES'));
 assert(ui.includes('buildAmbulatoryRows(attentions,ledger,start,end,{perVisitSubdivision:true'),'report must include both sites');
 assert(ui.includes('sharedMonthlyReconciliation(ledger,result.data)'),'reconciliation has one physical stock ledger');
 assert(!ui.includes('siteVisits')&&!ui.includes('setSubdivision'),'no worksite report filter');
