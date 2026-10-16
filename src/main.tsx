@@ -236,10 +236,14 @@ async function save(){
  setSavingAttention(true);setStorageState('saving');
  try{
   // A correction must never erase or alter an already-linked movement.
+  const previousSaved=att.find(a=>a.status==='saved'&&a.id===confirmed.id);
   for(const move of ledger.movements.filter(m=>m.dispenseRef?.attentionId===confirmed.id)){
    const ref=move.dispenseRef!;
-   if(!confirmed.items.some(i=>i.id===ref.itemId&&i.code===ref.clinicalCode&&i.name===ref.clinicalName&&i.unit===ref.clinicalUnit&&i.quantity===ref.clinicalQuantity&&(!i.physicalUse||(i.physicalUse.lotId===move.lotId&&i.physicalUse.quantity===move.quantity))))
-    throw Error('No se puede modificar un producto con entrega física vinculada. Se requiere una corrección auditada.');
+   const item=confirmed.items.find(i=>i.id===ref.itemId&&i.code===ref.clinicalCode&&
+     i.name===ref.clinicalName&&i.unit===ref.clinicalUnit&&i.quantity===ref.clinicalQuantity);
+   const original=previousSaved?.items.find(i=>i.id===ref.itemId);
+   if(!item||!original||JSON.stringify(item.physicalUse??null)!==JSON.stringify(original.physicalUse??null))
+    throw Error('No se puede modificar un producto con salidas físicas vinculadas a uno o varios lotes. Se requiere corrección auditada.');
   }
   // Never retroactively auto-consume for an attention already saved previously,
   // including same-day corrections or double-taps after a successful save.
