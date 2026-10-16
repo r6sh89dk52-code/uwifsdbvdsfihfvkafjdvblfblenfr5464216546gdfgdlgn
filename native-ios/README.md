@@ -26,6 +26,7 @@ swift test
 Mac con Xcode 16 y [XcodeGen](https://github.com/yonaskolb/XcodeGen):
 ```sh
 cd native-ios
+bash scripts/make-app-icon.sh
 xcodegen generate --spec project.yml
 xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO build
 ```

@@ -1,4 +1,4 @@
-name: DANPER Nativa - Xcode IPA prueba N0 (reintento JSON validado)
+name: DANPER Nativa - Xcode IPA prueba N0 (icono generado)
 on:
   push:
     branches: [native/swiftui-foundation-v0.1]
@@ -23,6 +23,8 @@ jobs:
         run: |
           if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
           xcodegen version
+      - name: Preparar AppIcon 1024 con logo oficial
+        run: cd native-ios && bash scripts/make-app-icon.sh
       - name: Generar proyecto Xcode
         run: cd native-ios && xcodegen generate --spec project.yml
       - name: Archivar iPhone ARM64 sin firmar
