@@ -1,5 +1,10 @@
 name: DANPER Native - Swift Core Linux
 on:
+  push:
+    branches: [native/swiftui-n1-encrypted-lab]
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/native-swift-linux.yml'
   pull_request:
     branches: [release/v0.21.12-build222-provisional-consumptions, native/swiftui-foundation-v0.1]
     paths:
