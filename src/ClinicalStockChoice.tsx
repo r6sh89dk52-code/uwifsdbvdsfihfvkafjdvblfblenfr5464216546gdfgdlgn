@@ -22,8 +22,9 @@ export function ClinicalStockChoice({item,ledger,onChange,locked=false}:Props){
  const variants=[...groups.values()];
  const chosen=variants.find(l=>eligible.some(e=>e.id===item.physicalUse?.lotId&&e.code===l.code&&e.name===l.name));
  const autoVariant=variants.length===1?variants[0]:undefined;
- const choice=chosen||autoVariant;
- const stockForChoice=choice?eligible.filter(l=>l.code===choice.code&&l.name===choice.name):[];
+ const choice=chosen||(allowed.length===1?autoVariant:undefined);
+ const stockForChoice=choice?eligible.filter(l=>l.code===choice.code&&l.name===choice.name&&
+   availableLots(eligible,l.code).some(x=>x.id===l.id)):[];
  const total=stockForChoice.reduce((n,l)=>n+countPhysicalUnits(l),0);
  if(locked)return <p className="hint" role="status">Salida física ya vinculada al Kardex: no puede cambiarse desde esta atención.</p>;
  if(!allowed.length)return <p className="hint" role="status">Sin equivalencia de Kardex autorizada. El uso clínico se conserva, sin movimiento físico ficticio.</p>;
@@ -31,7 +32,7 @@ export function ClinicalStockChoice({item,ledger,onChange,locked=false}:Props){
  if(!variants.length)return <p className="hint" role="status">No hay inventario compatible y disponible. La atención se guarda, con salida física pendiente.</p>;
  return <div className="clinicalPhysicalChoice" aria-label={'Presentación utilizada de '+item.name}>
   <p className="hint">DANPER selecciona automáticamente los lotes por FEFO. Aquí solo identificas la presentación y la cantidad física realmente utilizada cuando el catálogo no la determina.</p>
-  {variants.length>1&&<label>Presentación física usada
+  {(variants.length>1||allowed.length>1)&&<label>Presentación física usada
    <select value={chosen?.code||''} onChange={e=>{
     const variant=variants.find(l=>l.code===e.target.value);
     onChange(variant?{lotId:variant.id,quantity:unitCounted?item.quantity:0}:undefined);
