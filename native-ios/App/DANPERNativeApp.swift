@@ -16,14 +16,16 @@ struct DANPERNativeApp: App {
         WindowGroup {
             ZStack {
                 NativeRootView()
-                    .opacity(authenticated ? 1 : 0)
-                    .accessibilityHidden(!authenticated)
-                if !authenticated {
+                    .opacity(authenticated && scenePhase == .active ? 1 : 0)
+                    .accessibilityHidden(!authenticated || scenePhase != .active)
+                if !authenticated || scenePhase != .active {
                     VStack(spacing: 24) {
                         Spacer()
-                        Image(systemName: "cross.case.fill")
-                            .font(.system(size: 56))
-                            .foregroundStyle(Brand.red)
+                        Image("BrandLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 108, height: 108)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
                         Text("DANPER")
                             .font(.system(size: 40, weight: .heavy, design: .rounded))
                         Text("SALUD MÓVIL · SWIFTUI")
@@ -60,8 +62,8 @@ struct DANPERNativeApp: App {
                 }
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active {
-                    // Conceal the scene on task switching, background and screenshots.
+                if phase == .background {
+                    // Require fresh device authentication after backgrounding.
                     authenticated = false
                 }
             }
