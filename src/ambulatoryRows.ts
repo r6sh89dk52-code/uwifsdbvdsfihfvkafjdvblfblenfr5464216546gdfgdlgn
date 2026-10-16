@@ -1,4 +1,4 @@
-/** Read-only export. Never infer R from clinical quantities or alter stock. */
+/** Read-only export. Official R derives only from Kardex movements. Provisional R may show clinically declared, unverified quantities, never a fabricated stock movement. */
 import products from './products.json';
 import {validDanperWorksite} from './danperWorksites';
 import {validateStockLedger,postStockMovement,type StockLedger,type StockMovement} from './kardexMovements';
@@ -15,7 +15,7 @@ export type ExportVisit={
 };
 export type ExportValue=string|number;
 export type ExportLine={id:string;cells:ExportValue[]};
-export type ExportPlan={lines:ExportLine[];warnings:string[];blockers:string[];start:string;end:string;visits:number;linkedDeliveries:number;provisional?:boolean;pendingDeliveries?:number};
+export type ExportPlan={lines:ExportLine[];warnings:string[];blockers:string[];start:string;end:string;visits:number;linkedDeliveries:number;provisional?:boolean;pendingDeliveries?:number;unverifiedLineIds?:string[]};
 export type ExportOptions={subdivision?:string;perVisitSubdivision?:boolean;mappings?:CatalogMappingEvent[];incidents?:DeliveryIncident[];allowPendingDeliveries?:boolean};
 const productMap=new Map(products.map(p=>[p.code,p]));
 const frequencies=['PRIMERA','SEGUNDA','TERCERA','CUARTA','QUINTA'];
@@ -70,7 +70,7 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
  }
  const ordered=selected.filter(v=>v.date>=start&&v.date<=end).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)||a.id.localeCompare(b.id));
  const lines:ExportLine[]=[],warnings:string[]=[],blockers:string[]=[];
- let linkedDeliveries=0,pendingDeliveries=0;
+ let linkedDeliveries=0,pendingDeliveries=0;const unverifiedLineIds:string[]=[];
  const frequencyCount=new Map<string,number>(),deliveryMap=new Map<string,StockMovement[]>();
  for(const m of valid.movements)if(m.dispenseRef){
   const key=JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]);
@@ -109,6 +109,7 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
       // clinical encounter; do not create or infer a physical Kardex issue.
       quantity=item.quantity;
       pendingDeliveries++;
+      unverifiedLineIds.push(JSON.stringify([a.id,item.id]));
      }else blockers.push('Cantidad sin entrega conciliada: '+a.id.slice(0,8)+' / '+item.code);
     }else{
      let issued=0;
@@ -148,9 +149,10 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
   }
  }
  if(options.allowPendingDeliveries===true){
-  warnings.push('BORRADOR PROVISIONAL: '+pendingDeliveries+' productos utilizados sin entrega física confirmada. La columna R queda vacía para esas filas; NO equivale a consumo conciliado.');
+  warnings.push('BORRADOR PROVISIONAL: '+pendingDeliveries+' consumos clínicos pendientes. En CONSUMOS!R figuran las cantidades DECLARADAS en las atenciones; NO son salidas físicas conciliadas del Kardex.');
+  warnings.push('Para FCO/CJA/PAQ, una cantidad clínica declarada NO demuestra apertura de un nuevo envase: el R oficial 1/0 sigue pendiente de conciliación.');
  }
  warnings.push('CONTEO, INGRESOS y saldos: pendientes de conciliación. Solo los consumos confirmados corresponden al período.');
  return {lines,warnings:[...new Set(warnings)],blockers:[...new Set(blockers)],start,end,visits:ordered.length,linkedDeliveries,
-  ...(options.allowPendingDeliveries===true?{provisional:true,pendingDeliveries}:{})};
+  ...(options.allowPendingDeliveries===true?{provisional:true,pendingDeliveries,unverifiedLineIds}:{})};
 }
