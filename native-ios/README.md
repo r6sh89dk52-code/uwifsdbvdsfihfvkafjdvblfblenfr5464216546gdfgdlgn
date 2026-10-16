@@ -62,3 +62,7 @@ Fingerprint semántico completo JSON: protege borradores parciales, correcciones
 ## N1g — SwiftUI real: padrón, atención y borradores ficticios
 
 Implementación de UI SwiftUI de cinco pestañas y estado compartido de sesión `N1gClinic`, exclusiva de personas ficticias y sin persistencia clínica. Reglas de corrección, alergias y guardado simulado comprobadas en Linux; solo sintaxis de SwiftUI validada en Linux, **compilación real iOS pendiente**. Ver `docs/N1G_PANTALLAS_SWIFTUI.md`. No se genera IPA.
+
+## N1h — Formulario guiado con paridad de reglas TypeScript
+
+Se agregaron sistemas/segmentos de evaluación, horario, permiso, procedimientos independientes y marcadores sin fotografía al formulario SwiftUI ficticio; el validador Swift usa las mismas reglas que `src/attentionStepValidation.ts`, probadas con 16 escenarios sintéticos. Ver `docs/N1H_FORMULARIO_GUIADO.md`. Sigue sin guardar datos reales, sin compilar app iOS y sin generar IPA.
