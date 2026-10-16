@@ -160,6 +160,11 @@ assert.deepEqual(fractionalOut.ledger.movements.map(m=>m.excelQuantity),[0,1]);
 const fractionalIndicator=buildAmbulatoryRows([fractionalVisit],fractionalOut.ledger,
  '2026-10-09','2026-11-08',{perVisitSubdivision:true});
 assert.equal(fractionalIndicator.lines.length,1);
+assert.ok(fractionalOut.ledger.movements.every(m=>m.dispenseRef?.physicalTotal===0.5),
+ 'split metadata must carry original fractional physical quantity');
+const tamperedTotal={...fractionalOut.ledger,movements:fractionalOut.ledger.movements.map((m,i)=>
+ i===0?{...m,dispenseRef:{...m.dispenseRef,physicalTotal:0.75}}:m)};
+assert.throws(()=>ledgerRules.validateStockLedger(tamperedTotal),/Inconsistencia|cantidad física/,'split total tampering must be rejected at the storage level');
 assert.equal(fractionalIndicator.lines[0].cells[17],1,'one opened box, not 0.5 box');
 assert.equal(buildDailyReport(fractionalOut.ledger,'2026-10-14').rows.find(r=>r.code==='E-57').consumed,1);
 assert.throws(()=>buildAmbulatoryRows([{...fractionalVisit,items:[
