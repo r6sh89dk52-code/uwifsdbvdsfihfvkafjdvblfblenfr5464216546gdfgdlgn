@@ -31,8 +31,7 @@ internal enum N1sNursingExcelWriter {
     }
     private static func patch(_ source:String,address:String,
                               value:Any?,formula:String?=nil) throws -> String {
-        let rx="<c\\b[^>]*\\br=\""+NSRegularExpression.escapedPattern(for:address)+
-            "\"[^>]*(?:/>|>.*?</c>)"
+        let rx="<c\\b[^>]*\\br=\"" + NSRegularExpression.escapedPattern(for:address) + "\"[^>]*(?:/>|>.*?</c>)"
         var xml=source
         let current=try firstRange(rx,in:xml)
         var existingStyle=""
@@ -55,8 +54,7 @@ internal enum N1sNursingExcelWriter {
         }else if let num=numeric(value) {
             rendered=head+"><v>"+String(format:"%.12g",num)+"</v></c>"
         }else if let string=value as? String,!string.isEmpty {
-            rendered=head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">"+
-                (try escape(string))+"</t></is></c>"
+            rendered=head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + (try escape(string)) + "</t></is></c>"
         }else {
             rendered=head+"/>"
         }
