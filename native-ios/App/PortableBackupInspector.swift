@@ -32,44 +32,6 @@ private struct Envelope: Decodable {
     let data: String
 }
 
-private struct BackupPayload: Decodable {
-    let schema: Int
-    let exportedAt: String
-    let snapshot: [String: AnyValue]
-
-    struct AnyValue: Decodable {
-        let data: Data
-        init(from decoder: Decoder) throws {
-            let value = try JSONValue(from: decoder)
-            data = try JSONSerialization.data(withJSONObject: value.jsonObject, options: [.fragmentsAllowed])
-        }
-    }
-
-    private indirect enum JSONValue: Decodable {
-        case dict([String:JSONValue]), array([JSONValue]), string(String), number(Double), bool(Bool), null
-
-        init(from decoder: Decoder) throws {
-            let c = try decoder.singleValueContainer()
-            if c.decodeNil() { self = .null }
-            else if let b = try? c.decode(Bool.self) { self = .bool(b) }
-            else if let s = try? c.decode(String.self) { self = .string(s) }
-            else if let n = try? c.decode(Double.self) { self = .number(n) }
-            else if let a = try? c.decode([JSONValue].self) { self = .array(a) }
-            else { self = .dict(try c.decode([String:JSONValue].self)) }
-        }
-        var jsonObject: Any {
-            switch self {
-            case .dict(let d): return d.mapValues(\.jsonObject)
-            case .array(let a): return a.map(\.jsonObject)
-            case .string(let s): return s
-            case .number(let n): return n
-            case .bool(let b): return b
-            case .null: return NSNull()
-            }
-        }
-    }
-}
-
 /// Read-only cross-platform backup verifier. No writes to Keychain or Files.
 enum PortableBackupInspector {
     static func inspect(url: URL, password: String) throws -> SnapshotSummary {
@@ -109,7 +71,9 @@ enum PortableBackupInspector {
             }
         }
         guard result == kCCSuccess else { throw BackupInspectionError.invalidEnvelope }
-        defer { key.withUnsafeMutableBytes { $0.initializeMemory(as: UInt8.self, repeating: 0) } }
+        defer {
+            for i in key.indices { key[i] = 0 }
+        }
 
         let content: Data
         do {
