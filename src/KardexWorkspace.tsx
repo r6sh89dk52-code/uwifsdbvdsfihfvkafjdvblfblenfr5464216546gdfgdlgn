@@ -13,7 +13,7 @@ import {type CatalogMappingEvent,type DeliveryIncident} from './reconciliationRu
 type Section='home'|'inventory'|'movements'|'deliveries'|'reports';
 type Props={onExit:()=>void;onOpenIndicator:()=>void;ledger:StockLedger;attentions:SavedClinicalAttention[];mappings:CatalogMappingEvent[];incidents:DeliveryIncident[];
  onChange:(ledger:StockLedger)=>void;onMappings:(m:CatalogMappingEvent[])=>void;onIncidents:(m:DeliveryIncident[])=>void;responsible:string};
-const names:Record<Section,string>={home:'Kardex de Enfermería',inventory:'Inventario',movements:'Movimientos',deliveries:'Entregas',reports:'Reportes'};
+const names:Record<Section,string>={home:'Kardex de Enfermería',inventory:'Inventario',movements:'Movimientos',deliveries:'Conciliación anterior',reports:'Reportes'};
 export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attentions,mappings,incidents,onChange,onMappings,onIncidents,responsible}:Props){
  const [section,setSection]=useState<Section>('home');
  const [deliveryTab,setDeliveryTab]=useState<'confirm'|'incidents'>('confirm');
@@ -30,7 +30,7 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
     <div className="kardexGuideSteps">
      <button type="button" onClick={()=>navigate('inventory')}><span className="stageCIndex">1</span><strong>Inventario físico</strong><small>{ledger.lots.length===0?'Sin lotes cargados':'Consultar productos y lotes'}</small></button>
      <button type="button" onClick={()=>navigate('movements')}><span className="stageCIndex">2</span><strong>Entradas y salidas</strong><small>{ledger.movements.length} registro(s) de movimiento</small></button>
-     <button type="button" onClick={()=>navigate('deliveries')}><span className="stageCIndex">3</span><strong>Entrega de insumos</strong><small>Asocia productos a una atención y confirma el lote</small></button>
+     <button type="button" onClick={()=>navigate('deliveries')}><span className="stageCIndex">3</span><strong>Revisar pendientes anteriores</strong><small>Solo para incidencias históricas; las nuevas atenciones se procesan al guardar</small></button>
      <button type="button" onClick={()=>navigate('reports')}><span className="stageCIndex">4</span><strong>Exportar Kardex</strong><small>Genera un archivo Excel de existencias</small></button>
     </div>
    </div>
@@ -41,7 +41,7 @@ export default function KardexWorkspace({onExit,onOpenIndicator,ledger,attention
    {section==='movements'&&<KardexMovementsPanel ledger={ledger} mappings={mappings} onChange={onChange}/>}
    {section==='reports'&&<KardexDailyExport ledger={ledger} responsible={responsible}/>}
    {section==='deliveries'&&<>
-    <div className="kardexSubtabs"><button type="button" className={deliveryTab==='confirm'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('confirm')}}>Confirmar entrega</button><button type="button" className={deliveryTab==='incidents'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('incidents')}}>Revisar devoluciones</button></div>
+    <div className="kardexSubtabs"><button type="button" className={deliveryTab==='confirm'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('confirm')}}>Conciliar entrega antigua</button><button type="button" className={deliveryTab==='incidents'?'selected':''} onClick={()=>{feedback('selection');setDeliveryTab('incidents')}}>Revisar devoluciones</button></div>
     {deliveryTab==='confirm'?<AttentionDeliveryPanel attentions={attentions} ledger={ledger} mappings={mappings} onChange={onChange}/>:<ReconciliationPanel attentions={attentions} ledger={ledger} mappings={mappings} incidents={incidents} onMappings={onMappings} onIncidents={onIncidents}/>}
    </>}
   </>}
