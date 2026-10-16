@@ -66,3 +66,7 @@ Implementación de UI SwiftUI de cinco pestañas y estado compartido de sesión 
 ## N1h — Formulario guiado con paridad de reglas TypeScript
 
 Se agregaron sistemas/segmentos de evaluación, horario, permiso, procedimientos independientes y marcadores sin fotografía al formulario SwiftUI ficticio; el validador Swift usa las mismas reglas que `src/attentionStepValidation.ts`, probadas con 16 escenarios sintéticos. Ver `docs/N1H_FORMULARIO_GUIADO.md`. Sigue sin guardar datos reales, sin compilar app iOS y sin generar IPA.
+
+## N1i — Borradores ficticios cifrados y recuperables
+
+El motor Swift incluye AES-256-GCM y puntero autenticado para guardar exclusivamente datos inventados. La interfaz de prueba incorpora un adaptador iOS a Keychain **separado**, guardado diferido de 650 ms y recuperación al abrir. La app de producción no se toca. Las pruebas Linux no sustituyen la compilación iOS con Xcode. Consultar docs/N1I_BORRADORES_CIFRADOS.md. Sin macOS ni IPA.
