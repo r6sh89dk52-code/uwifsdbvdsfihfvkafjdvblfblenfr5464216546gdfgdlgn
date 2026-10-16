@@ -90,8 +90,12 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedA
   if(explicit&&unitCounted&&explicit.quantity!==item.quantity)
    throw Error('La cantidad física de UND/TBL/PAR debe coincidir con la cantidad clínica.');
   const physicalQuantity=explicit?explicit.quantity:item.quantity;
-  const candidates=availableLots(chosen,explicit?chosen[0].code:allowedCodes[0],at).filter(l=>
-    countPhysicalUnits(l)>=physicalQuantity);
+  const fefo=availableLots(chosen,explicit?chosen[0].code:allowedCodes[0],at);
+  if(!explicit&&fefo.length>0&&countPhysicalUnits(fefo[0])<physicalQuantity){
+   pending('El lote FEFO más próximo no alcanza: se requiere reparto entre lotes dentro de la atención. No se usó otro lote por suposición.');
+   continue;
+  }
+  const candidates=fefo.filter(l=>countPhysicalUnits(l)>=physicalQuantity);
   if(!candidates.length){
    pending('No existe saldo físico del producto/selección con cantidad suficiente y sin vencer. No se inventó descuento.');
    continue;
