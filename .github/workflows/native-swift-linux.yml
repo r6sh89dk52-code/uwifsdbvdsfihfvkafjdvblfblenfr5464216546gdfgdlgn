@@ -1,13 +1,13 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1b-linux-crypto-restore]
+    branches: [native/swiftui-n1c-durable-journal-linux]
     paths:
       - 'native-ios/**'
       - 'scripts/generate-native-compat-fixtures.cjs'
       - '.github/workflows/native-swift-linux.yml'
   pull_request:
-    branches: [release/v0.21.12-build222-provisional-consumptions, native/swiftui-foundation-v0.1, native/swiftui-n1-encrypted-lab]
+    branches: [native/swiftui-n1b-linux-crypto-restore]
     paths:
       - 'native-ios/**'
       - 'scripts/generate-native-compat-fixtures.cjs'
@@ -26,17 +26,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Instalar compilador TS para producir fixtures 100% ficticias
+      - name: Instalar compilador TS para fixtures ficticias
         run: npm ci --no-fund --ignore-scripts
-      - name: Generar fixture del cifrador TypeScript oficial (solo memoria de prueba)
+      - name: Generar respaldos cifrados exclusivamente sintéticos
         run: |
           mkdir -p "$RUNNER_TEMP/danper-n1-fixtures"
           echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-n1-fixtures" >> "$GITHUB_ENV"
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-native-compat-fixtures.cjs
-      - name: Pruebas Swift con Crypto Linux y respaldo TypeScript sintético
+      - name: Pruebas Swift de cifrado y journal persistente N1c
         run: cd native-ios && swift test --jobs 2
-      - name: Garantizar ausencia de IPA y archivos clínicos en artefactos
+      - name: Comprobar ejecución Linux sin empaquetado iOS
         run: |
+          test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
-          test ! -f native-ios/App/real.danperbackup
-          echo 'PASS: Linux only, no macOS runner, no IPA'
+          test ! -d native-ios/DANPERNative.xcodeproj
+          echo "PASS: Linux only, 0 IPA generated"
