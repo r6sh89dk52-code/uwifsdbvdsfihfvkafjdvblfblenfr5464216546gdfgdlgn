@@ -65,7 +65,7 @@ assert.equal(reopened.ledger.lots[0].openedRemaining,99);
 const report=buildAmbulatoryRows([visits[0],visits[1],visits[99],attention(101,true)],
  reopened.ledger,'2026-10-09','2026-11-08',{perVisitSubdivision:true});
 assert.equal(report.blockers.length,0);
-assert.deepEqual(report.lines.map(l=>l.cells[17]),[1,0,0,1]);
+assert.deepEqual(report.lines.map(l=>l.cells[17]),[1,0,1,0], 'Excel orders by same-day time and visit ID, not input list; source matches [1,0,1,0]');
 const old=finish(reopened.ledger,attention(101,true),at+102000,config);
 assert.equal(old.deducted,0,'cannot duplicate clinical link');
 assert.equal(old.results[0].outcome,'already-linked');
