@@ -12,13 +12,15 @@ public final class N1iEncryptedDemoDraftVault {
     }
     public enum Failure: Error, Equatable {
         case unsafeLocation, badKey, missingRecord, malformedPointer
-        case corruptedCiphertext, conflictingCommit, invalidDemoData
+        case corruptedCiphertext, conflictingCommit, invalidDemoData, staleRevision
     }
     private struct Pointer: Codable, Equatable {
         let version: Int
         let generation: String
         let ciphertextSHA256: String
         let authentication: String
+        // N1i v1 pointer lacked a logical revision; kept readable as revision zero.
+        let revision: Int64?
     }
     private let root: URL
     private let key: SymmetricKey
@@ -56,11 +58,18 @@ public final class N1iEncryptedDemoDraftVault {
     private func digest(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format:"%02x", $0) }.joined()
     }
-    private func message(_ gen: String, _ digest: String) -> Data {
-        Data((Self.scope + gen + "|" + digest).utf8)
+    private func message(_ gen: String, _ digest: String, revision: Int64?) -> Data {
+        // Retain N1i authenticated format for old (v1) mock snapshots.
+        // N1j v2 authenticates generation, physical ciphertext and monotone revision.
+        if let revision {
+            return Data(("DANPER-N1J-DEMO-REVISION|v2|" + gen + "|" +
+                         String(revision) + "|" + digest).utf8)
+        }
+        return Data((Self.scope + gen + "|" + digest).utf8)
     }
-    private func mac(_ gen: String, _ digest: String) -> String {
-        Data(HMAC<SHA256>.authenticationCode(for: message(gen,digest), using:key))
+    private func mac(_ gen: String, _ digest: String, revision: Int64?) -> String {
+        Data(HMAC<SHA256>.authenticationCode(
+            for: message(gen,digest,revision:revision),using:key))
             .base64EncodedString()
     }
     private func readFile(_ name: String) throws -> Data? {
@@ -84,14 +93,16 @@ public final class N1iEncryptedDemoDraftVault {
         guard let raw = try readFile(pointerName) else { return nil }
         guard raw.count < 2048,
               let pointer = try? JSONDecoder().decode(Pointer.self,from:raw),
-              pointer.version == 1,
+              ((pointer.version == 1 && pointer.revision == nil) ||
+               (pointer.version == 2 && (pointer.revision ?? 0) > 0)),
               let uuid=UUID(uuidString:pointer.generation),
               uuid.uuidString == pointer.generation,
               pointer.ciphertextSHA256.count == 64,
               pointer.ciphertextSHA256.utf8.allSatisfy({
                 (48...57).contains($0) || (97...102).contains($0)
               }),
-              pointer.authentication == mac(pointer.generation,pointer.ciphertextSHA256)
+              pointer.authentication == mac(pointer.generation,pointer.ciphertextSHA256,
+                                            revision:pointer.revision)
         else { throw Failure.malformedPointer }
         return pointer
     }
@@ -115,17 +126,44 @@ public final class N1iEncryptedDemoDraftVault {
     /// Returns nil only when the store is genuinely empty; tampering,
     /// an invalid key, or missing files cause an error (fail closed).
     public func load() throws -> N1gClinic? {
+        try loadWithRevision()?.clinic
+    }
+    public struct RecoveredDemo {
+        public let clinic: N1gClinic
+        public let revision: Int64
+    }
+    public func loadWithRevision() throws -> RecoveredDemo? {
         guard let pointer = try readPointer() else { return nil }
-        return try authenticate(pointer)
+        let clinic = try authenticate(pointer)
+        return RecoveredDemo(clinic:clinic,revision:pointer.revision ?? 0)
+    }
+    public func activeRevision() throws -> Int64 {
+        guard let value = try loadWithRevision() else { return 0 }
+        return value.revision
     }
     /// Stage + verify before the single logical activation pointer. Old
     /// generations are intentionally retained to avoid destructive rollback.
     /// No fsync/anti-rollback guarantee yet; used only with demo data.
+    /// Backward-compatible lab API. Not for autosave, which MUST supply
+    /// the revision assigned when the UI captured its snapshot.
     @discardableResult
     public func save(_ clinic: N1gClinic,
                      fault: ((Checkpoint) throws -> Void)? = nil) throws -> String {
+        let current = try readPointer()
+        let oldRevision = current?.revision ?? 0
+        guard oldRevision < Int64.max else { throw Failure.staleRevision }
+        return try save(clinic,revision:oldRevision+1,fault:fault)
+    }
+    /// Explicit revision rejects delayed/stale snapshots even after process
+    /// restart. This is not an interprocess lock; conflict check is best effort.
+    @discardableResult
+    public func save(_ clinic: N1gClinic, revision: Int64,
+                     fault: ((Checkpoint) throws -> Void)? = nil) throws -> String {
         let expectedGeneration = try readPointer()
         if let active=expectedGeneration { _ = try authenticate(active) }
+        guard revision > (expectedGeneration?.revision ?? 0) else {
+            throw Failure.staleRevision
+        }
         let plain: Data
         do { plain=try N1iDemoArchiveCodec.encode(clinic) }
         catch { throw Failure.invalidDemoData }
@@ -139,9 +177,10 @@ public final class N1iEncryptedDemoDraftVault {
         } catch { throw Failure.corruptedCiphertext }
         try writeFile(sealed,name:fileName(generation))
         try fault?(.ciphertextWritten)
-        let receipt=Pointer(version:1,generation:generation,
+        let receipt=Pointer(version:2,generation:generation,
             ciphertextSHA256:digest(sealed),
-            authentication:mac(generation,digest(sealed)))
+            authentication:mac(generation,digest(sealed),revision:revision),
+            revision:revision)
         _ = try authenticate(receipt)
         try fault?(.ciphertextVerified)
         guard try readPointer() == expectedGeneration else {
