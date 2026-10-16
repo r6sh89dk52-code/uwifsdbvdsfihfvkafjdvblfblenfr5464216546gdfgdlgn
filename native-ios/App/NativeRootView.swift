@@ -41,8 +41,28 @@ struct NativeRootView: View {
                         } label: {
                             Text("MIGRACIÓN SEGURA").foregroundStyle(danperRed)
                         }
+                        NavigationLink {
+                            BackupPreviewView()
+                                .navigationTitle("Respaldo real · lectura")
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Comprobar respaldo real").font(.headline)
+                                    Text("Se abre únicamente en tu iPhone, con contraseña; inspección sin restaurar datos ni alterar el Kardex.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "lock.doc.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(danperRed)
+                            }
+                            .padding(13)
+                            .background(Color(uiColor: .secondarySystemGroupedBackground),
+                                        in: RoundedRectangle(cornerRadius: 15))
+                        }
+                        .buttonStyle(.plain)
                         StatusCard(icon: "person.text.rectangle", title: "Trabajadores y atenciones",
-                                   detail: "Padrón ficticio, evaluación guiada de cuatro pasos y borradores en memoria.")
+                                   detail: "Registro SwiftUI en preparación. Las simulaciones están aisladas; los datos reales se comprueban mediante respaldo cifrado en modo lectura.")
                         StatusCard(icon: "pills", title: "FEFO nativo",
                                    detail: "Motor Swift independiente con pruebas de lotes, vencimientos y envases.")
                         StatusCard(icon: "doc.zipper", title: "Respaldo cifrado",
