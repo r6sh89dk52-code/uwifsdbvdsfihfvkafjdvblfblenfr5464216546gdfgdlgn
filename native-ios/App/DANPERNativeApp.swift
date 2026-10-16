@@ -9,16 +9,22 @@ private enum Brand {
 struct DANPERNativeApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var authenticated = false
+    @State private var hasUnlockedOnce = false
     @State private var unlocking = false
     @State private var authError = ""
+    @AppStorage("danper.native.onboarding.v1.finished") private var onboardingFinished = false
 
     var body: some Scene {
         WindowGroup {
             ZStack {
-                NativeRootView()
-                    .opacity(authenticated && scenePhase == .active ? 1 : 0)
-                    .accessibilityHidden(!authenticated || scenePhase != .active)
-                if !authenticated || scenePhase != .active {
+                if onboardingFinished {
+                    if hasUnlockedOnce {
+                        NativeRootView()
+                            .opacity(authenticated && scenePhase == .active ? 1 : 0)
+                            .accessibilityHidden(!authenticated || scenePhase != .active)
+                            .allowsHitTesting(authenticated && scenePhase == .active)
+                    }
+                    if !authenticated || scenePhase != .active {
                     VStack(spacing: 24) {
                         Spacer()
                         Image("BrandLogo")
@@ -53,17 +59,24 @@ struct DANPERNativeApp: App {
                         .disabled(unlocking)
                         .padding(.horizontal, 25)
                         Spacer()
-                        Text("Datos reales: no habilitados en esta versión de prueba")
+                        Text("Todavía es una versión nativa de evaluación; los respaldos reales se inspeccionan solo con tu autorización.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(uiColor: .systemBackground))
+                    }
+                } else {
+                    NativeFirstRunOnboarding {
+                        onboardingFinished = true
+                        authError = ""
+                    }
+                    .transition(.opacity)
                 }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
-                    // Require fresh device authentication after backgrounding.
+                    // Obscure at inactive; require new authentication upon background.
                     authenticated = false
                 }
             }
@@ -80,6 +93,7 @@ struct DANPERNativeApp: App {
             DispatchQueue.main.async {
                 unlocking = false
                 authenticated = success
+                if success { hasUnlockedOnce = true }
                 if !success {
                     authError = error?.localizedDescription ?? "No se pudo confirmar la autenticación del dispositivo."
                 }

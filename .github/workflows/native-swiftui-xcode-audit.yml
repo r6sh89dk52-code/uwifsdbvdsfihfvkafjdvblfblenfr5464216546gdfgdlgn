@@ -1,0 +1,97 @@
+name: DANPER Native - Xcode Integration Audit (NO IPA)
+on:
+  push:
+    branches: [native/swiftui-n1k-xcode-integration-onboarding]
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/native-swiftui-xcode-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: danper-native-n1k-xcode
+  cancel-in-progress: true
+jobs:
+  xcode-audit:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - name: Checkout isolated native SwiftUI source
+        uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: Install XcodeGen if missing
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+      - name: Ensure isolated app identifier, no production overwrite
+        run: |
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview' native-ios/project.yml
+          ! grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.prototipo' native-ios/project.yml
+          grep -q 'INFOPLIST_KEY_NSFaceIDUsageDescription' native-ios/project.yml
+          test -f native-ios/App/NativeFirstRunOnboarding.swift
+          test -f native-ios/App/Assets.xcassets/BrandLogo.imageset/danper-logo.png
+      - name: Generate native Xcode project and official icon
+        working-directory: native-ios
+        run: |
+          bash scripts/make-app-icon.sh
+          xcodegen generate --spec project.yml
+          test -d DANPERNative.xcodeproj
+          xcodebuild -list -project DANPERNative.xcodeproj
+      - name: Compile actual SwiftUI app for iOS Simulator (unsigned)
+        working-directory: native-ios
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/danper-xcode-simulator"
+          xcodebuild \
+            -project DANPERNative.xcodeproj \
+            -scheme DANPERNative \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/danper-xcode-simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build > "$RUNNER_TEMP/n1k-simulator-build.log" 2>&1 || {
+              grep -E -A 5 '(error:|error generated|BUILD FAILED|could not resolve|failed)' "$RUNNER_TEMP/n1k-simulator-build.log" | tail -n 120 || true
+              exit 1
+            }
+          test -d "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app"
+          echo 'PASS: real Xcode SwiftUI/iOS Simulator compilation (no installation).'
+      - name: Compile for generic iPhone with signing disabled (no archive)
+        working-directory: native-ios
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/danper-xcode-iphone"
+          xcodebuild \
+            -project DANPERNative.xcodeproj \
+            -scheme DANPERNative \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/danper-xcode-iphone" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build > "$RUNNER_TEMP/n1k-iphone-build.log" 2>&1 || {
+              grep -E -A 5 '(error:|error generated|BUILD FAILED|could not resolve|failed)' "$RUNNER_TEMP/n1k-iphone-build.log" | tail -n 120 || true
+              exit 1
+            }
+          test -d "$RUNNER_TEMP/danper-xcode-iphone/Build/Products/Debug-iphoneos/DANPERNative.app"
+          echo 'PASS: real Xcode generic iPhone compilation (unsigned, no IPA).'
+      - name: Audit app privacy metadata and zero IPA packaging
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/danper-xcode-iphone/Build/Products/Debug-iphoneos/DANPERNative.app"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          test "$BUNDLE" = 'pe.danper.saludmovil.native.preview'
+          /usr/libexec/PlistBuddy -c 'Print :NSFaceIDUsageDescription' "$APP/Info.plist" >/dev/null
+          test ! -d outputs
+          test ! -d native-ios/outputs
+          test ! -d native-ios/DANPERNative.xcarchive
+          echo 'PASS: native preview bundle verified, Face ID purpose text present.'
+          echo 'PASS: NO signed installer, NO IPA, NO uploaded binary and NO iPhone installation.'

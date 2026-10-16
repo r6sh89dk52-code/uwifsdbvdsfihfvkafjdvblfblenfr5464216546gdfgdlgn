@@ -3,139 +3,178 @@ import DanperCore
 
 private let danperRed = Color(red: 0.88, green: 0.09, blue: 0.16)
 
+/// Smaller computed tabs avoid a SwiftUI type-checker explosion with
+/// a five-tab NavigationStack plus nested asynchronous state handlers.
 struct NativeRootView: View {
     @State private var clinic = N1gClinic()
     @State private var selectedTab = 0
     @State private var demoReady = false
+    @State private var restoring = false
     @State private var demoStorageMessage = "Abriendo almacenamiento cifrado de pruebas…"
     @State private var writeTask: Task<Void, Never>?
     @State private var demoClock = N1jRevisionClock()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        HStack(spacing: 14) {
-                            Image(systemName: "cross.case.fill")
-                                .font(.title)
-                                .foregroundStyle(danperRed)
-                            VStack(alignment: .leading) {
-                                Text("DANPER").font(.largeTitle.bold())
-                                Text("Salud Móvil Nativa").font(.subheadline).foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 12)
-                        GroupBox {
-                            VStack(alignment: .leading, spacing: 9) {
-                                Label("SwiftUI real, sin WebView", systemImage: "checkmark.seal.fill")
-                                    .font(.headline)
-                                Text("Esta instalación es independiente de la build 222. Solo los borradores FICTICIOS se guardan en un almacén cifrado separado.")
-                                Text(demoStorageMessage)
-                                    .font(.footnote)
-                                    .foregroundStyle(demoReady ? .secondary : .orange)
-                                Text("Para utilizar datos clínicos reales faltan: restauración transaccional, validación de inventario y exportadores Excel nativos.")
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        } label: {
-                            Text("MIGRACIÓN SEGURA").foregroundStyle(danperRed)
-                        }
-                        StatusCard(icon: "person.text.rectangle", title: "Trabajadores y atenciones",
-                                   detail: "Padrón ficticio, evaluación guiada de cuatro pasos y borradores en memoria.")
-                        StatusCard(icon: "pills", title: "FEFO nativo",
-                                   detail: "Motor Swift independiente con pruebas de lotes, vencimientos y envases.")
-                        StatusCard(icon: "doc.zipper", title: "Respaldo cifrado",
-                                   detail: "Lectura local del formato .danperbackup; solo muestra totales.")
-                        StatusCard(icon: "tablecells", title: "Indicador y Kardex",
-                                   detail: "Pendientes de portar y contrastar contra el Excel oficial original.")
-                    }
-                    .padding()
-                }
-                .navigationTitle("Inicio")
-            }
-            .tabItem { Label("Inicio", systemImage: "house") }
-            .tag(0)
-
-            NavigationStack {
-                N1gRosterScreen(clinic: $clinic, selectedTab: $selectedTab)
-                    .disabled(!demoReady)
-            }
-            .tabItem { Label("Personal", systemImage: "person.2") }
-            .tag(1)
-
-            NavigationStack {
-                N1gAttentionScreen(clinic: $clinic)
-                    .disabled(!demoReady)
-            }
-            .tabItem { Label("Atención", systemImage: "cross.case") }
-            .tag(2)
-
-            NavigationStack {
-                N1gHistoryScreen(clinic: $clinic, selectedTab: $selectedTab)
-                    .disabled(!demoReady)
-            }
-            .tabItem { Label("Borradores", systemImage: "doc.text") }
-            .tag(3)
-
-            NavigationStack {
-                List {
-                    Section("Herramientas nativas") {
-                        NavigationLink {
-                            FEFOSandboxView().navigationTitle("FEFO")
-                        } label: { Label("FEFO ficticio", systemImage: "shippingbox") }
-                        NavigationLink {
-                            BackupPreviewView().navigationTitle("Respaldo")
-                        } label: { Label("Verificar respaldo · solo lectura", systemImage: "lock.shield") }
-                        NavigationLink {
-                            NativeStorageLabView().navigationTitle("Laboratorio")
-                        } label: { Label("Laboratorio N1 aislado", systemImage: "externaldrive") }
-                    }
-                    Section("Seguridad") {
-                        Text("N1i cifra borradores de simulación en un almacén independiente. No se admiten datos reales. La build 222 y sus registros no se modifican.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                }
-                .navigationTitle("Herramientas")
-            }
-            .tabItem { Label("Más", systemImage: "square.grid.2x2") }
-            .tag(4)
+        TabView(selection:$selectedTab) {
+            homeTab
+            workersTab
+            attentionTab
+            draftsTab
+            toolsTab
         }
         .tint(danperRed)
-        .task {
-            guard !demoReady else { return }
-            do {
-                if let recovered = try await N1iDemoDraftIOSVault.shared.loadWithRevision() {
-                    // The authenticated revision is the first value the UI uses,
-                    // avoiding reset-to-zero and a stale overwrite after restart.
-                    demoClock = N1jRevisionClock(recoveredRevision:recovered.revision)
-                    clinic = recovered.clinic
-                    demoStorageMessage = "Simulación cifrada recuperada (revisión \(recovered.revision))."
-                } else {
-                    demoClock = N1jRevisionClock()
-                    demoStorageMessage = "Almacén ficticio disponible: guardado cifrado por revisión."
-                }
-                demoReady = true
-            } catch {
-                demoReady = false
-                demoStorageMessage = "Error de verificación del almacén de prueba. Edición bloqueada para evitar sobrescribir datos."
-            }
-        }
+        .task { await loadDemo() }
         .onChange(of: clinic.visits) { _, _ in scheduleDemoWrite() }
         .onChange(of: clinic.workers) { _, _ in scheduleDemoWrite() }
         .onChange(of: clinic.allergies) { _, _ in scheduleDemoWrite() }
         .onChange(of: clinic.activeDraftID) { _, _ in scheduleDemoWrite() }
-        .onChange(of: scenePhase) { _, next in
-            if next != .active { scheduleDemoWrite(immediately: true) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { scheduleDemoWrite(immediately:true) }
+        }
+    }
+
+    private var homeTab: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment:.leading,spacing:17) {
+                    HStack(spacing:14) {
+                        Image(systemName:"cross.case.fill")
+                            .font(.largeTitle).foregroundStyle(danperRed)
+                        VStack(alignment:.leading) {
+                            Text("DANPER").font(.largeTitle.bold())
+                            Text("Salud Móvil Nativa").font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    GroupBox("MIGRACIÓN SEGURA") {
+                        VStack(alignment:.leading,spacing:8) {
+                            Text("SwiftUI nativo · Sin WebView")
+                                .font(.headline)
+                            Text("La build 222 no se reemplaza ni se modifica.")
+                            Text(demoStorageMessage)
+                                .font(.footnote)
+                                .foregroundStyle(demoReady ? Color.secondary : Color.orange)
+                            Text("La gestión clínica real requiere todavía importación verificada y paridad del Kardex/Excel.")
+                                .font(.footnote)
+                        }
+                        .frame(maxWidth:.infinity,alignment:.leading)
+                    }
+                    readOnlyBackupLink
+                    StatusCard(icon:"person.text.rectangle",title:"Trabajadores y atenciones",
+                        detail:"Formulario nativo guiado en entorno ficticio, separado de los datos reales.")
+                    StatusCard(icon:"pills",title:"FEFO nativo",
+                        detail:"Reglas Swift probadas en Linux con inventario ficticio.")
+                    StatusCard(icon:"tablecells",title:"Indicador y Kardex",
+                        detail:"El formato oficial y la conciliación clínica siguen pendientes de migración.")
+                }
+                .padding()
+            }
+            .navigationTitle("Inicio")
+        }
+        .tabItem { Label("Inicio",systemImage:"house") }
+        .tag(0)
+    }
+
+    private var readOnlyBackupLink: some View {
+        NavigationLink {
+            BackupPreviewView()
+                .navigationTitle("Respaldo real · lectura")
+        } label: {
+            HStack(spacing:12) {
+                Image(systemName:"lock.doc.fill")
+                    .font(.title3).foregroundStyle(danperRed)
+                VStack(alignment:.leading,spacing:4) {
+                    Text("Comprobar respaldo real").font(.headline)
+                    Text("Solo lectura: inspecciona una copia local con contraseña sin restaurar ni alterar consumos.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength:0)
+                Image(systemName:"chevron.right").foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .background(Color(uiColor:.secondarySystemGroupedBackground),
+                        in:RoundedRectangle(cornerRadius:15))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var workersTab: some View {
+        NavigationStack {
+            N1gRosterScreen(clinic:$clinic,selectedTab:$selectedTab)
+                .disabled(!demoReady)
+        }
+        .tabItem { Label("Personal",systemImage:"person.2") }
+        .tag(1)
+    }
+
+    private var attentionTab: some View {
+        NavigationStack {
+            N1gAttentionScreen(clinic:$clinic)
+                .disabled(!demoReady)
+        }
+        .tabItem { Label("Atención",systemImage:"cross.case") }
+        .tag(2)
+    }
+
+    private var draftsTab: some View {
+        NavigationStack {
+            N1gHistoryScreen(clinic:$clinic,selectedTab:$selectedTab)
+                .disabled(!demoReady)
+        }
+        .tabItem { Label("Borradores",systemImage:"doc.text") }
+        .tag(3)
+    }
+
+    private var toolsTab: some View {
+        NavigationStack {
+            List {
+                Section("Herramientas nativas") {
+                    NavigationLink {
+                        FEFOSandboxView().navigationTitle("FEFO")
+                    } label: { Label("FEFO ficticio",systemImage:"shippingbox") }
+                    NavigationLink {
+                        BackupPreviewView().navigationTitle("Respaldo")
+                    } label: { Label("Inspección de respaldo real · solo lectura",systemImage:"lock.shield") }
+                    NavigationLink {
+                        NativeStorageLabView().navigationTitle("Laboratorio")
+                    } label: { Label("Laboratorio N1 aislado",systemImage:"externaldrive") }
+                }
+                Section("Seguridad") {
+                    Text("N1j cifra las simulaciones ficticias en un almacén independiente y protege las revisiones. La build 222 permanece intacta.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Herramientas")
+        }
+        .tabItem { Label("Más",systemImage:"square.grid.2x2") }
+        .tag(4)
+    }
+
+    @MainActor
+    private func loadDemo() async {
+        guard !demoReady && !restoring else { return }
+        restoring = true
+        defer { restoring = false }
+        do {
+            if let previous = try await N1iDemoDraftIOSVault.shared.loadWithRevision() {
+                demoClock = N1jRevisionClock(recoveredRevision:previous.revision)
+                clinic = previous.clinic
+                demoStorageMessage = "Simulación cifrada recuperada · revisión \(previous.revision)."
+            } else {
+                demoClock = N1jRevisionClock()
+                demoStorageMessage = "Almacén ficticio disponible: guardado cifrado por revisión."
+            }
+            demoReady = true
+        } catch {
+            demoReady = false
+            demoStorageMessage = "Error de verificación del almacén ficticio. Edición bloqueada."
         }
     }
 
     private func scheduleDemoWrite(immediately: Bool = false) {
         guard demoReady else { return }
-        // Capture clock and *value* synchronously. An older Task may already
-        // be running despite cancellation; the persisted revision blocks it
-        // from replacing a newer committed generation.
-        let revision: Int64
+        let revision:Int64
         do { revision = try demoClock.capture() }
         catch {
             demoReady = false
@@ -156,9 +195,6 @@ struct NativeRootView: View {
                     demoStorageMessage = "Borrador ficticio cifrado · revisión \(revision) confirmada."
                 }
             } catch N1iEncryptedDemoDraftVault.Failure.staleRevision {
-                // Superseded background jobs must not show a success or
-                // overwrite a fresh UI status. A *latest* stale revision means
-                // another writer advanced the vault: stop rather than reset.
                 if demoClock.isLatest(revision) {
                     demoReady = false
                     demoStorageMessage = "Existe una revisión cifrada más nueva. Edición bloqueada."
@@ -166,7 +202,7 @@ struct NativeRootView: View {
             } catch {
                 if demoClock.isLatest(revision) {
                     demoReady = false
-                    demoStorageMessage = "Falló el guardado cifrado de prueba. Edición bloqueada; no cierres sin revisar."
+                    demoStorageMessage = "Falló el guardado cifrado de prueba. Edición bloqueada."
                 }
             }
         }
