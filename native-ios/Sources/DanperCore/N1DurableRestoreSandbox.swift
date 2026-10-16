@@ -38,7 +38,19 @@ internal final class N1DurableRestoreSandbox {
             throw Failure.unauthorizedLocation
         }
         self.root = canonical
-        try fm.createDirectory(at: canonical, withIntermediateDirectories: false)
+        // Reopening an existing sandbox models process restart on Linux.
+        // Linux FileManager throws EEXIST for createDirectory(false).
+        if !fm.fileExists(atPath: canonical.path) {
+            do {
+                try fm.createDirectory(at: canonical, withIntermediateDirectories: false)
+            } catch {
+                let check = try? canonical.resourceValues(
+                    forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+                guard check?.isDirectory == true, check?.isSymbolicLink != true else {
+                    throw error
+                }
+            }
+        }
         let flags = try canonical.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
         guard flags.isDirectory == true, flags.isSymbolicLink != true else {
             throw Failure.unauthorizedLocation
