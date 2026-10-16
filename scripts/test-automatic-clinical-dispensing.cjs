@@ -59,6 +59,26 @@ assert.equal(exportedParts.linkedDeliveries,2,'physical parts do not double-coun
 const savedAgain=run(multiple.ledger,a('two',[item('a'),item('b',p,2)]),date+300);
 assert.equal(savedAgain.deducted,0);
 assert.equal(savedAgain.ledger.movements.length,3,'retry never duplicates either FEFO part');
+const {validateStockLedger}=load('src/kardexMovements.ts');
+assert.throws(()=>validateStockLedger({lots:multiple.ledger.lots,
+ movements:multiple.ledger.movements.filter(m=>m.dispenseRef?.partIndex!==2)}),
+ /incompleta/,'a truncated physical split must never be considered a valid persisted ledger');
+assert.throws(()=>validateStockLedger({lots:multiple.ledger.lots,
+ movements:[...multiple.ledger.movements,{...multiple.ledger.movements[2],id:multiple.ledger.movements[2].id+':dup'}]}),
+ /inválido|duplicado/,'duplicate FEFO parts cannot be restored');
+const insufficient=run({lots:[lot('little',0,2),lot('next',1,1)],movements:[]},
+ a('shortage',[item('amount-five',p,5)]),date);
+assert.equal(insufficient.pending,1,'total across all lots must be sufficient');
+assert.equal(insufficient.ledger.movements.length,0,'no partial stock debits allowed');
+const mixedExpiry=run({lots:[{...lot('expired',0,9),expires:'2026-10-14'},
+ {...lot('valid',1,9),expires:'2026-10-15'}],movements:[]},
+ a('on-expiry',[item('today',p,2)]),Date.parse('2026-10-16T01:52:00Z'));
+assert.equal(mixedExpiry.deducted,1,'today in Peru still eligible despite UTC next day');
+assert.equal(mixedExpiry.ledger.movements[0].lotId,'valid');
+assert.equal(mixedExpiry.ledger.lots[0].looseUnits,9,'already expired lot never debited');
+const {peruStockDate}=load('src/inventoryRules.ts');
+assert.equal(peruStockDate(Date.parse('2026-10-16T01:52:00Z')),'2026-10-15');
+
 
 const depleted=run({lots:[lot('jan',0,1)],movements:[]},a('too-much',[item('i',p,100)]),date);
 assert.equal(depleted.pending,1);
@@ -97,6 +117,21 @@ const nextBox=run(firstBox.ledger,a('second-needle',[{...boxLine,id:'needle-next
 assert.equal(nextBox.deducted,1);
 assert.equal(nextBox.ledger.movements[1].excelQuantity,0,'R=0 when using already-open box');
 assert.equal(nextBox.ledger.lots[0].openedRemaining,98);
+const openLot={...needleBoxLot,id:'opened-lot',lot:'opened-lot',expires:'2026-11-01',
+ sealedContainers:0,openedRemaining:1};
+const sealedNext={...needleBoxLot,id:'sealed-lot',lot:'sealed-lot',expires:'2027-03-01'};
+const packagedSplit=run({lots:[openLot,sealedNext],movements:[]},
+ a('pack-across-lots',[{...boxLine,id:'pack-item',physicalUse:{lotId:'opened-lot',quantity:2}}]),date);
+assert.equal(packagedSplit.deducted,1,'auto FEFO packaged content spans open and sealed lots');
+assert.equal(packagedSplit.ledger.movements.length,2);
+assert.deepEqual(packagedSplit.ledger.movements.map(m=>m.excelQuantity),[0,1],
+ 'R reports first opening only, never number of clinical rows');
+const packagedExcel=buildAmbulatoryRows([a('pack-across-lots',
+ [{...boxLine,id:'pack-item',physicalUse:{lotId:'opened-lot',quantity:2}}])],
+ packagedSplit.ledger,'2026-10-09','2026-11-08',{perVisitSubdivision:true});
+assert.equal(packagedExcel.lines.length,1);
+assert.equal(packagedExcel.lines[0].cells[17],1,'R 0+1 aggregated once');
+
 const absentBox=run({lots:[],movements:[]},a('absent',[boxLine]),date);
 assert.equal(absentBox.pending,1,'explicit past stock must never invent a present lot');
 assert.equal(absentBox.ledger.movements.length,0);
