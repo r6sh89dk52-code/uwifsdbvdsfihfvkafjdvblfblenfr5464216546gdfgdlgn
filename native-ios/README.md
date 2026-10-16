@@ -94,3 +94,7 @@ Se añadió almacenamiento cifrado independiente de preparación de la base aut�
 
 ## N1o — ensayo de transacción cifrada sin activación clínica
 Cifrado, journal y recuperación para nueve colecciones **solo con fixtures sintéticos** y directorios temporales aislados. No está conectado al iPhone ni al respaldo real. Véase `docs/N1O_TRANSACCION_CIFRADA_INACTIVA.md`.
+
+
+## N1p — contraste del Excel de 10 hojas y las 30 columnas A–AD
+El generador de fixtures sintéticos ejecuta los motores TS de la build222; Swift reconstituye las 30 celdas y verifica la paridad clínica/FEFO/consumos, sin crear una IPA ni restaurar datos reales. No es un exportador Swift operativo. Véase `docs/N1P_PARIDAD_EXCEL_CLINICA.md`.
