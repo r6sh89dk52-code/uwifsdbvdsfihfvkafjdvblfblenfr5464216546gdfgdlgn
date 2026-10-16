@@ -139,7 +139,8 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedA
   // Every physical part carries the same clinical identity and part count.
   // Old single-lot references remain fully backwards compatible.
   const ref={attentionId:visit.id,itemId:item.id,clinicalCode:item.code,
-   clinicalName:item.name,clinicalUnit:item.unit,clinicalQuantity:item.quantity,confirmedAt:at};
+   clinicalName:item.name,clinicalUnit:item.unit,clinicalQuantity:item.quantity,confirmedAt:at,
+   physicalTotal:physicalQuantity};
   const commands:StockCommand[]=parts.map((part,i)=>({
    id:parts.length===1?dispenseMovementId(visit.id,item.id):
       dispenseMovementId(visit.id,item.id)+':PART:'+(i+1),
