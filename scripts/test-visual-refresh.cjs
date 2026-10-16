@@ -9,7 +9,7 @@ const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
 const lock=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
 const iosBuild=fs.readFileSync('scripts/build-ios-ipa.sh','utf8');
 const iosVerifier=fs.readFileSync('scripts/verify-ios-ipa.mjs','utf8');
-assert.equal(pkg.version,'0.21.10','the visual prototype must have its own version');
+assert.equal(pkg.version,'0.21.11','the visual prototype must have its own version');
 assert.equal(lock.version,pkg.version,'npm lock version');
 assert.equal(lock.packages[''].version,pkg.version,'npm root version');
 assert(main.includes("import './style.css';import './visualRefresh.css';"),'new theme loads after old rules');
@@ -36,6 +36,6 @@ assert(css.includes('prefers-reduced-motion:reduce'),'iOS Reduce Motion preferen
 assert(base.includes('.registerDock'),'original save dock not removed');
 assert(main.includes('function save()'),'clinical save function remains');
 assert(main.includes('function patch('),'draft update function remains');
-assert(iosBuild.includes('CFBundleVersion 220'),'new iPhone build must be 220');
-assert(iosVerifier.includes("packed.CFBundleVersion,'220'"),'IPA verifier must require build 220');
-console.log('PASS: Stage A visual shell, accessible anchors, reduced motion, iOS safe areas, build 220 and preserved clinical action hooks.');
+assert(iosBuild.includes('CFBundleVersion 221'),'new iPhone build must be 220');
+assert(iosVerifier.includes("packed.CFBundleVersion,'221'"),'IPA verifier must require build 220');
+console.log('PASS: Stage A visual shell, accessible anchors, reduced motion, iOS safe areas, build 221 and preserved clinical action hooks.');

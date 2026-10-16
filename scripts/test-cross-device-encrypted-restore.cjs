@@ -56,14 +56,30 @@ function phone(){
  };
 }
 (async()=>{
+ // Same encrypted portable format, now with REAL structural FEFO split records.
+ const {load,visit}=require('./ambulatory-test-helpers.cjs');
+ const p=require('../src/products.json').find(x=>x.code==='16000182');
+ const nurse=load('src/kardexCatalog.ts').kardexCatalog.find(x=>x.id==='E-22');
+ assert(p&&nurse);
+ const at=Date.parse('2026-10-15T14:00:00Z');
+ const stockLot=(id,qty,expires)=>({id,code:nurse.id,name:nurse.name,catalogUnit:'UND',
+  lot:id,expires,container:'unidad',unitsPerContainer:1,sealedContainers:0,looseUnits:qty,
+  openedRemaining:0,updatedAt:at-86400000});
+ const visitLine={...visit('portable-fefo',[{id:'item-fefo',code:p.code,name:p.name,
+  unit:p.unit,quantity:5,procedure:'TRATAMIENTO ORAL'}]),date:'2026-10-15',status:'saved',
+  worker:{...visit().worker,site:'LA VENTUROSA'}};
+ const fefo=load('src/automaticClinicalDispensing.ts').finalizeVisitAndPlanStock(
+  {lots:[stockLot('early',2,'2026-10-17'),stockLot('later',8,'2027-01-01')],movements:[]},
+  visitLine,at);
+ assert.equal(fefo.deducted,1);assert.equal(fefo.ledger.movements.length,2);
  const source=phone();
  const synthetic={
   workers:Array.from({length:350},(_,i)=>({dni:String(11000000+i),name:'EMPLEADO FICTICIO '+i,source:'imported',area:'SIMULADA'})),
-  attentions:Array.from({length:120},(_,i)=>({id:'PRUEBA-'+i,worker:{dni:String(11000000+i%350)},diagnosis:'EJEMPLO DEMO'})),
+  attentions:[...Array.from({length:120},(_,i)=>({id:'PRUEBA-'+i,worker:{dni:String(11000000+i%350)},diagnosis:'EJEMPLO DEMO'})),visitLine],
   allergies:{'11000000':{status:'none',substances:'',updatedAt:100}},
   notifications:false,
-  stockLots:[{id:'LOTE-PRUEBA',code:'E-01',quantity:33}],
-  stockMovements:[{id:'MOV-PRUEBA',type:'OUT',quantity:2}],
+  stockLots:fefo.ledger.lots,
+  stockMovements:fefo.ledger.movements,
   catalogMappings:[{product:'E-01',code:'AC-1'}],
   deliveryIncidents:[{id:'INC-PRUEBA'}],
   ambulatoryReconciliation:[{id:'RECON-PRUEBA'}]
@@ -83,6 +99,12 @@ function phone(){
  await destination.secure.restoreEmptyDeviceFromBackup(restored);
  const newData=await destination.secure.loadDemoSnapshot();
  assert.deepEqual(JSON.parse(JSON.stringify(newData)),JSON.parse(JSON.stringify(synthetic)),'all clinical and inventory fields restored exactly');
+ const movements=newData.stockMovements;
+ assert.equal(movements.length,2,'FEFO grouped physical issues preserved');
+ assert.deepEqual(JSON.parse(JSON.stringify(movements.map(m=>m.dispenseRef.partIndex))),[1,2]);
+ load('src/kardexMovements.ts').validateStockLedger({lots:newData.stockLots,movements});
+ assert.deepEqual(JSON.parse(JSON.stringify(newData.attentions.at(-1))),JSON.parse(JSON.stringify(visitLine)),
+  'original clinical item and count restored without duplicate visit');
  assert.notEqual(destination.keys.get('workers-v1-aes-key'),source.keys.get('workers-v1-aes-key'),'new device must generate different private worker key');
  assert.notEqual(destination.keys.get('clinical-v1-aes256-key'),source.keys.get('clinical-v1-aes256-key'),'new device must generate different clinical key');
  assert.equal(destination.keys.get('clinical-v1-portable-restore-pending'),'finished');
@@ -98,5 +120,5 @@ function phone(){
  assert.equal(anotherPhone.keys.get('clinical-v1-active-file'),undefined,'do not activate clinical state on partial restore');
  anotherPhone.failClinicalWrites(false);
  assert.equal((await anotherPhone.secure.loadDemoSnapshot()).workers.length,0);
- console.log('PASS: cross-iPhone REAL AES-GCM restore (350 fake staff,120 synthetic encounters,all inventory), different keys, reboot, incorrect password, no overwrite, interrupted write.');
+ console.log('PASS: cross-iPhone REAL AES-GCM restore (350 fake staff,121 synthetic encounters and 2 FEFO lot parts,all inventory), different keys, reboot, incorrect password, no overwrite, interrupted write.');
 })().catch(error=>{console.error(error);process.exitCode=1});
