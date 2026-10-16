@@ -50,3 +50,7 @@ El paquete Swift ahora incluye `N1DurableRestoreSandbox`, exclusivo de tests fic
 ## N1d — Ensayo de almacenamiento cifrado con generaciones recuperables (Linux)
 
 `N1EncryptedGenerationLab` cifra datos sintéticos con AES-256-GCM, autentica manifiestos con HMAC-SHA256, obliga a verificar dos dominios antes de activar un puntero único y valida reinicios/fallos. Las claves se suministran por fuera; no hay acceso a datos clínicos ni integración con iOS Keychain todavía. Revisa `docs/N1D_GENERACIONES_CIFRADAS.md`. No genera IPA.
+
+## N1e — Validación de paridad clínica y Kardex (solo lectura, Linux)
+
+`N1eLegacyClinicalAudit` verifica los consumos, stock por lotes y grupos FEFO conforme a las reglas originales TS, conservando `R=0` frente a `R=nil`. Pruebas generadas sintéticamente por código TS de la build 222, sin pacientes reales y sin IPA. Ver `docs/N1E_PARIDAD_CLINICA_STOCK.md`.
