@@ -1,7 +1,7 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1k-xcode-integration-onboarding]
+    branches: [native/swiftui-n1l-real-backup-audit-no-merge]
     paths:
       - 'native-ios/**'
       - 'src/attentionStepValidation.ts'
@@ -40,4 +40,4 @@ jobs:
         run: |
           test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
-          echo 'PASS N1k: Swift portable + onboarding syntax, no IPA'
+          echo 'PASS N1l: single-source audit no merge + Swift tests, no IPA'
