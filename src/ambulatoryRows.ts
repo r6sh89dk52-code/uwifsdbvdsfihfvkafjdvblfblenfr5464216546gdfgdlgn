@@ -53,8 +53,11 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
  const ordered=selected.filter(v=>v.date>=start&&v.date<=end).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)||a.id.localeCompare(b.id));
  const lines:ExportLine[]=[],warnings:string[]=[],blockers:string[]=[];
  let linkedDeliveries=0,pendingDeliveries=0;
- const frequencyCount=new Map<string,number>(),deliveryMap=new Map<string,StockMovement>();
- for(const m of valid.movements)if(m.dispenseRef)deliveryMap.set(JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]),m);
+ const frequencyCount=new Map<string,number>(),deliveryMap=new Map<string,StockMovement[]>();
+ for(const m of valid.movements)if(m.dispenseRef){
+  const key=JSON.stringify([m.dispenseRef.attentionId,m.dispenseRef.itemId]);
+  deliveryMap.set(key,[...(deliveryMap.get(key)||[]),m]);
+ }
  const subdivision=options.subdivision||'';
  const perVisitSubdivision=options.perVisitSubdivision===true;
  if(perVisitSubdivision&&subdivision)throw Error('No combines una sede fija con el modo de ambas sedes.');
@@ -81,24 +84,27 @@ export function buildAmbulatoryRows(visits:ExportVisit[],ledger:StockLedger,star
     if(!p||p.name.trim()!==item.name?.trim()||p.unit.trim()!==item.unit?.trim())throw Error('Material o unidad no verificados: '+item.code);
     if(!Number.isInteger(item.quantity)||item.quantity<=0||!item.procedure?.trim())throw Error('Cantidad clínica o procedimiento inválido.');
     code=p.code;name=p.name;procedure=item.procedure;
-    const m=deliveryMap.get(JSON.stringify([a.id,item.id]));
-    if(!m){
+    const movements=deliveryMap.get(JSON.stringify([a.id,item.id]))||[];
+    if(!movements.length){
      if(options.allowPendingDeliveries===true){
       // PROVISIONAL ONLY: no stock movement exists, so R must stay unknown.
-      // Clinical item/code are retained but no physical quantity is inferred.
       pendingDeliveries++;
      }else blockers.push('Cantidad sin entrega conciliada: '+a.id.slice(0,8)+' / '+item.code);
-    }
-    else{
-     const ref=m.dispenseRef!;
-     if(ref.clinicalCode!==item.code||ref.clinicalName.trim()!==item.name.trim()||ref.clinicalUnit.trim()!==item.unit.trim()||ref.clinicalQuantity!==item.quantity)
-      throw Error('La atención fue modificada después de confirmar la entrega.');
-     // The official Indicator code and the nursing Kardex stock code are
-     // independent catalogs. Only explicit user-reviewed pairs are valid.
-     if(m.code!==item.code&&!isReviewedAssociation(item.code,m.code))
-      blockers.push('Falta correspondencia aprobada entre el material y el lote: '+item.code);
-     if(incidents.some(i=>i.movementId===m.id))blockers.push('Entrega con devolución o discrepancia pendiente de conciliación: '+item.code);
-     quantity=auditedQuantity(m);linkedDeliveries++;
+    }else{
+     let issued=0;
+     for(const m of movements){
+      const ref=m.dispenseRef!;
+      if(ref.clinicalCode!==item.code||ref.clinicalName.trim()!==item.name.trim()||
+        ref.clinicalUnit.trim()!==item.unit.trim()||ref.clinicalQuantity!==item.quantity)
+       throw Error('La atención fue modificada después de confirmar la entrega.');
+      if(m.code!==item.code&&!isReviewedAssociation(item.code,m.code))
+       blockers.push('Falta correspondencia aprobada entre el material y el lote: '+item.code);
+      if(incidents.some(i=>i.movementId===m.id))
+       blockers.push('Entrega con devolución o discrepancia pendiente de conciliación: '+item.code);
+      issued+=auditedQuantity(m);
+     }
+     quantity=Math.round(issued*1000)/1000;
+     linkedDeliveries++; // physical group, not lot-part count
     }
    }else procedure=(a.standaloneProcedures||[]).join(' / ');
    const rawAge=String(a.worker.age),age=Number(rawAge);
