@@ -38,3 +38,7 @@ No considerar la migración completa hasta que los test nativos y cruzados con l
 ## Etapa N1a — almacenamiento aislado de prueba
 
 La pestaña «Laboratorio» comprueba escritura/lectura cifrada de **un contador ficticio** usando CryptoKit y Keychain independientes. No carga, importa ni modifica datos clínicos. El núcleo añade validación de colecciones del respaldo antes de una futura restauración. Detalles y condiciones en `docs/N1A_SEGURIDAD_Y_PENDIENTES.md`.
+
+## Etapa N1b (Linux exclusivamente; sin IPA)
+
+El núcleo Swift ahora incluye verificación de respaldo AES-256-GCM compatible con la generación TypeScript mediante Apple Swift Crypto. Las pruebas Linux producen archivos **ficticios** temporales desde `src/portableBackup.ts` y comparan autenticidad, digest de texto claro, estructura, daños y contraseña incorrecta. El simulador de restauración es puramente de pruebas; **no permite importar trabajadores o atenciones reales**. Consultar `docs/N1B_COMPATIBILIDAD_LINUX.md`.
