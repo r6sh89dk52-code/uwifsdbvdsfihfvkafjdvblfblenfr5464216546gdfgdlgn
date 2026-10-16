@@ -54,7 +54,7 @@ struct NativeRootView: View {
                             Text("La build 222 no se reemplaza ni se modifica.")
                             Text(demoStorageMessage)
                                 .font(.footnote)
-                                .foregroundStyle(demoReady ? .secondary : .orange)
+                                .foregroundStyle(demoReady ? Color.secondary : Color.orange)
                             Text("La gestión clínica real requiere todavía importación verificada y paridad del Kardex/Excel.")
                                 .font(.footnote)
                         }
