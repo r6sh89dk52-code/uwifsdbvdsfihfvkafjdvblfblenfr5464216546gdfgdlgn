@@ -21,7 +21,7 @@ const history=fs.readFileSync('src/KardexMovementsPanel.tsx','utf8');
 const daily=fs.readFileSync('src/KardexDailyExport.tsx','utf8');
 assert.ok(main.includes('<KardexWorkspace '));
 for(const word of ['Inventario','Movimientos','Conciliación anterior','Reportes'])assert.ok(workspace.includes(word));
-assert.ok(workspace.includes('Solo para incidencias históricas'),'no second dispensing step in routine flow');
+assert.ok(workspace.includes('Entrega de insumos automática al guardar una atención'),'no second dispensing step in routine flow');
 assert.ok(inventory.includes('<KardexProductSearch '));
 assert.ok(history.includes('<KardexProductSearch '));
 assert.ok(!inventory.includes('<KardexMovementsPanel '));
