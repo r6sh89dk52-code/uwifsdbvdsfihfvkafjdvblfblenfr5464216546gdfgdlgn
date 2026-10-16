@@ -18,8 +18,19 @@ No se debe obligar al usuario a entrar en Kardex > Entrega para confirmar de nue
 - Un lote registrado hoy no demuestra cuánto stock existía al principio del mes o en una atención anterior.
 - No debe ejecutarse una migración retroactiva de los consumos antiguos del iPhone hacia saldos actuales sin recuento y validación por el operador.
 
-## Próxima ampliación necesaria antes de promover el cambio
-Añadir en el **mismo formulario de atención** (nunca en un módulo posterior) la cantidad física usada o presentación precisa solo para FCO, CJA, PAQ, correspondencias múltiples o envases no inequívocos, y calcular correctamente apertura R=1/0 con casos de frascos abiertos, cajas abiertas, agotamiento, FEFO y varios lotes. Las cantidades por defecto deben configurarse por producto con evidencia y permitir revisión. No adivinar mL/volumen.
+## Implementación integrada en la atención (PR #57)
+- `ClinicalStockChoice`: dentro de la tarjeta del medicamento, permite elegir el lote físico y la cantidad interna (UND o mL según el inventario) para CJA/FCO/PAQ y asociaciones ambiguas E-62/E-63. No se introduce una pantalla externa de confirmación.
+- Al pulsar **Guardar**, `finalizeVisitAndPlanStock` reutiliza las reglas auditadas de Kardex, registra R=1 cuando abre por primera vez un envase y R=0 al usar un envase abierto, conservando consumo físico diferente de R. Para tabletas/UND con correspondencia única, el descuento es automático sin selección.
+- Si falta información, no se inventa el descuento; queda en la atención como pendiente con R vacía en el Excel provisional.
+- El Indicador tiene **un botón** que selecciona reporte oficial cuando no hay salidas pendientes o provisional con consentimiento explícito cuando solo faltan cantidades físicas.
+- **No se reejecuta el stock de atenciones ya guardadas**, incluso si se corrigen el mismo día. Los cinco casos previos no se migran automáticamente.
+- FEFO no puede pasar por encima de un lote anterior insuficiente: mientras el historial solo soporte un lote/movimiento por ítem, se conserva como pendiente y se señala la necesidad de descuento multilote.
+
+## Limitaciones previas a producción
+- Falta un flujo auditable de consumos multilote que conserve la regla de una fila clínica pero permita varias salidas físicas sin duplicar el Indicador.
+- Hay que validar los cálculos reales con los dos Excel exportados desde iPhone, con datos ficticios o anonimizados.
+- Sigue pendiente la restauración física del respaldo cifrado y la resolución del límite de 1.000 movimientos.
+- Una cantidad usada de un frasco que no pueda ser verificada debe quedar pendiente, no estimarse automáticamente.
 
 ## Gates de validación
 - Tests Linux de cálculo, claves idempotentes, doble guardado, guardado fallido, FEFO, stock agotado, alteraciones posteriores, lotes vencidos, varias sedes y exportación provisional/oficial.
