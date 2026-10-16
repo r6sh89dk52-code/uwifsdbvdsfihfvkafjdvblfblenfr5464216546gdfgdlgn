@@ -1,0 +1,67 @@
+name: DANPER Nativa - Xcode IPA prueba N0 (unica)
+on:
+  push:
+    branches: [native/swiftui-foundation-v0.1]
+    paths: ['.github/workflows/native-swiftui-one-shot.yml']
+permissions:
+  contents: read
+jobs:
+  ios:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/native/swiftui-foundation-v0.1' && contains(github.event.head_commit.message, 'trigger one authorized DANPER SwiftUI macOS build')
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Obtener fuentes
+        uses: actions/checkout@v4
+      - name: Version de Xcode
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Pruebas puras Swift
+        run: cd native-ios && swift test
+      - name: Generador del proyecto iOS
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          xcodegen version
+      - name: Generar proyecto Xcode
+        run: cd native-ios && xcodegen generate --spec project.yml
+      - name: Archivar iPhone ARM64 sin firmar
+        run: |
+          cd native-ios
+          mkdir -p out
+          xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/out/DANPERNative.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' archive
+      - name: Empaquetar y comprobar candidato paralelo
+        run: |
+          set -euo pipefail
+          cd native-ios
+          APP="out/DANPERNative.xcarchive/Products/Applications/DANPERNative.app"
+          test -d "$APP"
+          test -f "$APP/DANPERNative"
+          test -f "$APP/Assets.car"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          test "$ID" = "pe.danper.saludmovil.native.preview"
+          test "$VERSION" = "0.1.0"
+          test "$BUILD" = "1"
+          /usr/bin/lipo -archs "$APP/DANPERNative" | grep -w arm64
+          mkdir -p out/ipa/Payload
+          cp -R "$APP" out/ipa/Payload/
+          (cd out/ipa && /usr/bin/zip -qry "../DANPER-Nativa-v0.1.0-N0-SIN_FIRMAR.ipa" Payload)
+          (cd out && shasum -a 256 DANPER-Nativa-v0.1.0-N0-SIN_FIRMAR.ipa > DANPER-Nativa-v0.1.0-N0-SIN_FIRMAR.ipa.sha256)
+          /usr/bin/unzip -t out/DANPER-Nativa-v0.1.0-N0-SIN_FIRMAR.ipa | tail -1
+          echo "PASS: SwiftUI iOS N0 $VERSION build $BUILD ID=$ID, ARM64, official asset and IPA archive"
+          cat out/DANPER-Nativa-v0.1.0-N0-SIN_FIRMAR.ipa.sha256
+      - name: Publicar IPA de evaluacion aislada
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER-Nativa-SwiftUI-v0.1.0-N0-PRUEBA-NO-CLINICA
+          path: |
+            native-ios/out/*.ipa
+            native-ios/out/*.sha256
+          if-no-files-found: error
+          retention-days: 7
