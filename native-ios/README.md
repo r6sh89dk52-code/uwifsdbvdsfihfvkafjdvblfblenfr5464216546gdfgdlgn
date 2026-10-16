@@ -98,3 +98,7 @@ Cifrado, journal y recuperación para nueve colecciones **solo con fixtures sint
 
 ## N1p — contraste del Excel de 10 hojas y las 30 columnas A–AD
 El generador de fixtures sintéticos ejecuta los motores TS de la build222; Swift reconstituye las 30 celdas y verifica la paridad clínica/FEFO/consumos, sin crear una IPA ni restaurar datos reales. No es un exportador Swift operativo. Véase `docs/N1P_PARIDAD_EXCEL_CLINICA.md`.
+
+
+## N1q — Conciliación y fórmulas del libro de diez hojas
+Swift comprueba los 432 materiales, stock/ingresos/conteo, ausencia frente a cero, anulaciones, fórmulas RESU/INGRESOS/CONTEO y ejemplos de celdas OOXML generados por la versión TS actual con datos ficticios. No exporta XLSX en Swift ni activa pacientes reales; véase `docs/N1Q_CONCILIACION_FORMULAS_PARIDAD.md`.
