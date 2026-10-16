@@ -9,6 +9,7 @@ private enum Brand {
 struct DANPERNativeApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var authenticated = false
+    @State private var hasUnlockedOnce = false
     @State private var unlocking = false
     @State private var authError = ""
     @AppStorage("danper.native.onboarding.v1.finished") private var onboardingFinished = false
@@ -16,16 +17,14 @@ struct DANPERNativeApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if onboardingFinished && authenticated && scenePhase == .active {
-                    NativeRootView()
-                        .transition(.opacity)
-                } else if !onboardingFinished {
-                    NativeFirstRunOnboarding {
-                        onboardingFinished = true
-                        authError = ""
+                if onboardingFinished {
+                    if hasUnlockedOnce {
+                        NativeRootView()
+                            .opacity(authenticated && scenePhase == .active ? 1 : 0)
+                            .accessibilityHidden(!authenticated || scenePhase != .active)
+                            .allowsHitTesting(authenticated && scenePhase == .active)
                     }
-                    .transition(.opacity)
-                } else {
+                    if !authenticated || scenePhase != .active {
                     VStack(spacing: 24) {
                         Spacer()
                         Image("BrandLogo")
@@ -66,11 +65,18 @@ struct DANPERNativeApp: App {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(uiColor: .systemBackground))
+                    }
+                } else {
+                    NativeFirstRunOnboarding {
+                        onboardingFinished = true
+                        authError = ""
+                    }
+                    .transition(.opacity)
                 }
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active {
-                    // Require fresh device authentication after backgrounding.
+                if phase == .background {
+                    // Obscure at inactive; require new authentication upon background.
                     authenticated = false
                 }
             }
@@ -87,6 +93,7 @@ struct DANPERNativeApp: App {
             DispatchQueue.main.async {
                 unlocking = false
                 authenticated = success
+                if success { hasUnlockedOnce = true }
                 if !success {
                     authError = error?.localizedDescription ?? "No se pudo confirmar la autenticación del dispositivo."
                 }
