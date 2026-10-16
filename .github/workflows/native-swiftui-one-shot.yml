@@ -1,4 +1,4 @@
-name: DANPER Nativa - Xcode IPA prueba N0 (unica)
+name: DANPER Nativa - Xcode IPA prueba N0 (reintento JSON validado)
 on:
   push:
     branches: [native/swiftui-foundation-v0.1]
