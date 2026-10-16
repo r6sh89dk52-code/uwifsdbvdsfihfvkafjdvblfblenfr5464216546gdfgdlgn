@@ -24,11 +24,12 @@ No se debe obligar al usuario a entrar en Kardex > Entrega para confirmar de nue
 - Si falta información, no se inventa el descuento; queda en la atención como pendiente con R vacía en el Excel provisional.
 - El Indicador tiene **un botón** que selecciona reporte oficial cuando no hay salidas pendientes o provisional con consentimiento explícito cuando solo faltan cantidades físicas.
 - **No se reejecuta el stock de atenciones ya guardadas**, incluso si se corrigen el mismo día. Los cinco casos previos no se migran automáticamente.
-- FEFO no puede pasar por encima de un lote anterior insuficiente: mientras el historial solo soporte un lote/movimiento por ítem, se conserva como pendiente y se señala la necesidad de descuento multilote.
+- FEFO ahora agota primero el lote que vence antes y después utiliza los siguientes lotes disponibles. Un artículo clínico puede tener varios movimientos físicos auditados por lote, con identificadores de parte y registro atómico; en CONSUMOS sigue habiendo una única fila cuya R suma el consumo oficial verificado.
 
 ## Limitaciones previas a producción
-- Falta un flujo auditable de consumos multilote que conserve la regla de una fila clínica pero permita varias salidas físicas sin duplicar el Indicador.
-- Hay que validar los cálculos reales con los dos Excel exportados desde iPhone, con datos ficticios o anonimizados.
+- El reparto multilote FEFO quedó implementado con integridad de grupo: si falta una de las partes, se rechaza la persistencia/recuperación como movimiento completo. Aún falta validar en iPhone real con datos sintéticos.
+- Validar Excel real del Indicador y Kardex generado en iPhone con datos ficticios o anonimizados, incluyendo frascos/cajas que requieran dos envases y R=0/1.
+- FEFO usa el día civil de Perú, no el cambio de fecha UTC. Los lotes vencidos se excluyen; vencimiento desconocido queda después de los lotes con fecha válida.
 - Sigue pendiente la restauración física del respaldo cifrado y la resolución del límite de 1.000 movimientos.
 - Una cantidad usada de un frasco que no pueda ser verificada debe quedar pendiente, no estimarse automáticamente.
 
