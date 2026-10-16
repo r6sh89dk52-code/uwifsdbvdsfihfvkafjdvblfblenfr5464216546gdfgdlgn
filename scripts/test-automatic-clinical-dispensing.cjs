@@ -39,7 +39,7 @@ const again=run(first.ledger,one,date+200);
 assert.equal(again.deducted,0);assert.equal(again.pending,0);
 assert.equal(again.results[0].outcome,'already-linked');
 assert.equal(again.ledger.movements.length,1);
-assert.throws(()=>run(first.ledger,a('one',[item('i',p,2)]),date+300),/modificar un medicamento/);
+assert.throws(()=>run(first.ledger,a('one',[item('i',p,2)]),date+300),/cambiar un medicamento/);
 const multiple=run(stock,a('two',[item('a'),item('b',p,2)]),date);
 assert.equal(multiple.deducted,2);
 assert.equal(multiple.ledger.movements.length,2);
