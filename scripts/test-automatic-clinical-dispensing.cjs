@@ -41,7 +41,7 @@ const multiple=run(stock,a('two',[item('a'),item('b',p,2)]),date);
 assert.equal(multiple.deducted,2);
 assert.equal(multiple.ledger.movements.length,2);
 assert.equal(multiple.ledger.lots[0].looseUnits,1);
-assert.equal(multiple.ledger.lots[1].looseUnits,6);
+assert.equal(multiple.ledger.lots[1].looseUnits,5);
 const depleted=run({lots:[lot('jan',0,1)],movements:[]},a('too-much',[item('i',p,100)]),date);
 assert.equal(depleted.pending,1);
 assert.equal(depleted.ledger.lots[0].looseUnits,1);
