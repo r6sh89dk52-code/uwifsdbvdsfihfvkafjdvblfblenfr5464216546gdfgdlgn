@@ -13,7 +13,7 @@ let package = Package(
         .target(name: "DanperCore",
                 dependencies: [.product(name: "Crypto", package: "swift-crypto")],
                 path: "Sources/DanperCore"),
-        .testTarget(name: "DanperCoreTests", dependencies: ["DanperCore"],
+        .testTarget(name: "DanperCoreTests", dependencies: ["DanperCore", .product(name: "Crypto", package: "swift-crypto")],
                     path: "Tests/DanperCoreTests")
     ]
 )
