@@ -127,7 +127,7 @@ assert.match(exporter,/window.confirm\('EXCEL PROVISIONAL/,'draft export must re
 assert.doesNotMatch(exporter,/onClick=\{\(\)=>void exportBook\(true\)\}/,'no second export button');
 const inline=require('node:fs').readFileSync('src/ClinicalStockChoice.tsx','utf8');
 assert.match(inline,/Cantidad física utilizada/);
-assert.match(inline,/Sin identificar/);
+assert.match(inline,/Presentación pendiente de identificar/);
 const amp=run({lots:[],movements:[]},a('amp',[item('amp',needle)]),date);
 assert.equal(amp.pending,1);
 const exportPlan=buildAmbulatoryRows([one],noStock.ledger,'2026-10-09','2026-11-08',{perVisitSubdivision:true,allowPendingDeliveries:true});
