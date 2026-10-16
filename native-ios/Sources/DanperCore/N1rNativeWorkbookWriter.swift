@@ -237,8 +237,7 @@ internal enum N1rNativeWorkbookWriter {
             throw N1rWorkbookError.invalidValue
         }
         if value.isEmpty {return "<c r=\""+ref+"\"/>"}
-        return "<c r=\""+ref+"\" t=\"inlineStr\"><is><t xml:space=\"preserve\">"+
-            escape(value)+"</t></is></c>"
+        return "<c r=\"\(ref)\" t=\"inlineStr\"><is><t xml:space=\"preserve\">\(escape(value))</t></is></c>"
     }
     private static func valueRows(_ manifest:Data) throws -> [[Any]] {
         guard manifest.count<=3_000_000,
@@ -294,15 +293,9 @@ internal enum N1rNativeWorkbookWriter {
             xmlRows += "<row r=\""+String(n)+"\">"
             for (j,value) in values.enumerated() {
                 if j==2 {
-                    xmlRows += "<c r=\"C"+String(n)+"\"><f>"+
-                     "IF(A"+String(n)+"=&quot;&quot;,&quot;&quot;,IFERROR(VLOOKUP(A"+
-                     String(n)+",'@subuo'!$A$3:$C$59,2,FALSE),&quot;&quot;))</f></c>"
+                    xmlRows += "<c r=\"C\(n)\"><f>IF(A\(n)=&quot;&quot;,&quot;&quot;,IFERROR(VLOOKUP(A\(n),'@subuo'!$A$3:$C$59,2,FALSE),&quot;&quot;))</f></c>"
                 }else if j==3 {
-                    xmlRows += "<c r=\"D"+String(n)+"\"><f>"+
-                     "IF(OR(A"+String(n)+"=&quot;&quot;,B"+String(n)+
-                     "=&quot;&quot;),&quot;&quot;,IFERROR(VLOOKUP(CONCATENATE(VLOOKUP(A"+
-                     String(n)+",'@subuo'!$A$3:$C$59,3,FALSE),B"+String(n)+
-                     "),'@uo'!$D$2:$E$234,2,FALSE),&quot;&quot;))</f></c>"
+                    xmlRows += "<c r=\"D\(n)\"><f>IF(OR(A\(n)=&quot;&quot;,B\(n)=&quot;&quot;),&quot;&quot;,IFERROR(VLOOKUP(CONCATENATE(VLOOKUP(A\(n),'@subuo'!$A$3:$C$59,3,FALSE),B\(n)),'@uo'!$D$2:$E$234,2,FALSE),&quot;&quot;))</f></c>"
                 }else{
                     xmlRows += try cell(value,col:j,row:n)
                 }
