@@ -2,7 +2,7 @@
  * No automatic name matching, dispensing, dose inference or implicit unit conversions.
  */
 import {postStockMovement,type StockLedger,type DispenseRef} from './kardexMovements';
-import {countPhysicalUnits,type StockLot} from './inventoryRules';
+import {countPhysicalUnits,peruStockDate,type StockLot} from './inventoryRules';
 
 export type ClinicalLine={id:string;code:string;name:string;quantity:number;unit:string};
 export type SavedClinicalAttention={id:string;status:'saved'|'draft';items:ClinicalLine[]};
@@ -14,7 +14,7 @@ export function alreadyDispensed(ledger:StockLedger,attentionId:string,itemId:st
  return ledger.movements.some(m=>m.id===id||(m.dispenseRef?.attentionId===attentionId&&m.dispenseRef.itemId===itemId));
 }
 export function availableLots(lots:StockLot[],code:string,at:number=Date.now()):StockLot[]{
- const day=new Date(at).toISOString().slice(0,10);
+ const day=peruStockDate(at);
  return lots.filter(l=>l.code===code&&countPhysicalUnits(l)>0&&(!l.expires||l.expires>=day))
  .sort((a,b)=>(a.expires||'9999-12-31').localeCompare(b.expires||'9999-12-31')||a.id.localeCompare(b.id));
 }
