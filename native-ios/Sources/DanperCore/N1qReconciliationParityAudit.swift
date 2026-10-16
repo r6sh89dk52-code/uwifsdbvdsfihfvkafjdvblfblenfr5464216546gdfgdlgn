@@ -274,7 +274,9 @@ internal enum N1qReconciliationParityAudit {
             eligibleIDs.append(id)
             for item in items {
                 let code=string(item["code"])!,itemID=string(item["id"])!
-                let value=linked[id+"\u{001F}"+itemID]!!
+                guard let value=linked[id+"\u{001F}"+itemID] ?? nil else {
+                    throw N1qAuditError.invalidPhysicalLedger
+                }
                 consumption[code,default:0]+=Int(value)
                 clinicalLines+=1
             }
@@ -284,11 +286,16 @@ internal enum N1qReconciliationParityAudit {
         let counts=events.filter{$0.kind=="count" && $0.date==end}
         let receipts=events.filter{$0.kind=="receipt" && $0.date>=start && $0.date<=end}
         let countOpening=openings.count,countCount=counts.count,countReceipts=receipts.count
-        let expectedWarnings:[String]=[
-            ...(review ? [] : ["Ingresos no cerrados para el período: ninguna ausencia puede interpretarse como cero."]),
-            ...(countOpening < 432 ? ["Stock inicial pendiente para "+String(432-countOpening)+" materiales."]:[]),
-            ...(countCount < 432 ? ["Recuento final pendiente para "+String(432-countCount)+" materiales."]:[])
-        ]
+        var expectedWarnings:[String]=[]
+        if !review {
+            expectedWarnings.append("Ingresos no cerrados para el período: ninguna ausencia puede interpretarse como cero.")
+        }
+        if countOpening < 432 {
+            expectedWarnings.append("Stock inicial pendiente para "+String(432-countOpening)+" materiales.")
+        }
+        if countCount < 432 {
+            expectedWarnings.append("Recuento final pendiente para "+String(432-countCount)+" materiales.")
+        }
         guard integer(expectedSummary["openingConfirmed"])==countOpening,
               integer(expectedSummary["countConfirmed"])==countCount,
               integer(expectedSummary["receiptsConfirmed"])==countReceipts,
@@ -357,7 +364,7 @@ internal enum N1qReconciliationParityAudit {
         for cell in observed {
             guard let code=string(cell["code"]),codes.contains(code),
                   let row=integer(cell["row"]),
-                  catalogCodes[row-3]==code,
+                  (3...434).contains(row),catalogCodes[row-3]==code,
                   let detail=computed[code],
                   let income=cell["income"] as? [String:String],
                   let comment=string(cell["comment"]),comment.isEmpty,
