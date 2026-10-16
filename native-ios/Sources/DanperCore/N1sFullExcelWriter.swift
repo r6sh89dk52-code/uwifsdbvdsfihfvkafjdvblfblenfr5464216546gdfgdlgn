@@ -94,7 +94,7 @@ internal enum N1sFullExcelWriter {
         }
         guard let value,!(value is NSNull) else {return head+"/>"}
         if let x=number(value) {
-            return head+"><v>"+String(format:"%.12g",x)+"</v></c>"
+            return head+"><v>"+(x.rounded()==x && abs(x)<1_000_000_000_000 ? String(Int64(x)) : String(x))+"</v></c>"
         }
         guard let t=value as? String else {throw N1sExcelError.invalidRow}
         if t.isEmpty{return head+"/>"}
