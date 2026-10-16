@@ -26,7 +26,17 @@ for(let i=1;i<=10;i++){
    assert.ok(found,'missing '+i+'!'+ref);
    const original=f(bc,ref),ours=f(ac,ref);
    if(original) assert.equal(ours,original,'formula '+i+'!'+ref);
-   else if(value(expected)!=='') assert.equal(value(found),value(expected),'value '+i+'!'+ref);
+   else if(value(expected)!=='') {
+    const a=value(found),b=value(expected);
+    // XLSX stores IEEE754 numbers; Swift and JS can serialize equivalent
+    // binary fractions with one last-decimal-digit textual difference.
+    if(expected.getAttribute('t')==='inlineStr'||found.getAttribute('t')==='inlineStr')
+      assert.equal(a,b,'text value '+i+'!'+ref);
+    else{
+      assert.ok(a!==''&&b!==''&&Number.isFinite(Number(a))&&Number.isFinite(Number(b))&&
+        Math.abs(Number(a)-Number(b))<=1e-12,'numeric value '+i+'!'+ref+' '+a+' / '+b);
+    }
+   }
   }
  }
 }
