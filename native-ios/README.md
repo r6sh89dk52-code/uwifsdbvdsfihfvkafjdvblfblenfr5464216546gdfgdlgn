@@ -102,3 +102,7 @@ El generador de fixtures sintéticos ejecuta los motores TS de la build222; Swif
 
 ## N1q — Conciliación y fórmulas del libro de diez hojas
 Swift comprueba los 432 materiales, stock/ingresos/conteo, ausencia frente a cero, anulaciones, fórmulas RESU/INGRESOS/CONTEO y ejemplos de celdas OOXML generados por la versión TS actual con datos ficticios. No exporta XLSX en Swift ni activa pacientes reales; véase `docs/N1Q_CONCILIACION_FORMULAS_PARIDAD.md`.
+
+
+## N1r — escritura OOXML en Swift (laboratorio)
+El escritor Swift nativo genera un XLSX real con 10 hojas/19 tablas a partir de una plantilla saneada y almacenada (ZIP STORE) con filas CONSUMOS A–AD sintéticas. El formato completo y la conciliación de las demás hojas están pendientes. No forma parte aún de SwiftUI ni usa datos personales. Véase `docs/N1R_NATIVE_XLSX_WRITER_LAB.md`.
