@@ -62,6 +62,12 @@ struct NativeRootView: View {
                     .navigationTitle("Respaldo")
             }
             .tabItem { Label("Respaldo", systemImage: "lock.shield") }
+
+            NavigationStack {
+                NativeStorageLabView()
+                    .navigationTitle("Almacén N1")
+            }
+            .tabItem { Label("Laboratorio", systemImage: "externaldrive") }
         }
         .tint(danperRed)
     }
