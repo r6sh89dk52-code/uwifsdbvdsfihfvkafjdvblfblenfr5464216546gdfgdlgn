@@ -34,7 +34,7 @@ struct NativeRootView: View {
                             Text("MIGRACIÓN SEGURA").foregroundStyle(danperRed)
                         }
                         StatusCard(icon: "person.text.rectangle", title: "Trabajadores y atenciones",
-                                   detail: "Padrón ficticio, formulario SwiftUI y borradores en memoria. Ningún dato real se guarda.")
+                                   detail: "Padrón ficticio, evaluación guiada de cuatro pasos y borradores en memoria.")
                         StatusCard(icon: "pills", title: "FEFO nativo",
                                    detail: "Motor Swift independiente con pruebas de lotes, vencimientos y envases.")
                         StatusCard(icon: "doc.zipper", title: "Respaldo cifrado",
@@ -50,16 +50,16 @@ struct NativeRootView: View {
             .tag(0)
 
             NavigationStack {
-                N1gAttentionScreen(clinic: $clinic)
-            }
-            .tabItem { Label("Atención", systemImage: "cross.case") }
-            .tag(2)
-
-            NavigationStack {
                 N1gRosterScreen(clinic: $clinic, selectedTab: $selectedTab)
             }
             .tabItem { Label("Personal", systemImage: "person.2") }
             .tag(1)
+
+            NavigationStack {
+                N1gAttentionScreen(clinic: $clinic)
+            }
+            .tabItem { Label("Atención", systemImage: "cross.case") }
+            .tag(2)
 
             NavigationStack {
                 N1gHistoryScreen(clinic: $clinic, selectedTab: $selectedTab)
@@ -81,7 +81,7 @@ struct NativeRootView: View {
                         } label: { Label("Laboratorio N1 aislado", systemImage: "externaldrive") }
                     }
                     Section("Seguridad") {
-                        Text("N1g guarda simulaciones solo en memoria. La build 222 y sus registros no se modifican.")
+                        Text("N1h guía la atención de prueba y conserva sus simulaciones solo en memoria. La build 222 y sus registros no se modifican.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -115,47 +115,6 @@ private struct StatusCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemGroupedBackground),
                     in: RoundedRectangle(cornerRadius: 16))
-    }
-}
-
-private struct AttentionPrototypeView: View {
-    @State private var dni = ""
-    @State private var reason = ""
-    @State private var diagnostic = ""
-    @State private var clinicalQuantity = 1
-    @State private var preview = false
-
-    var body: some View {
-        Form {
-            Section {
-                Label("Formulario SwiftUI interactivo · solo simulación",
-                      systemImage: "info.circle").foregroundStyle(danperRed)
-                Text("No guarda personas, atenciones, tratamientos ni movimientos físicos. La app operativa sigue siendo la build 222.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
-            Section("Trabajador · datos ficticios") {
-                TextField("DNI ficticio de 8 dígitos", text: $dni)
-                    .keyboardType(.numberPad)
-                    .onChange(of: dni) { _, new in
-                        dni = String(new.filter(\.isNumber).prefix(8))
-                    }
-            }
-            Section("Evaluación") {
-                TextField("Motivo", text: $reason)
-                TextField("Diagnóstico presuntivo", text: $diagnostic, axis: .vertical)
-                    .lineLimit(2...4)
-                Stepper("Cantidad clínica de prueba: \(clinicalQuantity)",
-                        value: $clinicalQuantity, in: 1...100)
-            }
-            Section {
-                Button("Revisar simulación") { preview = true }
-                    .disabled(dni.count != 8 || reason.isEmpty || diagnostic.isEmpty)
-                if preview {
-                    Text("La atención NO fue guardada. En la versión final se aplicará FEFO al confirmar y luego se persistirá una sola transacción cifrada.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-            }
-        }
     }
 }
 
