@@ -158,7 +158,7 @@ function postStockMovementInternal(ledger:StockLedger,command:StockCommand,allow
   const compatible=clinicalUnit==='PAR'?stockUnit==='PAR':
    stockUnit==='UND'||stockUnit==='TBL';
   if(!compatible)throw Error('Unidad física incompatible: medicamento individual requiere conteo en UND/TBL o PAR, no un frasco/caja contabilizado como envase.');
-  if(!Number.isInteger(command.quantity)||
+  if(typeof command.quantity!=='number'||!Number.isInteger(command.quantity)||
    (command.dispenseRef!.partCount===undefined
     ?command.quantity!==command.dispenseRef!.clinicalQuantity
     :command.quantity>command.dispenseRef!.clinicalQuantity))
