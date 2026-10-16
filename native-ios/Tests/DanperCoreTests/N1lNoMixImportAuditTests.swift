@@ -152,6 +152,7 @@ final class N1lNoMixImportAuditTests: XCTestCase {
             XCTAssertEqual(audit.manifest.workers,2)
             XCTAssertEqual(audit.manifest.attentions,3)
         }
-        XCTAssertEqual(src,try unmarked())
+        let again=try unmarked()
+        try N1fLosslessFieldGate.verifyUnchanged(original:src,candidate:again)
     }
 }
