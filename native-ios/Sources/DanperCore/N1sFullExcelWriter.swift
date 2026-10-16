@@ -98,8 +98,7 @@ internal enum N1sFullExcelWriter {
         }
         guard let t=value as? String else {throw N1sExcelError.invalidRow}
         if t.isEmpty{return head+"/>"}
-        return head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">"+
-            (try escaped(t))+"</t></is></c>"
+        return head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + (try escaped(t)) + "</t></is></c>"
     }
     private static func numericDate(_ s:String) throws -> Double {
         guard s.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
