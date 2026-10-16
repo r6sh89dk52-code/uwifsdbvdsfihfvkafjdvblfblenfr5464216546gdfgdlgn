@@ -1,0 +1,62 @@
+name: DANPER Salud Movil - IPA build 221 (autorizacion unica)
+# Temporal: una sola compilacion macOS autorizada para candidata build221.
+# Solo se activa al crear este mismo archivo en esta rama exacta.
+on:
+  push:
+    branches:
+      - prep/v0.21.11-build221-upgrade-safe-linux
+    paths:
+      - '.github/workflows/ios-221-one-shot.yml'
+permissions:
+  contents: read
+# Run once on the explicit authorization commit; no PR event, no automatic reruns.
+# Delete this temporary workflow as soon as the run is confirmed.
+jobs:
+  ipa:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/prep/v0.21.11-build221-upgrade-safe-linux'
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - name: Obtener fuentes
+        uses: actions/checkout@v4
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Version de Xcode
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: Garantizar CocoaPods
+        run: |
+          if ! command -v pod >/dev/null 2>&1; then brew install cocoapods; fi
+          pod --version
+      - name: Instalar dependencias npm
+        run: npm ci --no-fund
+      - name: Pruebas de lógica
+        run: npm run test:logic
+      - name: Auditoría de dependencias
+        run: npm audit --audit-level=high
+      - name: Comprobar preparación iOS
+        run: npm run ios:check
+      - name: Compilar aplicación web
+        run: npm run build
+      - name: Generar proyecto iOS
+        run: |
+          npx cap add ios
+          npx cap sync ios
+          node scripts/install-ios-gesture.mjs
+          node scripts/install-ios-access-lock.mjs
+      - name: Generar IPA sin firmar
+        run: bash scripts/build-ios-ipa.sh
+      - name: Verificar IPA y recursos
+        run: node scripts/verify-ios-ipa.mjs
+      - name: Adjuntar IPA descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER-Salud-Movil-iPhone-v0.21.11-BUILD-221-CANDIDATO-NO-PUBLICADO
+          path: |
+            outputs/*.ipa
+            outputs/*.sha256
+          if-no-files-found: error
+          retention-days: 7
