@@ -10,7 +10,7 @@ private enum N1gUI {
         guard let e = error as? N1gError else { return "No se pudo realizar esta simulación." }
         switch e {
         case .incompleteWorker: return "Selecciona un trabajador ficticio."
-        case .incompleteEvaluation: return "Completa categoría, diagnóstico y procedimiento."
+        case .incompleteEvaluation: return "Revisa evaluación, sistema, tratamiento y horario de permiso."
         case .allergyNotReviewed: return "Revisa primero el estado de alergias."
         case .correctionNeedsAudit: return "Este borrador de corrección no puede reemplazar una atención guardada sin una auditoría."
         case .demoRosterFull: return "El padrón ficticio está completo."
@@ -91,7 +91,8 @@ struct N1gAttentionScreen: View {
     @State private var step = 0
     @State private var message = ""
 
-    private enum Field { case worker, category, diagnosis, procedure, product, result }
+    private enum Field { case worker, category, diagnosis, procedure, product, result,
+                        date, time, system, segment, permission, permissionTime }
     private func binding(_ key: Field, id: UUID) -> Binding<String> {
         Binding(
             get: {
@@ -103,6 +104,12 @@ struct N1gAttentionScreen: View {
                 case .procedure: return draft.procedure
                 case .product: return draft.product
                 case .result: return draft.result
+                case .date: return draft.detailed.date
+                case .time: return draft.detailed.time
+                case .system: return draft.detailed.system
+                case .segment: return draft.detailed.segment
+                case .permission: return draft.detailed.permission
+                case .permissionTime: return draft.detailed.permissionTime
                 }
             },
             set: { selected in
@@ -116,6 +123,12 @@ struct N1gAttentionScreen: View {
                 case .procedure: mutation = .procedure(selected)
                 case .product: mutation = .product(selected)
                 case .result: mutation = .result(selected)
+                case .date: mutation = .date(selected)
+                case .time: mutation = .time(selected)
+                case .system: mutation = .system(selected)
+                case .segment: mutation = .segment(selected)
+                case .permission: mutation = .permission(selected)
+                case .permissionTime: mutation = .permissionTime(selected)
                 }
                 do { try clinic.edit(id, mutation, at: N1gUI.now); message = "" }
                 catch { message = N1gUI.notice(error) }
@@ -133,6 +146,41 @@ struct N1gAttentionScreen: View {
         )
     }
 
+    private func toggle(_ field: String, id: UUID) -> Binding<Bool> {
+        Binding(get: {
+            guard let a = clinic.activeDraft, a.id == id else { return false }
+            switch field {
+            case "photo": return a.detailed.photoSent
+            case "bandage": return a.detailed.blueBandage
+            case "returned": return a.detailed.returned
+            default: return false
+            }
+        }, set: { enabled in
+            let value: N1gChange
+            switch field {
+            case "photo": value = .photoSent(enabled)
+            case "bandage": value = .blueBandage(enabled)
+            case "returned": value = .returned(enabled)
+            default: return
+            }
+            do { try clinic.edit(id, value, at: N1gUI.now); message = "" }
+            catch { message = N1gUI.notice(error) }
+        })
+    }
+    private func extraProcedure(_ procedure: String, id: UUID) -> Binding<Bool> {
+        Binding(get: {
+            clinic.activeDraft?.detailed.standaloneProcedures.contains(procedure) ?? false
+        }, set: { enabled in
+            do { try clinic.edit(id, .standaloneProcedure(procedure, enabled), at: N1gUI.now) }
+            catch { message = N1gUI.notice(error) }
+        })
+    }
+    private func advance(_ id: UUID) {
+        let errors = clinic.invalidFields(for: id, step: step)
+        if errors.isEmpty { message = ""; step = min(3,step + 1) }
+        else { message = "Faltan datos para continuar: " + errors.joined(separator: ", ") }
+    }
+
     var body: some View {
         Group {
             if let active = clinic.activeDraft {
@@ -146,15 +194,17 @@ struct N1gAttentionScreen: View {
                         }
                     }
                     Section {
-                        Picker("Etapa", selection: $step) {
-                            Text("Persona").tag(0)
-                            Text("Evaluar").tag(1)
-                            Text("Tratar").tag(2)
-                            Text("Cierre").tag(3)
+                        HStack {
+                            Label("Paso \(step+1) de 4", systemImage: "list.number")
+                                .font(.headline)
+                            Spacer()
+                            Text(["Trabajador","Evaluación","Tratamiento","Resultado"][step])
+                                .font(.caption).foregroundStyle(.secondary)
                         }
-                        .pickerStyle(.segmented)
-                        Text("Paso \(step+1) de 4")
-                            .font(.caption).foregroundStyle(.secondary)
+                        ProgressView(value: Double(step+1), total: 4)
+                            .tint(N1gUI.red)
+                        Text("La validación guía el avance, como en la aplicación original.")
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
                     if step == 0 {
                         Section("1 · Trabajador") {
@@ -173,9 +223,27 @@ struct N1gAttentionScreen: View {
                     }
                     if step == 1 {
                         Section("2 · Evaluación clínica ficticia") {
+                            Picker("Fecha ficticia", selection: binding(.date,id:active.id)) {
+                                ForEach(N1gClinic.allowedDates,id:\.self) { Text($0).tag($0) }
+                            }
+                            Picker("Hora ficticia", selection: binding(.time,id:active.id)) {
+                                ForEach(N1gClinic.allowedTimes,id:\.self) { Text($0).tag($0) }
+                            }
                             Picker("Categoría", selection: binding(.category,id:active.id)) {
                                 Text("Seleccionar").tag("")
                                 ForEach(N1gClinic.categories,id:\.self) { Text($0).tag($0) }
+                            }
+                            Picker("Sistema afectado", selection: binding(.system,id:active.id)) {
+                                Text("Seleccionar").tag("")
+                                ForEach(N1gClinic.systems,id:\.self) { Text($0).tag($0) }
+                            }
+                            if active.detailed.system == "OSTEOMUSCULAR" {
+                                Picker("Segmento ficticio", selection: binding(.segment,id:active.id)) {
+                                    Text("Seleccionar").tag("")
+                                    ForEach(N1gClinic.segments.filter { !$0.isEmpty },id:\.self) {
+                                        Text($0).tag($0)
+                                    }
+                                }
                             }
                             Picker("Diagnóstico de prueba", selection: binding(.diagnosis,id:active.id)) {
                                 Text("Seleccionar").tag("")
@@ -222,20 +290,50 @@ struct N1gAttentionScreen: View {
                             Text("Los productos son inventados: ningún movimiento físico ni apertura de lote se ejecuta.")
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
+                        Section("Procedimientos independientes") {
+                            ForEach(N1gClinic.standaloneDemoProcedures,id:\.self) { name in
+                                Toggle(name, isOn: extraProcedure(name, id: active.id))
+                            }
+                            Text("No generan movimientos ni aperturas de lote.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     if step == 3 {
                         Section("4 · Resultado de demostración") {
-                            Picker("Destino", selection: binding(.result,id:active.id)) {
-                                ForEach(N1gClinic.results,id:\.self) { Text($0).tag($0) }
+                            Picker("Permiso", selection: binding(.permission,id:active.id)) {
+                                Text("Continúa laborando").tag("NO")
+                                Text("Permiso ficticio").tag("SI")
+                            }
+                            if active.detailed.permission == "SI" {
+                                Picker("Hora de permiso ficticia", selection: binding(.permissionTime,id:active.id)) {
+                                    Text("Seleccionar").tag("")
+                                    ForEach(N1gClinic.allowedTimes,id:\.self) { Text($0).tag($0) }
+                                }
                             }
                             LabeledContent("Trabajador", value: clinic.worker(active.workerID)?.name ?? "Pendiente")
                             LabeledContent("Categoría", value: active.category.isEmpty ? "Pendiente" : active.category)
                             LabeledContent("Diagnóstico", value: active.diagnosis.isEmpty ? "Pendiente" : active.diagnosis)
                             LabeledContent("Alergias", value: active.workerID.flatMap { clinic.allergies[$0]?.rawValue } ?? "Sin revisar")
                             LabeledContent("Procedimiento", value: active.procedure.isEmpty ? "Pendiente" : active.procedure)
+                            LabeledContent("Fecha / hora", value: "\(active.detailed.date) · \(active.detailed.time)")
+                            LabeledContent("Sistema afectado", value: active.detailed.system)
+                            LabeledContent("Destino laboral", value: active.result)
+                            LabeledContent("Procedimientos adicionales", value: "\(active.detailed.standaloneProcedures.count)")
                             if !active.product.isEmpty {
                                 LabeledContent("Producto", value: active.product)
                                 LabeledContent("Cantidad simulada", value: "\(active.quantity)")
+                            }
+                        }
+                        if active.procedure == "CURACION FICTICIA" ||
+                            active.category.contains("ACCIDENTE") {
+                            Section("Curación ficticia · marcadores") {
+                                Toggle("Curita y guante", isOn: toggle("bandage", id:active.id))
+                                if active.detailed.blueBandage {
+                                    Toggle("Material devuelto", isOn: toggle("returned", id:active.id))
+                                }
+                                Toggle("Foto enviada (solo marcador)", isOn: toggle("photo", id:active.id))
+                                Text("La aplicación de prueba no toma ni guarda ninguna foto.")
+                                    .font(.caption).foregroundStyle(.secondary)
                             }
                         }
                         Section {
@@ -260,7 +358,7 @@ struct N1gAttentionScreen: View {
                             }
                             Spacer()
                             if step < 3 {
-                                Button("Siguiente") { step += 1 }
+                                Button("Siguiente") { advance(active.id) }
                                     .buttonStyle(.borderedProminent)
                             }
                         }
@@ -276,7 +374,7 @@ struct N1gAttentionScreen: View {
                 ContentUnavailableView {
                     Label("Atención ficticia", systemImage:"cross.case")
                 } description: {
-                    Text("Formulario nativo de cuatro pasos. No permite introducir datos reales ni efectuar descuentos de stock.")
+                    Text("Formulario clínico guiado en SwiftUI con opciones ficticias. No guarda historias reales ni descuenta existencias.")
                 } actions: {
                     Button {
                         _ = clinic.newDraft(at:N1gUI.now)
@@ -333,6 +431,8 @@ struct N1gHistoryScreen: View {
                         Text(clinic.worker(saved.workerID)?.name ?? "Ficticio")
                             .font(.headline)
                         Text(saved.diagnosis).font(.subheadline)
+                        Text("\(saved.detailed.date) · \(saved.detailed.time) · \(saved.detailed.system)")
+                            .font(.caption).foregroundStyle(.secondary)
                         Text("Solo memoria · Sin movimiento físico")
                             .font(.caption).foregroundStyle(.secondary)
                         Button("Crear borrador de corrección") {
