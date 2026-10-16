@@ -19,7 +19,8 @@ const sourceBytes=fs.readFileSync(path.join(folder,'n1e-clinical-stock.json'));
 const source=JSON.parse(sourceBytes.toString('utf8'));
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const periodStart='2026-10-09',periodEnd='2026-11-08',subdivision='LA VENTUROSA';
-const selected=source.attentions.filter(v=>v.status==='saved'&&v.worker.site===subdivision);
+const selected=source.attentions.filter(v=>v.status==='saved'&&v.worker.site===subdivision&&
+ v.items.every(item=>source.stockMovements.some(m=>m.dispenseRef?.attentionId===v.id&&m.dispenseRef?.itemId===item.id)));
 assert.deepEqual(selected.map(v=>v.id),['fundo-unit','fundo-reuse']);
 const plan=buildAmbulatoryRows(selected,
  {lots:source.stockLots,movements:source.stockMovements},periodStart,periodEnd,{subdivision});
