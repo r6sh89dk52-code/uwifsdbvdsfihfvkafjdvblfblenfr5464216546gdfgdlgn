@@ -236,7 +236,9 @@ export function suggestFEFOLot(lots:StockLot[],code:string,at:number=Date.now())
 
 /** Public API cannot emit an incomplete multi-lot group. */
 export function postStockMovement(ledger:StockLedger,command:StockCommand):StockLedger{
- return postStockMovementInternal(ledger,command);
+ // Only the batch API can build a multi-part group. A public single command
+ // must not return a state containing an incomplete physical delivery.
+ return validateStockLedger(postStockMovementInternal(ledger,command));
 }
 
 /** All parts succeed or none is exposed. Intended for a single saved attention item. */
