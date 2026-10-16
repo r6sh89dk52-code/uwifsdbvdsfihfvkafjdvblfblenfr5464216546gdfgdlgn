@@ -7,7 +7,8 @@ function load(path,deps={}){
 const catalog=load('src/kardexCatalog.ts'),inventory=load('src/inventoryRules.ts'),ledgerRules=load('src/kardexMovements.ts',{'./inventoryRules':inventory});
 const daily=load('src/dailyKardex.ts',{'./kardexCatalog':catalog,'./kardexMovements':ledgerRules,'./inventoryRules':inventory});
 const at=Date.parse('2026-10-14T04:40:00Z'); // Oct 13, 23:40 in Peru
-const base={id:'lot-A',code:'E-1',name:catalog.kardexCatalog[0].name,catalogUnit:'UND',lot:'FICTICIO',expires:'2027-12-30',container:'frasco',unitsPerContainer:120,sealedContainers:2,looseUnits:0,openedRemaining:0,updatedAt:at-90000};
+// Synthetic package scenario: official unit FCO, not UND; otherwise 120 units must be counted individually.
+const base={id:'lot-A',code:'E-1',name:catalog.kardexCatalog[0].name,catalogUnit:'FCO',lot:'FICTICIO',expires:'2027-12-30',container:'frasco',unitsPerContainer:120,sealedContainers:2,looseUnits:0,openedRemaining:0,updatedAt:at-90000};
 let state={lots:[inventory.validateStockLot(base)],movements:[]};
 const move=(id,kind,atTime,more)=>({id,kind,lotId:'lot-A',description:'Demostración del reporte',at:atTime,...more});
 state=ledgerRules.postStockMovement(state,move('opening','use',at,{quantity:10,allowOpen:true}));
