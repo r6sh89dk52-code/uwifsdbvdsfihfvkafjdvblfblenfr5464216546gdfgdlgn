@@ -9,7 +9,7 @@ const p=products.find(x=>x.code==='16000182'),box=products.find(x=>x.code==='160
 const needle=products.find(x=>x.code==='16000064');
 assert(p&&box&&needle);
 const item=(id,product=p,quantity=1)=>({id,code:product.code,name:product.name,unit:product.unit,quantity,procedure:'TRATAMIENTO ORAL'});
-const a=(id,items)=>({...visit(id,items),status:'saved',worker:{...visit().worker,site:'LA VENTUROSA'}});
+const a=(id,items)=>({...visit(id,items),date:'2026-10-15',status:'saved',worker:{...visit().worker,site:'LA VENTUROSA'}});
 const empty={lots:[],movements:[]};
 const one=a('one',[item('i')]);
 const noStock=run(empty,one,date);
@@ -30,6 +30,9 @@ assert.equal(first.ledger.lots[0].looseUnits,1,'FEFO chooses earliest expiry');
 assert.equal(first.ledger.movements.length,1);
 assert.equal(first.ledger.movements[0].excelQuantity,1);
 assert.equal(first.ledger.movements[0].dispenseRef.attentionId,'one');
+const historic=run(stock,{...one,date:'2026-10-14'},date);
+assert.equal(historic.pending,1,'historical clinical use must not consume current stock');
+assert.equal(historic.ledger.movements.length,0);
 assert.equal(JSON.stringify(stock.lots),JSON.stringify([lot('jan',0,2),lot('dec',1,7)]),'pure planner cannot mutate input');
 assert.equal(JSON.stringify(one),original);
 const again=run(first.ledger,one,date+200);
