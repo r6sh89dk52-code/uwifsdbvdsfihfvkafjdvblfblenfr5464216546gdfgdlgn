@@ -135,8 +135,10 @@ assert.equal(packagedExcel.lines[0].cells[17],1,'R 0+1 aggregated once');
 const absentBox=run({lots:[],movements:[]},a('absent',[boxLine]),date);
 assert.equal(absentBox.pending,1,'explicit past stock must never invent a present lot');
 assert.equal(absentBox.ledger.movements.length,0);
-assert.throws(()=>run({lots:[needleBoxLot],movements:[]},a('invalid-quantity',
- [{...boxLine,physicalUse:{lotId:'needle-pack',quantity:0}}]),date),/cantidad física válida/);
+const missingPhysical=run({lots:[needleBoxLot],movements:[]},a('no-physical-yet',
+ [{...boxLine,physicalUse:{lotId:'needle-pack',quantity:0}}]),date);
+assert.equal(missingPhysical.pending,1,'empty physical use saves visit without stock issue');
+assert.equal(missingPhysical.ledger.movements.length,0,'no stock moved for unverified package');
 // E-62 and E-63 share an official code, requiring precise selection in the encounter.
 const disambiguated=run({lots:[lot('x',0,20,'E-62'),lot('y',1,20,'E-63')],movements:[]},
  a('amb-selected',[{...item('amb',ambiguousProduct),physicalUse:{lotId:'y',quantity:1}}]),date);
