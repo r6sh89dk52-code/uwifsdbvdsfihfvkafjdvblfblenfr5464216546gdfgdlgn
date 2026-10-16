@@ -41,7 +41,7 @@ assert.equal(upgraded.stockMovements.length,3);
 assert.equal(finalizeVisitAndPlanStock(posted.ledger,next,at+65000).deducted,0);
 assert.equal(JSON.stringify(snapshot),before,'old state is not mutated');
 const pkg=require('../package.json'),lock=require('../package-lock.json');
-assert.equal(pkg.version,'0.21.11');
+assert.equal(pkg.version,'0.21.12');
 assert.equal(lock.version,pkg.version);
 assert.equal(lock.packages[''].version,pkg.version);
 const app=fs.readFileSync('capacitor.config.ts','utf8');
