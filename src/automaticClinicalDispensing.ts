@@ -12,6 +12,10 @@ import {type StockLedger,validateStockLedger} from './kardexMovements';
 import {reviewedAssociationsFor} from './reviewedKardexAssociations';
 import {countPhysicalUnits} from './inventoryRules';
 
+/** Selected *inside* the attention, never in a separate Kardex confirmation screen. */
+export type InVisitPhysicalUse={lotId:string;quantity:number};
+export type InVisitClinicalLine=SavedClinicalAttention['items'][number]&{physicalUse?:InVisitPhysicalUse};
+export type InVisitSavedAttention=Omit<SavedClinicalAttention,'items'>&{items:InVisitClinicalLine[];date?:string};
 export type AutoOutcome='already-linked'|'deducted'|'pending';
 export type AutoDispenseResult={
  ledger:StockLedger;
@@ -29,7 +33,7 @@ function limaDay(at:number):string{
  const p=(type:string)=>parts.find(x=>x.type===type)?.value||'';
  return p('year')+'-'+p('month')+'-'+p('day');
 }
-export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:SavedClinicalAttention & {date?:string},at:number):AutoDispenseResult{
+export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:InVisitSavedAttention,at:number):AutoDispenseResult{
  if(!visit||visit.status!=='saved'||!visit.id?.trim())throw Error('La atención debe estar finalizada.');
  if(!Number.isSafeInteger(at)||at<=0)throw Error('Hora de entrega inválida.');
  let current=validateStockLedger(ledger);
@@ -56,32 +60,60 @@ export function finalizeVisitAndPlanStock(ledger:StockLedger,visit:SavedClinical
   }
   const associations=reviewedAssociationsFor(item.code).filter(x=>
     x.clinicalName===item.name&&x.clinicalUnit===item.unit);
-  const uniqueCodes=[...new Set(associations.map(x=>x.kardexCode))];
+  const allowedCodes=[...new Set(associations.map(x=>x.kardexCode))];
   const pending=(reason:string)=>results.push({itemId:item.id,clinicalCode:item.code,outcome:'pending',reason});
-  if(uniqueCodes.length!==1){pending(uniqueCodes.length?'Presentaciones de Kardex ambiguas.':'Producto sin correspondencia autorizada.');continue}
-  if(!individualUnit(item.unit)){
-   pending('Presentación por envase: falta cantidad física interna para decidir apertura y descuento 1/0.');continue;
+  if(!allowedCodes.length){pending('No existe correspondencia Kardex autorizada.');continue}
+  const unitCounted=individualUnit(item.unit);
+  const explicit=item.physicalUse;
+  // A selection in the clinical form is evidence only when it exactly matches
+  // an approved Kardex identity. It is NOT a second "confirm delivery" step.
+  if(explicit!==undefined){
+   if(!explicit||typeof explicit.lotId!=='string'||!explicit.lotId.trim()||
+     typeof explicit.quantity!=='number'||!Number.isFinite(explicit.quantity)||explicit.quantity<=0||
+     explicit.quantity>10000000)
+    throw Error('Selecciona una existencia y una cantidad física válida dentro de la atención.');
   }
-  const code=uniqueCodes[0],association=associations[0];
-  const compatible=current.lots.filter(l=>l.code===code&&l.name===association.kardexName&&(
-    item.unit.toUpperCase()==='PAR'?l.catalogUnit.toUpperCase()==='PAR':['UND','TBL'].includes(l.catalogUnit.toUpperCase())));
-  const candidates=availableLots(compatible,code,at).filter(l=>countPhysicalUnits(l)>=item.quantity);
-  // FEFO chooses a real stock row; no synthetic lots and no negative balances.
-  if(!candidates.length){pending('No existe saldo físico compatible y disponible. Se conservó el consumo clínico sin descuento.');continue}
+  if(!explicit&&allowedCodes.length!==1){
+   pending('Varias presentaciones del Kardex: selecciona la utilizada en esta atención.');continue;
+  }
+  if(!explicit&&!unitCounted){
+   pending('Para cajas/frascos indica la cantidad física utilizada en la atención, sin adivinar contenido.');continue;
+  }
+  const matching=current.lots.filter(l=>allowedCodes.includes(l.code)&&
+    associations.some(assoc=>assoc.kardexCode===l.code&&assoc.kardexName===l.name)&&
+    (!unitCounted||(item.unit.toUpperCase()==='PAR'?l.catalogUnit.toUpperCase()==='PAR':
+    ['UND','TBL'].includes(l.catalogUnit.toUpperCase()))));
+  const chosen=explicit?matching.filter(l=>l.id===explicit.lotId):matching.filter(l=>l.code===allowedCodes[0]);
+  if(explicit&&!chosen.length){
+   pending('La existencia elegida ya no corresponde al producto autorizado. Actualiza la ficha.');continue;
+  }
+  if(explicit&&unitCounted&&explicit.quantity!==item.quantity)
+   throw Error('La cantidad física de UND/TBL/PAR debe coincidir con la cantidad clínica.');
+  const physicalQuantity=explicit?explicit.quantity:item.quantity;
+  const candidates=availableLots(chosen,explicit?chosen[0].code:allowedCodes[0],at).filter(l=>
+    countPhysicalUnits(l)>=physicalQuantity);
+  if(!candidates.length){
+   pending('No existe saldo físico del producto/selección con cantidad suficiente y sin vencer. No se inventó descuento.');
+   continue;
+  }
   let posted=false;
   for(const lot of candidates){
    try{
+    // A fresh sealed container is opened only when there is no remainder
+    // or loose content, and when the registered inner capacity is sufficient.
+    const openNew=(lot.container!=='unidad'||lot.unitsPerContainer!==1||lot.catalogUnit!=='UND')&&
+      lot.openedRemaining===0&&lot.looseUnits===0&&lot.sealedContainers>0&&
+      physicalQuantity<=lot.unitsPerContainer;
     const next=postConfirmedAttentionDelivery(current,visit,{
-     itemId:item.id,lotId:lot.id,physicalQuantity:item.quantity,
+     itemId:item.id,lotId:lot.id,physicalQuantity,
      confirmIdentity:true,confirmUnits:true,confirmDelivery:true,
-     openNewContainer:(lot.container!=='unidad'||lot.unitsPerContainer!==1||lot.catalogUnit!=='UND')&&
-             lot.openedRemaining===0&&lot.looseUnits===0&&lot.sealedContainers>0&&item.quantity<=lot.unitsPerContainer,timestamp:at
+     openNewContainer:openNew,timestamp:at
     });
-    current=next;results.push({itemId:item.id,clinicalCode:item.code,outcome:'deducted',reason:'Salida física registrada automáticamente con FEFO.'});
+    current=next;
+    results.push({itemId:item.id,clinicalCode:item.code,outcome:'deducted',
+      reason:'Descuento físico desde la atención, con selección verificable.'});
     posted=true;break;
    }catch(err){
-    // Existing stock in a closed container may need its packaging opening
-    // explicitly tracked. Never silently make that decision.
     if(!(err instanceof Error))throw err;
     if(!/envase|contenido abierto|Stock insuficiente|Lote vencido/i.test(err.message))throw err;
    }
