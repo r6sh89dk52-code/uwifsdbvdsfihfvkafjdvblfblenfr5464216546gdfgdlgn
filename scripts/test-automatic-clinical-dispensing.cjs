@@ -99,6 +99,13 @@ assert.match(ui,/<ClinicalStockChoice item=\{i\}/,'in-form physical selection');
 assert.match(ui,/stockLots:result.ledger.lots,stockMovements:result.ledger.movements/,
  'visit plus physical movement must be persisted as one encrypted snapshot');
 assert.match(ui,/await writeDemoSnapshot\(snapshot\)/,'persistence before marking saved');
+assert.match(ui,/const alreadySaved=att.some/, 'older saved attention must not be retroactively debited');
+assert.match(ui,/alreadySaved\?\{/, 'on editing an existing visit only clinical state may change, not stock');
+assert.match(ui,/m\.dispenseRef\.itemId===i\.id/, 'recognized existing stock links stay immutable');
+const exporter=require('node:fs').readFileSync('src/AmbulatoryExportPanel.tsx','utf8');
+assert.match(exporter,/onClick=\{\(\)=>void exportBook\(canDraft\)\}/,'single smart export action');
+assert.match(exporter,/window.confirm\('EXCEL PROVISIONAL/,'draft export must require the operator\'s acknowledgement');
+assert.doesNotMatch(exporter,/onClick=\{\(\)=>void exportBook\(true\)\}/,'no second export button');
 const inline=require('node:fs').readFileSync('src/ClinicalStockChoice.tsx','utf8');
 assert.match(inline,/Cantidad física utilizada/);
 assert.match(inline,/Sin identificar/);
