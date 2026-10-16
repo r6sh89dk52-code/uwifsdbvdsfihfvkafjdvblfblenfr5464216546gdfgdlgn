@@ -1,7 +1,7 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1i-encrypted-demo-drafts-linux]
+    branches: [native/swiftui-n1j-draft-revision-guard-linux]
     paths:
       - 'native-ios/**'
       - 'src/attentionStepValidation.ts'
@@ -24,7 +24,7 @@ jobs:
           node-version: '22'
       - name: Install synthetic fixture dependencies
         run: npm ci --no-fund --ignore-scripts
-      - name: Generate fictional fixtures for all previous cross-language tests
+      - name: Generate entirely synthetic legacy interoperability fixtures
         run: |
           mkdir -p "$RUNNER_TEMP/danper-n1-fixtures"
           echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-n1-fixtures" >> "$GITHUB_ENV"
@@ -32,12 +32,12 @@ jobs:
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1e-clinical-fixtures.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1f-lossless-fixtures.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1h-clinical-parity.cjs
-      - name: Check SwiftUI iOS source syntax only
+      - name: Parse SwiftUI sources (syntax only; not UIKit/SwiftUI typecheck)
         run: swiftc -frontend -parse native-ios/App/*.swift
-      - name: Verify encrypted draft recovery, crash guards and prior Swift tests
+      - name: Swift tests including N1j revision races and legacy pointer upgrade
         run: cd native-ios && swift test --jobs 2
-      - name: Ensure Linux only, no macOS / IPA artifacts
+      - name: Guard zero macOS and no IPA generation
         run: |
           test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
-          echo 'PASS N1i: Linux only; zero compiled IPA'
+          echo 'PASS N1j: portable Swift tests only, no IPA'
