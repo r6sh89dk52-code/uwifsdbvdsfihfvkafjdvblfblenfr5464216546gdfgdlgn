@@ -78,3 +78,7 @@ A partir de N1i, cada generación cifrada almacena una revisión v2 con HMAC. Re
 ## N1k — Auditoría SwiftUI/Xcode y bienvenida profesional
 
 La introducción nativa de primer inicio solicita voluntariamente notificaciones y biometría, permite omitirlas y explica el acceso local a archivos. El acceso a respaldo cifrado real es **solo lectura**; no hay migración de pacientes todavía. Se audita la compilación Xcode sin firma en simulador y dispositivo genérico, sin generar IPA ni sustituir la build 222. Detalles: `docs/N1K_AUDITORIA_XCODE_ONBOARDING.md`.
+
+## N1l — Solo fuente real, sin mezclar datos ficticios
+
+Se amplió la lectura local del `.danperbackup` con auditoría completa de **nueve colecciones** (padrón, atenciones, alergias, avisos, lotes, movimientos, equivalencias, incidencias, conciliaciones); recuento de borradores/correcciones y vínculos pendientes. Bloqueo de destino ocupado o desconocido, marcadores ficticios reconocibles y duplicados. **No existe importador ni escritura de datos reales en N1l**: revisar `docs/N1L_PLAN_CERO_MEZCLAS.md`. El inspector nunca almacena registros reales ni mezcla con N1g. El cifrado no permite distinguir ficticios sin marcadores; un origen combinado requiere depuración de procedencia humana antes de migrar.
