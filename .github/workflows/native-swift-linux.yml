@@ -1,7 +1,7 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1m-real-clinical-stage-lab]
+    branches: [native/swiftui-n1n-inactive-backup-preparation]
     paths:
       - 'native-ios/**'
       - 'src/attentionStepValidation.ts'
@@ -34,10 +34,10 @@ jobs:
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1h-clinical-parity.cjs
       - name: Parse SwiftUI sources (syntax only; not UIKit/SwiftUI typecheck)
         run: swiftc -frontend -parse native-ios/App/*.swift
-      - name: Swift tests including N1j revision races and legacy pointer upgrade
+      - name: Swift tests including N1n inactive staging safeguards
         run: cd native-ios && swift test --jobs 2
       - name: Guard zero macOS and no IPA generation
         run: |
           test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
-          echo 'PASS N1m: isolated encrypted staging + Swift tests, no IPA'
+          echo 'PASS N1n: isolated encrypted staging + Swift tests, no IPA'
