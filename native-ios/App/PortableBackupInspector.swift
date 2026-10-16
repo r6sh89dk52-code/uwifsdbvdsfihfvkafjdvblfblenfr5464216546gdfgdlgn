@@ -41,6 +41,21 @@ enum PortableBackupInspector {
     /// Decrypts and audits exactly ONE user-selected backup in memory.
     /// Does not import, append, replace, sync or persist any clinical records.
     static func audit(url: URL, password: String) throws -> N1lSourceAudit {
+        try auditedSnapshot(url:url,password:password).1
+    }
+
+    /// Password and clear records are local to the selected iPhone backup.
+    /// No SwiftUI state or logs contain decrypted clinical records.
+    static func prepareInactive(url:URL,password:String,acknowledgment:N1nAcknowledgment)
+        async throws -> N1mRealClinicalStagingVault.Prepared {
+        var raw=try auditedSnapshot(url:url,password:password).0
+        defer { raw.resetBytes(in:0..<raw.count) }
+        _=try N1nInactiveSourceGate.authorize(raw,acknowledgment:acknowledgment)
+        return try await N1mRealClinicalStagingIOSVault.shared.prepareSingleSource(raw)
+    }
+
+    private static func auditedSnapshot(url:URL,password:String)
+        throws -> (Data,N1lSourceAudit) {
         guard password.count >= 14 && password.count <= 200 else {
             throw BackupInspectionError.invalidPasswordLength
         }
@@ -93,8 +108,9 @@ enum PortableBackupInspector {
               let snapshot = root["snapshot"] as? [String:Any]
         else { throw BackupInspectionError.invalidSnapshot }
         do {
-            return try N1lRealSnapshotGate.audit(
-                JSONSerialization.data(withJSONObject:snapshot),destination:.uncertain)
+            let raw=try JSONSerialization.data(withJSONObject:snapshot,options:[.sortedKeys])
+            let result=try N1lRealSnapshotGate.audit(raw,destination:.uncertain)
+            return (raw,result)
         } catch {
             throw BackupInspectionError.invalidSnapshot
         }
