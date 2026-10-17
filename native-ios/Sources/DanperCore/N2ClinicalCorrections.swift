@@ -110,6 +110,7 @@ public enum N2ClinicalCorrections {
         }
         // A clinical correction must never recalculate stock, change the
         // worker, shift the original visit between dates or change FEFO refs.
+        let changed=(try canonical(before)) != (try canonical(next))
         guard nonempty(next["diagnosis"]) != nil,
               nonempty(next["category"]) != nil,
               nonempty(next["system"]) != nil,
@@ -118,7 +119,7 @@ public enum N2ClinicalCorrections {
                (next["permissionTime"] as? String ?? "").range(
                 of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression) != nil),
               nonempty(next["responsible"]) != nil,
-              (allowUnchanged || (try canonical(before)) != (try canonical(next))) else{
+              (allowUnchanged || changed) else{
             throw N2CorrectionError.unchanged
         }
         return next
@@ -140,8 +141,9 @@ public enum N2ClinicalCorrections {
             }
             byID[id]=i
         }
-        var current=visits,events=Set<String>(),latest=Set<String>(),
-            pending=Set<String>()
+        var current=visits,events=Set<String>(),
+            pending=Set<String>(),previousEventSHA=""
+
         for event in history {
             guard let id=nonempty(event["id"]),UUID(uuidString:id) != nil,
                   events.insert(id).inserted,
@@ -154,6 +156,9 @@ public enum N2ClinicalCorrections {
                   let oldSHA=event["beforeSHA256"] as? String,
                   let newSHA=event["afterSHA256"] as? String,
                   let change=event["changes"] as? [String:Any],
+                  let prior=event["previousEventSHA256"] as? String,
+                  prior==previousEventSHA,
+                  let signed=event["eventSHA256"] as? String,
                   let note=event["medicationDiscrepancy"] as? String,
                   note.utf8.count<=1500,
                   oldSHA==(try? digest(current[idx])),
@@ -162,9 +167,14 @@ public enum N2ClinicalCorrections {
                   newSHA==(try? digest(next)) else{
                 throw N2CorrectionError.brokenHistory
             }
+            var receipt=event
+            receipt.removeValue(forKey:"eventSHA256")
+            guard signed==(try? digest(receipt)) else{
+                throw N2CorrectionError.brokenHistory
+            }
+            previousEventSHA=signed
             if !note.isEmpty {pending.insert(visitID)}
             current[idx]=next
-            latest.insert(visitID)
         }
         return(current,history,pending)
     }
@@ -246,14 +256,16 @@ public enum N2ClinicalCorrections {
         }
         let after=try corrected(before,changes:changes,
                                   allowUnchanged:!medicationDiscrepancy.isEmpty)
-        let record:[String:Any]=[
+        let previousEventSHA=current.history.last?["eventSHA256"] as? String ?? ""
+        var record:[String:Any]=[
             "id":eventID,"visitID":visitID,"recordedAt":at,
             "reason":reason.trimmingCharacters(in:.whitespacesAndNewlines),
             "operator":operatorName.trimmingCharacters(in:.whitespacesAndNewlines),
             "medicationDiscrepancy":medicationDiscrepancy,
             "beforeSHA256":try digest(before),"afterSHA256":try digest(after),
-            "changes":changes
+            "changes":changes,"previousEventSHA256":previousEventSHA
         ]
+        record["eventSHA256"]=try digest(record)
         var history=current.history
         guard history.count<10000 else{throw N2CorrectionError.brokenHistory}
         history.append(record)
