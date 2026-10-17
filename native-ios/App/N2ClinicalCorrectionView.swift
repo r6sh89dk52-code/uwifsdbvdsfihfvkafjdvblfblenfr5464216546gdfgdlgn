@@ -131,6 +131,17 @@ struct N2ClinicalCorrectionView:View {
                               systemImage:"checkmark.shield.fill")
                     }
                     .disabled(!ready)
+                    .confirmationDialog(
+                        "¿Confirmar una rectificación auditada?",
+                        isPresented:$pendingConfirmation,
+                        titleVisibility:.visible) {
+                        Button("Guardar rectificación") {
+                            Task {await confirm()}
+                        }
+                        Button("Cancelar",role:.cancel){}
+                    } message: {
+                        Text("La atención original, la fecha, los productos y todas las salidas de stock permanecen intactos.")
+                    }
                     Button(role:.destructive) {
                         confirmDiscard=true
                     } label: {
@@ -148,17 +159,6 @@ struct N2ClinicalCorrectionView:View {
                         Button("Cancelar",role:.cancel){}
                     } message: {
                         Text("Elimina solo la corrección aún no confirmada. La atención y el Kardex originales permanecen intactos.")
-                    }
-                    .confirmationDialog(
-                        "¿Confirmar una rectificación auditada?",
-                        isPresented:$pendingConfirmation,
-                        titleVisibility:.visible) {
-                        Button("Guardar rectificación") {
-                            Task {await confirm()}
-                        }
-                        Button("Cancelar",role:.cancel){}
-                    } message: {
-                        Text("La atención original, la fecha, los productos y todas las salidas de stock permanecen intactos.")
                     }
                 }
             }
