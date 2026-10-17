@@ -127,14 +127,14 @@ public final class N2ProtectedClinicalVaultCore {
               let workers=root["workers"] as? [[String:Any]],
               workers.count==5,Set(workers.compactMap{$0["dni"] as? String})
                  == Set(["00000001","00000002","00000003","00000004","00000005"]),
-              workers.allSatisfy {
-                ($0["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
-              },
+              workers.allSatisfy({ worker in
+                (worker["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
+              }),
               let visits=root["attentions"] as? [[String:Any]],
-              visits.allSatisfy { v in
-                let w=v["worker"] as? [String:Any] ?? [:]
-                return (w["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
-              } else {
+              visits.allSatisfy({ visit in
+                let worker=visit["worker"] as? [String:Any] ?? [:]
+                return (worker["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
+              }) else {
             throw N2ProtectedStoreError.unsafeSource
         }
         _=try N1eLegacyClinicalAudit.inspect(source)
