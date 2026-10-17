@@ -47,7 +47,10 @@ struct NativeRootView:View {
             NavigationStack { toolsTab }
                 .tabItem{Label("Más",systemImage:"square.grid.2x2.fill")}.tag(4)
         }
-        .tint(danperAccent)
+        .tint(DanperStyle.red)
+        .environment(\.locale,Locale(identifier:"es_PE"))
+        .animation(DanperStyle.animation,value:tab)
+        .sensoryFeedback(.selection,trigger:tab)
         .task {await refresh()}
     }
 
@@ -127,7 +130,7 @@ struct NativeRootView:View {
                                   systemImage:"cross.case.fill")
                                 .frame(maxWidth:.infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(DanperPrimaryButton())
                         .controlSize(.large)
                         .tint(danperAccent)
                         Button {
@@ -137,7 +140,7 @@ struct NativeRootView:View {
                                   systemImage:"person.text.rectangle")
                                 .frame(maxWidth:.infinity)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(DanperSecondaryButton())
                         .controlSize(.large)
                     }else{
                         Button {
@@ -147,7 +150,7 @@ struct NativeRootView:View {
                                   systemImage:"play.fill")
                                 .frame(maxWidth:.infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(DanperPrimaryButton())
                         .controlSize(.large)
                         .tint(danperAccent)
                         .disabled(loading || preparing)
@@ -188,21 +191,43 @@ struct NativeRootView:View {
         .navigationBarTitleDisplayMode(.inline)
     }
     private func quickInfo(_ index:String,title:String,desc:String)->some View {
-        VStack(alignment:.leading,spacing:9) {
-            Text(index).font(.subheadline.bold())
-                .foregroundStyle(.white)
-                .frame(width:31,height:31)
-                .background(danperAccent,in:Circle())
-            Text(title).font(.subheadline.bold())
-            Text(desc).font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal:false,vertical:true)
-            Spacer(minLength:0)
+        let symbols=["1":"person.2.fill","2":"cross.case.fill",
+                     "3":"doc.text.fill","4":"square.grid.2x2.fill"]
+        return Button {
+            if isReady,let next=Int(index) {tab=next}
+        } label: {
+            VStack(alignment:.leading,spacing:10) {
+                Image(systemName:symbols[index] ?? "square.grid.2x2")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(DanperStyle.red)
+                    .frame(width:43,height:43)
+                    .background(DanperStyle.red.opacity(0.1),
+                                in:RoundedRectangle(cornerRadius:13))
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                Text(desc)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal:false,vertical:true)
+                Spacer(minLength:0)
+                if isReady {
+                    Image(systemName:"arrow.up.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(DanperStyle.red)
+                        .frame(maxWidth:.infinity,alignment:.trailing)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth:.infinity,minHeight:150,alignment:.topLeading)
+            .background(DanperStyle.surface,
+                        in:RoundedRectangle(cornerRadius:19))
+            .overlay(RoundedRectangle(cornerRadius:19)
+                .strokeBorder(Color.secondary.opacity(0.08),lineWidth:1))
         }
-        .padding(14)
-        .frame(maxWidth:.infinity,minHeight:130,alignment:.topLeading)
-        .background(Color(uiColor:.secondarySystemGroupedBackground),
-                    in:RoundedRectangle(cornerRadius:16))
-        .accessibilityElement(children:.combine)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Abrir "+title)
+        .disabled(!isReady)
     }
     private func lockedTab(title:String,symbol:String)->some View {
         ContentUnavailableView {
@@ -282,6 +307,7 @@ struct NativeRootView:View {
         }
         .navigationTitle("Más")
         .navigationBarTitleDisplayMode(.inline)
+        .danperFormChrome()
     }
     @MainActor
     private func refresh() async {
