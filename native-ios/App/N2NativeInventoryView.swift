@@ -106,7 +106,8 @@ struct N2NativeInventoryView:View {
                         .keyboardType(.numberPad)
                     Toggle("Registrar fecha de vencimiento",isOn:$expiryEnabled)
                     if expiryEnabled {
-                        DatePicker("Vencimiento",selection:$expiry,
+                        LabeledContent("Vencimiento",value:DanperDatePresentation.display(localDay(expiry)))
+                        DatePicker("Cambiar vencimiento",selection:$expiry,
                                    displayedComponents:.date)
                     }
                 }else{
