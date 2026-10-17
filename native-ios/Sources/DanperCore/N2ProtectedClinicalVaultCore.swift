@@ -65,6 +65,19 @@ public final class N2ProtectedClinicalVaultCore {
 
     /// Caller must reauthenticate and encrypt this data into a portable
     /// backup before ever writing to Files/Share; no plaintext export allowed.
+    public func readReconciliationEvents()throws->[N2ReconciliationEventRow] {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2NativeReconciliationEditor.list(snapshot:active.snapshot)
+    }
+    public func appendReconciliationEvent(_ event:Data,catalog:Data,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeReconciliationEditor.append(
+                snapshot:$0,event:event,catalog:catalog)
+        }
+    }
     public func exportVerifiedIndicatorWorkbook(
         products:Data,mappings:Data,template:Data,
         start:String,end:String,subdivision:String,ids:Set<String>)throws

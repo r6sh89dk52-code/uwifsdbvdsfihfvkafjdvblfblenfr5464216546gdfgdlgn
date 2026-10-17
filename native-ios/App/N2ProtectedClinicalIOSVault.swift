@@ -148,6 +148,15 @@ actor N2ProtectedClinicalIOSVault {
     }
     /// May only be invoked from a Face ID/code authenticated screen after
     /// the user chooses a new passphrase; never persists plaintext to Files.
+    func reconciliationEvents()throws->[N2ReconciliationEventRow] {
+        try protectedStore().readReconciliationEvents()
+    }
+    func appendReconciliationEvent(_ event:Data,expectedRevision:Int)throws
+        ->N2ProtectedStoreSummary {
+        try protectedStore().appendReconciliationEvent(
+            event,catalog:resource("n2-ambulatory-products"),
+            expectedRevision:expectedRevision)
+    }
     func exportVerifiedIndicatorWorkbook(
         start:String,end:String,subdivision:String,ids:Set<String>)throws
         -> N2VerifiedIndicatorWorkbook.Result {
