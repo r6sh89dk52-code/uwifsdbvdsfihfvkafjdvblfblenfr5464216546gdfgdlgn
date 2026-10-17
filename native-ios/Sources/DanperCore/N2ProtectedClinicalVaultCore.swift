@@ -246,6 +246,14 @@ public final class N2ProtectedClinicalVaultCore {
                 snapshot:$0,visitID:visitID)
         }
     }
+    public func readCorrectionHistory(visitID:String)throws
+        ->[N2CorrectionHistoryEntry] {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2ClinicalCorrections.history(
+            snapshot:active.snapshot,visitID:visitID)
+    }
     public func readCorrectionDetail(visitID:String)throws->N2CorrectionDetail {
         guard let active=try journal.recover() else {
             throw N2ProtectedStoreError.absentSource

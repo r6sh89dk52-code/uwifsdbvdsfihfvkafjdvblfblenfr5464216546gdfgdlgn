@@ -39,6 +39,15 @@ public struct N2CorrectionDetail:Sendable {
     public let pendingMedicationDiscrepancy:Bool
     public let effectiveSHA256:String
 }
+public struct N2CorrectionHistoryEntry:Identifiable,Sendable {
+    public let id:String
+    public let recordedAt:Int64
+    public let reason:String
+    public let operatorName:String
+    public let beforeDiagnosis:String
+    public let afterDiagnosis:String
+    public let medicationDiscrepancy:String
+}
 public struct N2PendingClinicalCorrection:Sendable {
     public let visitID:String
     public let changes:Data
@@ -221,6 +230,35 @@ public enum N2ClinicalCorrections {
             }.count,
             pendingMedicationDiscrepancy:evaluated.pending.contains(visitID),
             effectiveSHA256:try digest(visit))
+    }
+    public static func history(snapshot:Data,visitID:String)throws
+        ->[N2CorrectionHistoryEntry] {
+        let source=try json(snapshot)
+        let inspected=try project(source)
+        guard let originals=source["attentions"] as? [[String:Any]],
+              let original=originals.first(where:{$0["id"] as? String==visitID}),
+              original["status"] as? String=="saved" else{
+            throw N2CorrectionError.missingVisit
+        }
+        var current=original,history=[N2CorrectionHistoryEntry]()
+        for event in inspected.history where event["visitID"] as? String==visitID {
+            guard let changes=event["changes"] as? [String:Any],
+                  let note=event["medicationDiscrepancy"] as? String else{
+                throw N2CorrectionError.brokenHistory
+            }
+            let next=try corrected(current,changes:changes,
+                                   allowUnchanged:!note.isEmpty)
+            history.append(N2CorrectionHistoryEntry(
+                id:event["id"] as? String ?? "",
+                recordedAt:(event["recordedAt"] as? NSNumber)?.int64Value ?? 0,
+                reason:event["reason"] as? String ?? "",
+                operatorName:event["operator"] as? String ?? "",
+                beforeDiagnosis:current["diagnosis"] as? String ?? "",
+                afterDiagnosis:next["diagnosis"] as? String ?? "",
+                medicationDiscrepancy:note))
+            current=next
+        }
+        return history.reversed()
     }
     /// For history/export projections only; the encrypted saved source stays
     /// immutable and its original physical R links are authoritative.

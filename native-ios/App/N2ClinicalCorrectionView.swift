@@ -28,6 +28,10 @@ struct N2ClinicalCorrectionView:View {
     @State private var operatorName="OPERADOR DANPER"
     @State private var eventID=UUID().uuidString
     @State private var draftTask:Task<Void,Never>?
+    @State private var history=[N2CorrectionHistoryEntry]()
+    @State private var confirmDiscard=false
+    @State private var suppressAutosave=false
+    @Environment(\.dismiss) private var dismiss
     @State private var recovering=false
     @State private var lastDraftAt:Int64=0
     @Environment(\.scenePhase) private var scenePhase
@@ -64,6 +68,10 @@ struct N2ClinicalCorrectionView:View {
                               systemImage:"exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                     }
+                }
+                if !history.isEmpty {
+                    Text("Rectificaciones anteriores: \(history.count)")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 Text(message).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
@@ -123,6 +131,24 @@ struct N2ClinicalCorrectionView:View {
                               systemImage:"checkmark.shield.fill")
                     }
                     .disabled(!ready)
+                    Button(role:.destructive) {
+                        confirmDiscard=true
+                    } label: {
+                        Label("Descartar rectificación en curso",
+                              systemImage:"trash")
+                    }
+                    .disabled(saving)
+                    .confirmationDialog(
+                        "¿Descartar el borrador de rectificación?",
+                        isPresented:$confirmDiscard,
+                        titleVisibility:.visible) {
+                        Button("Descartar borrador",role:.destructive) {
+                            Task {await discardDraft()}
+                        }
+                        Button("Cancelar",role:.cancel){}
+                    } message: {
+                        Text("Elimina solo la corrección aún no confirmada. La atención y el Kardex originales permanecen intactos.")
+                    }
                     .confirmationDialog(
                         "¿Confirmar una rectificación auditada?",
                         isPresented:$pendingConfirmation,
@@ -135,7 +161,32 @@ struct N2ClinicalCorrectionView:View {
                         Text("La atención original, la fecha, los productos y todas las salidas de stock permanecen intactos.")
                     }
                 }
-            }else if saved {
+            }
+            if !history.isEmpty {
+                Section("Trazabilidad de rectificaciones") {
+                    ForEach(history){event in
+                        VStack(alignment:.leading,spacing:5) {
+                            Text(event.reason).font(.headline)
+                            Text("Responsable: "+event.operatorName)
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text("Antes: "+event.beforeDiagnosis)
+                                .font(.caption2).foregroundStyle(.secondary)
+                            Text("Después: "+event.afterDiagnosis)
+                                .font(.caption2).foregroundStyle(.secondary)
+                            if !event.medicationDiscrepancy.isEmpty {
+                                Label(event.medicationDiscrepancy,
+                                      systemImage:"exclamationmark.triangle.fill")
+                                    .font(.caption).foregroundStyle(.orange)
+                            }
+                            Text(Date(timeIntervalSince1970:
+                                Double(event.recordedAt)/1000)
+                                .formatted(date:.numeric,time:.shortened))
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            if saved {
                 Section {
                     Label("Rectificación confirmada en la bóveda",
                           systemImage:"checkmark.shield.fill")
@@ -182,7 +233,8 @@ struct N2ClinicalCorrectionView:View {
         ]
     }
     private func queueDraft(immediate:Bool=false) {
-        guard detail != nil,!recovering,!saving,!saved,!failed else{return}
+        guard detail != nil,!recovering,!saving,!saved,!failed,
+              !suppressAutosave else{return}
         draftTask?.cancel()
         let changes=editPacket()
         let why=reason,op=operatorName,note=discrepancy
@@ -222,6 +274,8 @@ struct N2ClinicalCorrectionView:View {
             let ctx=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
             let d=try await N2ProtectedClinicalIOSVault.shared
                 .readCorrectionDetail(visitID:visitID)
+            history=try await N2ProtectedClinicalIOSVault.shared
+                .readCorrectionHistory(visitID:visitID)
             revision=ctx.revision
             detail=d
             category=d.category
@@ -272,6 +326,27 @@ struct N2ClinicalCorrectionView:View {
         }catch {
             failed=true
             message="No fue posible verificar la atención. Edición bloqueada sin afectar inventario."
+        }
+    }
+    @MainActor
+    private func discardDraft() async {
+        guard !saving else{return}
+        draftTask?.cancel()
+        saving=true
+        defer{saving=false}
+        do {
+            if try await N2ProtectedClinicalIOSVault.shared
+                  .readPendingClinicalCorrection(visitID:visitID) != nil {
+                let ctx=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+                _=try await N2ProtectedClinicalIOSVault.shared
+                    .deletePendingClinicalCorrection(
+                        visitID:visitID,expectedRevision:ctx.revision)
+            }
+            suppressAutosave=true
+            dismiss()
+        }catch {
+            failed=true
+            message="No pudo eliminarse el borrador de rectificación; la atención original no cambió."
         }
     }
     @MainActor

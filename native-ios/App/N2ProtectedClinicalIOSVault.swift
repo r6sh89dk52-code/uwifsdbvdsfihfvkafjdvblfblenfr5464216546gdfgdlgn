@@ -141,6 +141,10 @@ actor N2ProtectedClinicalIOSVault {
         try protectedStore().deletePendingClinicalCorrection(
             visitID:visitID,expectedRevision:expectedRevision)
     }
+    func readCorrectionHistory(visitID:String)throws
+        ->[N2CorrectionHistoryEntry] {
+        try protectedStore().readCorrectionHistory(visitID:visitID)
+    }
     func readCorrectionDetail(visitID:String)throws->N2CorrectionDetail {
         try protectedStore().readCorrectionDetail(visitID:visitID)
     }
