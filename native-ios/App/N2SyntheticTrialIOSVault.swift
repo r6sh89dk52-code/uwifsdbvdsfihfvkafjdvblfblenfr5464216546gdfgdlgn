@@ -11,8 +11,12 @@ actor N2SyntheticTrialIOSVault {
     private let account="n2-synthetic-trial-key-v1"
     enum Failure:LocalizedError {
         case missingKey, unavailableKeychain, keyInvalid, blockedMigration
+        case keychainStatus(Int32)
         var errorDescription:String? {
-            "No fue posible verificar la bóveda nativa. No se han modificado los datos de la build 222."
+            if case let .keychainStatus(code)=self {
+                return "Keychain no disponible (OSStatus \(code)). No se han modificado datos."
+            }
+            return "No fue posible verificar la bóveda nativa. No se han modificado los datos de la build 222."
         }
     }
     private func query()->[String:Any] {
@@ -39,7 +43,10 @@ actor N2SyntheticTrialIOSVault {
         var output:CFTypeRef?
         let result=SecItemCopyMatching(q as CFDictionary,&output)
         if result==errSecItemNotFound{return nil}
-        guard result==errSecSuccess,let secret=output as? Data else {
+        guard result==errSecSuccess else {
+            throw Failure.keychainStatus(result)
+        }
+        guard let secret=output as? Data else{
             throw Failure.unavailableKeychain
         }
         guard secret.count==32 else{throw Failure.keyInvalid}
@@ -55,7 +62,10 @@ actor N2SyntheticTrialIOSVault {
         q[kSecAttrAccessible as String]=kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let result=SecItemAdd(q as CFDictionary,nil)
         if result==errSecDuplicateItem{return try readKey()}
-        guard result==errSecSuccess,try readKey()==secret else {
+        guard result==errSecSuccess else{
+            throw Failure.keychainStatus(result)
+        }
+        guard try readKey()==secret else{
             throw Failure.unavailableKeychain
         }
         return secret
