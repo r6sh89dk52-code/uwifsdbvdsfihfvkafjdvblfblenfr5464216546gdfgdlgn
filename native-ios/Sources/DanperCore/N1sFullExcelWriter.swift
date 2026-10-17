@@ -274,6 +274,21 @@ internal enum N1sFullExcelWriter {
             guard provisional else {throw N1sExcelError.unreviewedOfficial}
         }
         var archive=try N1rStoredZip.unpack(base)
+        if provisional,let index=archive.firstIndex(where:{$0.name=="xl/worksheets/sheet6.xml"}),
+           var xml=String(data:archive[index].data,encoding:.utf8) {
+            let rowMatches=try matches(#"<row\b[^>]*\br="(\d+)""#,in:xml)
+            let last=rowMatches.compactMap {m->Int? in
+                guard let r=Range(m.range(at:1),in:xml) else{return nil}
+                return Int(xml[r])
+            }.max() ?? 1
+            let notes=["BORRADOR PROVISIONAL: R declarado NO equivale a salida física. FCO/CJA/PAQ no acredita apertura. Sin cierre oficial."]+(root["pendingNotes"] as? [String] ?? [])
+            let rows=try notes.enumerated().map {offset,note in
+                let row=last+offset+1
+                return "<row r=\"\(row)\"><c r=\"A\(row)\" t=\"inlineStr\"><is><t>\(try escaped(note))</t></is></c></row>"
+            }.joined()
+            xml=xml.replacingOccurrences(of:"</sheetData>",with:rows+"</sheetData>")
+            archive[index]=N1rStoredEntry(name:archive[index].name,data:Data(xml.utf8))
+        }
         guard let stylesIndex=archive.firstIndex(where:{$0.name=="xl/styles.xml"}),
               let stylesXML=String(data:archive[stylesIndex].data,encoding:.utf8)
         else{throw N1sExcelError.invalidTemplate}
@@ -419,3 +434,4 @@ internal enum N1sContainerUseRule {
             requiresOpeningConsent:false)
     }
 }
+

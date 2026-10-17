@@ -35,6 +35,7 @@ public enum N2NativeDraftRecovery {
             draft.dni=worker["dni"] as? String ?? ""
             draft.date=record["date"] as? String ?? ""
             draft.time=record["time"] as? String ?? ""
+            draft.dispensingSite=record["dispensingSite"] as? String ?? ""
             draft.category=record["category"] as? String ?? ""
             draft.system=record["system"] as? String ?? ""
             draft.segment=record["segment"] as? String ?? ""
@@ -42,6 +43,7 @@ public enum N2NativeDraftRecovery {
             draft.permission=record["permission"] as? String ?? "NO"
             draft.permissionTime=record["permissionTime"] as? String ?? ""
             draft.photoSent=record["photoSent"] as? Bool ?? false
+            draft.photoReviewed=record["photoReviewed"] as? Bool ?? false
             draft.blueBandage=record["blueBandage"] as? Bool ?? false
             draft.returned=record["returned"] as? Bool ?? false
             draft.responsible=record["responsible"] as? String ?? "RESPONSABLE"
@@ -59,6 +61,8 @@ public enum N2NativeDraftRecovery {
                 }
                 var med=N2FormMedication(id:itemID,code:code,quantity:quantity,
                                          procedure:procedureName)
+                med.procedureConfirmed=row["procedureConfirmed"] as? Bool ?? !procedureName.isEmpty
+                med.procedureSource=row["procedureSource"] as? String ?? "manual"
                 if let physical=row["physicalUse"] {
                     guard let info=physical as? [String:Any],
                           let lotID=info["lotId"] as? String,
@@ -83,3 +87,4 @@ public enum N2NativeDraftRecovery {
         }
     }
 }
+

@@ -44,6 +44,7 @@ public enum N2NativeInventoryCommands {
               let opened=num(l["openedRemaining"]),opened>=0,opened<=cap,
               let at=num(l["updatedAt"]),at>=0,at.rounded()==at,
               balance(l)<=10_000_000_000 else{return false}
+        if let site=l["site"], !["LA VENTUROSA","PLVENTUROSA"].contains(site as? String ?? "") {return false}
         if !expiry.isEmpty {
             guard expiry.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
                 options:.regularExpression) != nil else{return false}
@@ -82,6 +83,34 @@ public enum N2NativeInventoryCommands {
         }
         return found
     }
+    /// Explicit verification of a legacy lot's original location. Never a transfer,
+    /// count adjustment, or inferred assignment. Existing quantities and ledger stay exact.
+    public static func verifyOriginalSite(snapshot:Data,eventID:String,lotID:String,
+        site:String,reason:String,operatorName:String,at:Int64)throws->Data {
+        guard !eventID.isEmpty,eventID.count<=200,at>0,at<=9_007_199_254_740_991,
+              ["LA VENTUROSA","PLVENTUROSA"].contains(site),
+              (8...250).contains(reason.trimmingCharacters(in:.whitespacesAndNewlines).count),
+              (3...200).contains(operatorName.trimmingCharacters(in:.whitespacesAndNewlines).count)
+        else{throw N2InventoryError.insufficientEvidence}
+        var state=try root(snapshot)
+        var events=state["nativeStockSiteVerifications"] as? [[String:Any]] ?? []
+        let event:[String:Any]=["id":eventID,"lotId":lotID,"site":site,"reason":reason,
+                                "operatorName":operatorName,"at":at,"scope":"original-location"]
+        if let previous=events.first(where:{$0["id"] as? String==eventID}) {
+            guard try JSONSerialization.data(withJSONObject:previous,options:[.sortedKeys]) == JSONSerialization.data(withJSONObject:event,options:[.sortedKeys]) else{throw N2InventoryError.duplicatedMovement}
+            return snapshot
+        }
+        let sites=try N2StockSiteEvidence.resolve(state)
+        guard events.count<10000,let lots=state["stockLots"] as? [[String:Any]],
+              let lot=lots.first(where:{$0["id"] as? String==lotID}),
+              sites[lotID]==nil,(lot["site"] as? String ?? "").isEmpty,
+              validLot(lot) else{throw N2InventoryError.invalidLot}
+        // Ledger before/after snapshots are canonical and immutable. Keep the
+        // original lot byte-for-byte and attach location evidence separately.
+        events.append(event);state["nativeStockSiteVerifications"]=events
+        return try done(state)
+    }
+
     public static func registerLot(snapshot:Data,lot:Data,
                                    catalogData:Data)throws->Data {
         var state=try root(snapshot)
@@ -196,5 +225,37 @@ public enum N2NativeInventoryCommands {
         state["stockLots"]=lots
         state["stockMovements"]=movements
         return try done(state)
+    }
+}
+
+
+/// Effective original site is derived from explicit, validated evidence. It never
+/// edits legacy lot snapshots or rewrites their historical movement chain.
+enum N2StockSiteEvidence {
+    static func resolve(_ root:[String:Any])throws->[String:String] {
+        guard let lots=root["stockLots"] as? [[String:Any]] else{throw N2InventoryError.invalidSnapshot}
+        let known=["LA VENTUROSA","PLVENTUROSA"]
+        var sites=[String:String]()
+        for lot in lots {
+            if let id=lot["id"] as? String,let site=lot["site"] as? String,known.contains(site) {sites[id]=site}
+        }
+        guard let raw=root["nativeStockSiteVerifications"] else{return sites}
+        guard let events=raw as? [[String:Any]],events.count<=10000 else{throw N2InventoryError.invalidSnapshot}
+        var ids=Set<String>()
+        for event in events {
+            guard let id=event["id"] as? String,!id.isEmpty,ids.insert(id).inserted,
+                  let lotID=event["lotId"] as? String,
+                  let lot=lots.first(where:{$0["id"] as? String==lotID}),
+                  (lot["site"] as? String ?? "").isEmpty,sites[lotID]==nil,
+                  let site=event["site"] as? String,known.contains(site),
+                  event["scope"] as? String=="original-location",
+                  let reason=event["reason"] as? String,(8...250).contains(reason.trimmingCharacters(in:.whitespacesAndNewlines).count),
+                  let op=event["operatorName"] as? String,(3...200).contains(op.trimmingCharacters(in:.whitespacesAndNewlines).count),
+                  let at=event["at"] as? NSNumber,CFGetTypeID(at) != CFBooleanGetTypeID(),
+                  at.doubleValue>0,at.doubleValue<=9_007_199_254_740_991,at.doubleValue.rounded()==at.doubleValue
+            else{throw N2InventoryError.invalidSnapshot}
+            sites[lotID]=site
+        }
+        return sites
     }
 }

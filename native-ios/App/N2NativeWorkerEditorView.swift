@@ -5,6 +5,9 @@ import DanperCore
 /// Active ONLY after a verified one-source protected N2 vault exists.
 /// Writes a new manual worker atomically, never modifies worker identity.
 struct N2NativeWorkerEditorView:View {
+    @AppStorage("danper.haptics.enabled") private var haptics=true
+    @State private var existingDNI=Set<String>()
+    @State private var saved=false
     @State private var dni=""
     @State private var names=""
     @State private var area=""
@@ -19,7 +22,7 @@ struct N2NativeWorkerEditorView:View {
     @State private var failed=false
 
     private var ready:Bool {
-        revision != nil && !busy && dni.count==8 && dni.hasPrefix("000000") &&
+        revision != nil && !busy && !existingDNI.contains(dni) && dni.count==8 && dni.hasPrefix("000000") &&
         names.uppercased().hasPrefix("PERSONA FICTICIA ") &&
         dni.utf8.allSatisfy{(48...57).contains($0)} &&
         !names.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
@@ -27,49 +30,62 @@ struct N2NativeWorkerEditorView:View {
         (age.isEmpty || (Int(age).map{(0...120).contains($0)} == true))
     }
     var body:some View {
-        Form {
-            Section("Fuente cifrada independiente") {
-                Label("No se escribe en la build 222",systemImage:"lock.shield")
-                    .foregroundStyle(.secondary)
-                Text(status).font(.footnote)
-                    .foregroundStyle(failed ? Color.red : Color.secondary)
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel {
+                Label("Modo de prueba — datos ficticios",systemImage:"lock.shield")
+                    .font(.caption).foregroundStyle(DanperStyle.red)
+                if failed || saved {Text(status).font(.footnote).foregroundStyle(failed ? Color.orange : Color.green)}
             }
-            Section("Trabajador ficticio solamente") {
-                Text("Utiliza un DNI simulado que empiece con 000000 y un nombre que comience con PERSONA FICTICIA. No introduzcas datos reales en esta beta.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                TextField("DNI ficticio (ej. 00000006)",text:$dni)
+            DanperPanel("Identificación") {
+                Text("DNI de prueba: 000000 seguido de dos cifras. Nombre: PERSONA FICTICIA seguido de un identificador.")
+                    .font(.caption).foregroundStyle(.secondary)
+                DanperField(title:"DNI ficticio") {
+                    TextField("DNI ficticio (ej. 00000006)",text:$dni)
                     .keyboardType(.numberPad)
-                TextField("Nombre (PERSONA FICTICIA SEIS)",text:$names)
+                }
+                if existingDNI.contains(dni) {Label("Este DNI ya existe en Personal",systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)}
+                DanperField(title:"Nombre completo") {
+                    TextField("Nombre (PERSONA FICTICIA SEIS)",text:$names)
                     .textInputAutocapitalization(.characters)
-                TextField("Área",text:$area)
-                TextField("Cargo / labor",text:$labor)
-                TextField("Sede",text:$site)
-                Picker("Sexo registrado",selection:$sex) {
-                    Text("No consignado").tag("")
-                    Text("M").tag("M")
-                    Text("F").tag("F")
                 }
-                TextField("Edad (opcional)",text:$age).keyboardType(.numberPad)
-                TextField("Ubigeo (opcional)",text:$ubigeo)
             }
-            Section {
-                Button {
-                    save()
-                } label: {
-                    Label(busy ? "Guardando…" : "Guardar trabajador",
-                          systemImage:"checkmark.shield.fill")
+            DanperPanel("Datos laborales") {
+                DanperField(title:"Área") {
+                    TextField("Área (opcional)",text:$area)
                 }
-                .disabled(!ready)
-                Text("Rechaza DNI repetidos; la actualización se confirma solo cuando toda la generación cifrada ha sido verificada.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                DanperField(title:"Cargo / labor") {
+                    TextField("Cargo / labor",text:$labor)
+                }
+                DanperChoiceField(title:"Sede",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
             }
+            DanperPanel("Datos personales opcionales") {
+                DanperChoiceField(title:"Sexo registrado",selection:$sex,options:["","M","F"],labels:["":"No consignado","M":"Masculino","F":"Femenino"])
+                DanperField(title:"Edad") {
+                    TextField("Edad (opcional)",text:$age).keyboardType(.numberPad)
+                }
+                DanperField(title:"Ubigeo") {
+                    TextField("Ubigeo (opcional)",text:$ubigeo)
+                }
+            }
+          }.padding(16)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge:.bottom) {
+            Button {save()} label: {
+                Label(busy ? "Guardando…" : "Guardar trabajador",systemImage:"person.badge.plus")
+            }.buttonStyle(DanperPrimaryButton()).disabled(!ready)
+                .padding(16).background(.regularMaterial)
         }
         .navigationTitle("Nuevo trabajador")
         .danperFormChrome()
+        .sensoryFeedback(.success,trigger:saved) {_,_ in haptics}
         .task {
             do {
                 if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
                     revision=vault.revision
+                    let context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                    existingDNI=Set(context.workers.map(\.dni))
                 }
                 status=revision==nil ? "Activa el modo prueba desde Inicio para continuar." :
                     "Entorno ficticio listo; estos datos no se mezclan con la build 222."
@@ -95,6 +111,8 @@ struct N2NativeWorkerEditorView:View {
                     expectedRevision:current)
                 revision=result.revision
                 failed=false
+                saved=true
+                existingDNI.insert(dni)
                 status="Nuevo trabajador guardado en revisión cifrada \(result.revision)."
                 dni="";names="";area="";labor="";sex="";age="";ubigeo=""
             }catch{
@@ -105,3 +123,4 @@ struct N2NativeWorkerEditorView:View {
         }
     }
 }
+

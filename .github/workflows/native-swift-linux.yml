@@ -29,6 +29,7 @@ on:
       - 'native-ios/**'
       - '.github/workflows/native-swift-linux.yml'
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -57,6 +58,8 @@ jobs:
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n2-approved-fixture.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n2-nursing-parity.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n2-stock-commands-fixtures.cjs
+      - name: Generate frozen build222 procedure equivalence cases
+        run: node scripts/generate-n2-procedure-parity.cjs
       - name: Compile production TypeScript and verify one-click container opening
         run: |
           npm run build
@@ -75,3 +78,4 @@ jobs:
           test "$RUNNER_OS" = Linux
           test ! -d native-ios/out
           echo 'PASS N1s: isolated encrypted staging + Swift tests, no IPA'
+

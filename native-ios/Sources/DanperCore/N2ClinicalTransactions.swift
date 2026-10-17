@@ -145,17 +145,22 @@ public enum N2NativeClinicalTransaction {
                 throw N2ClinicalError.invalidVisit
             }
         }
+        let verifiedSites=try N2StockSiteEvidence.resolve(root)
         let today=limaDay(at)
         var linked=0,pending=0,already=0,reasons:[String]=[],added=0
-        func mark(_ reason:String) {pending+=1;reasons.append(reason)}
+        var lineID=""
+        var outcomes:[String:String]=[:]
+        func mark(_ reason:String) {pending+=1;reasons.append(reason);outcomes[lineID]=reason}
         for item in items {
             let itemID=item["id"] as! String,code=item["code"] as! String
+            lineID=itemID
             let existing=movements.filter{
                 guard let ref=$0["dispenseRef"] as? [String:Any] else{return false}
                 return ref["attentionId"] as? String == id && ref["itemId"] as? String == itemID
             }
             if !existing.isEmpty {
                 // Existing delivery is immutable and must still match the item.
+                outcomes[itemID]="Descontado"
                 already+=1;continue
             }
             if date != today {
@@ -182,7 +187,12 @@ public enum N2NativeClinicalTransaction {
                 mark("Cantidad física no verificada.");continue
             }
             let allowable=Set(candidates.map{$0.kardexCode})
+            let scope=new["dispensingSite"] as? String ?? ""
+            if !scope.isEmpty && !["LA VENTUROSA","PLVENTUROSA"].contains(scope) {
+                mark("Tópico de dispensación no verificado.");continue
+            }
             let eligible=lots.filter {l in
+                if !scope.isEmpty && verifiedSites[l["id"] as? String ?? ""] != scope {return false}
                 guard let lc=str(l["code"]),let ln=str(l["name"]),
                       allowable.contains(lc),
                       candidates.contains(where:{$0.kardexCode==lc && $0.kardexName==ln}),
@@ -195,6 +205,9 @@ public enum N2NativeClinicalTransaction {
                         stock=="PAR" : ["UND","TBL"].contains(stock)
                 }
                 return true
+            }
+            if eligible.isEmpty && !scope.isEmpty {
+                mark("Sin stock vigente con sede verificada en el tópico elegido. No se usa stock ajeno ni de sede desconocida.");continue
             }
             let chosen=eligible.first(where:{$0["id"] as? String == selected})
             if explicit != nil && (selected==nil || chosen==nil) {
@@ -307,6 +320,10 @@ public enum N2NativeClinicalTransaction {
             lots=probe
             added+=movements.count-beforeCount
             linked+=1
+            outcomes[itemID]="Descontado"
+        }
+        if let index=visits.firstIndex(where:{$0["id"] as? String == id}) {
+            visits[index]["nativeDispensing"]=outcomes
         }
         root["attentions"]=visits
         root["stockLots"]=lots
@@ -322,3 +339,4 @@ public enum N2NativeClinicalTransaction {
                                 physicalMovementsAdded:added)
     }
 }
+

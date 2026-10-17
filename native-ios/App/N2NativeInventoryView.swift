@@ -5,9 +5,21 @@ import DanperCore
 /// Independent N2 stock operations: register a lot, receive more supplies,
 /// and reconcile an explicitly counted lot. No guessed package sizes.
 struct N2NativeInventoryView:View {
+    private var layoutOnly=false
+    init() {}
+    #if DEBUG
+    init(layoutContext:N2FormContext,operation:String?=nil) {
+        layoutOnly=true
+        _context=State(initialValue:layoutContext)
+        _message=State(initialValue:"\(layoutContext.lots.count) lotes disponibles")
+        if let operation {_workspace=State(initialValue:"edit");_mode=State(initialValue:operation)}
+    }
+    #endif
     @State private var context:N2FormContext?
+    @State private var workspace="overview"
     @State private var mode="lot"
     @State private var materialCode=""
+    @State private var site=""
     @State private var container="unidad"
     @State private var unit="UND"
     @State private var lotNumber=""
@@ -26,7 +38,7 @@ struct N2NativeInventoryView:View {
     @State private var picking=false
     @State private var busy=false
     @State private var failed=false
-    @State private var message="Verificando la bóveda y el catálogo oficial…"
+    @State private var message="Cargando inventario…"
 
     private var material:N2NursingCatalogProduct? {
         context?.products.nursing.first{$0.id==materialCode}
@@ -50,9 +62,11 @@ struct N2NativeInventoryView:View {
         return fmt.string(from:day)
     }
     private var valid:Bool {
-        guard context != nil,!busy,let values=counts else{return false}
+        guard context != nil,!busy else{return false}
+        if mode=="site" {return !selectedLotID.isEmpty && !site.isEmpty && reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8}
+        guard let values=counts else{return false}
         if mode=="lot"{
-            return material != nil && values.2<=Double(values.3)
+            return material != nil && !site.isEmpty && values.2<=Double(values.3)
         }
         guard !selectedLotID.isEmpty &&
               reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8 else{
@@ -66,59 +80,73 @@ struct N2NativeInventoryView:View {
     }
 
     var body:some View {
-        Form {
-            Section("Inventario nativo · bóveda cifrada N2") {
+        DanperScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel("Inventario y lotes") {
                 Label("Kardex físico de enfermería · 98 materiales",
                       systemImage:"lock.shield.fill")
-                Text("Toda alta, ingreso y ajuste se confirma en una sola generación cifrada. No se infiere cuántos mL contiene un frasco o cuántas unidades contiene una caja.")
+                Text("Registra existencias y revisa los lotes de cada sede. La capacidad de cajas y frascos se indica al registrar el lote.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Text(message).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
             }
-            Section("Operación") {
-                Picker("Acción",selection:$mode) {
-                    Text("Registrar lote").tag("lot")
-                    Text("Ingreso extraordinario").tag("receipt")
-                    Text("Conciliar conteo físico").tag("count")
+            if workspace=="overview" {
+                DanperPanel("Gestionar existencias") {
+                    ForEach(["lot","receipt","count"],id:\.self) {action in
+                        Button {
+                            mode=action;workspace="edit"
+                        } label: {
+                            HStack {
+                                Label(["lot":"Registrar lote","receipt":"Ingreso extraordinario","count":"Conteo físico"][action]!,systemImage:action=="lot" ? "plus.circle" : action=="receipt" ? "tray.and.arrow.down" : "checkmark.shield")
+                                Spacer();Image(systemName:"chevron.right")
+                            }.padding(14).foregroundStyle(.primary).frame(minHeight:52)
+                                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
+                        }.buttonStyle(.plain)
+                    }
                 }
-                .pickerStyle(.segmented)
+            } else {
+            Button {workspace="overview"} label:{Label("Volver al inventario",systemImage:"chevron.left")}.buttonStyle(DanperSecondaryButton())
+            if mode=="site" {
+                DanperPanel("Verificar sede original del lote") {
+                    Text(context?.lots.first{$0.id==selectedLotID}?.name ?? selectedLotID).font(.headline)
+                    Text("Confirma la sede a la que pertenecen el lote y su historial. Esta operación no es un traslado ni cambia cantidades.").font(.footnote).foregroundStyle(.secondary)
+                    DanperChoiceField(title:"Sede verificada",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                    DanperField(title:"Evidencia de la sede original") {TextField("Justificación (mínimo 8 caracteres)",text:$reason,axis:.vertical)}
+                    Button {Task {await commit()}} label:{Label("Confirmar sede original",systemImage:"mappin.and.ellipse")}
+                        .buttonStyle(DanperPrimaryButton()).disabled(!valid)
+                }
+            } else {
+            DanperPanel("Operación") {
+                DanperChoiceField(title:"Operación",selection:$mode,options:["lot","receipt","count"],
+                                  labels:["lot":"Registrar lote","receipt":"Ingreso extraordinario","count":"Conciliar conteo físico"])
                 if mode=="lot" {
-                    Button {picking=true} label:{
+                    Button {picking.toggle()} label:{
                         Label(material.map{$0.name+" · "+$0.id} ??
                               "Seleccionar material oficial",
                               systemImage:"magnifyingglass")
                     }
+                    if picking,let context {
+                        DanperInlineSearch(title:"Material oficial de enfermería",placeholder:"Nombre o código E-",
+                            options:context.products.nursing.map{DanperSearchOption(id:$0.id,title:$0.name,detail:$0.id+" · "+$0.group)},
+                            onSelect:{id in materialCode=id;picking=false},onClose:{picking=false})
+                    }
+                    DanperChoiceField(title:"Sede del inventario",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                    DanperField(title:"N.º de lote o referencia") {
                     TextField("N.º de lote o referencia",text:$lotNumber)
-                    Picker("U.M. del producto",selection:$unit) {
-                        ForEach(["UND","TBL","PAR","CJA","PAQ","FCO","LT","ML"],id:\.self){
-                            Text($0).tag($0)
-                        }
-                    }
-                    Picker("Presentación física",selection:$container) {
-                        Text("Unidad").tag("unidad")
-                        Text("Caja").tag("caja")
-                        Text("Frasco").tag("frasco")
-                        Text("Paquete").tag("paquete")
-                        Text("Blíster").tag("blister")
-                        Text("Otro").tag("otro")
-                    }
+                }
+                    DanperChoiceField(title:"Unidad del catálogo",selection:$unit,options:["UND","TBL","PAR","CJA","PAQ","FCO","LT","ML"],labels:Dictionary(uniqueKeysWithValues:["UND","TBL","PAR","CJA","PAQ","FCO","LT","ML"].map{($0,$0)}))
+                    DanperChoiceField(title:"Presentación física",selection:$container,options:["unidad","caja","frasco","paquete","blister","otro"])
+                    DanperField(title:"Capacidad interna por envase") {
                     TextField("Capacidad interna por envase",text:$cap)
                         .keyboardType(.numberPad)
-                    Toggle("Registrar fecha de vencimiento",isOn:$expiryEnabled)
+                }
+                    DanperCheckRow(selected:$expiryEnabled) {Text("Registrar fecha de vencimiento")}
                     if expiryEnabled {
-                        LabeledContent("Vencimiento",value:DanperDatePresentation.display(localDay(expiry)))
-                        DatePicker("Cambiar vencimiento",selection:$expiry,
-                                   displayedComponents:.date)
+                        DanperDateField(title:"Vencimiento",selection:$expiry)
                     }
                 }else{
-                    Picker("Lote registrado",selection:$selectedLotID) {
-                        Text("Seleccionar lote").tag("")
-                        if let context {
-                            ForEach(context.lots){lot in
-                                Text(lot.name+" · "+lot.id).tag(lot.id)
-                            }
-                        }
-                    }
+                    DanperChoiceField(title:"Lote registrado",selection:$selectedLotID,options:context?.lots.map(\.id) ?? [],
+                                      labels:Dictionary(uniqueKeysWithValues:(context?.lots ?? []).map{($0.id,$0.name+" · "+$0.id)}))
                     if let current=context?.lots.first(where:{$0.id==selectedLotID}) {
                         LabeledContent("Existencia sellada",
                                        value:String(current.sealed))
@@ -131,76 +159,68 @@ struct N2NativeInventoryView:View {
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                     }
+                    DanperField(title:"Justificación obligatoria") {
                     TextField("Justificación obligatoria",text:$reason,
                               axis:.vertical).lineLimit(2...4)
                 }
+                }
             }
-            Section(mode=="count" ? "Conteo físico actual" :
+            DanperPanel(mode=="count" ? "Conteo físico actual" :
                     mode=="receipt" ? "Cantidades adicionales" : "Existencias iniciales") {
-                TextField("Envases sellados",text:$sealed)
+                DanperField(title:"Envases sellados") {
+                    TextField("Envases sellados",text:$sealed)
                     .keyboardType(.numberPad)
-                TextField("Unidades sueltas",text:$loose)
+                }
+                DanperField(title:"Unidades sueltas") {
+                    TextField("Unidades sueltas",text:$loose)
                     .keyboardType(.decimalPad)
+                }
                 if mode != "receipt" {
+                    DanperField(title:"Contenido de envase abierto") {
                     TextField("Contenido de envase abierto",text:$opened)
                         .keyboardType(.decimalPad)
+                }
                 }
                 Text("Distingue envases sellados, material suelto y remanente abierto. La U.M. del Kardex se conserva.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Confirmación") {
+            DanperPanel("Confirmación") {
                 Button {
                     Task {await commit()}
                 } label: {
-                    Label(busy ? "Guardando…" : "Confirmar en inventario N2",
+                    Label(busy ? "Guardando…" : "Guardar movimiento",
                           systemImage:"checkmark.shield.fill")
-                }.disabled(!valid)
+                }.buttonStyle(DanperPrimaryButton()).disabled(!valid)
             }
-            Section("Lotes actuales") {
+            }
+            }
+            if workspace=="overview" {
+            DanperPanel("Lotes actuales") {
                 if let context {
                     ForEach(context.lots){lot in
                         VStack(alignment:.leading,spacing:4){
                             Text(lot.name+" · "+lot.kardexCode).font(.headline)
+                            Label(lot.site.isEmpty ? "Sede sin verificar" : lot.site,systemImage:lot.site.isEmpty ? "exclamationmark.triangle" : "mappin.and.ellipse")
+                                .font(.caption).foregroundStyle(lot.site.isEmpty ? Color.orange : Color.secondary)
+                            if lot.site.isEmpty {
+                                Button("Verificar sede original") {
+                                    selectedLotID=lot.id;site="";reason="";mode="site";workspace="edit"
+                                }.buttonStyle(DanperSecondaryButton())
+                            }
                             Text("Sello: \(lot.sealed) · Abierto: \(lot.opened) · Suelto: \(lot.loose)")
                                 .font(.caption).foregroundStyle(.secondary)
                             Text("Lote: "+lot.id+" · Vence: "+DanperDatePresentation.display(lot.expires))
                                 .font(.caption2).foregroundStyle(.secondary)
-                        }
+                        }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
                     }
                 }
             }
+            }
+          }.padding(16)
         }
         .navigationTitle("Inventario y lotes")
         .danperFormChrome()
-        .sheet(isPresented:$picking){
-            NavigationStack {
-                List {
-                    if let context {
-                        ForEach(context.products.nursingMatches(search)) {p in
-                            Button {
-                                materialCode=p.id
-                                picking=false
-                                search=""
-                            } label:{
-                                VStack(alignment:.leading){
-                                    Text(p.name).foregroundStyle(.primary)
-                                    Text(p.id+" · "+p.group)
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                }
-                .searchable(text:$search,prompt:"Nombre o código E-")
-                .navigationTitle("Materiales de enfermería")
-                .toolbar{
-                    ToolbarItem(placement:.topBarTrailing){
-                        Button("Cerrar"){picking=false}
-                    }
-                }
-            }
-        }
-        .task {await load()}
+        .task {if !layoutOnly {await load()}}
     }
     @MainActor
     private func load() async {
@@ -216,7 +236,8 @@ struct N2NativeInventoryView:View {
     }
     @MainActor
     private func commit() async {
-        guard valid,let current=context,let values=counts else{return}
+        guard valid,let current=context else{return}
+        let values=counts ?? (0,0.0,0.0,1)
         busy=true
         failed=false
         defer{busy=false}
@@ -226,11 +247,16 @@ struct N2NativeInventoryView:View {
         do{
             let result:N2ProtectedStoreSummary
             switch mode {
+            case "site":
+                result=try await N2SyntheticTrialIOSVault.shared.verifyOriginalStockSite(
+                    eventID:movementID,lotID:selectedLotID,site:site,reason:reason,
+                    at:movementAt,expectedRevision:current.revision)
             case "lot":
                 guard let material else{return}
                 let record:[String:Any]=[
                     "id":lotID,"code":material.id,"name":material.name,
                     "catalogUnit":unit,"lot":lotNumber,
+                    "site":site,
                     "expires":expiryEnabled ? localDay(expiry) : "",
                     "container":container,"unitsPerContainer":values.3,
                     "sealedContainers":values.0,"looseUnits":values.1,
@@ -250,6 +276,7 @@ struct N2NativeInventoryView:View {
                     sealed:values.0,loose:values.1,opened:values.2,
                     reason:reason,expectedRevision:current.revision)
             }
+            _ = result
             context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             // Disable a second tap with stale quantities after a successful
             // receipt or lot creation. Failed writes retain the same ID/clock
@@ -257,6 +284,7 @@ struct N2NativeInventoryView:View {
             movementID=UUID().uuidString
             lotID=UUID().uuidString
             movementAt=0
+            workspace="overview"
             reason=""
             materialCode=""
             selectedLotID=""
@@ -266,10 +294,11 @@ struct N2NativeInventoryView:View {
             loose="0"
             opened="0"
             expiryEnabled=false
-            message="Movimiento o lote cifrado y auditado · revisión \(result.revision)."
+            message=mode=="site" ? "Sede original verificada. Las cantidades y movimientos se conservaron." : "Inventario actualizado correctamente."
         }catch {
             failed=true
             message="Operación no aplicada: verifica materiales, cantidades, lotes y revisión vigente. El identificador se conserva para impedir duplicar un ingreso al reintentar."
         }
     }
 }
+

@@ -315,7 +315,7 @@ struct N1gAttentionScreen: View {
                             LabeledContent("Diagnóstico", value: active.diagnosis.isEmpty ? "Pendiente" : active.diagnosis)
                             LabeledContent("Alergias", value: active.workerID.flatMap { clinic.allergies[$0]?.rawValue } ?? "Sin revisar")
                             LabeledContent("Procedimiento", value: active.procedure.isEmpty ? "Pendiente" : active.procedure)
-                            LabeledContent("Fecha / hora", value: "\(active.detailed.date) · \(active.detailed.time)")
+                            LabeledContent("Fecha / hora", value: DanperDatePresentation.displayDateTime(active.detailed.date,active.detailed.time))
                             LabeledContent("Sistema afectado", value: active.detailed.system)
                             LabeledContent("Destino laboral", value: active.result)
                             LabeledContent("Procedimientos adicionales", value: "\(active.detailed.standaloneProcedures.count)")
@@ -431,7 +431,7 @@ struct N1gHistoryScreen: View {
                         Text(clinic.worker(saved.workerID)?.name ?? "Ficticio")
                             .font(.headline)
                         Text(saved.diagnosis).font(.subheadline)
-                        Text("\(saved.detailed.date) · \(saved.detailed.time) · \(saved.detailed.system)")
+                        Text(DanperDatePresentation.displayDateTime(saved.detailed.date,saved.detailed.time)+" · "+saved.detailed.system)
                             .font(.caption).foregroundStyle(.secondary)
                         Text("Solo memoria · Sin movimiento físico")
                             .font(.caption).foregroundStyle(.secondary)
@@ -449,3 +449,4 @@ struct N1gHistoryScreen: View {
         .navigationTitle("Borradores")
     }
 }
+

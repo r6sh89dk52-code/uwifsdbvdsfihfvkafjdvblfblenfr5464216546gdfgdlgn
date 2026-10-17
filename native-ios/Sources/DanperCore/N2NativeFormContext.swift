@@ -26,6 +26,7 @@ public struct N2FormLot:Equatable,Sendable,Identifiable {
     public let sealed:Int
     public let loose:Double
     public let opened:Double
+    public var site:String=""
     public var total:Double {Double(sealed)*capacity+loose+opened}
     public var needsOpening:Bool {opened <= 0 && loose <= 0 && sealed>0}
 }
@@ -35,10 +36,11 @@ public struct N2FormContext:Sendable {
     public let allergies:[String:N2FormAllergy]
     public let lots:[N2FormLot]
     public let products:N2NativeCatalogIndex
-    public func options(for code:String,at date:String)->[N2FormLot] {
+    public func options(for code:String,at date:String,site:String="")->[N2FormLot] {
         let approved=Set(products.authorizedNursingOptions(for:code).map(\.id))
         return lots.filter {
             approved.contains($0.kardexCode) && $0.total>0 &&
+            (site.isEmpty || $0.site==site) &&
             ($0.expires.isEmpty || $0.expires>=date)
         }.sorted {
             let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
@@ -88,6 +90,7 @@ public enum N2NativeFormContextReader {
             records[dni]=N2FormAllergy(status:status,
                                       substances:substances,reviewed:true)
         }
+        let sites=try N2StockSiteEvidence.resolve(root)
         let all=stock.compactMap { row->N2FormLot? in
             guard let id=row["id"] as? String,
                   let code=row["code"] as? String,
@@ -102,7 +105,7 @@ public enum N2NativeFormContextReader {
             }
             return N2FormLot(id:id,kardexCode:code,name:name,unit:unit,
                              expires:expiry,capacity:capacity,sealed:sealed,
-                             loose:loose,opened:opened)
+                             loose:loose,opened:opened,site:sites[id] ?? "")
         }
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
         return N2FormContext(revision:revision,workers:people,
@@ -117,14 +120,18 @@ public struct N2FormMedication:Equatable,Sendable,Identifiable {
     public var code:String
     public var quantity:Int
     public var procedure:String
+    public var procedureConfirmed:Bool
+    public var procedureSource:String
     public var selectedLotID:String
     public var physicalQuantity:Double
     public var approveOpening:Bool
     public init(id:String=UUID().uuidString,code:String,quantity:Int=1,
-                procedure:String="OBSERVACION",selectedLotID:String="",
+                procedure:String="",selectedLotID:String="",
                 physicalQuantity:Double=0,approveOpening:Bool=false) {
         self.id=id;self.code=code;self.quantity=quantity
         self.procedure=procedure;self.selectedLotID=selectedLotID
+        self.procedureConfirmed = !procedure.isEmpty
+        self.procedureSource = procedure.isEmpty ? "review" : "manual"
         self.physicalQuantity=physicalQuantity;self.approveOpening=approveOpening
     }
 }
@@ -133,18 +140,20 @@ public struct N2NativeFormDraft:Equatable,Sendable {
     public var dni:String=""
     public var date:String=""
     public var time:String=""
+    public var dispensingSite:String=""
     public var category:String=""
     public var system:String=""
     public var segment:String=""
     public var diagnosis:String=""
-    public var procedures:[String]=["OBSERVACION"]
+    public var procedures:[String]=[]
     public var items:[N2FormMedication]=[]
     public var permission:String="NO"
     public var permissionTime:String=""
     public var photoSent:Bool=false
+    public var photoReviewed:Bool=false
     public var blueBandage:Bool=false
     public var returned:Bool=false
-    public var responsible:String="RESPONSABLE"
+    public var responsible:String="Felipe Azcárate Silva"
     public var responsibleDni:String=""
     public init(id:String=UUID().uuidString) {self.id=id}
 
@@ -172,14 +181,15 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                         options:.regularExpression) != nil else {
             throw N2FormError.invalidDate
         }
-        guard !category.isEmpty,!system.isEmpty,
+        guard (0...3).allSatisfy({clinicalIssues(step:$0,context:context).isEmpty}),
               (!procedures.isEmpty || !items.isEmpty),
               !diagnosis.trimmingCharacters(in:.whitespaces).isEmpty,
               ["NO","SI"].contains(permission),
               (permission != "SI" || permissionTime.range(of:
                   #"^([01]\d|2[0-3]):[0-5]\d$"#,
                   options:.regularExpression) != nil),
-              !responsible.isEmpty else {
+              !responsible.isEmpty,
+              (!hasWound || photoReviewed) else {
             throw N2FormError.invalidVisit
         }
         var lines=[[String:Any]]()
@@ -191,12 +201,15 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             var row:[String:Any]=[
                 "id":med.id,"code":product.code,"name":product.name,
                 "unit":product.unit,"quantity":med.quantity,
-                "procedure":med.procedure
+                "procedure":med.procedure,
+                "procedureConfirmed":med.procedureConfirmed,
+                "procedureSource":med.procedureSource
             ]
             if !med.selectedLotID.isEmpty {
-                guard context.options(for:med.code,at:date).contains(where:{
-                    $0.id==med.selectedLotID
-                }),med.physicalQuantity>0,med.physicalQuantity.isFinite else{
+                // Preserve the operator's clinical record if stock changed
+                // while editing. The transactional engine verifies identity,
+                // availability and scope and records a pending reason instead.
+                guard med.physicalQuantity>0,med.physicalQuantity.isFinite else{
                     throw N2FormError.invalidProduct
                 }
                 row["physicalUse"]=[
@@ -217,6 +230,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         }
         let source:[String:Any]=[
             "id":id,"status":"saved","date":date,"time":time,
+            "dispensingSite":dispensingSite,
             "worker":workerRaw,"category":category,"system":system,
             "segment":segment,"diagnosis":diagnosis,"items":lines,
             "permission":permission,
@@ -239,7 +253,9 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         let itemRows:[[String:Any]]=items.map { med in
             var row:[String:Any]=[
                 "id":med.id,"code":med.code,"quantity":med.quantity,
-                "procedure":med.procedure
+                "procedure":med.procedure,
+                "procedureConfirmed":med.procedureConfirmed,
+                "procedureSource":med.procedureSource
             ]
             if let catalog=context.products.clinical.first(where:{$0.code==med.code}) {
                 row["name"]=catalog.name;row["unit"]=catalog.unit
@@ -255,13 +271,15 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         return try JSONSerialization.data(withJSONObject:[
             "worker":workerRaw,"items":itemRows,
             "date":date,"time":time,"category":category,
+            "dispensingSite":dispensingSite,
             "system":system,"segment":segment,"diagnosis":diagnosis,
             "permission":permission,"permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
-            "photoSent":photoSent,"responsible":responsible,
+            "photoSent":photoSent,"photoReviewed":photoReviewed,"responsible":responsible,
             "responsibleDni":responsibleDni,
             "standaloneProcedures":procedures,
             "workStatus":permission=="SI" ? "PERMISO":"LABORANDO"
         ])
     }
 }
+

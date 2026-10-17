@@ -18,6 +18,20 @@ private struct N2IndicatorShareSheet:UIViewControllerRepresentable {
 /// Entirely native N2 selection screen. The builder refuses pending stock,
 /// missing review events, mixed sites, or invented official balances.
 struct N2VerifiedIndicatorExportView:View {
+    private var layoutOnly=false
+    private var layoutSelectionOnly=false
+    init() {}
+    #if DEBUG
+    init(layoutVisits:[N2VisitIndexRow],selectionOnly:Bool=false) {
+        layoutSelectionOnly=selectionOnly
+        layoutOnly=true
+        _visits=State(initialValue:layoutVisits)
+        _selected=State(initialValue:Set(layoutVisits.filter{$0.pendingPhysicalLines==0}.map(\.id)))
+        let f=DateFormatter();f.dateFormat="yyyy-MM-dd";f.timeZone=TimeZone(identifier:"America/Lima")
+        _startDate=State(initialValue:f.date(from:"2026-10-01")!)
+        _endDate=State(initialValue:f.date(from:"2026-10-31")!)
+    }
+    #endif
     @State private var site="LA VENTUROSA"
     @State private var startDate=Date()
     @State private var endDate=Date()
@@ -27,6 +41,8 @@ struct N2VerifiedIndicatorExportView:View {
     @State private var working=false
     @State private var failed=false
     @State private var status="Abriendo la bóveda clínica N2…"
+    @State private var provisional=false
+    @State private var confirmProvisional=false
     @State private var share:N2IndicatorShare?
     @State private var folder:URL?
 
@@ -47,26 +63,25 @@ struct N2VerifiedIndicatorExportView:View {
         !selected.isEmpty
     }
     var body:some View {
-        Form {
-            Section("Indicador Ambulatorio N2 · 10 hojas") {
-                Label("Fuente cifrada original, sin datos de demostración",
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            if !layoutSelectionOnly {
+            DanperPanel("Indicador ambulatorio · 10 hojas") {
+                Label("Modo de prueba — datos ficticios",
                       systemImage:"lock.shield.fill")
                 Text("Solo atenciones elegidas y consumos enlazados al Kardex. No se rellena stock inicial, ingreso o recuento sin evento revisado.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Section("Seleccionar período y sede") {
-                Picker("Subdivisión",selection:$site) {
-                    Text("Fundo La Venturosa").tag("LA VENTUROSA")
-                    Text("Planta La Venturosa").tag("PLVENTUROSA")
-                }
-                LabeledContent("Desde",value:DanperDatePresentation.display(local(startDate)))
-                DatePicker("Cambiar inicio",selection:$startDate,displayedComponents:.date)
-                LabeledContent("Hasta",value:DanperDatePresentation.display(local(endDate)))
-                DatePicker("Cambiar fin",selection:$endDate,displayedComponents:.date)
+            DanperPanel("Seleccionar período y sede") {
+                DanperChoiceField(title:"Sede",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
+                                  labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                DanperDateField(title:"Desde",selection:$startDate)
+                DanperDateField(title:"Hasta",selection:$endDate)
                 Text("La selección inicial es esta semana (lunes a domingo). Para el corte mensual, elige día 9 a día 8.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Section("Atenciones seleccionadas") {
+            }
+            DanperPanel("Atenciones seleccionadas") {
                 HStack {
                     Text("\(selected.count) elegidas de \(inRange.count)")
                     Spacer()
@@ -77,7 +92,7 @@ struct N2VerifiedIndicatorExportView:View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(inRange) { v in
-                    Toggle(isOn:Binding(
+                    DanperCheckRow(selected:Binding(
                         get:{selected.contains(v.id)},
                         set:{on in
                             if on {selected.insert(v.id)}
@@ -89,7 +104,7 @@ struct N2VerifiedIndicatorExportView:View {
                             Text(DanperDatePresentation.displayDateTime(v.date,v.time)+" · "+v.diagnosis)
                                 .font(.caption).foregroundStyle(.secondary)
                             if v.pendingPhysicalLines>0 {
-                                Label("Consumo físico pendiente: exportación se bloqueará",
+                                Label("Consumo físico pendiente: requiere libro provisional",
                                       systemImage:"exclamationmark.triangle")
                                     .font(.caption2).foregroundStyle(.orange)
                             }
@@ -97,25 +112,41 @@ struct N2VerifiedIndicatorExportView:View {
                     }
                 }
             }
-            Section("Exportación y protección") {
+            DanperPanel("Exportación y protección") {
+                DanperCheckRow(selected:$provisional) {
+                    VStack(alignment:.leading,spacing:5) {
+                        Text("Incluir consumos pendientes").font(.subheadline.weight(.semibold))
+                        Text("Genera un libro provisional identificado").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if provisional {
+                    Text("BORRADOR: R incluye cantidades clínicas declaradas cuando falta salida física. Para cajas y frascos esto no acredita apertura. No modifica inventario ni acredita cierre.")
+                        .font(.footnote).foregroundStyle(.orange)
+                }
                 Button {
-                    Task {await export()}
+                    if provisional {confirmProvisional=true}
+                    else {Task {await export()}}
                 } label:{
-                    Label(working ? "Conciliando…" : "Generar Excel oficial y compartir",
+                    Label(working ? "Generando…" : provisional ? "Generar provisional y compartir" : "Generar Excel oficial y compartir",
                           systemImage:"square.and.arrow.up")
-                }.disabled(!enabled)
+                }.buttonStyle(DanperPrimaryButton()).disabled(!enabled)
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
                 Text("Necesita cierres de inventario registrados en el período. Si faltan existencias, se dejan celdas vacías; revisa el resultado en Excel antes de enviarlo.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+          }.padding(16)
         }
         .navigationTitle("Indicador ambulatorio")
         .danperFormChrome()
         .sheet(item:$share,onDismiss:cleanup){share in
             N2IndicatorShareSheet(file:share.file)
         }
-        .task {await load()}
+        .alert("¿Generar un libro provisional?",isPresented:$confirmProvisional) {
+            Button("Generar provisional") {Task {await export()}}
+            Button("Cancelar",role:.cancel) {}
+        } message: {Text("Las cantidades declaradas pendientes no son movimientos físicos de Kardex. El archivo quedará identificado como PROVISIONAL.")}
+        .task {if !layoutOnly {await load()}}
         .onChange(of:startDate) {_,_ in selectConfirmed()}
         .onChange(of:endDate) {_,_ in selectConfirmed()}
         .onDisappear {if share == nil {cleanup()}}
@@ -137,7 +168,7 @@ struct N2VerifiedIndicatorExportView:View {
             visits=history.visits
             ready=true
             selectConfirmed()
-            status="Fuente N2 verificada. Revisa las atenciones y el cierre contable antes de exportar."
+            status="Datos verificados. Revisa las atenciones y el cierre contable antes de exportar."
         }catch{
             failed=true
             ready=false
@@ -158,7 +189,7 @@ struct N2VerifiedIndicatorExportView:View {
             let result=try await N2SyntheticTrialIOSVault.shared
                 .exportVerifiedIndicatorWorkbook(
                     start:local(startDate),end:local(endDate),
-                    subdivision:site,ids:selected)
+                    subdivision:site,ids:selected,allowPending:provisional)
             cleanup()
             let dir=FileManager.default.temporaryDirectory
                 .appendingPathComponent("danper-n2-indicator-"+UUID().uuidString,
@@ -168,9 +199,9 @@ struct N2VerifiedIndicatorExportView:View {
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
             let url=dir.appendingPathComponent(
-                "DANPER_INDICADOR_N2_"+local(startDate)+"_"+local(endDate)+".xlsx")
+                (result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_")+local(startDate)+"_"+local(endDate)+".xlsx")
             try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
-            status="Generado: \(result.visits) atenciones / \(result.rows) filas. " +
+            status=(result.provisional ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. " : "")+"Generado: \(result.visits) atenciones / \(result.rows) filas. " +
                 "Materiales sin stock inicial: \(result.missingOpening); " +
                 "sin recuento final: \(result.missingClosingCount). " +
                 "Las celdas no conciliadas siguen vacías."
@@ -187,3 +218,4 @@ struct N2VerifiedIndicatorExportView:View {
         folder=nil
     }
 }
+

@@ -45,6 +45,7 @@ final class N2NativeClinicalFormTests:XCTestCase {
     func testDraftRecoveryRetainsMultipleProceduresAndPhysicalChoices()throws {
         var (draft,ctx)=try form()
         draft.procedures=["OBSERVACION","CURACION DE HERIDA","CONTROL"]
+        draft.dispensingSite="LA VENTUROSA"
         draft.items[0].selectedLotID="lot-selected"
         draft.items[0].physicalQuantity=2.5
         draft.items[0].approveOpening=true
@@ -56,6 +57,7 @@ final class N2NativeClinicalFormTests:XCTestCase {
         XCTAssertEqual(restored.form.procedures,draft.procedures)
         XCTAssertEqual(restored.form.dni,draft.dni)
         XCTAssertEqual(restored.form.items.count,1)
+        XCTAssertEqual(restored.form.dispensingSite,"LA VENTUROSA")
         XCTAssertEqual(restored.form.items[0].selectedLotID,"lot-selected")
         XCTAssertEqual(restored.form.items[0].physicalQuantity,2.5)
         XCTAssertTrue(restored.form.items[0].approveOpening)
@@ -123,7 +125,7 @@ final class N2NativeClinicalFormTests:XCTestCase {
              with:partial) as? [String:Any])
         XCTAssertEqual((parsed["attentions"] as? [[String:Any]])?.count,6)
     }
-    func testAllergyReviewEnablesSavingAndImproperPhysicalLotFails()throws {
+    func testAllergyReviewEnablesSavingAndStalePhysicalLotKeepsClinicalPending()throws {
         let original=try source("n1e-clinical-stock.json")
         let updated=try N2SnapshotEditor.reviewAllergies(
             snapshot:original,dni:"00000001",status:"none",
@@ -134,9 +136,14 @@ final class N2NativeClinicalFormTests:XCTestCase {
         let bytes=try form.makeSavedVisit(context:context)
         XCTAssertFalse(bytes.isEmpty)
         form.items[0].selectedLotID="nonexistent-stock"
-        form.items[0].physicalQuantity=1
-        XCTAssertThrowsError(try form.makeSavedVisit(context:context)) {
-            XCTAssertEqual($0 as? N2FormError,.invalidProduct)
-        }
+        form.items[0].physicalQuantity=2
+        let clinical=try form.makeSavedVisit(context:context)
+        let outcome=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:updated,
+            visit:clinical,approvedCatalog:source("n2-reviewed-approved.json"),at:at())
+        XCTAssertEqual(outcome.pending,1)
+        XCTAssertEqual(outcome.physicalMovementsAdded,0)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(outcome.snapshot).attentions,
+                       try N1eLegacyClinicalAudit.inspect(updated).attentions+1)
     }
 }
+

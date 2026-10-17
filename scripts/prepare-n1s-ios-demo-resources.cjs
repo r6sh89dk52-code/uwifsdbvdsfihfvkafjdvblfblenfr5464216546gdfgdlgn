@@ -43,6 +43,15 @@ try{
  assert(synthetic.attentions.every(a=>a.worker.name.startsWith('PERSONA FICTICIA ')));
  assert.equal(synthetic.stockLots.length,5);
  assert.equal(synthetic.stockMovements.length,synthetic.stockMovements.filter(m=>m.dispenseRef).length);
+ // Two explicitly fictional site-scoped supplies for evaluating new visits.
+ // Existing unscoped lots and historical movements are never relabelled.
+ const example=synthetic.stockLots.find(l=>l.code==='E-22');
+ assert(example);
+ for(const [suffix,site] of [['fundo','LA VENTUROSA'],['planta','PLVENTUROSA']]) {
+  synthetic.stockLots.push({...example,id:'FICTICIO-'+suffix,lot:'FICTICIO-'+suffix,
+   site,expires:'2028-12-31',container:'unidad',catalogUnit:'UND',
+   unitsPerContainer:1,sealedContainers:0,looseUnits:20,openedRemaining:0});
+ }
  fs.writeFileSync(path.join(output,'n2-synthetic-clinical.json'),JSON.stringify(synthetic));
  const {load}=require('./ambulatory-test-helpers.cjs');
  const products=require('../src/products.json');
@@ -65,3 +74,4 @@ try{
 } finally {
  fs.rmSync(temporary,{recursive:true,force:true});
 }
+

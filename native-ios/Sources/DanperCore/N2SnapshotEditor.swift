@@ -16,7 +16,7 @@ public enum N2SnapshotEditor {
         "worker","date","time","category","system","segment","diagnosis",
         "items","permission","workStatus","permissionTime","blueBandage",
         "returned","photoSent","standaloneProcedures","responsible",
-        "responsibleDni"
+        "responsibleDni","photoReviewed","dispensingSite"
     ]
     private static func parse(_ data:Data) throws->[String:Any] {
         guard let root=try? JSONSerialization.jsonObject(with:data) as? [String:Any],
@@ -141,3 +141,4 @@ public enum N2SnapshotEditor {
         return try finish(root)
     }
 }
+

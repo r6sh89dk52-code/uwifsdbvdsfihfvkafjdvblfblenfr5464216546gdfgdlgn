@@ -15,15 +15,16 @@ struct N2NativeHistoryView: View {
     var body:some View {
         Group {
             if let projection {
-                List {
-                    Section {
+                ScrollView {
+                  VStack(alignment:.leading,spacing:16) {
+                    DanperPanel {
                         Label(useProtectedVault ? "BÓVEDA CLÍNICA N2 · SOLO LECTURA" : "SOLO PRUEBA · TRABAJADORES FICTICIOS",
                               systemImage:"lock.shield.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.secondary)
                         Text(useProtectedVault ? "Datos locales desde la bóveda cifrada N2. No se modifica la build 222." : "Se muestran registros sintéticos. No se leen ni guardan datos clínicos de tu iPhone.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    Section("Directorio · \(projection.searchableRoster.count) disponibles") {
+                    DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
                         ForEach(projection.findWorkers(query)) { w in
                             Button {
                                 selectedDNI = w.dni
@@ -45,15 +46,18 @@ struct N2NativeHistoryView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    Section("Historial completo") {
+                    DanperPanel("Historial completo") {
                         Text("\(projection.visits.filter{$0.status=="saved"}.count) atenciones guardadas · \(projection.visits.filter{$0.status=="draft"}.count) borradores")
                             .font(.subheadline)
                         Text("\(projection.pendingClinicalLines) consumo(s) sin confirmación física; nunca se sustituyen por cero.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(projection.visits) { visit in
                             visitCell(visit)
+                                .padding(14).frame(maxWidth:.infinity,alignment:.leading)
+                                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
                         }
                     }
+                  }.padding(16)
                 }
                 .searchable(text:$query,prompt:"Buscar DNI, nombres o área")
                 .navigationDestination(item:$selectedDNI) { dni in
@@ -61,12 +65,12 @@ struct N2NativeHistoryView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    hasError ? (useProtectedVault ? "Bóveda clínica no disponible" :
+                    hasError ? (useProtectedVault ? "Historial no disponible" :
                                 "No se pudo verificar la muestra") :
                                "Abriendo historial nativo",
                     systemImage:"lock.doc",
                     description:Text(useProtectedVault ?
-                        "Activa una sola fuente clínica N2 cifrada antes de consultar su historial." :
+                        "Activa el modo de prueba desde Inicio para consultar el historial." :
                         "Verificación de registros ficticios."))
             }
         }
@@ -82,8 +86,9 @@ struct N2NativeHistoryView: View {
             HStack {
                 Text(visit.workerName).font(.subheadline.weight(.semibold))
                 Spacer()
-                Text(DanperDatePresentation.displayDateTime(visit.date,visit.time)).font(.caption2).foregroundStyle(.secondary)
+
             }
+            Text(DanperDatePresentation.displayDateTime(visit.date,visit.time)).font(.caption).foregroundStyle(.secondary)
             Text(visit.diagnosis.isEmpty ? "Borrador sin diagnóstico" : visit.diagnosis)
                 .font(.footnote)
             HStack(spacing:10) {
@@ -124,16 +129,17 @@ private struct N2WorkerHistoryDetail:View {
     let model:N2NativeReadModel
     let realSource:Bool
     var body:some View {
-        List {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
             if let worker=model.roster.first(where:{$0.dni==dni}) {
-                Section(realSource ? "Trabajador" : "Trabajador ficticio") {
+                DanperPanel(realSource ? "Trabajador" : "Trabajador ficticio") {
                     LabeledContent("Nombre",value:worker.name)
                     LabeledContent("DNI",value:worker.dni)
                     LabeledContent("Área",value:worker.area)
                     LabeledContent("Ubicación",value:worker.site)
                 }
             }
-            Section("Atenciones y borradores") {
+            DanperPanel("Atenciones y borradores") {
                 ForEach(model.workerHistory(dni)) { visit in
                     VStack(alignment:.leading,spacing:6) {
                         HStack {
@@ -146,6 +152,9 @@ private struct N2WorkerHistoryDetail:View {
                         }
                         Text(visit.diagnosis.isEmpty ? "Borrador incompleto" : visit.diagnosis)
                         if realSource && visit.status=="saved" {
+                            NavigationLink {N2VisitDispensingView(visitID:visit.id)} label: {
+                                Label("Medicamentos y consumos",systemImage:"pills.fill")
+                            }
                             NavigationLink {
                                 N2ClinicalCorrectionView(visitID:visit.id)
                             } label: {
@@ -167,8 +176,37 @@ private struct N2WorkerHistoryDetail:View {
                     .padding(.vertical,4)
                 }
             }
+          }.padding(16)
         }
         .navigationTitle(realSource ? "Historia clínica" : "Historia de prueba")
         .danperFormChrome()
+    }
+}
+
+
+struct N2VisitDispensingView:View {
+    let visitID:String
+    @State private var lines=[N2DispensingLine]()
+    @State private var failed=false
+    var body:some View {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            if failed {Text("No se pudo verificar el consumo. Inténtalo de nuevo.")}
+            ForEach(lines) { line in
+                VStack(alignment:.leading,spacing:7) {
+                    Text(line.name).font(.headline)
+                    Text(line.code+" · Cantidad clínica: "+line.quantity.formatted()).font(.caption)
+                    Label(line.result,systemImage:line.result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.circle")
+                        .font(.footnote).foregroundStyle(line.result=="Descontado" ? Color.green : Color.orange)
+                }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+            }
+            if lines.isEmpty && !failed {Text("Atención sin medicamentos o insumos.").foregroundStyle(.secondary)}
+          }.padding(16)
+        }
+        .navigationTitle("Consumos de la atención").danperFormChrome()
+        .task {
+            do {lines=try await N2SyntheticTrialIOSVault.shared.dispensingLines(visitID:visitID)}
+            catch {failed=true}
+        }
     }
 }

@@ -9,9 +9,10 @@ struct N2NativeDraftsDashboard:View {
     @State private var message="Leyendo borradores cifrados…"
 
     var body:some View {
-        List {
-            Section {
-                Label("Bóveda clínica N2",systemImage:"lock.shield")
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel {
+                Label("Datos protegidos",systemImage:"lock.shield")
                 Text("Los borradores están guardados dentro de la misma bóveda cifrada. Reabrir no crea otra atención ni descuenta inventario.")
                     .font(.footnote).foregroundStyle(.secondary)
                 if failed {
@@ -21,7 +22,7 @@ struct N2NativeDraftsDashboard:View {
                     Text(message).font(.footnote).foregroundStyle(.secondary)
                 }
             }
-            Section("Registros pendientes") {
+            DanperPanel("Registros pendientes") {
                 if records.isEmpty && !loading {
                     Text("No hay borradores para recuperar.")
                         .foregroundStyle(.secondary)
@@ -33,24 +34,26 @@ struct N2NativeDraftsDashboard:View {
                         VStack(alignment:.leading,spacing:5) {
                             Text(draft.workerName.isEmpty ?
                                 "Trabajador por seleccionar":draft.workerName)
-                                .font(.headline)
+                                .font(.headline).foregroundStyle(.primary)
                             Text(DanperDatePresentation.displayDateTime(draft.form.date,draft.form.time))
                                 .font(.caption).foregroundStyle(.secondary)
                             Text("Materiales: \(draft.form.items.count) · Procedimientos: \(draft.form.procedures.count)")
                                 .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
+                        }.frame(maxWidth:.infinity,alignment:.leading)
+                            .padding(14).background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
+                    }.buttonStyle(.plain)
                 }
             }
-            Section {
+            DanperPanel {
                 NavigationLink {
                     N2NativeClinicalFormView()
                 } label: {
-                    Label("Nueva atención nativa",systemImage:"cross.case.fill")
+                    Label("Nueva atención",systemImage:"cross.case.fill")
                 }
                 Text("Para borrar un borrador, ábrelo y utiliza la acción de eliminación confirmada desde la lista de borradores del formulario.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+          }.padding(16)
         }
         .navigationTitle("Borradores")
         .danperFormChrome()
@@ -72,3 +75,4 @@ struct N2NativeDraftsDashboard:View {
         }
     }
 }
+

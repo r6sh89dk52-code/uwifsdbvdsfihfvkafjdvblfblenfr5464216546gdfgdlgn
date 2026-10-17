@@ -24,10 +24,11 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview
         PRODUCT_NAME: DANPERNative
         SWIFT_VERSION: "5.9"
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.4.0"
+        CURRENT_PROJECT_VERSION: "10"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDevelopmentRegion: es
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
         INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_CFBundleDisplayName: "DANPER Nativa Prueba"
@@ -38,6 +39,7 @@ targets:
     scheme:
       testTargets:
         - DANPERNativeTests
+        - DANPERInteractionTests
   DANPERNativeTests:
     type: bundle.unit-test
     platform: iOS
@@ -53,3 +55,18 @@ targets:
         SWIFT_VERSION: "5.9"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/DANPERNative.app/DANPERNative"
         BUNDLE_LOADER: "$(TEST_HOST)"
+
+  DANPERInteractionTests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: InteractionTests
+    dependencies:
+      - target: DANPERNative
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview.interactiontests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+        TEST_TARGET_NAME: DANPERNative
