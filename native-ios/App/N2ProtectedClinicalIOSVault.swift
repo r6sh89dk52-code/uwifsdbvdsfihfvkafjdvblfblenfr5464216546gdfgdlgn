@@ -148,6 +148,18 @@ actor N2ProtectedClinicalIOSVault {
     }
     /// May only be invoked from a Face ID/code authenticated screen after
     /// the user chooses a new passphrase; never persists plaintext to Files.
+    func exportVerifiedDailyNursingWorkbook(date:String,shift:String,
+        responsible:String)throws->N2VerifiedNursingWorkbook.Result {
+        guard let source=Bundle.main.url(
+            forResource:"n1s-nursing-template-store",
+            withExtension:"zip",subdirectory:"N1sDemoResources") else {
+            throw Failure.blockedMigration
+        }
+        return try protectedStore().exportVerifiedDailyNursingWorkbook(
+            catalog:resource("n2-nursing-catalog"),
+            template:Data(contentsOf:source),
+            date:date,shift:shift,responsible:responsible)
+    }
     func exportPortableEncryptedBackup(password:String)throws->Data {
         guard let secret=try deviceKey(create:false) else{
             throw Failure.missingKey

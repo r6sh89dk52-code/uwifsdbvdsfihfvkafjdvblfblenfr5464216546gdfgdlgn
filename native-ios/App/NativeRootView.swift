@@ -90,6 +90,11 @@ struct NativeRootView: View {
                             } label: {
                                 Label("Atención clínica N2",systemImage:"cross.case.fill")
                             }
+                            NavigationLink {
+                                N2VerifiedNursingExportView()
+                            } label: {
+                                Label("Exportar Kardex diario desde N2",systemImage:"tablecells")
+                            }
                             Text("La atención ficticia de las otras pestañas sigue separada. Esta compilación todavía NO sustituye la build 222.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -191,6 +196,11 @@ struct NativeRootView: View {
                     NavigationLink {
                         N2NativeClinicalFormView()
                     } label: { Label("Nueva atención clínica N2",systemImage:"cross.case.fill") }
+                    NavigationLink {
+                        N2VerifiedNursingExportView()
+                    } label: {
+                        Label("Kardex de enfermería N2 auditado",systemImage:"tablecells")
+                    }
                     NavigationLink {
                         N1sDemoExportView()
                     } label: { Label("Exportar dos Excel ficticios",systemImage:"tablecells") }

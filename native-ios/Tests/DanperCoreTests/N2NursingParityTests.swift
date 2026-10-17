@@ -75,6 +75,22 @@ final class N2NursingParityTests:XCTestCase {
                 shift:"CONSOLIDADO",responsible:"OPERADOR FICTICIO"))
         }
     }
+    func testExportActualSnapshotToOfficialNursingXLSXWithUnknownBlanks() throws {
+        let source=try bytes("n1e-clinical-stock.json")
+        let (_,catalog)=try fixture()
+        let template=try bytes("n1s-nursing-template-store.zip")
+        let result=try N2VerifiedNursingWorkbook.export(
+            snapshot:source,catalog:catalog,template:template,
+            date:"2026-10-14",shift:"CONSOLIDADO",
+            responsible:"OPERADOR FICTICIO")
+        XCTAssertEqual(result.stockKnownRows,2)
+        XCTAssertEqual(result.stockUnknownRows,96)
+        XCTAssertTrue(result.xlsx.starts(with:[0x50,0x4B,0x03,0x04]))
+        XCTAssertThrowsError(try N2VerifiedNursingWorkbook.export(
+            snapshot:source,catalog:catalog,template:template,
+            date:"2026-02-30",shift:"CONSOLIDADO",
+            responsible:"OPERADOR FICTICIO"))
+    }
     func testRangeCannotMasqueradeAsOfficialSingleDayWorkbook() throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (_,catalog)=try fixture()

@@ -65,6 +65,16 @@ public final class N2ProtectedClinicalVaultCore {
 
     /// Caller must reauthenticate and encrypt this data into a portable
     /// backup before ever writing to Files/Share; no plaintext export allowed.
+    public func exportVerifiedDailyNursingWorkbook(
+        catalog:Data,template:Data,date:String,shift:String,
+        responsible:String)throws->N2VerifiedNursingWorkbook.Result {
+        guard let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2VerifiedNursingWorkbook.export(
+            snapshot:active.snapshot,catalog:catalog,template:template,
+            date:date,shift:shift,responsible:responsible)
+    }
     public func sourceForEncryptedBackup()throws->Data {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
