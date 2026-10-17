@@ -235,7 +235,8 @@ struct N2NativeInventoryView:View {
     }
     @MainActor
     private func commit() async {
-        guard valid,let current=context,let values=counts else{return}
+        guard valid,let current=context else{return}
+        let values=counts ?? (0,0.0,0.0,1)
         busy=true
         failed=false
         defer{busy=false}

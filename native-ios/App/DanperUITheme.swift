@@ -202,7 +202,8 @@ struct DanperInlineSearch:View {
     @State private var query=""
     @FocusState private var focused:Bool
     private var matches:[DanperSearchOption] {
-        options.filter {query.isEmpty || $0.title.localizedStandardContains(query) || $0.id.localizedStandardContains(query)}
+        let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
+        return options.filter {q.isEmpty || $0.title.localizedStandardContains(q) || $0.id.localizedStandardContains(q)}
     }
     var body:some View {
         VStack(alignment:.leading,spacing:12) {

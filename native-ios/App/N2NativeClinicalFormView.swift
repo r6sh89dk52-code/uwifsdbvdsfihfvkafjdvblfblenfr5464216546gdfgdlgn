@@ -715,7 +715,7 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy || previewBusy || (!form.items.isEmpty && pendingRequirements.isEmpty && !previewReady && !layoutOnly))
+                .disabled(busy || previewBusy || (step==3 && !form.items.isEmpty && pendingRequirements.isEmpty && !previewReady && !layoutOnly))
             }
 
         }
