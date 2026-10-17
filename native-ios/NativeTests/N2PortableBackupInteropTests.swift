@@ -39,8 +39,20 @@ final class N2PortableBackupInteropTests:XCTestCase {
             url:url,password:"This-is-a-wrong-14-char-password"))
     }
     func testExplicitSyntheticN2ActivationEnablesClinicalTabsWithoutRealBackup() async throws {
-        let before=try await N2SyntheticTrialIOSVault.shared.inspect()
-        let created=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+        // CI deliberately builds the Simulator app without code signing.
+        // On that runner, Security.framework can refuse Keychain with
+        // errSecMissingEntitlement (-34018). Do not treat this as a passed
+        // iPhone/SideStore Keychain test: the encrypted core still has its
+        // independent Swift tests, and physical-device Keychain must be checked.
+        let before:N2ProtectedStoreSummary?
+        let created:N2ProtectedStoreSummary
+        do {
+            before=try await N2SyntheticTrialIOSVault.shared.inspect()
+            created=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+        } catch N2SyntheticTrialIOSVault.Failure.keychainStatus(let status)
+            where status == -34018 {
+            throw XCTSkip("Simulador sin firmar carece de entitlement Keychain (-34018); requiere validación con app firmada en iPhone")
+        }
         XCTAssertEqual(created.workers,5)
         XCTAssertEqual(created.revision,before?.revision ?? 1)
         let model=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
