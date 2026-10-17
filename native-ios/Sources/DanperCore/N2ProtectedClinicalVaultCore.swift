@@ -53,6 +53,15 @@ public final class N2ProtectedClinicalVaultCore {
         }
         return try N2NativeDraftRecovery.read(active.snapshot)
     }
+    public func dispensingStatus(visitID:String)throws->[String:String] {
+        guard let active=try journal.recover(),
+              let root=try JSONSerialization.jsonObject(with:active.snapshot) as? [String:Any],
+              let visits=root["attentions"] as? [[String:Any]],
+              let visit=visits.first(where:{$0["id"] as? String==visitID}) else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return visit["nativeDispensing"] as? [String:String] ?? [:]
+    }
     public func readIndex()throws->N2NativeReadModel? {
         guard let active=try journal.recover() else{return nil}
         return try N2NativeSnapshotReader.read(active.snapshot)
@@ -323,3 +332,4 @@ public final class N2ProtectedClinicalVaultCore {
         return try summary(committed)
     }
 }
+

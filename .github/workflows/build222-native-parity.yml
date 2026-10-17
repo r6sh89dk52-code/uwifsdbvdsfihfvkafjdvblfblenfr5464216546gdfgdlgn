@@ -1,0 +1,15 @@
+name: Build222 Native Parity - tests then isolated beta
+on:
+  push:
+    branches: [feat/build222-native-parity-20261017]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    uses: ./.github/workflows/native-swift-linux.yml
+  xcode:
+    uses: ./.github/workflows/native-swiftui-xcode-audit.yml
+  beta:
+    needs: [linux, xcode]
+    uses: ./.github/workflows/n2-iphone-beta-ipa.yml

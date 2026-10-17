@@ -15,7 +15,7 @@ for command in xcodebuild xcodegen node npm ditto unzip git; do
   command -v "$command" >/dev/null || { echo "Falta: $command" >&2; exit 1; }
 done
 cd "$ROOT"
-if [[ "$(git branch --show-current)" != "native/swiftui-n1s-complete-excel-and-container-gate" ]]; then
+if [[ "$(git branch --show-current)" != "feat/build222-native-parity-20261017" ]]; then
   echo "ERROR: abre primero la rama N2. No empaquetar main." >&2; exit 1
 fi
 WORK="$(mktemp -d)"
@@ -30,7 +30,7 @@ node scripts/prepare-n1s-ios-demo-resources.cjs
    -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
    -derivedDataPath "$WORK/Derived" CODE_SIGNING_ALLOWED=NO \
    CODE_SIGNING_REQUIRED=NO \
-   MARKETING_VERSION=0.2.0 CURRENT_PROJECT_VERSION=2 build
+   MARKETING_VERSION=0.4.0 CURRENT_PROJECT_VERSION=6 build
 )
 APP="$WORK/Derived/Build/Products/Release-iphoneos/DANPERNative.app"
 test -d "$APP"
@@ -47,3 +47,4 @@ echo "IPA DE EVALUACION SIN FIRMAR: $OUTPUT"
 shasum -a 256 "$OUTPUT"
 echo "NO EQUIVALE A BUILD222. No usar con pacientes ni reemplazar build222."
 echo "SideStore/AltStore debe firmar el paquete al instalar; pendiente de validar."
+

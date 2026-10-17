@@ -12,6 +12,10 @@ struct NativeRootView:View {
     @State private var preparing=false
     @State private var problem=""
     @State private var showAdvanced=false
+    @State private var metrics:N2DashboardMetrics?
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("danper.haptics.enabled") private var haptics=true
 
     private var isReady:Bool { summary != nil }
     var body:some View {
@@ -49,9 +53,10 @@ struct NativeRootView:View {
         }
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
-        .animation(DanperStyle.animation,value:tab)
-        .sensoryFeedback(.selection,trigger:tab)
-        .task {await refresh()}
+        .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
+        .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
+        .task(id:tab) {await refresh()}
+        .onChange(of:scenePhase) {_,phase in if phase == .active {Task {await refresh()}}}
     }
 
     private var home:some View {
@@ -70,7 +75,7 @@ struct NativeRootView:View {
                         Text("Tu espacio de enfermería")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.87))
-                        Label("Beta nativa SwiftUI",systemImage:"checkmark.shield.fill")
+                        Label("Salud ocupacional",systemImage:"checkmark.shield.fill")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.white.opacity(0.9))
                     }
@@ -91,12 +96,32 @@ struct NativeRootView:View {
                     .padding(.horizontal,12)
                     .padding(.vertical,8)
                     .background(danperAccent.opacity(0.09),in:Capsule())
+                if isReady {
+                    Button {tab=2} label: {
+                        Label("Nueva atención",systemImage:"plus.circle.fill")
+                    }
+                    .buttonStyle(DanperPrimaryButton())
+                    if let metrics {
+                        ViewThatFits(in:.horizontal) {
+                            HStack(spacing:10) {
+                                metric("Hoy",metrics.today,"sun.max.fill")
+                                metric("Esta semana",metrics.week,"calendar")
+                                metric("Borradores",metrics.drafts,"doc.text.fill")
+                            }
+                            VStack(spacing:10) {
+                                metric("Hoy",metrics.today,"sun.max.fill")
+                                metric("Esta semana",metrics.week,"calendar")
+                                metric("Borradores",metrics.drafts,"doc.text.fill")
+                            }
+                        }
+                    }
+                }
                 VStack(alignment:.leading,spacing:12) {
                     Text(isReady ? "Listo para comenzar" :
                         "Comienza a probar la aplicación")
                         .font(.title3.bold())
                     Text(isReady ?
-                         "Ya tienes un entorno de demostración cifrado. Puedes practicar atenciones, consultar el historial y revisar el inventario sin tocar tu aplicación anterior." :
+                         "Atenciones, tratamientos y consumos en un solo flujo. Semana de lunes a domingo, hora de Perú." :
                          "Para registrar una atención de prueba, activa primero el ejemplo ficticio. No necesitas importar un respaldo ni configurar un inventario real.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -189,6 +214,15 @@ struct NativeRootView:View {
         .background(Color(uiColor:.systemGroupedBackground))
         .navigationTitle("Inicio")
         .navigationBarTitleDisplayMode(.inline)
+    }
+    private func metric(_ title:String,_ count:Int,_ symbol:String)->some View {
+        VStack(alignment:.leading,spacing:8) {
+            Image(systemName:symbol).foregroundStyle(DanperStyle.red)
+            Text(count.formatted()).font(.system(.title,design:.rounded,weight:.bold)).monospacedDigit()
+            Text(title).font(.caption).foregroundStyle(.secondary)
+        }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:18))
+            .accessibilityElement(children:.combine)
     }
     private func quickInfo(_ index:String,title:String,desc:String)->some View {
         let symbols=["1":"person.2.fill","2":"cross.case.fill",
@@ -300,6 +334,7 @@ struct NativeRootView:View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            Section("Preferencias") {Toggle("Respuesta háptica",isOn:$haptics)}
             Section {
                 Text("Versión beta SwiftUI · uso con información ficticia. No sustituye la build 222.")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -315,6 +350,9 @@ struct NativeRootView:View {
         defer{loading=false}
         do {
             summary=try await N2SyntheticTrialIOSVault.shared.inspect()
+            if let model=try await N2SyntheticTrialIOSVault.shared.readHistory() {
+                metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())
+            }
             problem=""
         }catch {
             summary=nil
@@ -328,6 +366,9 @@ struct NativeRootView:View {
         defer{preparing=false}
         do {
             summary=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+            if let model=try await N2SyntheticTrialIOSVault.shared.readHistory() {
+                metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())
+            }
             problem=""
         }catch {
             problem=trialFailureMessage(error)
@@ -355,3 +396,4 @@ struct NativeRootView:View {
         return "No se pudo iniciar la práctica (\(details.domain), código \(details.code)). Ningún dato fue borrado; comparte este diagnóstico."
     }
 }
+

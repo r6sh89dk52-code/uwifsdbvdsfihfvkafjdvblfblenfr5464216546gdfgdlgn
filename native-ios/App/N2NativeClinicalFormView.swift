@@ -18,15 +18,16 @@ struct N2NativeClinicalFormView:View {
         "OSTEOMUSCULAR","PIEL Y ANEXOS","RESPIRATORIO","SENSORIAL",
         "URINARIO/RENAL","OTROS"
     ]
-    private let procedures=[
-        "OBSERVACION","TRATAMIENTO ORAL","INYECTABLE","CURACION DE HERIDA",
-        "APLICACION DE CREMA","LAVADO OCULAR","CONTROL",
-        "RETIRO DE PUNTOS DE SUTURA","SUTURAS","TOMA DE PETAR"
-    ]
+    private let procedures=N2ProcedureRules.procedures
     @State private var context:N2FormContext?
     @State private var form=N2NativeFormDraft()
     @State private var step=0
     @State private var busy=false
+    @State private var validationMessage=""
+    @State private var showValidation=false
+    @State private var savedLines:[String:String]=[:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var saved=false
     @State private var fault=false
     @State private var status="Abriendo bóveda cifrada N2…"
@@ -44,7 +45,7 @@ struct N2NativeClinicalFormView:View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let stepTitles=["Trabajador y alergias","Evaluación clínica",
-                            "Procedimientos y consumos","Confirmar atención"]
+                            "Tratamiento y consumo","Confirmar atención"]
     private var dateSelection:Binding<Date> {
         Binding(get:{
             let f=DateFormatter()
@@ -80,8 +81,8 @@ struct N2NativeClinicalFormView:View {
                     Section {
                         DanperStatusBanner(
                             symbol:fault ? "exclamationmark.shield.fill" : "lock.shield.fill",
-                            title:fault ? "Comprueba el almacenamiento" : "Registro clínico protegido",
-                            detail:status)
+                            title:fault ? "Comprueba el almacenamiento" : "Modo de prueba — datos ficticios",
+                            detail:fault || saved ? status : "Guardado automático · datos protegidos")
                     }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -97,6 +98,16 @@ struct N2NativeClinicalFormView:View {
                     }
                     if saved {
                         Section {
+                            ForEach(form.items) { med in
+                                VStack(alignment:.leading,spacing:5) {
+                                    Text(medicationName(med.code,context)).font(.headline)
+                                    let result=savedLines[med.id] ?? "Pendiente de conciliar"
+                                    Label(result=="Descontado" ? result : "Pendiente: "+result,
+                                          systemImage:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.circle")
+                                        .font(.footnote)
+                                        .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
+                                }
+                            }
                             Label("Atención guardada y verificada",
                                   systemImage:"checkmark.shield.fill")
                                 .foregroundStyle(.green)
@@ -119,10 +130,10 @@ struct N2NativeClinicalFormView:View {
                 .safeAreaInset(edge:.bottom,spacing:0) {
                     if !saved {actions(context)}
                 }
-                .animation(DanperStyle.animation,value:step)
-                .sensoryFeedback(.selection,trigger:step)
-                .sensoryFeedback(.selection,trigger:form.procedures.count)
-                .sensoryFeedback(.success,trigger:saved)
+                .animation(reduceMotion ? nil : DanperStyle.animation,value:step)
+                .sensoryFeedback(.selection,trigger:step) {_,_ in haptics}
+                .sensoryFeedback(.selection,trigger:form.procedures.count) {_,_ in haptics}
+                .sensoryFeedback(.success,trigger:saved) {_,_ in haptics}
                 .sheet(isPresented:$chooseWorker) {
                     NavigationStack {
                         List {
@@ -155,9 +166,10 @@ struct N2NativeClinicalFormView:View {
                 .sheet(isPresented:$chooseProduct) {
                     NavigationStack {
                         List {
-                            ForEach(context.products.clinicalMatches(search).prefix(150)) {p in
+                            ForEach(context.products.clinicalMatches(search)) {p in
                                 Button {
                                     form.items.append(N2FormMedication(code:p.code))
+                                    form.refreshProcedureSuggestions(catalog:context.products)
                                     chooseProduct=false
                                     search=""
                                 } label: {
@@ -225,7 +237,13 @@ struct N2NativeClinicalFormView:View {
                         }
                     }
                 }
-                .onChange(of:form) {_,_ in scheduleDraft() }
+                .onChange(of:form) {_,_ in
+                    form.refreshProcedureSuggestions(catalog:context.products)
+                    scheduleDraft()
+                }
+                .alert("Completa este paso",isPresented:$showValidation) {
+                    Button("Revisar",role:.cancel) {}
+                } message: {Text(validationMessage)}
                 .onChange(of:scenePhase) {_,phase in
                     if phase != .active {scheduleDraft(immediate:true)}
                 }
@@ -311,6 +329,17 @@ struct N2NativeClinicalFormView:View {
         }
     }
     private func treatmentSection(_ context:N2FormContext)->some View {
+        Group {
+        Section {
+            Button {search="";chooseProduct=true} label: {
+                Label("Agregar medicamento o insumo",systemImage:"plus.circle.fill")
+            }
+            .buttonStyle(DanperPrimaryButton())
+            .accessibilityIdentifier("add-clinical-product")
+            Text("Busca por nombre o código entre los \(context.products.clinical.count) productos. El consumo se confirma al guardar la atención.")
+                .font(.footnote).foregroundStyle(.secondary)
+        } header: {Text("Medicamentos e insumos")}
+        medicationFields(context)
         Section("Procedimientos") {
             LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ?
                       [GridItem(.flexible())] :
@@ -348,12 +377,17 @@ struct N2NativeClinicalFormView:View {
                 }
             }
             .padding(.vertical,5)
-            Text("Selecciona uno o varios procedimientos. Las entregas de medicamentos se registran por separado.")
+            Text("Selecciona uno o varios procedimientos. Los medicamentos y sus consumos se registran arriba, en esta misma atención.")
                 .font(.caption).foregroundStyle(.secondary)
-            if form.procedures.contains(where:{
-                $0.contains("HERIDA") || $0=="SUTURAS"
-            }) {
-                Toggle("Foto enviada (SI/NO)",isOn:$form.photoSent)
+            if form.hasWound {
+                Picker("¿Se envió la foto?",selection:Binding(
+                    get:{form.photoReviewed ? (form.photoSent ? "SI" : "NO") : ""},
+                    set:{form.photoReviewed = !$0.isEmpty;form.photoSent = $0=="SI"}
+                )) {
+                    Text("Seleccionar").tag("")
+                    Text("Sí").tag("SI")
+                    Text("No").tag("NO")
+                }
             }else {
                 Text("ENVÍO FOTO = NO para atenciones sin lesión o curación.")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -364,6 +398,7 @@ struct N2NativeClinicalFormView:View {
             }
         }
     }
+        }
     private func medicationName(_ code:String,_ context:N2FormContext)->String {
         context.products.clinical.first(where:{$0.code==code})?.name ?? code
     }
@@ -374,7 +409,7 @@ struct N2NativeClinicalFormView:View {
                 HStack {
                     VStack(alignment:.leading,spacing:3) {
                         Text(medicationName(med.code,context)).font(.headline)
-                        Text(med.code).font(.caption).foregroundStyle(.secondary)
+                        Text(med.code+" · "+(context.products.clinical.first{$0.code==med.code}?.unit ?? "")).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button(role:.destructive) {
@@ -383,8 +418,19 @@ struct N2NativeClinicalFormView:View {
                 }
                 TextField("Cantidad clínica",value:$med.quantity,format:.number)
                     .keyboardType(.numberPad)
-                Picker("Procedimiento del producto",selection:$med.procedure) {
+                Picker("Procedimiento del producto",selection:Binding(
+                    get:{med.procedure},set:{med.procedure=$0;med.procedureConfirmed=true;med.procedureSource="manual"}
+                )) {
+                    Text("Por definir — elige un procedimiento").tag("")
                     ForEach(procedures,id:\.self){Text($0).tag($0)}
+                }
+                Text(med.procedureConfirmed ? "Elección registrada" :
+                     med.procedureSource=="presentation" ? "Sugerido por presentación · puedes cambiarlo" :
+                     med.procedureSource=="context" ? "Sugerido por contexto · puedes cambiarlo" :
+                     "Ambiguo: confirma el procedimiento utilizado")
+                    .font(.caption).foregroundStyle(med.procedure.isEmpty ? Color.orange : Color.secondary)
+                if !med.procedureConfirmed && !med.procedure.isEmpty {
+                    Button("Confirmar procedimiento") {med.procedureConfirmed=true}
                 }
                 let matches=context.options(for:med.code,at:form.date)
                 Picker("Lote físico FEFO",selection:$med.selectedLotID) {
@@ -396,10 +442,14 @@ struct N2NativeClinicalFormView:View {
                 }
                 if !med.selectedLotID.isEmpty {
                     let selected=matches.first{$0.id==med.selectedLotID}
+                    if let selected {
+                        LabeledContent("Existencia interna verificada",value:selected.total.formatted())
+                        LabeledContent("Capacidad por envase",value:selected.capacity.formatted())
+                    }
                     TextField("Unidades físicas usadas (mL, UND…)",
                               value:$med.physicalQuantity,format:.number)
                         .keyboardType(.decimalPad)
-                    if selected?.needsOpening==true {
+                    if matches.contains(where:{$0.sealed>0}) {
                         Toggle("Autorizo abrir un frasco o caja nuevo",
                                isOn:$med.approveOpening)
                     }
@@ -408,18 +458,12 @@ struct N2NativeClinicalFormView:View {
                 }
             }
         }
-        Section {
-            Button {
-                chooseProduct=true
-            } label: {
-                Label("Agregar medicamento o insumo",systemImage:"plus")
-            }
-            Text("La cantidad clínica se guarda aunque no exista salida física verificable; el Kardex nunca convierte un pendiente en cero.")
-                .font(.footnote).foregroundStyle(.secondary)
-        }
     }
     private var pendingRequirements:[String] {
         var missing=[String]()
+        if let context, context.allergies[form.dni]?.reviewed != true {missing.append("confirmar revisión de alergias")}
+        if form.items.contains(where:{$0.procedure.isEmpty || $0.quantity<=0}) {missing.append("cantidad y procedimiento de cada producto")}
+        if form.hasWound && !form.photoReviewed {missing.append("indicar si se envió la foto")}
         if currentWorker==nil {missing.append("seleccionar trabajador")}
         if form.category.isEmpty {missing.append("tipo de atención")}
         if form.system.isEmpty {missing.append("sistema afectado")}
@@ -433,6 +477,22 @@ struct N2NativeClinicalFormView:View {
             missing.append("hora del permiso")
         }
         return missing
+    }
+    private var stepRequirements:[String] {
+        switch step {
+        case 0:
+            var missing=[String]()
+            if currentWorker==nil {missing.append("Selecciona un trabajador.")}
+            if let context,context.allergies[form.dni]?.reviewed != true {missing.append("Confirma la revisión de alergias.")}
+            return missing
+        case 1:
+            var missing=[String]()
+            if form.category.isEmpty {missing.append("Selecciona el tipo de atención.")}
+            if form.system.isEmpty {missing.append("Selecciona el sistema afectado.")}
+            if form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {missing.append("Escribe el diagnóstico presuntivo.")}
+            return missing
+        default:return pendingRequirements
+        }
     }
     private func reviewSection(_ context:N2FormContext)->some View {
         Section("Revisión antes de guardar") {
@@ -463,9 +523,12 @@ struct N2NativeClinicalFormView:View {
                 }
                 Button {
                     if step<3 {
-                        withAnimation(DanperStyle.animation){step+=1}
+                        let missing=stepRequirements
+                        if missing.isEmpty {withAnimation(reduceMotion ? nil : DanperStyle.animation){step+=1}}
+                        else {validationMessage=missing.joined(separator:"\n");showValidation=true}
                     } else {
-                        Task {await confirm()}
+                        if pendingRequirements.isEmpty {Task {await confirm()}}
+                        else {validationMessage=pendingRequirements.joined(separator:"\n");showValidation=true}
                     }
                 } label: {
                     Label(step<3 ? "Siguiente" :
@@ -473,7 +536,7 @@ struct N2NativeClinicalFormView:View {
                           systemImage:step<3 ? "arrow.right" : "checkmark.shield.fill")
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy || (step==3 && !pendingRequirements.isEmpty))
+                .disabled(busy)
             }
             Button {
                 scheduleDraft(immediate:true)
@@ -584,6 +647,7 @@ struct N2NativeClinicalFormView:View {
             let raw=try form.makeSavedVisit(context:fresh)
             let outcome=try await N2SyntheticTrialIOSVault.shared.saveAttention(
                 raw,at:now,expectedRevision:fresh.revision)
+            savedLines=try await N2SyntheticTrialIOSVault.shared.dispensingStatus(visitID:form.id)
             saved=true
             N2DraftReminder.cancel(id:form.id)
             self.context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
@@ -642,3 +706,4 @@ struct N2NativeClinicalFormView:View {
         status="Nuevo registro clínico N2."
     }
 }
+

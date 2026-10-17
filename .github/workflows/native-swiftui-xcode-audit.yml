@@ -11,6 +11,7 @@ on:
       - 'native-ios/**'
       - '.github/workflows/native-swiftui-xcode-audit.yml'
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 concurrency:
@@ -142,3 +143,4 @@ jobs:
           test ! -d native-ios/DANPERNative.xcarchive
           echo 'PASS: native preview bundle verified, Face ID purpose text present.'
           echo 'PASS: NO signed installer, NO IPA, NO uploaded binary and NO iPhone installation.'
+

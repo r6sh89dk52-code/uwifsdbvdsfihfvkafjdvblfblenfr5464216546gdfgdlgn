@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/n2-iphone-beta-ipa.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -25,7 +26,7 @@ jobs:
       - name: Verify beta branch, bundle isolation and correction implementation
         run: |
           set -euo pipefail
-          test "$GITHUB_REF" = "refs/heads/native/swiftui-n1s-complete-excel-and-container-gate"
+          test "$GITHUB_REF" = "refs/heads/feat/build222-native-parity-20261017"
           grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview' native-ios/project.yml
           grep -q 'public enum N2ClinicalCorrections' native-ios/Sources/DanperCore/N2ClinicalCorrections.swift
           grep -q 'N2ClinicalCorrectionView' native-ios/App/N2NativeHistoryView.swift
@@ -75,12 +76,15 @@ jobs:
             exit 1
           fi
           echo "PASS isolated beta: $BUNDLE (UNSIGNED; SideStore must sign it)"
-          shasum -a 256 "$IPA"
+          shasum -a 256 "$IPA" | tee native-preview-artifacts/SHA256SUMS.txt
       - name: Publish unsigned IPA ZIP artifact for PRIVATE beta download
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER_N2_BETA_IPHONE_UNSIGNED
-          path: native-preview-artifacts/DANPER_N2_EVALUACION_UNSIGNED.ipa
+          name: DANPER_SWIFTUI_PARIDAD_BUILD222_B6_UNSIGNED
+          path: |
+            native-preview-artifacts/DANPER_N2_EVALUACION_UNSIGNED.ipa
+            native-preview-artifacts/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+

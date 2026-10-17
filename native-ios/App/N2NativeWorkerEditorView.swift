@@ -28,22 +28,28 @@ struct N2NativeWorkerEditorView:View {
     }
     var body:some View {
         Form {
-            Section("Fuente cifrada independiente") {
-                Label("No se escribe en la build 222",systemImage:"lock.shield")
-                    .foregroundStyle(.secondary)
-                Text(status).font(.footnote)
-                    .foregroundStyle(failed ? Color.red : Color.secondary)
+            Section {
+                Label("Modo de prueba — datos ficticios",systemImage:"lock.shield")
+                    .font(.caption).foregroundStyle(DanperStyle.red)
+                if failed {Text(status).font(.footnote).foregroundStyle(.orange)}
             }
-            Section("Trabajador ficticio solamente") {
-                Text("Utiliza un DNI simulado que empiece con 000000 y un nombre que comience con PERSONA FICTICIA. No introduzcas datos reales en esta beta.")
-                    .font(.footnote).foregroundStyle(.secondary)
+            Section("Identificación") {
+                Text("DNI de prueba: 000000 seguido de dos cifras. Nombre: PERSONA FICTICIA seguido de un identificador.")
+                    .font(.caption).foregroundStyle(.secondary)
                 TextField("DNI ficticio (ej. 00000006)",text:$dni)
                     .keyboardType(.numberPad)
                 TextField("Nombre (PERSONA FICTICIA SEIS)",text:$names)
                     .textInputAutocapitalization(.characters)
-                TextField("Área",text:$area)
+            }
+            Section("Datos laborales") {
+                TextField("Área (opcional)",text:$area)
                 TextField("Cargo / labor",text:$labor)
-                TextField("Sede",text:$site)
+                Picker("Sede",selection:$site) {
+                    Text("La Venturosa").tag("LA VENTUROSA")
+                    Text("Planta Chepén").tag("PLANTA CHEPEN")
+                }
+            }
+            Section("Datos personales opcionales") {
                 Picker("Sexo registrado",selection:$sex) {
                     Text("No consignado").tag("")
                     Text("M").tag("M")
@@ -52,17 +58,13 @@ struct N2NativeWorkerEditorView:View {
                 TextField("Edad (opcional)",text:$age).keyboardType(.numberPad)
                 TextField("Ubigeo (opcional)",text:$ubigeo)
             }
-            Section {
-                Button {
-                    save()
-                } label: {
-                    Label(busy ? "Guardando…" : "Guardar trabajador",
-                          systemImage:"checkmark.shield.fill")
-                }
-                .disabled(!ready)
-                Text("Rechaza DNI repetidos; la actualización se confirma solo cuando toda la generación cifrada ha sido verificada.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge:.bottom) {
+            Button {save()} label: {
+                Label(busy ? "Guardando…" : "Guardar trabajador",systemImage:"person.badge.plus")
+            }.buttonStyle(DanperPrimaryButton()).disabled(!ready)
+                .padding(16).background(.regularMaterial)
         }
         .navigationTitle("Nuevo trabajador")
         .danperFormChrome()
@@ -105,3 +107,4 @@ struct N2NativeWorkerEditorView:View {
         }
     }
 }
+

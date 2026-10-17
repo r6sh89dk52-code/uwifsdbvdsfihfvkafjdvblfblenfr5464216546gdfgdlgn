@@ -90,6 +90,9 @@ actor N2SyntheticTrialIOSVault {
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
     }
+    func dispensingStatus(visitID:String)throws->[String:String] {
+        try protectedStore().dispensingStatus(visitID:visitID)
+    }
     func readHistory()throws->N2NativeReadModel? {
         guard let secret=try deviceKey(create:false) else{return nil}
         return try N2ProtectedClinicalVaultCore(keyData:secret,namespace:.synthetic).readIndex()
@@ -247,3 +250,4 @@ actor N2SyntheticTrialIOSVault {
             snapshot:source,password:password)
     }
 }
+

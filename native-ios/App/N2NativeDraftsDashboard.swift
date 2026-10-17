@@ -11,7 +11,7 @@ struct N2NativeDraftsDashboard:View {
     var body:some View {
         List {
             Section {
-                Label("Bóveda clínica N2",systemImage:"lock.shield")
+                Label("Datos protegidos",systemImage:"lock.shield")
                 Text("Los borradores están guardados dentro de la misma bóveda cifrada. Reabrir no crea otra atención ni descuenta inventario.")
                     .font(.footnote).foregroundStyle(.secondary)
                 if failed {
@@ -46,7 +46,7 @@ struct N2NativeDraftsDashboard:View {
                 NavigationLink {
                     N2NativeClinicalFormView()
                 } label: {
-                    Label("Nueva atención nativa",systemImage:"cross.case.fill")
+                    Label("Nueva atención",systemImage:"cross.case.fill")
                 }
                 Text("Para borrar un borrador, ábrelo y utiliza la acción de eliminación confirmada desde la lista de borradores del formulario.")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -72,3 +72,4 @@ struct N2NativeDraftsDashboard:View {
         }
     }
 }
+

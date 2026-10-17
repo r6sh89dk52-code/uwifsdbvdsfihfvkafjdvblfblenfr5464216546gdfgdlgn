@@ -61,12 +61,12 @@ struct N2NativeHistoryView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    hasError ? (useProtectedVault ? "Bóveda clínica no disponible" :
+                    hasError ? (useProtectedVault ? "Historial no disponible" :
                                 "No se pudo verificar la muestra") :
                                "Abriendo historial nativo",
                     systemImage:"lock.doc",
                     description:Text(useProtectedVault ?
-                        "Activa una sola fuente clínica N2 cifrada antes de consultar su historial." :
+                        "Activa el modo de prueba desde Inicio para consultar el historial." :
                         "Verificación de registros ficticios."))
             }
         }
@@ -172,3 +172,4 @@ private struct N2WorkerHistoryDetail:View {
         .danperFormChrome()
     }
 }
+

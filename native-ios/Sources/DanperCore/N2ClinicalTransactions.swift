@@ -147,15 +147,19 @@ public enum N2NativeClinicalTransaction {
         }
         let today=limaDay(at)
         var linked=0,pending=0,already=0,reasons:[String]=[],added=0
-        func mark(_ reason:String) {pending+=1;reasons.append(reason)}
+        var lineID=""
+        var outcomes:[String:String]=[:]
+        func mark(_ reason:String) {pending+=1;reasons.append(reason);outcomes[lineID]=reason}
         for item in items {
             let itemID=item["id"] as! String,code=item["code"] as! String
+            lineID=itemID
             let existing=movements.filter{
                 guard let ref=$0["dispenseRef"] as? [String:Any] else{return false}
                 return ref["attentionId"] as? String == id && ref["itemId"] as? String == itemID
             }
             if !existing.isEmpty {
                 // Existing delivery is immutable and must still match the item.
+                outcomes[itemID]="Descontado"
                 already+=1;continue
             }
             if date != today {
@@ -307,6 +311,10 @@ public enum N2NativeClinicalTransaction {
             lots=probe
             added+=movements.count-beforeCount
             linked+=1
+            outcomes[itemID]="Descontado"
+        }
+        if let index=visits.firstIndex(where:{$0["id"] as? String == id}) {
+            visits[index]["nativeDispensing"]=outcomes
         }
         root["attentions"]=visits
         root["stockLots"]=lots
@@ -322,3 +330,4 @@ public enum N2NativeClinicalTransaction {
                                 physicalMovementsAdded:added)
     }
 }
+

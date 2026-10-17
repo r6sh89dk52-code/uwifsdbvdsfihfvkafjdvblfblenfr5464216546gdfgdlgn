@@ -117,14 +117,18 @@ public struct N2FormMedication:Equatable,Sendable,Identifiable {
     public var code:String
     public var quantity:Int
     public var procedure:String
+    public var procedureConfirmed:Bool
+    public var procedureSource:String
     public var selectedLotID:String
     public var physicalQuantity:Double
     public var approveOpening:Bool
     public init(id:String=UUID().uuidString,code:String,quantity:Int=1,
-                procedure:String="OBSERVACION",selectedLotID:String="",
+                procedure:String="",selectedLotID:String="",
                 physicalQuantity:Double=0,approveOpening:Bool=false) {
         self.id=id;self.code=code;self.quantity=quantity
         self.procedure=procedure;self.selectedLotID=selectedLotID
+        self.procedureConfirmed = !procedure.isEmpty
+        self.procedureSource = procedure.isEmpty ? "review" : "manual"
         self.physicalQuantity=physicalQuantity;self.approveOpening=approveOpening
     }
 }
@@ -137,14 +141,15 @@ public struct N2NativeFormDraft:Equatable,Sendable {
     public var system:String=""
     public var segment:String=""
     public var diagnosis:String=""
-    public var procedures:[String]=["OBSERVACION"]
+    public var procedures:[String]=[]
     public var items:[N2FormMedication]=[]
     public var permission:String="NO"
     public var permissionTime:String=""
     public var photoSent:Bool=false
+    public var photoReviewed:Bool=false
     public var blueBandage:Bool=false
     public var returned:Bool=false
-    public var responsible:String="RESPONSABLE"
+    public var responsible:String="Felipe Azcárate Silva"
     public var responsibleDni:String=""
     public init(id:String=UUID().uuidString) {self.id=id}
 
@@ -179,7 +184,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
               (permission != "SI" || permissionTime.range(of:
                   #"^([01]\d|2[0-3]):[0-5]\d$"#,
                   options:.regularExpression) != nil),
-              !responsible.isEmpty else {
+              !responsible.isEmpty,
+              (!hasWound || photoReviewed) else {
             throw N2FormError.invalidVisit
         }
         var lines=[[String:Any]]()
@@ -191,7 +197,9 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             var row:[String:Any]=[
                 "id":med.id,"code":product.code,"name":product.name,
                 "unit":product.unit,"quantity":med.quantity,
-                "procedure":med.procedure
+                "procedure":med.procedure,
+                "procedureConfirmed":med.procedureConfirmed,
+                "procedureSource":med.procedureSource
             ]
             if !med.selectedLotID.isEmpty {
                 guard context.options(for:med.code,at:date).contains(where:{
@@ -239,7 +247,9 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         let itemRows:[[String:Any]]=items.map { med in
             var row:[String:Any]=[
                 "id":med.id,"code":med.code,"quantity":med.quantity,
-                "procedure":med.procedure
+                "procedure":med.procedure,
+                "procedureConfirmed":med.procedureConfirmed,
+                "procedureSource":med.procedureSource
             ]
             if let catalog=context.products.clinical.first(where:{$0.code==med.code}) {
                 row["name"]=catalog.name;row["unit"]=catalog.unit
@@ -258,10 +268,11 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             "system":system,"segment":segment,"diagnosis":diagnosis,
             "permission":permission,"permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
-            "photoSent":photoSent,"responsible":responsible,
+            "photoSent":photoSent,"photoReviewed":photoReviewed,"responsible":responsible,
             "responsibleDni":responsibleDni,
             "standaloneProcedures":procedures,
             "workStatus":permission=="SI" ? "PERMISO":"LABORANDO"
         ])
     }
 }
+
