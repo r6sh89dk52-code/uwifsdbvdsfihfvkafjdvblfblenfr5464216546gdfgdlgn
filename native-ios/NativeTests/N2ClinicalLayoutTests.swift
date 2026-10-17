@@ -65,6 +65,32 @@ import DanperCore
             N2NativeClinicalFormView(layoutContext:context,draft:form,step:2)
         },name:"Tratamiento-DynamicType",dark:false,large:true)
     }
+    func testEvaluationReviewSavedAndExportLayouts() async throws {
+        let context=try context()
+        var form=N2NativeFormDraft()
+        form.dni=context.workers[0].dni;form.date="2026-10-17";form.time="13:14"
+        form.category="ENFERMEDAD";form.system="OSTEOMUSCULAR";form.segment="Pie"
+        form.diagnosis="Faringitis aguda";form.dispensingSite="LA VENTUROSA"
+        form.items=[N2FormMedication(code:"16000182")]
+        form.refreshProcedureSuggestions(catalog:context.products)
+        for dark in [false,true] {
+            for step in [1,3] {
+                try await capture(NavigationStack {
+                    N2NativeClinicalFormView(layoutContext:context,draft:form,step:step)
+                },name:"Paso-\(step+1)-\(dark ? "oscuro" : "claro")",dark:dark)
+            }
+            try await capture(NavigationStack {
+                N2NativeClinicalFormView(layoutContext:context,draft:form,step:3,saved:true)
+            },name:"Atencion-guardada-\(dark ? "oscuro" : "claro")",dark:dark)
+            let model=try N2NativeSnapshotReader.read(resource("n2-synthetic-clinical"))
+            try await capture(NavigationStack {
+                N2VerifiedIndicatorExportView(layoutVisits:model.visits)
+            },name:"Exportacion-\(dark ? "oscuro" : "claro")",dark:dark)
+        }
+        try await capture(NavigationStack {
+            N2NativeClinicalFormView(layoutContext:context,draft:form,step:3)
+        },name:"Resumen-DynamicType",dark:false,large:true)
+    }
     func testHomeLayouts() async throws {
         let snapshot=try resource("n2-synthetic-clinical")
         let model=try N2NativeSnapshotReader.read(snapshot)

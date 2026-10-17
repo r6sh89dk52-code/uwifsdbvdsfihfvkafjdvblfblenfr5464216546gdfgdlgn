@@ -30,38 +30,45 @@ struct N2NativeWorkerEditorView:View {
         (age.isEmpty || (Int(age).map{(0...120).contains($0)} == true))
     }
     var body:some View {
-        Form {
-            Section {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel {
                 Label("Modo de prueba — datos ficticios",systemImage:"lock.shield")
                     .font(.caption).foregroundStyle(DanperStyle.red)
                 if failed || saved {Text(status).font(.footnote).foregroundStyle(failed ? Color.orange : Color.green)}
             }
-            Section("Identificación") {
+            DanperPanel("Identificación") {
                 Text("DNI de prueba: 000000 seguido de dos cifras. Nombre: PERSONA FICTICIA seguido de un identificador.")
                     .font(.caption).foregroundStyle(.secondary)
-                TextField("DNI ficticio (ej. 00000006)",text:$dni)
+                DanperField(title:"DNI ficticio") {
+                    TextField("DNI ficticio (ej. 00000006)",text:$dni)
                     .keyboardType(.numberPad)
+                }
                 if existingDNI.contains(dni) {Label("Este DNI ya existe en Personal",systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)}
-                TextField("Nombre (PERSONA FICTICIA SEIS)",text:$names)
+                DanperField(title:"Nombre completo") {
+                    TextField("Nombre (PERSONA FICTICIA SEIS)",text:$names)
                     .textInputAutocapitalization(.characters)
-            }
-            Section("Datos laborales") {
-                TextField("Área (opcional)",text:$area)
-                TextField("Cargo / labor",text:$labor)
-                Picker("Sede",selection:$site) {
-                    Text("La Venturosa").tag("LA VENTUROSA")
-                    Text("Planta La Venturosa").tag("PLVENTUROSA")
                 }
             }
-            Section("Datos personales opcionales") {
-                Picker("Sexo registrado",selection:$sex) {
-                    Text("No consignado").tag("")
-                    Text("M").tag("M")
-                    Text("F").tag("F")
+            DanperPanel("Datos laborales") {
+                DanperField(title:"Área") {
+                    TextField("Área (opcional)",text:$area)
                 }
-                TextField("Edad (opcional)",text:$age).keyboardType(.numberPad)
-                TextField("Ubigeo (opcional)",text:$ubigeo)
+                DanperField(title:"Cargo / labor") {
+                    TextField("Cargo / labor",text:$labor)
+                }
+                DanperChoiceField(title:"Sede",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
             }
+            DanperPanel("Datos personales opcionales") {
+                DanperChoiceField(title:"Sexo registrado",selection:$sex,options:["","M","F"],labels:["":"No consignado","M":"Masculino","F":"Femenino"])
+                DanperField(title:"Edad") {
+                    TextField("Edad (opcional)",text:$age).keyboardType(.numberPad)
+                }
+                DanperField(title:"Ubigeo") {
+                    TextField("Ubigeo (opcional)",text:$ubigeo)
+                }
+            }
+          }.padding(16)
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge:.bottom) {

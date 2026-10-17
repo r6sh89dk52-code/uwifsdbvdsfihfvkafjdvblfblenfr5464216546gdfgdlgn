@@ -18,6 +18,18 @@ private struct N2IndicatorShareSheet:UIViewControllerRepresentable {
 /// Entirely native N2 selection screen. The builder refuses pending stock,
 /// missing review events, mixed sites, or invented official balances.
 struct N2VerifiedIndicatorExportView:View {
+    private var layoutOnly=false
+    init() {}
+    #if DEBUG
+    init(layoutVisits:[N2VisitIndexRow]) {
+        layoutOnly=true
+        _visits=State(initialValue:layoutVisits)
+        _selected=State(initialValue:Set(layoutVisits.filter{$0.pendingPhysicalLines==0}.map(\.id)))
+        let f=DateFormatter();f.dateFormat="yyyy-MM-dd";f.timeZone=TimeZone(identifier:"America/Lima")
+        _startDate=State(initialValue:f.date(from:"2026-10-01")!)
+        _endDate=State(initialValue:f.date(from:"2026-10-31")!)
+    }
+    #endif
     @State private var site="LA VENTUROSA"
     @State private var startDate=Date()
     @State private var endDate=Date()
@@ -49,26 +61,23 @@ struct N2VerifiedIndicatorExportView:View {
         !selected.isEmpty
     }
     var body:some View {
-        Form {
-            Section("Indicador ambulatorio · 10 hojas") {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel("Indicador ambulatorio · 10 hojas") {
                 Label("Modo de prueba — datos ficticios",
                       systemImage:"lock.shield.fill")
                 Text("Solo atenciones elegidas y consumos enlazados al Kardex. No se rellena stock inicial, ingreso o recuento sin evento revisado.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Section("Seleccionar período y sede") {
-                Picker("Subdivisión",selection:$site) {
-                    Text("Fundo La Venturosa").tag("LA VENTUROSA")
-                    Text("Planta La Venturosa").tag("PLVENTUROSA")
-                }
-                LabeledContent("Desde",value:DanperDatePresentation.display(local(startDate)))
-                DatePicker("Cambiar inicio",selection:$startDate,displayedComponents:.date)
-                LabeledContent("Hasta",value:DanperDatePresentation.display(local(endDate)))
-                DatePicker("Cambiar fin",selection:$endDate,displayedComponents:.date)
+            DanperPanel("Seleccionar período y sede") {
+                DanperChoiceField(title:"Sede",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
+                                  labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                DanperDateField(title:"Desde",selection:$startDate)
+                DanperDateField(title:"Hasta",selection:$endDate)
                 Text("La selección inicial es esta semana (lunes a domingo). Para el corte mensual, elige día 9 a día 8.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Section("Atenciones seleccionadas") {
+            DanperPanel("Atenciones seleccionadas") {
                 HStack {
                     Text("\(selected.count) elegidas de \(inRange.count)")
                     Spacer()
@@ -79,7 +88,7 @@ struct N2VerifiedIndicatorExportView:View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(inRange) { v in
-                    Toggle(isOn:Binding(
+                    DanperCheckRow(selected:Binding(
                         get:{selected.contains(v.id)},
                         set:{on in
                             if on {selected.insert(v.id)}
@@ -99,8 +108,13 @@ struct N2VerifiedIndicatorExportView:View {
                     }
                 }
             }
-            Section("Exportación y protección") {
-                Toggle("Libro provisional con consumos pendientes",isOn:$provisional)
+            DanperPanel("Exportación y protección") {
+                DanperCheckRow(selected:$provisional) {
+                    VStack(alignment:.leading,spacing:5) {
+                        Text("Incluir consumos pendientes").font(.subheadline.weight(.semibold))
+                        Text("Genera un libro provisional identificado").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 if provisional {
                     Text("BORRADOR: R incluye cantidades clínicas declaradas cuando falta salida física. Para cajas y frascos esto no acredita apertura. No modifica inventario ni acredita cierre.")
                         .font(.footnote).foregroundStyle(.orange)
@@ -111,12 +125,13 @@ struct N2VerifiedIndicatorExportView:View {
                 } label:{
                     Label(working ? "Generando…" : provisional ? "Generar provisional y compartir" : "Generar Excel oficial y compartir",
                           systemImage:"square.and.arrow.up")
-                }.disabled(!enabled)
+                }.buttonStyle(DanperPrimaryButton()).disabled(!enabled)
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
                 Text("Necesita cierres de inventario registrados en el período. Si faltan existencias, se dejan celdas vacías; revisa el resultado en Excel antes de enviarlo.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+          }.padding(16)
         }
         .navigationTitle("Indicador ambulatorio")
         .danperFormChrome()
@@ -127,7 +142,7 @@ struct N2VerifiedIndicatorExportView:View {
             Button("Generar provisional") {Task {await export()}}
             Button("Cancelar",role:.cancel) {}
         } message: {Text("Las cantidades declaradas pendientes no son movimientos físicos de Kardex. El archivo quedará identificado como PROVISIONAL.")}
-        .task {await load()}
+        .task {if !layoutOnly {await load()}}
         .onChange(of:startDate) {_,_ in selectConfirmed()}
         .onChange(of:endDate) {_,_ in selectConfirmed()}
         .onDisappear {if share == nil {cleanup()}}

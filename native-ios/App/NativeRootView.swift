@@ -301,8 +301,8 @@ struct NativeRootView:View {
                     Text("Sistema").tag("system")
                     Text("Claro").tag("light")
                     Text("Oscuro").tag("dark")
-                }
-                Toggle("Respuesta háptica",isOn:$haptics)
+                }.pickerStyle(.segmented)
+                DanperCheckRow(selected:$haptics) {Text("Respuesta háptica")}
                 LabeledContent("Responsable",value:"Felipe Azcárate Silva")
             }
             Section {

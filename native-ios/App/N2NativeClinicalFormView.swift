@@ -8,9 +8,12 @@ struct N2NativeClinicalFormView:View {
     let requestedDraftID:String?
     init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
     #if DEBUG
-    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="") {
+    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="",saved:Bool=false,showCatalog:Bool=false) {
         requestedDraftID=nil
         layoutOnly=true
+        _saved=State(initialValue:saved)
+        _chooseProduct=State(initialValue:showCatalog)
+        _expandedMedication=State(initialValue:draft.items.first?.id)
         _context=State(initialValue:layoutContext)
         _form=State(initialValue:draft)
         _step=State(initialValue:step)
@@ -36,6 +39,7 @@ struct N2NativeClinicalFormView:View {
     @State private var saved=false
     @State private var fault=false
     @State private var status="Abriendo bóveda cifrada N2…"
+    @State private var expandedMedication:String?
     @State private var chooseWorker=false
     @State private var chooseProduct=false
     @State private var chooseDraft=false
@@ -82,19 +86,16 @@ struct N2NativeClinicalFormView:View {
     var body:some View {
         Group {
             if let context {
-                Form {
-                    Section {
-                        if fault || saved {
-                            DanperStatusBanner(symbol:fault ? "exclamationmark.shield.fill" : "checkmark.shield.fill",
-                                title:fault ? "Revisa el registro" : "Atención confirmada",detail:status)
-                        } else {
-                            Label("Prueba · datos ficticios",systemImage:"lock.shield")
-                                .font(.caption).foregroundStyle(DanperStyle.red)
-                        }
+                ScrollView {
+                  VStack(alignment:.leading,spacing:16) {
+                    if fault {
+                        DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
+                    } else if !saved {
+                        Label("Prueba · datos ficticios",systemImage:"lock.shield")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                    .listRowBackground(Color.clear)
                     if !saved && !drafts.isEmpty {
-                        Section("Registros pendientes") {
+                        DanperPanel("Registros pendientes") {
                             Button {
                                 chooseDraft=true
                             } label: {
@@ -104,23 +105,29 @@ struct N2NativeClinicalFormView:View {
                         }
                     }
                     if saved {
-                        Section {
-                            ForEach(form.items) { med in
-                                VStack(alignment:.leading,spacing:5) {
-                                    Text(medicationName(med.code,context)).font(.headline)
-                                    let result=savedLines[med.id] ?? "Pendiente de conciliar"
-                                    Label(result=="Descontado" ? result : "Pendiente: "+result,
-                                          systemImage:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.circle")
-                                        .font(.footnote)
+                        DanperPanel {
+                            Image(systemName:"checkmark.circle.fill").font(.system(size:48)).foregroundStyle(.green)
+                            Text("Atención registrada").font(.title2.bold())
+                            Text(currentWorker?.name ?? form.dni).font(.headline)
+                            Text(DanperDatePresentation.displayDateTime(form.date,form.time)).font(.subheadline).foregroundStyle(.secondary)
+                            Divider()
+                            reviewValue("Diagnóstico",form.diagnosis)
+                            ForEach(form.items) {med in
+                                let result=savedLines[med.id] ?? "Pendiente de conciliar"
+                                HStack(alignment:.top,spacing:10) {
+                                    Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "clock")
                                         .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
+                                    VStack(alignment:.leading,spacing:5) {
+                                        Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
+                                        Text("Cantidad \(med.quantity) · "+result).font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
                             }
-                            Label("Atención guardada y verificada",
-                                  systemImage:"checkmark.shield.fill")
-                                .foregroundStyle(.green)
-                            Button("Registrar otra atención") {
-                                startAnother()
-                            }
+                            if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
+                            Button {startAnother()} label: {Label("Nueva atención",systemImage:"plus")}
+                                .buttonStyle(DanperPrimaryButton())
+                            NavigationLink {N2NativeHistoryView(useProtectedVault:true)} label: {Label("Ver historial y consumos",systemImage:"clock.arrow.circlepath")}
+                                .buttonStyle(DanperSecondaryButton())
                         }
                     } else {
                         stepHeading
@@ -129,14 +136,24 @@ struct N2NativeClinicalFormView:View {
                         if step==2 {treatmentSection(context)}
                         if step==3 {reviewSection(context)}
                         if dynamicTypeSize.isAccessibilitySize {
-                            Section {Button("Guardar borrador") {scheduleDraft(immediate:true)}}
+                            DanperPanel {Button("Guardar borrador") {scheduleDraft(immediate:true)}}
                         }
                     }
                 }
-                .navigationTitle("Nueva atención")
+                  }.padding(16)
+                .navigationTitle(saved ? "Atención registrada" : "Nueva atención")
                 .navigationBarTitleDisplayMode(.inline)
                 .danperFormChrome()
                 .scrollDismissesKeyboard(.interactively)
+                .toolbar {
+                    if !saved {
+                        ToolbarItem(placement:.topBarTrailing) {
+                            Button {scheduleDraft(immediate:true)} label: {
+                                Image(systemName:"square.and.arrow.down").foregroundStyle(.secondary)
+                            }.accessibilityLabel("Guardar borrador").disabled(busy)
+                        }
+                    }
+                }
                 .safeAreaInset(edge:.bottom,spacing:0) {
                     if !saved {actions(context)}
                 }
@@ -175,30 +192,49 @@ struct N2NativeClinicalFormView:View {
                 }
                 .sheet(isPresented:$chooseProduct) {
                     NavigationStack {
-                        List {
-                            ForEach(context.products.clinicalMatches(search)) {p in
-                                Button {
-                                    form.items.append(N2FormMedication(code:p.code))
-                                    form.refreshProcedureSuggestions(catalog:context.products)
-                                    chooseProduct=false
-                                    search=""
-                                } label: {
-                                    VStack(alignment:.leading,spacing:3) {
-                                        Text(p.name).foregroundStyle(.primary)
-                                        Text(p.code+" · "+p.unit)
-                                            .font(.caption).foregroundStyle(.secondary)
-                                    }
+                        ScrollView {
+                            LazyVStack(spacing:10) {
+                                Text("Busca y agrega los productos que necesitas")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                                    .frame(maxWidth:.infinity,alignment:.leading)
+                                ForEach(context.products.clinicalMatches(search)) {p in
+                                    Button {
+                                        let med=N2FormMedication(code:p.code)
+                                        form.items.append(med)
+                                        expandedMedication=med.id
+                                        form.refreshProcedureSuggestions(catalog:context.products)
+                                    } label: {
+                                        HStack(spacing:12) {
+                                            Image(systemName:"cross.vial").font(.title3)
+                                                .foregroundStyle(.secondary).frame(width:34)
+                                            VStack(alignment:.leading,spacing:5) {
+                                                Text(p.name).font(.subheadline.weight(.semibold))
+                                                    .foregroundStyle(.primary)
+                                                    .multilineTextAlignment(.leading)
+                                                Text(p.code+" · "+p.unit).font(.caption).foregroundStyle(.secondary)
+                                            }
+                                            Spacer(minLength:4)
+                                            let count=form.items.filter{$0.code==p.code}.count
+                                            Image(systemName:count>0 ? "checkmark.circle.fill" : "plus.circle")
+                                                .font(.title3).foregroundStyle(count>0 ? DanperStyle.red : Color.secondary)
+                                                .accessibilityLabel(count>0 ? "Agregado. Agregar otra línea" : "Agregar")
+                                        }.padding(14).frame(maxWidth:.infinity,minHeight:72)
+                                            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+                                            .contentShape(RoundedRectangle(cornerRadius:16))
+                                    }.buttonStyle(.plain)
                                 }
-                            }
+                            }.padding(16)
                         }
-                        .searchable(text:$search,prompt:"Código o nombre del material")
-                        .navigationTitle("Medicamentos e insumos")
-                        .toolbar{
-                            ToolbarItem(placement:.topBarTrailing) {
-                                Button("Cerrar"){chooseProduct=false}
-                            }
+                        .background(DanperStyle.canvas)
+                        .searchable(text:$search,prompt:"Nombre o código del producto")
+                        .navigationTitle("Catálogo clínico").navigationBarTitleDisplayMode(.inline)
+                        .safeAreaInset(edge:.bottom) {
+                            Button {chooseProduct=false;search=""} label: {
+                                Text("Continuar · \(form.items.count) productos")
+                            }.buttonStyle(DanperPrimaryButton()).padding(16).background(.regularMaterial)
                         }
-                    }
+                        .toolbar {ToolbarItem(placement:.topBarTrailing){Button("Listo"){chooseProduct=false;search=""}}}
+                    }.presentationDragIndicator(.visible)
                 }
                 .sheet(isPresented:$chooseDraft) {
                     NavigationStack {
@@ -279,14 +315,50 @@ struct N2NativeClinicalFormView:View {
     }
 
     private var stepHeading:some View {
-        Section {
+        VStack(alignment:.leading,spacing:12) {
             DanperStepProgress(step:step,titles:stepTitles)
+            ScrollView(.horizontal,showsIndicators:false) {
+                HStack(spacing:8) {
+                    ForEach(0..<4) { target in
+                        Button {
+                            guard let context else{return}
+                            let missing=target<=step ? [] : (step..<target).flatMap { index in
+                                form.clinicalIssues(step:index,context:context).map{N2ClinicalFormOptions.messages[$0] ?? $0} + (index==2 ? extraTreatmentRequirements : [])
+                            }
+                            let allergyMissing=step==0 && target>0 ? form.clinicalIssues(step:1,context:context).filter{$0.hasPrefix("allergy-")}.map{N2ClinicalFormOptions.messages[$0] ?? $0} : []
+                            if (missing+allergyMissing).isEmpty {
+                                withAnimation(reduceMotion ? nil : DanperStyle.animation){step=target}
+                            } else {validationMessage=(missing+allergyMissing).joined(separator:"\n");showValidation=true}
+                        } label: {
+                            HStack(spacing:7) {
+                                Text("\(target+1)").font(.caption.bold())
+                                    .frame(width:24,height:24)
+                                    .background(step==target ? DanperStyle.red : Color.secondary.opacity(0.10),in:Circle())
+                                    .foregroundStyle(step==target ? .white : .primary)
+                                Text(["Trabajador","Evaluación","Tratamiento","Resultado"][target]).font(.caption.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                            }.padding(10).frame(minHeight:44)
+                                .background(step==target ? DanperStyle.red.opacity(0.08) : DanperStyle.surface,in:RoundedRectangle(cornerRadius:14))
+                                .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(step==target ? DanperStyle.red.opacity(0.45) : Color.secondary.opacity(0.16)))
+                        }.buttonStyle(.plain).accessibilityAddTraits(step==target ? .isSelected : [])
+                    }
+                }
+            }
+            if step>0,let worker=currentWorker {
+                HStack(spacing:10) {
+                    Image(systemName:"person.crop.circle").foregroundStyle(.secondary)
+                    VStack(alignment:.leading,spacing:4) {
+                        Text(worker.name).font(.subheadline.weight(.semibold))
+                        Text("DNI "+worker.dni).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength:4)
+                    Button("Editar") {step=0}.font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }.padding(14).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+            }
         }
-        .listRowInsets(EdgeInsets())
-        .listRowBackground(Color.clear)
     }
     private func workerSection(_ context:N2FormContext)->some View {
-        Section("Identificación") {
+        DanperPanel("Identificación") {
             Button {
                 chooseWorker=true
             } label: {
@@ -302,72 +374,66 @@ struct N2NativeClinicalFormView:View {
                 LabeledContent("Sede",value:worker.site)
                 Text("Alergias revisadas antes de registrar medicamentos.")
                     .font(.footnote).foregroundStyle(.secondary)
-                Picker("Estado de alergias",selection:$allergyStatus) {
-                    Text("No evaluado").tag("unknown")
-                    Text("Niega alergias conocidas").tag("none")
-                    Text("Alergias reportadas").tag("known")
-                }
+                DanperChoiceField(title:"Revisión de alergias",selection:$allergyStatus,
+                    options:["unknown","none","known"],labels:["unknown":"No evaluado","none":"Niega alergias conocidas","known":"Alergias reportadas"])
                 if allergyStatus=="known" {
-                    TextField("Sustancias reportadas",text:$allergySubstances,
-                              axis:.vertical).lineLimit(2...5)
+                    DanperField(title:"Sustancias reportadas") {
+                    TextField("Indica las sustancias",text:$allergySubstances,axis:.vertical).lineLimit(2...5)
+                }
                 }
                 Button(editingAllergy ? "Verificando..." : "Confirmar revisión de alergias") {
                     Task {await recordAllergy(worker.dni)}
                 }
+                .buttonStyle(DanperSecondaryButton())
                 .disabled(editingAllergy || allergyStatus=="known" &&
                           allergySubstances.trimmingCharacters(in:.whitespaces).isEmpty)
             }
         }
     }
     private func clinicalSection()->some View {
-        Section("Datos de la atención") {
-            LabeledContent("Fecha",value:DanperDatePresentation.display(form.date))
-            DatePicker("Cambiar fecha",selection:dateSelection,displayedComponents:.date)
-            TextField("Hora HH:mm",text:$form.time).focused($focusedField,equals:"time")
-                .keyboardType(.numbersAndPunctuation)
-            Picker("Tipo de atención",selection:$form.category) {
-                Text("Seleccionar").tag("")
-                ForEach(categories,id:\.self){Text($0).tag($0)}
+        DanperPanel("Evaluación clínica") {
+            DanperDateField(title:"Fecha de atención",selection:dateSelection)
+            DanperField(title:"Hora de atención") {
+                TextField("HH:mm",text:$form.time).focused($focusedField,equals:"time")
+                    .keyboardType(.numbersAndPunctuation)
             }
+            DanperChoiceField(title:"Tipo de atención",selection:$form.category,options:categories)
             if N1hClinicalValidator.systemRequired.contains(form.category) {
-                Picker("Sistema afectado",selection:$form.system) {
-                    Text("Seleccionar").tag("")
-                    ForEach(systems,id:\.self){Text($0).tag($0)}
-                }
+                DanperChoiceField(title:"Sistema afectado",selection:$form.system,options:systems)
                 if form.system=="OSTEOMUSCULAR" {
-                    TextField("Segmento anatómico afectado",text:$form.segment).focused($focusedField,equals:"segment")
+                    DanperField(title:"Segmento anatómico") {
+                        TextField("Describe la zona afectada",text:$form.segment).focused($focusedField,equals:"segment")
+                    }
                 }
             }
-            TextField("Diagnóstico presuntivo",text:$form.diagnosis,axis:.vertical).focused($focusedField,equals:"diagnosis")
-                .lineLimit(2...5)
+            DanperField(title:"Diagnóstico presuntivo") {
+                TextField("Escribe para buscar o registrar",text:$form.diagnosis,axis:.vertical)
+                    .focused($focusedField,equals:"diagnosis").lineLimit(2...5)
+            }
             if !form.diagnosis.isEmpty {
                 let suggestions=N2ClinicalFormOptions.diagnoses.filter {
                     $0.localizedStandardContains(form.diagnosis) && $0 != form.diagnosis
                 }
                 ForEach(Array(suggestions.prefix(5)),id:\.self) { diagnosis in
                     Button {form.diagnosis=diagnosis;focusedField=nil} label: {
-                        Label(diagnosis,systemImage:"text.magnifyingglass")
-                    }.font(.subheadline)
+                        HStack {Text(diagnosis).foregroundStyle(.primary);Spacer();Image(systemName:"arrow.up.left").foregroundStyle(.secondary)}
+                            .font(.subheadline).padding(12).frame(maxWidth:.infinity,alignment:.leading)
+                            .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:12))
+                    }.buttonStyle(.plain)
                 }
-            }
-            Picker("Permiso",selection:$form.permission) {
-                Text("No").tag("NO")
-                Text("Sí").tag("SI")
-            }
-            if form.permission=="SI" {
-                TextField("Hora del permiso HH:mm",text:$form.permissionTime)
             }
         }
     }
     private func treatmentSection(_ context:N2FormContext)->some View {
         Group {
-        Section {
+        DanperPanel {
             Button {search="";chooseProduct=true} label: {
                 Label("Agregar medicamento o insumo",systemImage:"plus.circle.fill")
             }
             .buttonStyle(DanperPrimaryButton())
             .accessibilityIdentifier("add-clinical-product")
-            Picker("Tópico de dispensación",selection:Binding(
+            Text("Medicamentos e insumos").font(.headline)
+            DanperChoiceField(title:"Tópico de dispensación",selection:Binding(
                 get:{form.dispensingSite},set:{site in
                     guard site != form.dispensingSite else{return}
                     form.dispensingSite=site
@@ -376,16 +442,12 @@ struct N2NativeClinicalFormView:View {
                         form.items[i].approveOpening=false
                     }
                 }
-            )) {
-                Text("Seleccionar").tag("")
-                Text("Fundo La Venturosa").tag("LA VENTUROSA")
-                Text("Planta La Venturosa").tag("PLVENTUROSA")
-            }
+            ),options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
             Text("Busca por nombre o código entre los \(context.products.clinical.count) productos. El consumo se confirma al guardar la atención.")
                 .font(.footnote).foregroundStyle(.secondary)
-        } header: {Text("Medicamentos e insumos")}
+        }
         medicationFields(context)
-        Section("Procedimientos") {
+        DanperPanel("Procedimientos") {
             LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ?
                       [GridItem(.flexible())] :
                       [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],
@@ -425,21 +487,14 @@ struct N2NativeClinicalFormView:View {
             Text("Selecciona uno o varios procedimientos. Los medicamentos y sus consumos se registran arriba, en esta misma atención.")
                 .font(.caption).foregroundStyle(.secondary)
             if form.hasWound {
-                Picker("¿Se envió la foto?",selection:Binding(
+                DanperChoiceField(title:"¿Se envió la foto?",selection:Binding(
                     get:{form.photoReviewed ? (form.photoSent ? "SI" : "NO") : ""},
                     set:{form.photoReviewed = !$0.isEmpty;form.photoSent = $0=="SI"}
-                )) {
-                    Text("Seleccionar").tag("")
-                    Text("Sí").tag("SI")
-                    Text("No").tag("NO")
-                }
-            }else {
-                Text("ENVÍO FOTO = NO para atenciones sin lesión o curación.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                ),options:["SI","NO"],labels:["SI":"Sí, se envió","NO":"No se envió"])
             }
-            Toggle("Se colocó banda o curita azul",isOn:$form.blueBandage)
+            DanperCheckRow(selected:$form.blueBandage) {Text("Se colocó banda o curita azul").font(.subheadline)}
             if form.blueBandage {
-                Toggle("Se devolvió la banda o curita",isOn:$form.returned)
+                DanperCheckRow(selected:$form.returned) {Text("Se devolvió la banda o curita").font(.subheadline)}
             }
         }
     }
@@ -450,74 +505,77 @@ struct N2NativeClinicalFormView:View {
     @ViewBuilder
     private func medicationFields(_ context:N2FormContext)->some View {
         ForEach($form.items) { $med in
-            Section {
-                HStack {
-                    VStack(alignment:.leading,spacing:3) {
-                        Text(medicationName(med.code,context)).font(.headline)
-                        Text(med.code+" · "+(context.products.clinical.first{$0.code==med.code}?.unit ?? "")).font(.caption).foregroundStyle(.secondary)
+            DanperPanel {
+                Button {withAnimation(reduceMotion ? nil : DanperStyle.animation) {
+                    expandedMedication = expandedMedication==med.id ? nil : med.id
+                }} label: {
+                    HStack(alignment:.top,spacing:12) {
+                        Image(systemName:"cross.vial.fill").foregroundStyle(DanperStyle.red)
+                            .padding(10).background(DanperStyle.red.opacity(0.08),in:RoundedRectangle(cornerRadius:12))
+                        VStack(alignment:.leading,spacing:6) {
+                            Text(medicationName(med.code,context)).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
+                            Text("Cantidad \(med.quantity) · \(med.procedure.isEmpty ? "Procedimiento pendiente" : med.procedure.capitalized)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }.frame(maxWidth:.infinity,alignment:.leading)
+                        Image(systemName:expandedMedication==med.id ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    }.contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                if expandedMedication==med.id || med.procedure.isEmpty {
+                    Divider()
+                    Text(med.code+" · "+(context.products.clinical.first{$0.code==med.code}?.unit ?? ""))
+                        .font(.caption).foregroundStyle(.secondary)
+                    DanperField(title:"Cantidad clínica") {
+                        HStack {
+                            Button {if med.quantity>1 {med.quantity-=1}} label: {Image(systemName:"minus.circle").frame(width:44,height:44)}.disabled(med.quantity<=1)
+                            TextField("Cantidad",value:$med.quantity,format:.number)
+                                .keyboardType(.numberPad).multilineTextAlignment(.center).accessibilityLabel("Cantidad clínica")
+                            Button {med.quantity+=1} label: {Image(systemName:"plus.circle").frame(width:44,height:44)}
+                        }.buttonStyle(.plain).font(.title3).foregroundStyle(.primary)
                     }
-                    Spacer()
-                    Button(role:.destructive) {
-                        form.items.removeAll{$0.id==med.id}
-                    } label: {Image(systemName:"trash")}
-                }
-                LabeledContent("Cantidad clínica") {
-                    TextField("Cantidad",value:$med.quantity,format:.number)
-                        .keyboardType(.numberPad).multilineTextAlignment(.trailing)
-                        .accessibilityLabel("Cantidad clínica")
-                }
-                Picker("Procedimiento del producto",selection:Binding(
-                    get:{med.procedure},set:{med.procedure=$0;med.procedureConfirmed=true;med.procedureSource="manual"}
-                )) {
-                    Text("Por definir — elige un procedimiento").tag("")
-                    ForEach(procedures,id:\.self){Text($0).tag($0)}
-                }
-                Text(med.procedureConfirmed ? "Elección registrada" :
-                     med.procedureSource=="presentation" ? "Sugerido por presentación · puedes cambiarlo" :
-                     med.procedureSource=="context" ? "Sugerido por contexto · puedes cambiarlo" :
-                     "Ambiguo: confirma el procedimiento utilizado")
-                    .font(.caption).foregroundStyle(med.procedure.isEmpty ? Color.orange : Color.secondary)
-                if !med.procedureConfirmed && !med.procedure.isEmpty {
-                    Button("Confirmar procedimiento") {med.procedureConfirmed=true}
-                }
-                let matches=context.options(for:med.code,at:form.date,site:form.dispensingSite)
-                Picker("Presentación física · reparto FEFO",selection:Binding(
-                    get:{med.selectedLotID},set:{value in
-                        med.selectedLotID=value;med.approveOpening=false
-                        let unit=context.products.clinical.first{$0.code==med.code}?.unit ?? ""
-                        if ["UND","TBL","PAR"].contains(unit.uppercased()) {
-                            med.physicalQuantity=Double(med.quantity)
+                    DanperChoiceField(title:"Procedimiento",selection:Binding(
+                        get:{med.procedure},set:{med.procedure=$0;med.procedureConfirmed=true;med.procedureSource="manual"}
+                    ),options:procedures)
+                    Text(med.procedureConfirmed ? "Elección confirmada" :
+                         med.procedureSource=="presentation" ? "Sugerido por la presentación del producto" :
+                         med.procedureSource=="context" ? "Sugerido por el contexto de la atención" :
+                         "Selecciona el procedimiento utilizado")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if !med.procedureConfirmed && !med.procedure.isEmpty {
+                        Button {med.procedureConfirmed=true} label: {Label("Confirmar sugerencia",systemImage:"checkmark")}
+                            .buttonStyle(DanperSecondaryButton())
+                    }
+                    let matches=context.options(for:med.code,at:form.date,site:form.dispensingSite)
+                    DanperChoiceField(title:"Existencia física",selection:Binding(
+                        get:{med.selectedLotID},set:{value in
+                            med.selectedLotID=value;med.approveOpening=false
+                            let unit=context.products.clinical.first{$0.code==med.code}?.unit ?? ""
+                            if ["UND","TBL","PAR"].contains(unit.uppercased()) {med.physicalQuantity=Double(med.quantity)}
+                        }
+                    ),options:[""]+matches.map(\.id),labels:Dictionary(uniqueKeysWithValues:
+                        [("","Automático por FEFO / pendiente")]+matches.map{($0.id,$0.name+" · Lote "+$0.id+" · Vence "+DanperDatePresentation.display($0.expires))}))
+                    if let first=matches.first {
+                        Text("FEFO: "+first.id+" · Disponible: "+matches.reduce(0){$0+$1.total}.formatted())
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Label("Sin existencia aprobada vigente. Se registrará como consumo pendiente.",systemImage:"clock")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !med.selectedLotID.isEmpty {
+                        if let selected=matches.first(where:{$0.id==med.selectedLotID}) {
+                            Text("Existencia: "+selected.total.formatted()+" · Capacidad por envase: "+selected.capacity.formatted())
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        DanperField(title:"Unidades físicas usadas (mL, UND…)") {
+                            TextField("Cantidad física",value:$med.physicalQuantity,format:.number).keyboardType(.decimalPad)
+                        }
+                        if matches.contains(where:{$0.sealed>0}) {
+                            DanperCheckRow(selected:$med.approveOpening) {Text("Autorizo abrir un frasco o caja nuevo").font(.subheadline)}
                         }
                     }
-                )) {
-                    Text("Pendiente / automático si es unidad").tag("")
-                    ForEach(matches) {lot in
-                        Text(lot.name+" · "+lot.id+" · "+DanperDatePresentation.display(lot.expires))
-                            .tag(lot.id)
-                    }
-                }
-                if let first=matches.first {
-                    LabeledContent("FEFO propuesto",value:first.id)
-                    LabeledContent("Disponible interno",value:matches.reduce(0){$0+$1.total}.formatted())
-                } else {
-                    Label("Pendiente de conciliar: sin existencia aprobada vigente",systemImage:"exclamationmark.circle")
-                        .font(.caption).foregroundStyle(.orange)
-                }
-                if !med.selectedLotID.isEmpty {
-                    let selected=matches.first{$0.id==med.selectedLotID}
-                    if let selected {
-                        LabeledContent("Existencia interna verificada",value:selected.total.formatted())
-                        LabeledContent("Capacidad por envase",value:selected.capacity.formatted())
-                    }
-                    TextField("Unidades físicas usadas (mL, UND…)",
-                              value:$med.physicalQuantity,format:.number)
-                        .keyboardType(.decimalPad)
-                    if matches.contains(where:{$0.sealed>0}) {
-                        Toggle("Autorizo abrir un frasco o caja nuevo",
-                               isOn:$med.approveOpening)
-                    }
-                    Text("El sistema recalcula el reparto FEFO al confirmar. No inventa existencias ni convierte el tamaño del envase en dosis.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Button(role:.destructive) {form.items.removeAll{$0.id==med.id}} label: {
+                        Label("Quitar producto",systemImage:"trash").font(.caption.weight(.semibold))
+                    }.buttonStyle(.plain)
                 }
             }
         }
@@ -541,21 +599,39 @@ struct N2NativeClinicalFormView:View {
         return issues+allergies+(step==2 ? extraTreatmentRequirements : [])
     }
     private func reviewSection(_ context:N2FormContext)->some View {
-        Section("Revisión antes de guardar") {
-            LabeledContent("Trabajador",value:currentWorker?.name ?? "Pendiente")
-            LabeledContent("Fecha",value:DanperDatePresentation.displayDateTime(form.date,form.time))
-            LabeledContent("Diagnóstico",value:form.diagnosis)
-            LabeledContent("Medicamentos",value:String(form.items.count))
-            LabeledContent("Procedimientos",value:form.procedures.joined(separator:", "))
-            if !pendingRequirements.isEmpty {
-                Label("Falta completar: "+pendingRequirements.joined(separator:", ")+".",
-                      systemImage:"exclamationmark.triangle.fill")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal:false,vertical:true)
+        Group {
+            DanperPanel("Resumen de la atención") {
+                Label(currentWorker?.name ?? "Trabajador pendiente",systemImage:"person.crop.circle.fill").font(.headline)
+                Text("DNI "+form.dni+" · "+DanperDatePresentation.displayDateTime(form.date,form.time))
+                    .font(.caption).foregroundStyle(.secondary)
+                Divider()
+                reviewValue("Evaluación",form.category.capitalized)
+                reviewValue("Diagnóstico",form.diagnosis)
+                ForEach(form.items) {med in
+                    reviewValue(medicationName(med.code,context),"Cantidad \(med.quantity) · \(med.procedure.capitalized)")
+                }
+                if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
+                Button("Editar evaluación") {step=1}.buttonStyle(DanperSecondaryButton())
             }
-            Text("Al guardar, se realizará una transacción cifrada que incluye la atención y todos sus descuentos físicos válidos. Un envase nuevo exige la autorización anterior.")
-                .font(.footnote).foregroundStyle(.secondary)
+            DanperPanel("Resultado y controles") {
+                DanperChoiceField(title:"Situación al finalizar",selection:$form.permission,options:["NO","SI"],
+                                  labels:["NO":"Continúa laborando","SI":"Se retira con permiso"])
+                if form.permission=="SI" {
+                    DanperField(title:"Hora del permiso") {TextField("HH:mm",text:$form.permissionTime).keyboardType(.numbersAndPunctuation)}
+                }
+                if !pendingRequirements.isEmpty {
+                    Label(pendingRequirements.joined(separator:"\n"),systemImage:"exclamationmark.triangle")
+                        .font(.footnote).foregroundStyle(.orange).fixedSize(horizontal:false,vertical:true)
+                }
+                Text("La atención y los consumos válidos se guardan juntos. Podrás revisar cualquier consumo pendiente en el historial.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+    private func reviewValue(_ title:String,_ value:String)->some View {
+        VStack(alignment:.leading,spacing:5) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.subheadline.weight(.medium)).fixedSize(horizontal:false,vertical:true)
         }
     }
     private func actions(_ context:N2FormContext)->some View {
@@ -591,18 +667,7 @@ struct N2NativeClinicalFormView:View {
                 .buttonStyle(DanperPrimaryButton())
                 .disabled(busy)
             }
-            if !dynamicTypeSize.isAccessibilitySize {
-            Button {
-                scheduleDraft(immediate:true)
-            }label:{
-                Label("Guardar borrador",systemImage:"square.and.arrow.down")
-                    .font(.footnote.weight(.semibold))
-                    .frame(maxWidth:.infinity,minHeight:36)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(DanperStyle.red)
-            .disabled(busy)
-            }
+
         }
         .padding(.horizontal,16)
         .padding(.top,10)
