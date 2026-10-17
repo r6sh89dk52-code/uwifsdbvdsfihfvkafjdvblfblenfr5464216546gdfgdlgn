@@ -53,14 +53,14 @@ jobs:
             xcodegen generate --spec project.yml
             xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
               -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
-              -derivedDataPath "$RUNNER_TEMP/danper-n2-build3" \
+              -derivedDataPath "$RUNNER_TEMP/danper-n2-build4" \
               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
               MARKETING_VERSION=0.2.2 CURRENT_PROJECT_VERSION=4 build
           )
       - name: Package and audit unsigned IPA without changing build222
         run: |
           set -euo pipefail
-          APP="$RUNNER_TEMP/danper-n2-build3/Build/Products/Release-iphoneos/DANPERNative.app"
+          APP="$RUNNER_TEMP/danper-n2-build4/Build/Products/Release-iphoneos/DANPERNative.app"
           test -d "$APP"
           BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
           VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
@@ -91,7 +91,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DANPER_N2_BOVEDA_CORREGIDA_IPHONE_BUILD4_UNSIGNED
-          path: native-preview-artifacts/DANPER_N2_DIAGNOSTICO_BUILD3_UNSIGNED.ipa
+          path: native-preview-artifacts/DANPER_N2_BOVEDA_CORREGIDA_BUILD4_UNSIGNED.ipa
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
