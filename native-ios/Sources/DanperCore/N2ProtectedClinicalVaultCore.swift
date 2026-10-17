@@ -46,6 +46,15 @@ public final class N2ProtectedClinicalVaultCore {
         guard let active=try journal.recover() else{return nil}
         return try N2NativeSnapshotReader.read(active.snapshot)
     }
+    /// Caller must reauthenticate and encrypt this data into a portable
+    /// backup before ever writing to Files/Share; no plaintext export allowed.
+    public func sourceForEncryptedBackup()throws->Data {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        _=try N1eLegacyClinicalAudit.inspect(active.snapshot)
+        return active.snapshot
+    }
     /// Admission of ONE previously verified complete backup, never a merge.
     /// No silent bootstrap or automatic migration on first launch.
     @discardableResult

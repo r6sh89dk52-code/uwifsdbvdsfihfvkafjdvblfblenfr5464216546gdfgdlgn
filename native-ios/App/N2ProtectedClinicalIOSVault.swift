@@ -82,4 +82,15 @@ actor N2ProtectedClinicalIOSVault {
         guard let secret=try deviceKey(create:false) else{return nil}
         return try N2ProtectedClinicalVaultCore(keyData:secret).readIndex()
     }
+    /// May only be invoked from a Face ID/code authenticated screen after
+    /// the user chooses a new passphrase; never persists plaintext to Files.
+    func exportPortableEncryptedBackup(password:String)throws->Data {
+        guard let secret=try deviceKey(create:false) else{
+            throw Failure.missingKey
+        }
+        let source=try N2ProtectedClinicalVaultCore(keyData:secret)
+            .sourceForEncryptedBackup()
+        return try N2NativePortableBackupMaker.createVerified(
+            snapshot:source,password:password)
+    }
 }

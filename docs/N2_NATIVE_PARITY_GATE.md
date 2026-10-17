@@ -26,3 +26,10 @@
 - `N2NativeSnapshotReader` proyecta las nueve colecciones clínicas sin modificarlas; preserva diferencia entre `R=0` verificado y `R=nil` pendiente; aplica FRECUENCIA por trabajador/fecha ordenando por fecha, hora, ID de atención, no por cantidad de materiales consumidos.
 - Búsqueda de personal respeta activación del padrón oficial, sin borrar personal histórico ni atenciones antiguas.
 - La vista SwiftUI `N2NativeHistoryView` utiliza exclusivamente un snapshot ficticio construido en CI; el lector es reutilizable en una futura bóveda operativa autorizada. No importa ni expone datos reales.
+
+## N2: almacenamiento clínico persistente y respaldo portátil
+
+- `N2ProtectedClinicalVaultCore` encapsula una generación clínica separada bajo `Application Support/DANPER-N2-CLINICAL-VAULT`, con protección completa iOS, verificación contra modificaciones y retención de generaciones previas. Solo admite una fuente inicial completa y revisada explícitamente; no fusiona datos de prueba ni accede al contenedor de la build 222.
+- `N2ProtectedClinicalIOSVault` utiliza otro servicio Keychain `...preview.n2.clinical`; nunca crea una clave reemplazo si existe contenido que no puede descifrar.
+- La API de respaldo `N2NativePortableBackupMaker` implementa `.danperbackup` v1 compatible (PBKDF2-SHA256, 310.000 iteraciones, AES-256-GCM, sal de 16 bytes, nonce de 12 bytes); verifica descifrado antes de entregar el cifrado para compartir. No escribe respaldos sin contraseña ni incluye datos en el ejecutable.
+- **No conectado aún a los flujos operativos o pantallas de importación/exportación real.** Compilar iOS no sustituye una prueba de restauración real y una comparación completa de snapshots de origen/destino.
