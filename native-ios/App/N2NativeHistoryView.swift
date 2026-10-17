@@ -101,7 +101,7 @@ struct N2NativeHistoryView: View {
         guard projection==nil else {return}
         do {
             if useProtectedVault {
-                guard let records=try await N2ProtectedClinicalIOSVault.shared.readHistory() else {
+                guard let records=try await N2SyntheticTrialIOSVault.shared.readHistory() else {
                     hasError=true;return
                 }
                 projection=records

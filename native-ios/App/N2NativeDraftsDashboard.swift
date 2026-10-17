@@ -61,7 +61,7 @@ struct N2NativeDraftsDashboard:View {
         loading=true
         defer {loading=false}
         do {
-            records=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
+            records=try await N2SyntheticTrialIOSVault.shared.readDrafts()
             failed=false
             message="Borradores recuperables: \(records.count). Desliza para actualizar."
         }catch{

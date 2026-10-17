@@ -410,9 +410,9 @@ struct N2NativeClinicalFormView:View {
     @MainActor
     private func load() async {
         do {
-            let source=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            let source=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             context=source
-            drafts=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
+            drafts=try await N2SyntheticTrialIOSVault.shared.readDrafts()
             if let requestedDraftID {
                 guard let recovered=drafts.first(where:{$0.id==requestedDraftID}) else {
                     fault=true
@@ -440,12 +440,12 @@ struct N2NativeClinicalFormView:View {
         defer{editingAllergy=false}
         do{
             let normalized=allergyStatus=="known" ? allergySubstances : ""
-            let fresh=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
-            let updated=try await N2ProtectedClinicalIOSVault.shared
+            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            let updated=try await N2SyntheticTrialIOSVault.shared
                 .reviewAllergies(dni:dni,status:allergyStatus,
                     substances:normalized,at:now,
                     expectedRevision:fresh.revision)
-            context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             status="Alergias revisadas en revisión \(updated.revision)."
             fault=false
         }catch{
@@ -469,11 +469,11 @@ struct N2NativeClinicalFormView:View {
             }
             guard !Task.isCancelled else{return}
             do{
-                let latest=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+                let latest=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
                 let patch=try version.makeDraftPatch(context:context)
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
-                let result=try await N2ProtectedClinicalIOSVault.shared.saveDraft(
+                let result=try await N2SyntheticTrialIOSVault.shared.saveDraft(
                     id:version.id,changes:patch,at:timestamp,
                     expectedRevision:latest.revision)
                 lastAutosaveTimestamp=timestamp
@@ -494,14 +494,14 @@ struct N2NativeClinicalFormView:View {
         busy=true
         defer{busy=false}
         do {
-            let fresh=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             let raw=try form.makeSavedVisit(context:fresh)
-            let outcome=try await N2ProtectedClinicalIOSVault.shared.saveAttention(
+            let outcome=try await N2SyntheticTrialIOSVault.shared.saveAttention(
                 raw,at:now,expectedRevision:fresh.revision)
             saved=true
             N2DraftReminder.cancel(id:form.id)
-            self.context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
-            drafts=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
+            self.context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            drafts=try await N2SyntheticTrialIOSVault.shared.readDrafts()
             status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."
         }catch {
             status="No se pudo confirmar la atención. La operación fue rechazada y el stock no se debe descontar parcialmente."
@@ -524,12 +524,12 @@ struct N2NativeClinicalFormView:View {
         busy=true
         defer {busy=false}
         do {
-            let fresh=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
-            _=try await N2ProtectedClinicalIOSVault.shared.deleteDraft(
+            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            _=try await N2SyntheticTrialIOSVault.shared.deleteDraft(
                 id:id,expectedRevision:fresh.revision)
             N2DraftReminder.cancel(id:id)
-            drafts=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
-            context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            drafts=try await N2SyntheticTrialIOSVault.shared.readDrafts()
+            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             if form.id==id {
                 autosaveTask?.cancel()
                 form=N2NativeFormDraft()

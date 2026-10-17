@@ -64,7 +64,7 @@ struct N2NativeWorkerEditorView:View {
         .navigationTitle("Nuevo trabajador N2")
         .task {
             do {
-                if let vault=try await N2ProtectedClinicalIOSVault.shared.inspect() {
+                if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
                     revision=vault.revision
                 }
                 status=revision==nil ? "Sin fuente clínica nativa verificada; registro bloqueado." :
@@ -86,7 +86,7 @@ struct N2NativeWorkerEditorView:View {
         busy=true
         Task {
             do {
-                let result=try await N2ProtectedClinicalIOSVault.shared.registerWorker(
+                let result=try await N2SyntheticTrialIOSVault.shared.registerWorker(
                     bytes,at:Int64(Date().timeIntervalSince1970*1000),
                     expectedRevision:current)
                 revision=result.revision
