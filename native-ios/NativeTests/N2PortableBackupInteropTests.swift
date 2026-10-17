@@ -38,6 +38,22 @@ final class N2PortableBackupInteropTests:XCTestCase {
         XCTAssertThrowsError(try PortableBackupInspector.audit(
             url:url,password:"This-is-a-wrong-14-char-password"))
     }
+    func testExplicitSyntheticN2ActivationEnablesClinicalTabsWithoutRealBackup() async throws {
+        let before=try await N2SyntheticTrialIOSVault.shared.inspect()
+        let created=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+        XCTAssertEqual(created.workers,5)
+        XCTAssertEqual(created.revision,before?.revision ?? 1)
+        let model=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+        XCTAssertEqual(model.workers.count,5)
+        XCTAssertEqual(model.products.clinical.count,432)
+        XCTAssertEqual(model.products.nursing.count,98)
+        XCTAssertEqual(model.revision,created.revision)
+        let again=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+        XCTAssertEqual(again.revision,created.revision)
+        // The fictional startup does not create or import the protected
+        // clinical vault of the old build222 or native real-source flow.
+        XCTAssertNil(try await N2ProtectedClinicalIOSVault.shared.inspect())
+    }
     func testUnsafePasswordAndPlaintextAreRejected() throws {
         XCTAssertThrowsError(try N2NativePortableBackupMaker.createVerified(
             snapshot:try sample(),password:"short"))

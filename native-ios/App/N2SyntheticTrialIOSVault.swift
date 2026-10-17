@@ -99,7 +99,14 @@ actor N2SyntheticTrialIOSVault {
     }
     func registerWorker(_ worker:Data,at:Int64,expectedRevision:Int)
         throws->N2ProtectedStoreSummary {
-        try protectedStore().registerWorker(worker,at:at,expectedRevision:expectedRevision)
+        guard let obj=try? JSONSerialization.jsonObject(with:worker) as? [String:Any],
+              let dni=obj["dni"] as? String,
+              let name=obj["name"] as? String,
+              dni.count==8,dni.hasPrefix("000000"),
+              name.uppercased().hasPrefix("PERSONA FICTICIA ") else {
+            throw Failure.blockedMigration
+        }
+        return try protectedStore().registerWorker(worker,at:at,expectedRevision:expectedRevision)
     }
     func reviewAllergies(dni:String,status:String,substances:String,
                         at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {

@@ -15,11 +15,12 @@ struct N2NativeWorkerEditorView:View {
     @State private var ubigeo=""
     @State private var revision:Int?
     @State private var busy=false
-    @State private var status="Verificando bóveda clínica N2…"
+    @State private var status="Comprobando práctica cifrada…"
     @State private var failed=false
 
     private var ready:Bool {
-        revision != nil && !busy && dni.count==8 &&
+        revision != nil && !busy && dni.count==8 && dni.hasPrefix("000000") &&
+        names.uppercased().hasPrefix("PERSONA FICTICIA ") &&
         dni.utf8.allSatisfy{(48...57).contains($0)} &&
         !names.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
         (sex.isEmpty || ["M","F"].contains(sex)) &&
@@ -33,10 +34,12 @@ struct N2NativeWorkerEditorView:View {
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
             }
-            Section("Identificación del trabajador") {
-                TextField("DNI · 8 dígitos",text:$dni)
+            Section("Trabajador ficticio solamente") {
+                Text("Utiliza un DNI simulado que empiece con 000000 y un nombre que comience con PERSONA FICTICIA. No introduzcas datos reales en esta beta.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                TextField("DNI ficticio (ej. 00000006)",text:$dni)
                     .keyboardType(.numberPad)
-                TextField("Apellidos y nombres",text:$names)
+                TextField("Nombre (PERSONA FICTICIA SEIS)",text:$names)
                     .textInputAutocapitalization(.characters)
                 TextField("Área",text:$area)
                 TextField("Cargo / labor",text:$labor)
@@ -61,14 +64,14 @@ struct N2NativeWorkerEditorView:View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Nuevo trabajador N2")
+        .navigationTitle("Trabajador ficticio")
         .task {
             do {
                 if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
                     revision=vault.revision
                 }
-                status=revision==nil ? "Sin fuente clínica nativa verificada; registro bloqueado." :
-                    "Bóveda N2 verificada. Los datos se guardan solo en este iPhone."
+                status=revision==nil ? "Activa el modo prueba desde Inicio para continuar." :
+                    "Entorno ficticio listo; estos datos no se mezclan con la build 222."
             }catch{
                 failed=true;status="Error de integridad de la bóveda. Registro bloqueado."
             }
