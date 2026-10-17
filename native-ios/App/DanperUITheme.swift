@@ -160,42 +160,83 @@ struct DanperField<Content:View>:View {
         }
     }
 }
+/// Anchored system menu, matching build222's native HTML select presentation.
 struct DanperChoiceField:View {
     let title:String
     @Binding var selection:String
     let options:[String]
     var labels:[String:String]=[:]
-    @State private var open=false
-    @State private var query=""
     private func label(_ value:String)->String {labels[value] ?? value.capitalized(with:Locale(identifier:"es_PE"))}
     var body:some View {
-        Button {open=true} label: {
+        Menu {
+            Picker(title,selection:$selection) {
+                if !options.contains("") {Text("Seleccionar").tag("")}
+                ForEach(options,id:\.self) {value in Text(label(value)).tag(value)}
+            }
+        } label: {
             DanperField(title:title) {
-                HStack(alignment:.center,spacing:12) {
+                HStack(spacing:12) {
                     Text(selection.isEmpty ? (labels[""] ?? "Seleccionar") : label(selection))
                         .foregroundStyle(selection.isEmpty ? .secondary : .primary)
                         .multilineTextAlignment(.leading).fixedSize(horizontal:false,vertical:true)
                     Spacer(minLength:0)
-                    Image(systemName:"chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                    Image(systemName:"chevron.up.chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 }.frame(minHeight:24)
             }
-        }.buttonStyle(.plain)
-        .sheet(isPresented:$open) {
-            NavigationStack {
-                List(options.filter{query.isEmpty || label($0).localizedStandardContains(query)},id:\.self) { value in
-                    Button {selection=value;open=false;query=""} label: {
-                        HStack(spacing:14) {
-                            Text(label(value)).foregroundStyle(.primary).fixedSize(horizontal:false,vertical:true)
-                            Spacer()
-                            if selection==value {Image(systemName:"checkmark.circle.fill").foregroundStyle(DanperStyle.red)}
-                        }.frame(minHeight:44).contentShape(Rectangle())
-                    }.buttonStyle(.plain)
-                }
-                .searchable(text:$query,prompt:"Buscar opción")
-                .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
-                .toolbar {ToolbarItem(placement:.topBarTrailing){Button("Listo"){open=false}}}
-                .danperFormChrome()
-            }.presentationDragIndicator(.visible)
+        }.buttonStyle(.plain).accessibilityIdentifier("choice-"+title)
+    }
+}
+
+/// Inline autocomplete used by clinical, inventory and reconciliation catalogs.
+struct DanperSearchOption:Identifiable {
+    let id:String
+    let title:String
+    let detail:String
+}
+struct DanperInlineSearch:View {
+    let title:String
+    let placeholder:String
+    let options:[DanperSearchOption]
+    let onSelect:(String)->Void
+    var onClose:(()->Void)?=nil
+    @State private var query=""
+    @FocusState private var focused:Bool
+    private var matches:[DanperSearchOption] {
+        options.filter {query.isEmpty || $0.title.localizedStandardContains(query) || $0.id.localizedStandardContains(query)}
+    }
+    var body:some View {
+        VStack(alignment:.leading,spacing:12) {
+            HStack {
+                Text(title).font(.subheadline.weight(.bold))
+                Spacer()
+                if let onClose {Button(action:onClose){Image(systemName:"xmark").padding(10)}.buttonStyle(.plain).accessibilityLabel("Cerrar búsqueda")}
+            }
+            DanperField(title:"Buscar por nombre o código") {
+                TextField(placeholder,text:$query).focused($focused)
+                    .autocorrectionDisabled().textInputAutocapitalization(.never)
+                    .accessibilityIdentifier("inline-catalog-query")
+            }
+            if query.trimmingCharacters(in:.whitespaces).isEmpty {
+                Text("Escribe para ver sugerencias de los \(options.count) productos.").font(.caption).foregroundStyle(.secondary)
+            } else {
+                if matches.isEmpty {Text("No se encontraron productos.").font(.caption).foregroundStyle(.secondary)}
+                ScrollView {
+                    LazyVStack(spacing:8) {
+                        ForEach(matches) { option in
+                            Button {
+                                onSelect(option.id);query="";focused=false
+                            } label: {
+                                VStack(alignment:.leading,spacing:5) {
+                                    Text(option.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                                    Text(option.detail).font(.caption).foregroundStyle(.secondary)
+                                }.padding(12).frame(maxWidth:.infinity,alignment:.leading)
+                                    .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:12))
+                                    .contentShape(RoundedRectangle(cornerRadius:12))
+                            }.buttonStyle(.plain).accessibilityIdentifier("suggestion-"+option.id)
+                        }
+                    }
+                }.frame(maxHeight:240)
+            }
         }
     }
 }
@@ -240,5 +281,23 @@ struct DanperDateField:View {
                     .environment(\.timeZone,TimeZone(identifier:"America/Lima")!)
             }.presentationDetents([.medium,.large])
         }
+    }
+}
+
+struct DanperToolLink<Destination:View>:View {
+    let title:String
+    let symbol:String
+    @ViewBuilder let destination:Destination
+    var body:some View {
+        NavigationLink {destination} label: {
+            HStack(spacing:12) {
+                Image(systemName:symbol).font(.title3).foregroundStyle(DanperStyle.red)
+                    .frame(width:42,height:42).background(DanperStyle.red.opacity(0.08),in:RoundedRectangle(cornerRadius:12))
+                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                    .frame(maxWidth:.infinity,alignment:.leading).fixedSize(horizontal:false,vertical:true)
+                Image(systemName:"chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }.padding(10).frame(maxWidth:.infinity,minHeight:64)
+                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
+        }.buttonStyle(.plain)
     }
 }

@@ -51,8 +51,9 @@ struct N2ClinicalCorrectionView:View {
     }
 
     var body:some View {
-        Form {
-            Section("Rectificación clínica · origen conservado") {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel("Rectificación clínica · origen conservado") {
                 Label("La atención guardada y el Kardex no se reemplazan",
                       systemImage:"lock.shield.fill")
                     .foregroundStyle(.orange)
@@ -77,29 +78,42 @@ struct N2ClinicalCorrectionView:View {
                     .foregroundStyle(failed ? Color.red : Color.secondary)
             }
             if detail != nil && !saved {
-                Section("Campos clínicos rectificables") {
+                DanperPanel("Campos clínicos rectificables") {
+                    DanperField(title:"Diagnóstico") {
                     TextField("Diagnóstico",text:$diagnosis,axis:.vertical)
                         .lineLimit(2...5)
+                }
+                    DanperField(title:"Tipo de atención") {
                     TextField("Tipo de atención",text:$category)
+                }
+                    DanperField(title:"Sistema afectado") {
                     TextField("Sistema afectado",text:$system)
+                }
+                    DanperField(title:"Detalle") {
                     TextField("Detalle",text:$segment)
+                }
+                    DanperField(title:"Procedimientos (uno por línea)") {
                     TextField("Procedimientos (uno por línea)",text:$procedures,
                               axis:.vertical).lineLimit(2...6)
-                    Picker("Permiso",selection:$permission) {
-                        Text("NO").tag("NO")
-                        Text("SI").tag("SI")
-                    }
+                }
+                    DanperChoiceField(title:"Situación al finalizar",selection:$permission,options:["NO","SI"],labels:["NO":"Continúa laborando","SI":"Se retira con permiso"])
                     if permission=="SI" {
-                        TextField("Hora del permiso (HH:mm)",text:$permissionTime)
+                        DanperField(title:"Hora del permiso (HH:mm)") {
+                    TextField("Hora del permiso (HH:mm)",text:$permissionTime)
+                }
                     }
-                    Toggle("Retornó a labores",isOn:$returned)
-                    Toggle("Vendaje azul",isOn:$blueBandage)
-                    Toggle("Foto enviada",isOn:$photoSent)
+                    DanperCheckRow(selected:$returned) {Text("Retornó a labores")}
+                    DanperCheckRow(selected:$blueBandage) {Text("Vendaje azul")}
+                    DanperCheckRow(selected:$photoSent) {Text("Foto enviada")}
+                    DanperField(title:"Responsable") {
                     TextField("Responsable",text:$responsible)
+                }
+                    DanperField(title:"DNI del responsable") {
                     TextField("DNI del responsable",text:$responsibleDni)
                 }
+                }
                 if let detail {
-                    Section("Medicamentos y consumos originales") {
+                    DanperPanel("Medicamentos y consumos originales") {
                         Text("El código, la cantidad administrada y las salidas FEFO son inmutables. Solo puedes corregir la descripción del procedimiento clínico, sin volver a descontar inventario.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(detail.medications,id:\.id){ item in
@@ -113,17 +127,23 @@ struct N2ClinicalCorrectionView:View {
                                 ))
                             }
                         }
-                        TextField("Discrepancia de medicamento / dosis (opcional)",
+                        DanperField(title:"Discrepancia de medicamento / dosis (opcional)") {
+                    TextField("Discrepancia de medicamento / dosis (opcional)",
                                   text:$discrepancy,axis:.vertical)
                             .lineLimit(2...5)
+                }
                         Text("Si documentas una discrepancia de medicamento o cantidad, quedará en el historial pero se bloqueará su inclusión en el Excel oficial hasta revisión de inventario. No se simula una devolución ni nueva entrega.")
                             .font(.caption).foregroundStyle(.orange)
                     }
                 }
-                Section("Auditoría obligatoria") {
+                DanperPanel("Auditoría obligatoria") {
+                    DanperField(title:"Motivo detallado de la rectificación") {
                     TextField("Motivo detallado de la rectificación",text:$reason,
                               axis:.vertical).lineLimit(2...5)
+                }
+                    DanperField(title:"Responsable que rectifica") {
                     TextField("Responsable que rectifica",text:$operatorName)
+                }
                     Button {
                         pendingConfirmation=true
                     } label: {
@@ -163,7 +183,7 @@ struct N2ClinicalCorrectionView:View {
                 }
             }
             if !history.isEmpty {
-                Section("Trazabilidad de rectificaciones") {
+                DanperPanel("Trazabilidad de rectificaciones") {
                     ForEach(history){event in
                         VStack(alignment:.leading,spacing:5) {
                             Text(event.reason).font(.headline)
@@ -185,13 +205,14 @@ struct N2ClinicalCorrectionView:View {
                 }
             }
             if saved {
-                Section {
+                DanperPanel {
                     Label("Rectificación confirmada en la bóveda",
                           systemImage:"checkmark.shield.fill")
                         .foregroundStyle(.green)
                     Text("Reabre el historial para consultar el diagnóstico corregido y su trazabilidad.")
                 }
             }
+          }.padding(16)
         }
         .navigationTitle("Rectificar atención")
         .danperFormChrome()
@@ -376,3 +397,4 @@ struct N2ClinicalCorrectionView:View {
         }
     }
 }
+

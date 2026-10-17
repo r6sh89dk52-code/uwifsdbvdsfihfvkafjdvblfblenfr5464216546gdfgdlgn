@@ -8,10 +8,13 @@ struct N2NativeClinicalFormView:View {
     let requestedDraftID:String?
     init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
     #if DEBUG
-    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="",saved:Bool=false,showCatalog:Bool=false,detailOnly:Bool=false) {
+    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="",saved:Bool=false,showCatalog:Bool=false,detailOnly:Bool=false,layoutOutcomes:[String:String]=[:]) {
         requestedDraftID=nil
         layoutOnly=true
         layoutDetailOnly=detailOnly
+        _savedLines=State(initialValue:layoutOutcomes)
+        _previewLines=State(initialValue:layoutOutcomes)
+        _previewReady=State(initialValue:!layoutOutcomes.isEmpty)
         _saved=State(initialValue:saved)
         _chooseProduct=State(initialValue:showCatalog)
         _expandedMedication=State(initialValue:draft.items.first?.id)
@@ -35,6 +38,10 @@ struct N2NativeClinicalFormView:View {
     @FocusState private var focusedField:String?
     @State private var validationMessage=""
     @State private var showValidation=false
+    @State private var previewLines:[String:String]=[:]
+    @State private var previewReady=false
+    @State private var previewBusy=false
+    @State private var previewError=""
     @State private var savedLines:[String:String]=[:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("danper.haptics.enabled") private var haptics=true
@@ -108,8 +115,15 @@ struct N2NativeClinicalFormView:View {
                     }
                     if saved {
                         DanperPanel {
-                            Image(systemName:"checkmark.circle.fill").font(.system(size:48)).foregroundStyle(.green)
+                            Image(systemName:savedLines.values.allSatisfy{$0=="Descontado"} ? "checkmark.circle.fill" : "checkmark.shield.fill").font(.system(size:48)).foregroundStyle(.green)
                             Text("Atención registrada").font(.title2.bold())
+                            if savedLines.values.contains(where:{$0 != "Descontado"}) {
+                                Label("Hay consumos sin salida física. Revisa el motivo de cada producto.",systemImage:"exclamationmark.triangle")
+                                    .font(.footnote).foregroundStyle(.orange)
+                            } else if !form.items.isEmpty {
+                                Label("Dispensación descontada automáticamente",systemImage:"checkmark.circle.fill")
+                                    .font(.footnote).foregroundStyle(.green)
+                            }
                             Text(currentWorker?.name ?? form.dni).font(.headline)
                             Text(DanperDatePresentation.displayDateTime(form.date,form.time)).font(.subheadline).foregroundStyle(.secondary)
                             Divider()
@@ -117,7 +131,7 @@ struct N2NativeClinicalFormView:View {
                             ForEach(form.items) {med in
                                 let result=savedLines[med.id] ?? "Pendiente de conciliar"
                                 HStack(alignment:.top,spacing:10) {
-                                    Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "clock")
+                                    Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                                         .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
                                     VStack(alignment:.leading,spacing:5) {
                                         Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
@@ -193,56 +207,6 @@ struct N2NativeClinicalFormView:View {
                         }
                     }
                 }
-                .sheet(isPresented:$chooseProduct) {
-                    NavigationStack {
-                        ScrollView {
-                            LazyVStack(spacing:10) {
-                                Text("Busca y agrega los productos que necesitas")
-                                    .font(.subheadline).foregroundStyle(.secondary)
-                                    .frame(maxWidth:.infinity,alignment:.leading)
-                                if context.products.clinicalMatches(search).isEmpty {
-                                    ContentUnavailableView.search(text:search)
-                                }
-                                ForEach(context.products.clinicalMatches(search)) {p in
-                                    Button {
-                                        let med=N2FormMedication(code:p.code)
-                                        form.items.append(med)
-                                        expandedMedication=med.id
-                                        form.refreshProcedureSuggestions(catalog:context.products)
-                                    } label: {
-                                        HStack(spacing:12) {
-                                            Image(systemName:"cross.vial").font(.title3)
-                                                .foregroundStyle(.secondary).frame(width:34)
-                                            VStack(alignment:.leading,spacing:5) {
-                                                Text(p.name).font(.subheadline.weight(.semibold))
-                                                    .foregroundStyle(.primary)
-                                                    .multilineTextAlignment(.leading)
-                                                Text(p.code+" · "+p.unit).font(.caption).foregroundStyle(.secondary)
-                                            }
-                                            Spacer(minLength:4)
-                                            let count=form.items.filter{$0.code==p.code}.count
-                                            Image(systemName:count>0 ? "checkmark.circle.fill" : "plus.circle")
-                                                .font(.title3).foregroundStyle(count>0 ? DanperStyle.red : Color.secondary)
-                                                .accessibilityLabel(count>0 ? "Agregado. Agregar otra línea" : "Agregar")
-                                        }.padding(14).frame(maxWidth:.infinity,minHeight:72)
-                                            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
-                                            .contentShape(RoundedRectangle(cornerRadius:16))
-                                    }.buttonStyle(.plain)
-                                }
-                            }.padding(16)
-                        }
-                        .background(DanperStyle.canvas)
-                        .searchable(text:$search,prompt:"Nombre o código del producto")
-                        .scrollDismissesKeyboard(.interactively)
-                        .navigationTitle("Catálogo clínico").navigationBarTitleDisplayMode(.inline)
-                        .safeAreaInset(edge:.bottom) {
-                            Button {chooseProduct=false;search=""} label: {
-                                Text("Continuar · \(form.items.count) productos")
-                            }.buttonStyle(DanperPrimaryButton()).padding(16).background(.regularMaterial)
-                        }
-                        .toolbar {ToolbarItem(placement:.topBarTrailing){Button("Listo"){chooseProduct=false;search=""}}}
-                    }.presentationDragIndicator(.visible)
-                }
                 .sheet(isPresented:$chooseDraft) {
                     NavigationStack {
                         List {
@@ -294,7 +258,14 @@ struct N2NativeClinicalFormView:View {
                     allergyStatus=context.allergies[dni]?.status ?? "unknown"
                     allergySubstances=context.allergies[dni]?.substances ?? ""
                 }
+                .task(id:form) {
+                    if step==3 && !saved && !layoutOnly {
+                        do {try await Task.sleep(for:.milliseconds(800))} catch{return}
+                        await refreshDispensingPreview()
+                    }
+                }
                 .onChange(of:form) {_,_ in
+                    previewReady=false
                     if !form.blueBandage {form.returned=false}
                     form.refreshProcedureSuggestions(catalog:context.products)
                     scheduleDraft()
@@ -440,11 +411,21 @@ struct N2NativeClinicalFormView:View {
         Group {
         if !layoutDetailOnly {
         DanperPanel {
-            Button {search="";chooseProduct=true} label: {
+            Button {withAnimation(reduceMotion ? nil : DanperStyle.animation){chooseProduct.toggle()}} label: {
                 Label("Agregar medicamento o insumo",systemImage:"plus.circle.fill")
             }
             .buttonStyle(DanperPrimaryButton())
             .accessibilityIdentifier("add-clinical-product")
+            if chooseProduct {
+                DanperInlineSearch(title:"Buscar medicamento o insumo",placeholder:"Ej. Paracetamol",
+                    options:context.products.clinical.map{DanperSearchOption(id:$0.code,title:$0.name,detail:$0.unit+" · Código "+$0.code)},
+                    onSelect:{code in
+                        let med=N2FormMedication(code:code)
+                        form.items.append(med);expandedMedication=med.id
+                        form.refreshProcedureSuggestions(catalog:context.products)
+                    },onClose:{chooseProduct=false})
+            }
+
             DanperChoiceField(title:"Tópico de dispensación",selection:Binding(
                 get:{form.dispensingSite},set:{site in
                     guard site != form.dispensingSite else{return}
@@ -571,7 +552,7 @@ struct N2NativeClinicalFormView:View {
                         Text("FEFO: "+first.id+" · Disponible: "+matches.reduce(0){$0+$1.total}.formatted())
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
-                        Label("Sin existencia aprobada vigente. Se registrará como consumo pendiente.",systemImage:"clock")
+                        Label("Sin existencia aprobada vigente. Se registrará como consumo pendiente.",systemImage:"exclamationmark.triangle")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if !med.selectedLotID.isEmpty {
@@ -622,6 +603,23 @@ struct N2NativeClinicalFormView:View {
         let allergies=step==0 ? form.clinicalIssues(step:1,context:context).filter{$0.hasPrefix("allergy-")}.map{N2ClinicalFormOptions.messages[$0] ?? $0} : []
         return issues+allergies+(step==2 ? extraTreatmentRequirements : [])
     }
+    private var previewPending:Bool {previewReady && previewLines.values.contains{$0 != "Descontado"}}
+    @MainActor
+    private func refreshDispensingPreview() async {
+        guard !layoutOnly,!saved,!previewBusy,pendingRequirements.isEmpty else{return}
+        if form.items.isEmpty {previewReady=true;previewLines=[:];return}
+        previewBusy=true;previewReady=false;previewError=""
+        defer{previewBusy=false}
+        do {
+            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            let raw=try form.makeSavedVisit(context:fresh)
+            let results=try await N2SyntheticTrialIOSVault.shared.previewAttention(raw,visitID:form.id,at:now,expectedRevision:fresh.revision)
+            guard !Task.isCancelled else{return}
+            previewLines=results;previewReady=results.count==form.items.count
+        } catch {
+            if !Task.isCancelled {previewError="No se pudo comprobar el stock actual. Actualiza la verificación antes de guardar."}
+        }
+    }
     private func reviewSection(_ context:N2FormContext)->some View {
         Group {
             DanperPanel("Resumen de la atención") {
@@ -636,6 +634,34 @@ struct N2NativeClinicalFormView:View {
                 }
                 if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
                 Button("Editar evaluación") {step=1}.buttonStyle(DanperSecondaryButton())
+            }
+            if !form.items.isEmpty {
+                DanperPanel("Dispensación al guardar") {
+                    if previewBusy {ProgressView("Comprobando stock y FEFO…")}
+                    if previewReady {
+                        ForEach(form.items) {med in
+                            let result=previewLines[med.id] ?? "Verificación incompleta"
+                            HStack(alignment:.top,spacing:10) {
+                                Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                    .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
+                                VStack(alignment:.leading,spacing:5) {
+                                    Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
+                                    Text(result=="Descontado" ? "Se descontará automáticamente al guardar" : "Sin salida física: "+result)
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } else if !previewBusy {
+                        Text(previewError.isEmpty ? "Completa la revisión para comprobar los consumos." : previewError)
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Actualizar verificación") {Task {await refreshDispensingPreview()}}
+                            .buttonStyle(DanperSecondaryButton())
+                    }
+                    if previewPending {
+                        DanperToolLink(title:"Revisar existencias y sedes",symbol:"shippingbox") {N2NativeInventoryView()}
+                        Text("Guardar con pendientes conserva el registro clínico, pero no acredita una salida de stock.").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
             DanperPanel("Resultado y controles") {
                 DanperChoiceField(title:"Situación al finalizar",selection:$form.permission,options:["NO","SI"],
@@ -684,12 +710,12 @@ struct N2NativeClinicalFormView:View {
                             .lineLimit(1).fixedSize(horizontal:false,vertical:true)
                     } else {
                         Label(step<3 ? "Siguiente" :
-                              (busy ? "Confirmando…" : "Guardar atención"),
+                              (busy ? "Confirmando…" : previewPending ? "Guardar con pendientes" : "Guardar atención"),
                               systemImage:step<3 ? "arrow.right" : "checkmark.shield.fill")
                     }
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy)
+                .disabled(busy || previewBusy || (!form.items.isEmpty && pendingRequirements.isEmpty && !previewReady && !layoutOnly))
             }
 
         }

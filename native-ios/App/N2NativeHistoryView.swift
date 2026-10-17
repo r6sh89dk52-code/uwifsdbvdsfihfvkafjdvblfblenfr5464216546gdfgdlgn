@@ -129,16 +129,17 @@ private struct N2WorkerHistoryDetail:View {
     let model:N2NativeReadModel
     let realSource:Bool
     var body:some View {
-        List {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
             if let worker=model.roster.first(where:{$0.dni==dni}) {
-                Section(realSource ? "Trabajador" : "Trabajador ficticio") {
+                DanperPanel(realSource ? "Trabajador" : "Trabajador ficticio") {
                     LabeledContent("Nombre",value:worker.name)
                     LabeledContent("DNI",value:worker.dni)
                     LabeledContent("Área",value:worker.area)
                     LabeledContent("Ubicación",value:worker.site)
                 }
             }
-            Section("Atenciones y borradores") {
+            DanperPanel("Atenciones y borradores") {
                 ForEach(model.workerHistory(dni)) { visit in
                     VStack(alignment:.leading,spacing:6) {
                         HStack {
@@ -175,6 +176,7 @@ private struct N2WorkerHistoryDetail:View {
                     .padding(.vertical,4)
                 }
             }
+          }.padding(16)
         }
         .navigationTitle(realSource ? "Historia clínica" : "Historia de prueba")
         .danperFormChrome()
@@ -187,7 +189,8 @@ struct N2VisitDispensingView:View {
     @State private var lines=[N2DispensingLine]()
     @State private var failed=false
     var body:some View {
-        List {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
             if failed {Text("No se pudo verificar el consumo. Inténtalo de nuevo.")}
             ForEach(lines) { line in
                 VStack(alignment:.leading,spacing:7) {
@@ -195,9 +198,10 @@ struct N2VisitDispensingView:View {
                     Text(line.code+" · Cantidad clínica: "+line.quantity.formatted()).font(.caption)
                     Label(line.result,systemImage:line.result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.circle")
                         .font(.footnote).foregroundStyle(line.result=="Descontado" ? Color.green : Color.orange)
-                }.padding(.vertical,5)
+                }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
             }
             if lines.isEmpty && !failed {Text("Atención sin medicamentos o insumos.").foregroundStyle(.secondary)}
+          }.padding(16)
         }
         .navigationTitle("Consumos de la atención").danperFormChrome()
         .task {

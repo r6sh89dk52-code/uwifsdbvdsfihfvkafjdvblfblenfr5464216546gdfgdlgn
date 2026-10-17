@@ -86,7 +86,7 @@ import DanperCore
                 N2NativeClinicalFormView(layoutContext:context,draft:form,step:2,detailOnly:true)
             },name:"Detalle-producto-\(dark ? "oscuro" : "claro")",dark:dark)
             try await capture(NavigationStack {
-                N2NativeClinicalFormView(layoutContext:context,draft:form,step:3,saved:true)
+                N2NativeClinicalFormView(layoutContext:context,draft:form,step:3,saved:true,layoutOutcomes:Dictionary(uniqueKeysWithValues:form.items.map{($0.id,"Descontado")}))
             },name:"Atencion-guardada-\(dark ? "oscuro" : "claro")",dark:dark)
             let model=try N2NativeSnapshotReader.read(resource("n2-synthetic-clinical"))
             try await capture(NavigationStack {
@@ -99,6 +99,21 @@ import DanperCore
         try await capture(NavigationStack {
             N2NativeClinicalFormView(layoutContext:context,draft:form,step:3)
         },name:"Resumen-DynamicType",dark:false,large:true)
+    }
+    func testAccessInventoryAndReconciliationLayouts() async throws {
+        let context=try context()
+        for dark in [false,true] {
+            try await capture(DanperAccessView(unlocking:false,canRetry:false,error:"",onUnlock:{}),
+                name:"Acceso-\(dark ? "oscuro" : "claro")",dark:dark)
+            try await capture(NavigationStack {N2NativeInventoryView(layoutContext:context)},
+                name:"Inventario-inicio-\(dark ? "oscuro" : "claro")",dark:dark)
+            try await capture(NavigationStack {N2NativeInventoryView(layoutContext:context,operation:"lot")},
+                name:"Inventario-lote-\(dark ? "oscuro" : "claro")",dark:dark)
+            try await capture(NavigationStack {N2ReconciliationView(layoutContext:context)},
+                name:"Conciliacion-\(dark ? "oscuro" : "claro")",dark:dark)
+            try await capture(NavigationStack {N2VerifiedNursingExportView()},
+                name:"Kardex-exportar-\(dark ? "oscuro" : "claro")",dark:dark)
+        }
     }
     func testHomeLayouts() async throws {
         let snapshot=try resource("n2-synthetic-clinical")

@@ -35,8 +35,9 @@ struct N2NativeBackupExportView:View {
     }
 
     var body:some View {
-        Form {
-            Section("Respaldo cifrado") {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel("Respaldo cifrado") {
                 Label("Datos protegidos del modo de prueba",
                       systemImage:"lock.shield.fill")
                     .font(.headline)
@@ -52,27 +53,32 @@ struct N2NativeBackupExportView:View {
                 Text("El respaldo se cifra con AES-256-GCM y una clave derivada de tu contraseña. No accede a la app híbrida instalada.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Section("Protección del archivo") {
-                SecureField("Nueva contraseña (mínimo 14 caracteres)",text:$password)
+            DanperPanel("Protección del archivo") {
+                DanperField(title:"Nueva contraseña (mínimo 14 caracteres)") {
+                    SecureField("Nueva contraseña (mínimo 14 caracteres)",text:$password)
                     .textContentType(.newPassword)
-                SecureField("Repetir contraseña",text:$confirmation)
+                }
+                DanperField(title:"Repetir contraseña") {
+                    SecureField("Repetir contraseña",text:$confirmation)
                     .textContentType(.newPassword)
+                }
                 Text("No se almacena tu contraseña. Sin ella no podrás restaurar el archivo. Se solicitará Face ID o código antes de exportar.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Section("Generar y compartir") {
+            DanperPanel("Generar y compartir") {
                 Button {
                     Task {await exportProtected()}
                 } label:{
                     Label(busy ? "Verificando…" : "Crear respaldo cifrado y compartir",
                           systemImage:"square.and.arrow.up.on.square")
                 }
-                .disabled(!valid)
+                .buttonStyle(DanperPrimaryButton()).disabled(!valid)
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
                 Text("El archivo temporal contiene solo datos cifrados. Se elimina de esta carpeta al cerrar Compartir; una copia que guardes en Archivos queda bajo tu control.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+          }.padding(16)
         }
         .navigationTitle("Respaldo cifrado")
         .danperFormChrome()

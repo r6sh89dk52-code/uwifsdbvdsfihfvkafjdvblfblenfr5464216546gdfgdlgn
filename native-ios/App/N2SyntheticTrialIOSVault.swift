@@ -187,6 +187,18 @@ actor N2SyntheticTrialIOSVault {
             approvedCatalog:resource("n2-approved-mappings"),
             at:at,expectedRevision:expectedRevision)
     }
+    func previewAttention(_ attention:Data,visitID:String,at:Int64,expectedRevision:Int)throws->[String:String] {
+        let result=try protectedStore().previewAttention(attention,
+            approvedCatalog:resource("n2-approved-mappings"),at:at,expectedRevision:expectedRevision)
+        let root=try JSONSerialization.jsonObject(with:result.snapshot) as? [String:Any]
+        let visits=root?["attentions"] as? [[String:Any]]
+        return visits?.first{$0["id"] as? String==visitID}?["nativeDispensing"] as? [String:String] ?? [:]
+    }
+    func verifyOriginalStockSite(eventID:String,lotID:String,site:String,reason:String,
+        at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().verifyOriginalStockSite(eventID:eventID,lotID:lotID,site:site,
+            reason:reason,operatorName:"Felipe Azcárate Silva",at:at,expectedRevision:expectedRevision)
+    }
     func addLot(_ lot:Data,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().registerStockLot(lot,
             nursingCatalog:resource("n2-nursing-catalog"),expectedRevision:expectedRevision)

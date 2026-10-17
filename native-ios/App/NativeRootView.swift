@@ -248,51 +248,17 @@ struct NativeRootView:View {
             }
             if isReady {
                 DanperPanel("Inventario y reportes de prueba") {
-                    NavigationLink {
-                        N2NativeInventoryView()
-                    }label:{
-                        Label("Inventario y lotes",systemImage:"shippingbox")
-                    }
-                    NavigationLink {
-                        N2ReconciliationView()
-                    }label:{
-                        Label("Conciliación de inventario",
-                              systemImage:"checkmark.shield")
-                    }
-                    NavigationLink {
-                        N2VerifiedNursingExportView()
-                    }label:{
-                        Label("Kardex de enfermería",
-                              systemImage:"tablecells")
-                    }
-                    NavigationLink {
-                        N2VerifiedIndicatorExportView()
-                    }label:{
-                        Label("Indicador ambulatorio · Excel",
-                              systemImage:"doc.richtext")
-                    }
-                    NavigationLink {
-                        N2NativeBackupExportView()
-                    }label:{
-                        Label("Respaldar datos ficticios cifrados",
-                              systemImage:"lock.doc")
-                    }
+                    DanperToolLink(title:"Inventario y lotes",symbol:"shippingbox") {N2NativeInventoryView()}
+                    DanperToolLink(title:"Conciliación de inventario",symbol:"checkmark.shield") {N2ReconciliationView()}
+                    DanperToolLink(title:"Kardex de enfermería",symbol:"tablecells") {N2VerifiedNursingExportView()}
+                    DanperToolLink(title:"Indicador ambulatorio · Excel",symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
+                    DanperToolLink(title:"Respaldar datos ficticios cifrados",symbol:"lock.doc") {N2NativeBackupExportView()}
                 }
             }
             DanperPanel("Datos reales · no se mezclan con las pruebas") {
-                NavigationLink {
-                    BackupPreviewView()
-                }label:{
-                    Label("Comprobar respaldo original (solo lectura)",
-                          systemImage:"doc.text.magnifyingglass")
-                }
+                DanperToolLink(title:"Comprobar respaldo original (solo lectura)",symbol:"doc.text.magnifyingglass") {BackupPreviewView()}
                 DisclosureGroup("Configuración avanzada",isExpanded:$showAdvanced) {
-                    NavigationLink {
-                        N2NativeActivationView()
-                    }label:{
-                        Label("Importación protegida en bóveda independiente",
-                              systemImage:"lock.shield")
-                    }
+                    DanperToolLink(title:"Importación protegida en bóveda independiente",symbol:"lock.shield") {N2NativeActivationView()}
                     Text("Esta función es independiente de la demostración. No la necesitas para probar atenciones.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }

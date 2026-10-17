@@ -80,7 +80,7 @@ jobs:
       - name: Publish unsigned IPA ZIP artifact for PRIVATE beta download
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER_SWIFTUI_PARIDAD_BUILD222_B9_UNSIGNED
+          name: DANPER_SWIFTUI_PARIDAD_BUILD222_B10_UNSIGNED
           path: |
             native-preview-artifacts/DANPER_N2_EVALUACION_UNSIGNED.ipa
             native-preview-artifacts/SHA256SUMS.txt

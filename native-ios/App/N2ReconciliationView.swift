@@ -4,6 +4,14 @@ import DanperCore
 
 /// Only audited source records; never mutates stock or patient visits.
 struct N2ReconciliationView:View {
+    private var layoutOnly=false
+    init() {}
+    #if DEBUG
+    init(layoutContext:N2FormContext,operation:String?=nil) {
+        layoutOnly=true
+        _context=State(initialValue:layoutContext)
+    }
+    #endif
     @State private var context:N2FormContext?
     @State private var events=[N2ReconciliationEventRow]()
     @State private var site="LA VENTUROSA"
@@ -42,77 +50,71 @@ struct N2ReconciliationView:View {
                 document.trimmingCharacters(in:.whitespaces).count>=3))))
     }
     var body:some View {
-        Form {
-            Section("Conciliación auditable · 432 productos") {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel("Conciliación auditable · 432 productos") {
                 Label("Fuente N2 cifrada independiente",systemImage:"lock.shield.fill")
                 Text("Todo ajuste se añade como evento con fecha y justificación. Para corregir, anula el evento: la historia original nunca se borra.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
             }
-            Section("Tipo y sede") {
-                Picker("Sede",selection:$site) {
-                    Text("Fundo La Venturosa").tag("LA VENTUROSA")
-                    Text("Planta La Venturosa").tag("PLVENTUROSA")
-                }
-                Picker("Evento",selection:$kind) {
-                    Text("Stock inicial").tag("opening")
-                    Text("Ingreso extraordinario").tag("receipt")
-                    Text("Conteo final").tag("count")
-                    Text("Revisar / cerrar período").tag("review")
-                    Text("Anular evento previo").tag("void")
-                }
+            DanperPanel("Tipo y sede") {
+                DanperChoiceField(title:"Sede",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                DanperChoiceField(title:"Evento",selection:$kind,options:["opening","receipt","count","review","void"],labels:["opening":"Stock inicial","receipt":"Ingreso extraordinario","count":"Conteo final","review":"Revisar / cerrar período","void":"Anular evento previo"])
+
             }
-            Section("Datos comprobables") {
-                LabeledContent("Fecha del evento",value:DanperDatePresentation.display(localDay(date)))
-                DatePicker("Cambiar fecha",selection:$date,displayedComponents:.date)
+            DanperPanel("Datos comprobables") {
+                DanperDateField(title:"Fecha del evento",selection:$date)
                 if kind=="review" {
-                    LabeledContent("Fin del período",value:DanperDatePresentation.display(localDay(periodEnd)))
-                    DatePicker("Cambiar fin",selection:$periodEnd,
-                               displayedComponents:.date)
+                    DanperDateField(title:"Fin del período",selection:$periodEnd)
                     Text("El cierre confirma revisión de ingresos, pero no inventa cantidades faltantes.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }else if kind=="void" {
-                    Picker("Registro que se anula",selection:$selectedVoid) {
-                        Text("Selecciona un evento").tag("")
-                        ForEach(options){r in
-                            Text(r.kind+" · "+DanperDatePresentation.display(r.date)+" · "+r.code+" ("+String(r.quantity)+")")
-                                .tag(r.id)
-                        }
-                    }
+                    DanperChoiceField(title:"Registro que se anula",selection:$selectedVoid,options:options.map(\.id),
+                        labels:Dictionary(uniqueKeysWithValues:options.map{($0.id,$0.kind+" · "+DanperDatePresentation.display($0.date)+" · "+$0.code+" ("+String($0.quantity)+")")}))
                 }else{
                     Button {
-                        pickProduct=true
+                        pickProduct.toggle()
                     }label:{
                         Label(code.isEmpty ? "Seleccionar material oficial" : code,
                               systemImage:"magnifyingglass")
                     }
+                    if pickProduct,let context {
+                        DanperInlineSearch(title:"Buscar material oficial",placeholder:"Nombre o código",
+                            options:context.products.clinical.map{DanperSearchOption(id:$0.code,title:$0.name,detail:$0.code+" · "+$0.unit)},
+                            onSelect:{id in code=id;pickProduct=false},onClose:{pickProduct=false})
+                    }
+                    DanperField(title:"Cantidad física (unidad del catálogo)") {
                     TextField("Cantidad física (unidad del catálogo)",text:$quantity)
                         .keyboardType(.numberPad)
+                }
                     if kind=="receipt" {
-                        TextField("Documento o guía",text:$document)
-                        Toggle("Tiene vencimiento",isOn:$hasExpires)
+                        DanperField(title:"Documento o guía") {
+                    TextField("Documento o guía",text:$document)
+                }
+                        DanperCheckRow(selected:$hasExpires) {Text("Tiene vencimiento")}
                         if hasExpires {
-                            LabeledContent("Vencimiento",value:DanperDatePresentation.display(localDay(expires)))
-                            DatePicker("Cambiar vencimiento",selection:$expires,
-                                       displayedComponents:.date)
+                            DanperDateField(title:"Vencimiento",selection:$expires)
                         }
                     }
                 }
-                TextField("Justificación obligatoria",text:$reason,
+                DanperField(title:"Justificación obligatoria") {
+                    TextField("Justificación obligatoria",text:$reason,
                           axis:.vertical).lineLimit(2...5)
+                }
             }
-            Section("Guardar registro") {
+            DanperPanel("Guardar registro") {
                 Button {
                     Task {await save()}
                 }label:{
                     Label(busy ? "Verificando…" : "Confirmar evento cifrado",
                           systemImage:"checkmark.shield.fill")
-                }.disabled(!enabled)
+                }.buttonStyle(DanperPrimaryButton()).disabled(!enabled)
                 Text("El registro queda en una sola generación cifrada. Este formulario no modifica las atenciones ni las salidas del Kardex.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Historial de eventos") {
+            DanperPanel("Historial de eventos") {
                 Text("\(events.count) eventos guardados (incluye anulaciones)")
                     .font(.footnote).foregroundStyle(.secondary)
                 ForEach(events.prefix(20)) { event in
@@ -125,38 +127,11 @@ struct N2ReconciliationView:View {
                     }
                 }
             }
+          }.padding(16)
         }
         .navigationTitle("Conciliación de inventario")
         .danperFormChrome()
-        .sheet(isPresented:$pickProduct) {
-            NavigationStack {
-                List {
-                    if let context {
-                        ForEach(context.products.clinicalMatches(search).prefix(150)) { p in
-                            Button {
-                                code=p.code
-                                pickProduct=false
-                                search=""
-                            } label: {
-                                VStack(alignment:.leading) {
-                                    Text(p.name).foregroundStyle(.primary)
-                                    Text(p.code+" · "+p.unit)
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                }
-                .searchable(text:$search,prompt:"Código o nombre")
-                .navigationTitle("432 materiales")
-                .toolbar {
-                    ToolbarItem(placement:.topBarTrailing) {
-                        Button("Cerrar"){pickProduct=false}
-                    }
-                }
-            }
-        }
-        .task {await load()}
+        .task {if !layoutOnly {await load()}}
     }
     @MainActor
     private func load() async {
@@ -203,3 +178,4 @@ struct N2ReconciliationView:View {
         }
     }
 }
+

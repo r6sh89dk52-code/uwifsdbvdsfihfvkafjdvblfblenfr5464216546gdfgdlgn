@@ -40,6 +40,10 @@ public final class N2ProtectedClinicalVaultCore {
         journal=try N2EncryptedClinicalJournal(
             protectedAppSupportDirectory:directory,secret:keyData)
     }
+    // Test-only dependency injection; internal, inaccessible to the app module.
+    init(testJournal:N2EncryptedClinicalJournal,directory:URL) {
+        journal=testJournal;self.directory=directory
+    }
     private func summary(_ record:N2EncryptedClinicalJournal.Recovered) throws
         -> N2ProtectedStoreSummary {
         let a=try N1eLegacyClinicalAudit.inspect(record.snapshot)
@@ -262,6 +266,23 @@ public final class N2ProtectedClinicalVaultCore {
                             expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try modify(expectedRevision:expectedRevision) {
             try N2SnapshotEditor.deleteDraft(snapshot:$0,id:id)
+        }
+    }
+    /// Runs the exact physical planner against an in-memory copy. No journal commit,
+    /// draft mutation, stock deduction or generation increment occurs in this method.
+    public func previewAttention(_ attention:Data,approvedCatalog:Data,at:Int64,
+                                 expectedRevision:Int)throws->N2ClinicalResult {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        guard active.revision==expectedRevision else{throw N2ProtectedStoreError.staleRevision}
+        return try N2NativeClinicalTransaction.appendSavedVisit(snapshot:active.snapshot,
+            visit:attention,approvedCatalog:approvedCatalog,at:at)
+    }
+    @discardableResult
+    public func verifyOriginalStockSite(eventID:String,lotID:String,site:String,
+        reason:String,operatorName:String,at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeInventoryCommands.verifyOriginalSite(snapshot:$0,eventID:eventID,
+                lotID:lotID,site:site,reason:reason,operatorName:operatorName,at:at)
         }
     }
     @discardableResult

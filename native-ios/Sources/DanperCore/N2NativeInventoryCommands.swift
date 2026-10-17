@@ -83,6 +83,33 @@ public enum N2NativeInventoryCommands {
         }
         return found
     }
+    /// Explicit verification of a legacy lot's original location. Never a transfer,
+    /// count adjustment, or inferred assignment. Existing quantities and ledger stay exact.
+    public static func verifyOriginalSite(snapshot:Data,eventID:String,lotID:String,
+        site:String,reason:String,operatorName:String,at:Int64)throws->Data {
+        guard !eventID.isEmpty,eventID.count<=200,at>0,at<=9_007_199_254_740_991,
+              ["LA VENTUROSA","PLVENTUROSA"].contains(site),
+              (8...250).contains(reason.trimmingCharacters(in:.whitespacesAndNewlines).count),
+              (3...200).contains(operatorName.trimmingCharacters(in:.whitespacesAndNewlines).count)
+        else{throw N2InventoryError.insufficientEvidence}
+        var state=try root(snapshot)
+        var events=state["nativeStockSiteVerifications"] as? [[String:Any]] ?? []
+        let event:[String:Any]=["id":eventID,"lotId":lotID,"site":site,"reason":reason,
+                                "operatorName":operatorName,"at":at,"scope":"original-location"]
+        if let previous=events.first(where:{$0["id"] as? String==eventID}) {
+            guard NSDictionary(dictionary:previous).isEqual(to:event) else{throw N2InventoryError.duplicatedMovement}
+            return snapshot
+        }
+        guard events.count<10000,var lots=state["stockLots"] as? [[String:Any]],
+              let index=lots.firstIndex(where:{$0["id"] as? String==lotID}),
+              (lots[index]["site"] as? String ?? "").isEmpty
+        else{throw N2InventoryError.invalidLot}
+        lots[index]["site"]=site
+        guard validLot(lots[index]) else{throw N2InventoryError.invalidLot}
+        events.append(event);state["stockLots"]=lots;state["nativeStockSiteVerifications"]=events
+        return try done(state)
+    }
+
     public static func registerLot(snapshot:Data,lot:Data,
                                    catalogData:Data)throws->Data {
         var state=try root(snapshot)
