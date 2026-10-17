@@ -26,6 +26,7 @@ public struct N2FormLot:Equatable,Sendable,Identifiable {
     public let sealed:Int
     public let loose:Double
     public let opened:Double
+    public var site:String=""
     public var total:Double {Double(sealed)*capacity+loose+opened}
     public var needsOpening:Bool {opened <= 0 && loose <= 0 && sealed>0}
 }
@@ -35,10 +36,11 @@ public struct N2FormContext:Sendable {
     public let allergies:[String:N2FormAllergy]
     public let lots:[N2FormLot]
     public let products:N2NativeCatalogIndex
-    public func options(for code:String,at date:String)->[N2FormLot] {
+    public func options(for code:String,at date:String,site:String="")->[N2FormLot] {
         let approved=Set(products.authorizedNursingOptions(for:code).map(\.id))
         return lots.filter {
             approved.contains($0.kardexCode) && $0.total>0 &&
+            (site.isEmpty || $0.site==site) &&
             ($0.expires.isEmpty || $0.expires>=date)
         }.sorted {
             let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
@@ -102,7 +104,7 @@ public enum N2NativeFormContextReader {
             }
             return N2FormLot(id:id,kardexCode:code,name:name,unit:unit,
                              expires:expiry,capacity:capacity,sealed:sealed,
-                             loose:loose,opened:opened)
+                             loose:loose,opened:opened,site:row["site"] as? String ?? "")
         }
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
         return N2FormContext(revision:revision,workers:people,
@@ -137,6 +139,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
     public var dni:String=""
     public var date:String=""
     public var time:String=""
+    public var dispensingSite:String=""
     public var category:String=""
     public var system:String=""
     public var segment:String=""
@@ -202,7 +205,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "procedureSource":med.procedureSource
             ]
             if !med.selectedLotID.isEmpty {
-                guard context.options(for:med.code,at:date).contains(where:{
+                guard context.options(for:med.code,at:date,site:dispensingSite).contains(where:{
                     $0.id==med.selectedLotID
                 }),med.physicalQuantity>0,med.physicalQuantity.isFinite else{
                     throw N2FormError.invalidProduct
@@ -225,6 +228,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         }
         let source:[String:Any]=[
             "id":id,"status":"saved","date":date,"time":time,
+            "dispensingSite":dispensingSite,
             "worker":workerRaw,"category":category,"system":system,
             "segment":segment,"diagnosis":diagnosis,"items":lines,
             "permission":permission,
@@ -265,6 +269,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         return try JSONSerialization.data(withJSONObject:[
             "worker":workerRaw,"items":itemRows,
             "date":date,"time":time,"category":category,
+            "dispensingSite":dispensingSite,
             "system":system,"segment":segment,"diagnosis":diagnosis,
             "permission":permission,"permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,

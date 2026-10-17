@@ -90,6 +90,9 @@ actor N2SyntheticTrialIOSVault {
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
     }
+    func dispensingLines(visitID:String)throws->[N2DispensingLine] {
+        try protectedStore().dispensingLines(visitID:visitID)
+    }
     func dispensingStatus(visitID:String)throws->[String:String] {
         try protectedStore().dispensingStatus(visitID:visitID)
     }
@@ -214,7 +217,7 @@ actor N2SyntheticTrialIOSVault {
             expectedRevision:expectedRevision)
     }
     func exportVerifiedIndicatorWorkbook(
-        start:String,end:String,subdivision:String,ids:Set<String>)throws
+        start:String,end:String,subdivision:String,ids:Set<String>,allowPending:Bool=false)throws
         -> N2VerifiedIndicatorWorkbook.Result {
         guard let url=Bundle.main.url(
             forResource:"n1s-indicator-template-store",
@@ -225,7 +228,7 @@ actor N2SyntheticTrialIOSVault {
             products:resource("n2-ambulatory-products"),
             mappings:resource("n2-approved-mappings"),
             template:Data(contentsOf:url),
-            start:start,end:end,subdivision:subdivision,ids:ids)
+            start:start,end:end,subdivision:subdivision,ids:ids,allowPending:allowPending)
     }
 
     func exportVerifiedDailyNursingWorkbook(date:String,shift:String,

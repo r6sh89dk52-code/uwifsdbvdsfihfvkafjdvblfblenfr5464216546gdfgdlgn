@@ -5,6 +5,8 @@ import DanperCore
 /// Active ONLY after a verified one-source protected N2 vault exists.
 /// Writes a new manual worker atomically, never modifies worker identity.
 struct N2NativeWorkerEditorView:View {
+    @State private var existingDNI=Set<String>()
+    @State private var saved=false
     @State private var dni=""
     @State private var names=""
     @State private var area=""
@@ -19,7 +21,7 @@ struct N2NativeWorkerEditorView:View {
     @State private var failed=false
 
     private var ready:Bool {
-        revision != nil && !busy && dni.count==8 && dni.hasPrefix("000000") &&
+        revision != nil && !busy && !existingDNI.contains(dni) && dni.count==8 && dni.hasPrefix("000000") &&
         names.uppercased().hasPrefix("PERSONA FICTICIA ") &&
         dni.utf8.allSatisfy{(48...57).contains($0)} &&
         !names.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
@@ -31,13 +33,14 @@ struct N2NativeWorkerEditorView:View {
             Section {
                 Label("Modo de prueba — datos ficticios",systemImage:"lock.shield")
                     .font(.caption).foregroundStyle(DanperStyle.red)
-                if failed {Text(status).font(.footnote).foregroundStyle(.orange)}
+                if failed || saved {Text(status).font(.footnote).foregroundStyle(failed ? Color.orange : Color.green)}
             }
             Section("Identificación") {
                 Text("DNI de prueba: 000000 seguido de dos cifras. Nombre: PERSONA FICTICIA seguido de un identificador.")
                     .font(.caption).foregroundStyle(.secondary)
                 TextField("DNI ficticio (ej. 00000006)",text:$dni)
                     .keyboardType(.numberPad)
+                if existingDNI.contains(dni) {Label("Este DNI ya existe en Personal",systemImage:"exclamationmark.circle").font(.caption).foregroundStyle(.orange)}
                 TextField("Nombre (PERSONA FICTICIA SEIS)",text:$names)
                     .textInputAutocapitalization(.characters)
             }
@@ -46,7 +49,7 @@ struct N2NativeWorkerEditorView:View {
                 TextField("Cargo / labor",text:$labor)
                 Picker("Sede",selection:$site) {
                     Text("La Venturosa").tag("LA VENTUROSA")
-                    Text("Planta Chepén").tag("PLANTA CHEPEN")
+                    Text("Planta La Venturosa").tag("PLVENTUROSA")
                 }
             }
             Section("Datos personales opcionales") {
@@ -68,10 +71,13 @@ struct N2NativeWorkerEditorView:View {
         }
         .navigationTitle("Nuevo trabajador")
         .danperFormChrome()
+        .sensoryFeedback(.success,trigger:saved)
         .task {
             do {
                 if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
                     revision=vault.revision
+                    let context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                    existingDNI=Set(context.workers.map(\.dni))
                 }
                 status=revision==nil ? "Activa el modo prueba desde Inicio para continuar." :
                     "Entorno ficticio listo; estos datos no se mezclan con la build 222."
@@ -97,6 +103,8 @@ struct N2NativeWorkerEditorView:View {
                     expectedRevision:current)
                 revision=result.revision
                 failed=false
+                saved=true
+                existingDNI.insert(dni)
                 status="Nuevo trabajador guardado en revisión cifrada \(result.revision)."
                 dni="";names="";area="";labor="";sex="";age="";ubigeo=""
             }catch{

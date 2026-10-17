@@ -7,6 +7,16 @@ import DanperCore
 struct N2NativeClinicalFormView:View {
     let requestedDraftID:String?
     init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
+    #if DEBUG
+    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int) {
+        requestedDraftID=nil
+        layoutOnly=true
+        _context=State(initialValue:layoutContext)
+        _form=State(initialValue:draft)
+        _step=State(initialValue:step)
+    }
+    #endif
+    private var layoutOnly=false
     private let brand=Color(red:0.88,green:0.09,blue:0.16)
     private let categories=[
         "ACCIDENTE COMUN","ACCIDENTE DE TRABAJO","ENFERMEDAD",
@@ -23,6 +33,7 @@ struct N2NativeClinicalFormView:View {
     @State private var form=N2NativeFormDraft()
     @State private var step=0
     @State private var busy=false
+    @FocusState private var focusedField:String?
     @State private var validationMessage=""
     @State private var showValidation=false
     @State private var savedLines:[String:String]=[:]
@@ -237,12 +248,23 @@ struct N2NativeClinicalFormView:View {
                         }
                     }
                 }
+                .onChange(of:form.dispensingSite) {_,_ in
+                    for i in form.items.indices {
+                        form.items[i].selectedLotID="";form.items[i].physicalQuantity=0
+                        form.items[i].approveOpening=false
+                    }
+                }
                 .onChange(of:form) {_,_ in
                     form.refreshProcedureSuggestions(catalog:context.products)
                     scheduleDraft()
                 }
                 .alert("Completa este paso",isPresented:$showValidation) {
-                    Button("Revisar",role:.cancel) {}
+                    Button("Revisar",role:.cancel) {
+                        if form.category.isEmpty {focusedField="category"}
+                        else if form.system.isEmpty {focusedField="system"}
+                        else if form.diagnosis.isEmpty {focusedField="diagnosis"}
+                        else {focusedField="time"}
+                    }
                 } message: {Text(validationMessage)}
                 .onChange(of:scenePhase) {_,phase in
                     if phase != .active {scheduleDraft(immediate:true)}
@@ -306,7 +328,7 @@ struct N2NativeClinicalFormView:View {
         Section("Datos de la atención") {
             LabeledContent("Fecha",value:DanperDatePresentation.display(form.date))
             DatePicker("Cambiar fecha",selection:dateSelection,displayedComponents:.date)
-            TextField("Hora HH:mm",text:$form.time)
+            TextField("Hora HH:mm",text:$form.time).focused($focusedField,equals:"time")
                 .keyboardType(.numbersAndPunctuation)
             Picker("Tipo de atención",selection:$form.category) {
                 Text("Seleccionar").tag("")
@@ -317,7 +339,7 @@ struct N2NativeClinicalFormView:View {
                 ForEach(systems,id:\.self){Text($0).tag($0)}
             }
             TextField("Segmento anatómico (si corresponde)",text:$form.segment)
-            TextField("Diagnóstico presuntivo",text:$form.diagnosis,axis:.vertical)
+            TextField("Diagnóstico presuntivo",text:$form.diagnosis,axis:.vertical).focused($focusedField,equals:"diagnosis")
                 .lineLimit(2...5)
             Picker("Permiso",selection:$form.permission) {
                 Text("No").tag("NO")
@@ -336,6 +358,11 @@ struct N2NativeClinicalFormView:View {
             }
             .buttonStyle(DanperPrimaryButton())
             .accessibilityIdentifier("add-clinical-product")
+            Picker("Tópico de dispensación",selection:$form.dispensingSite) {
+                Text("Seleccionar sede del stock").tag("")
+                Text("Fundo La Venturosa").tag("LA VENTUROSA")
+                Text("Planta La Venturosa").tag("PLVENTUROSA")
+            }
             Text("Busca por nombre o código entre los \(context.products.clinical.count) productos. El consumo se confirma al guardar la atención.")
                 .font(.footnote).foregroundStyle(.secondary)
         } header: {Text("Medicamentos e insumos")}
@@ -432,13 +459,20 @@ struct N2NativeClinicalFormView:View {
                 if !med.procedureConfirmed && !med.procedure.isEmpty {
                     Button("Confirmar procedimiento") {med.procedureConfirmed=true}
                 }
-                let matches=context.options(for:med.code,at:form.date)
+                let matches=context.options(for:med.code,at:form.date,site:form.dispensingSite)
                 Picker("Lote físico FEFO",selection:$med.selectedLotID) {
                     Text("Pendiente / automático si es unidad").tag("")
                     ForEach(matches) {lot in
                         Text(lot.name+" · "+lot.id+" · "+DanperDatePresentation.display(lot.expires))
                             .tag(lot.id)
                     }
+                }
+                if let first=matches.first {
+                    LabeledContent("FEFO propuesto",value:first.id)
+                    LabeledContent("Disponible interno",value:matches.reduce(0){$0+$1.total}.formatted())
+                } else {
+                    Label("Pendiente de conciliar: sin existencia aprobada vigente",systemImage:"exclamationmark.circle")
+                        .font(.caption).foregroundStyle(.orange)
                 }
                 if !med.selectedLotID.isEmpty {
                     let selected=matches.first{$0.id==med.selectedLotID}
@@ -462,6 +496,7 @@ struct N2NativeClinicalFormView:View {
     private var pendingRequirements:[String] {
         var missing=[String]()
         if let context, context.allergies[form.dni]?.reviewed != true {missing.append("confirmar revisión de alergias")}
+        if !form.items.isEmpty && form.dispensingSite.isEmpty {missing.append("seleccionar tópico de dispensación")}
         if form.items.contains(where:{$0.procedure.isEmpty || $0.quantity<=0}) {missing.append("cantidad y procedimiento de cada producto")}
         if form.hasWound && !form.photoReviewed {missing.append("indicar si se envió la foto")}
         if currentWorker==nil {missing.append("seleccionar trabajador")}
@@ -473,7 +508,7 @@ struct N2NativeClinicalFormView:View {
         if form.procedures.isEmpty && form.items.isEmpty {
             missing.append("al menos un procedimiento o medicamento")
         }
-        if form.permission=="SI" && form.permissionTime.count != 5 {
+        if form.permission=="SI" && form.permissionTime.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression)==nil {
             missing.append("hora del permiso")
         }
         return missing
@@ -487,6 +522,7 @@ struct N2NativeClinicalFormView:View {
             return missing
         case 1:
             var missing=[String]()
+            if form.time.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression)==nil {missing.append("Hora inválida: utiliza HH:mm.")}
             if form.category.isEmpty {missing.append("Selecciona el tipo de atención.")}
             if form.system.isEmpty {missing.append("Selecciona el sistema afectado.")}
             if form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {missing.append("Escribe el diagnóstico presuntivo.")}
@@ -608,7 +644,7 @@ struct N2NativeClinicalFormView:View {
         !form.items.isEmpty
     }
     private func scheduleDraft(immediate:Bool=false) {
-        guard let context,!busy,!saved,!fault,meaningfulDraft else{return}
+        guard !layoutOnly,let context,!busy,!saved,!fault,meaningfulDraft else{return}
         autosaveTask?.cancel()
         let version=form
         autosaveTask=Task { @MainActor in

@@ -27,6 +27,8 @@ struct N2VerifiedIndicatorExportView:View {
     @State private var working=false
     @State private var failed=false
     @State private var status="Abriendo la bóveda clínica N2…"
+    @State private var provisional=false
+    @State private var confirmProvisional=false
     @State private var share:N2IndicatorShare?
     @State private var folder:URL?
 
@@ -48,8 +50,8 @@ struct N2VerifiedIndicatorExportView:View {
     }
     var body:some View {
         Form {
-            Section("Indicador Ambulatorio N2 · 10 hojas") {
-                Label("Fuente cifrada original, sin datos de demostración",
+            Section("Indicador ambulatorio · 10 hojas") {
+                Label("Modo de prueba — datos ficticios",
                       systemImage:"lock.shield.fill")
                 Text("Solo atenciones elegidas y consumos enlazados al Kardex. No se rellena stock inicial, ingreso o recuento sin evento revisado.")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -89,7 +91,7 @@ struct N2VerifiedIndicatorExportView:View {
                             Text(DanperDatePresentation.displayDateTime(v.date,v.time)+" · "+v.diagnosis)
                                 .font(.caption).foregroundStyle(.secondary)
                             if v.pendingPhysicalLines>0 {
-                                Label("Consumo físico pendiente: exportación se bloqueará",
+                                Label("Consumo físico pendiente: requiere libro provisional",
                                       systemImage:"exclamationmark.triangle")
                                     .font(.caption2).foregroundStyle(.orange)
                             }
@@ -98,10 +100,16 @@ struct N2VerifiedIndicatorExportView:View {
                 }
             }
             Section("Exportación y protección") {
+                Toggle("Libro provisional con consumos pendientes",isOn:$provisional)
+                if provisional {
+                    Text("BORRADOR: R incluye cantidades clínicas declaradas cuando falta salida física. Para cajas y frascos esto no acredita apertura. No modifica inventario ni acredita cierre.")
+                        .font(.footnote).foregroundStyle(.orange)
+                }
                 Button {
-                    Task {await export()}
+                    if provisional {confirmProvisional=true}
+                    else {Task {await export()}}
                 } label:{
-                    Label(working ? "Conciliando…" : "Generar Excel oficial y compartir",
+                    Label(working ? "Generando…" : provisional ? "Generar provisional y compartir" : "Generar Excel oficial y compartir",
                           systemImage:"square.and.arrow.up")
                 }.disabled(!enabled)
                 Text(status).font(.footnote)
@@ -115,6 +123,10 @@ struct N2VerifiedIndicatorExportView:View {
         .sheet(item:$share,onDismiss:cleanup){share in
             N2IndicatorShareSheet(file:share.file)
         }
+        .alert("¿Generar un libro provisional?",isPresented:$confirmProvisional) {
+            Button("Generar provisional") {Task {await export()}}
+            Button("Cancelar",role:.cancel) {}
+        } message: {Text("Las cantidades declaradas pendientes no son movimientos físicos de Kardex. El archivo quedará identificado como PROVISIONAL.")}
         .task {await load()}
         .onChange(of:startDate) {_,_ in selectConfirmed()}
         .onChange(of:endDate) {_,_ in selectConfirmed()}
@@ -158,7 +170,7 @@ struct N2VerifiedIndicatorExportView:View {
             let result=try await N2SyntheticTrialIOSVault.shared
                 .exportVerifiedIndicatorWorkbook(
                     start:local(startDate),end:local(endDate),
-                    subdivision:site,ids:selected)
+                    subdivision:site,ids:selected,allowPending:provisional)
             cleanup()
             let dir=FileManager.default.temporaryDirectory
                 .appendingPathComponent("danper-n2-indicator-"+UUID().uuidString,
@@ -168,9 +180,9 @@ struct N2VerifiedIndicatorExportView:View {
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
             let url=dir.appendingPathComponent(
-                "DANPER_INDICADOR_N2_"+local(startDate)+"_"+local(endDate)+".xlsx")
+                (result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_")+local(startDate)+"_"+local(endDate)+".xlsx")
             try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
-            status="Generado: \(result.visits) atenciones / \(result.rows) filas. " +
+            status=(result.provisional ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. " : "")+"Generado: \(result.visits) atenciones / \(result.rows) filas. " +
                 "Materiales sin stock inicial: \(result.missingOpening); " +
                 "sin recuento final: \(result.missingClosingCount). " +
                 "Las celdas no conciliadas siguen vacías."
@@ -187,3 +199,4 @@ struct N2VerifiedIndicatorExportView:View {
         folder=nil
     }
 }
+

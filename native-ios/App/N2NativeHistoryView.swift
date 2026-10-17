@@ -146,6 +146,9 @@ private struct N2WorkerHistoryDetail:View {
                         }
                         Text(visit.diagnosis.isEmpty ? "Borrador incompleto" : visit.diagnosis)
                         if realSource && visit.status=="saved" {
+                            NavigationLink {N2VisitDispensingView(visitID:visit.id)} label: {
+                                Label("Medicamentos y consumos",systemImage:"pills.fill")
+                            }
                             NavigationLink {
                                 N2ClinicalCorrectionView(visitID:visit.id)
                             } label: {
@@ -173,3 +176,28 @@ private struct N2WorkerHistoryDetail:View {
     }
 }
 
+
+struct N2VisitDispensingView:View {
+    let visitID:String
+    @State private var lines=[N2DispensingLine]()
+    @State private var failed=false
+    var body:some View {
+        List {
+            if failed {Text("No se pudo verificar el consumo. Inténtalo de nuevo.")}
+            ForEach(lines) { line in
+                VStack(alignment:.leading,spacing:7) {
+                    Text(line.name).font(.headline)
+                    Text(line.code+" · Cantidad clínica: "+line.quantity.formatted()).font(.caption)
+                    Label(line.result,systemImage:line.result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.circle")
+                        .font(.footnote).foregroundStyle(line.result=="Descontado" ? Color.green : Color.orange)
+                }.padding(.vertical,5)
+            }
+            if lines.isEmpty && !failed {Text("Atención sin medicamentos o insumos.").foregroundStyle(.secondary)}
+        }
+        .navigationTitle("Consumos de la atención").danperFormChrome()
+        .task {
+            do {lines=try await N2SyntheticTrialIOSVault.shared.dispensingLines(visitID:visitID)}
+            catch {failed=true}
+        }
+    }
+}

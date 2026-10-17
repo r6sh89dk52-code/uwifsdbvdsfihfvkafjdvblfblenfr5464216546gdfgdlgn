@@ -11,6 +11,8 @@ public enum N2VerifiedIndicatorWorkbook {
     }
     public struct Result:Sendable {
         public let xlsx:Data
+        public let provisional:Bool
+        public let pendingLines:Int
         public let rows:Int
         public let visits:Int
         public let missingOpening:Int
@@ -71,7 +73,7 @@ public enum N2VerifiedIndicatorWorkbook {
 
     public static func export(snapshot:Data,products:Data,mappings:Data,
         template:Data,start:String,end:String,subdivision:String,
-        selectedVisitIDs:Set<String>)throws->Result {
+        selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
         try period(start,end)
         guard ["LA VENTUROSA","PLVENTUROSA"].contains(subdivision) else{
             throw Failure.ambiguousSite
@@ -164,7 +166,19 @@ public enum N2VerifiedIndicatorWorkbook {
             (string(v["date"]),string(v["time"]),string(v["id"])) <
             (string(w["date"]),string(w["time"]),string(w["id"]))
         }
-        var frequencies=[String:Int](),seenIDs=Set<String>(),
+        var pendingLines=0
+        var pendingNotes=[String]()
+        var frequencies=[String:Int](),frequencyByID=[String:Int]()
+        for visit in visits.filter({string($0["status"])=="saved"}).sorted(by:{
+            (string($0["date"]),string($0["time"]),string($0["id"])) <
+            (string($1["date"]),string($1["time"]),string($1["id"]))
+        }) {
+            let worker=visit["worker"] as? [String:Any] ?? [:]
+            let key=string(visit["date"])+"|"+string(worker["dni"])
+            frequencies[key,default:0]+=1
+            frequencyByID[string(visit["id"])]=frequencies[key]
+        }
+        var seenIDs=Set<String>(),
             consumption=[String:Int](),output=[[String:Any]]()
         let freq=["PRIMERA","SEGUNDA","TERCERA","CUARTA","QUINTA"]
         for visit in selected {
@@ -180,9 +194,7 @@ public enum N2VerifiedIndicatorWorkbook {
                   ["",subdivision].contains(string(worker["site"])) else{
                 throw Failure.invalidVisit
             }
-            let pair=iso+"|"+dni
-            let count=(frequencies[pair] ?? 0)+1
-            frequencies[pair]=count
+            let count=frequencyByID[aid] ?? 1
             let ageString=String(describing:worker["age"] ?? "")
             let age=(Int(ageString).flatMap{(0...120).contains($0) ? $0 : nil})
             let procedures=visit["standaloneProcedures"] as? [String] ?? []
@@ -209,13 +221,17 @@ public enum N2VerifiedIndicatorWorkbook {
                         throw Failure.invalidVisit
                     }
                     let key=aid+"\u{001F}"+itemID
-                    guard let audited=parityR[key],let value=audited,
-                          let sum=linesByItem[key],abs(sum-value)<0.0001,
-                          value.rounded()==value, value>=0 else{
-                        throw Failure.unverifiedDelivery
-                    }
-                    physical=value
-                    consumption[code,default:0]+=Int(value)
+                    if let audited=parityR[key],let value=audited,
+                       let sum=linesByItem[key],abs(sum-value)<0.0001,
+                       value.rounded()==value,value>=0 {
+                        physical=value
+                        consumption[code,default:0]+=Int(value)
+                    } else if allowPending,let declared=integer(row["quantity"]),declared>0 {
+                        physical=declared
+                        consumption[code,default:0]+=declared
+                        pendingLines+=1
+                        pendingNotes.append(aid+" / "+code+" / "+name+": R declarado, sin salida física confirmada")
+                    } else {throw Failure.unverifiedDelivery}
                 } else {
                     procedure=procedures.joined(separator:" / ")
                 }
@@ -333,7 +349,7 @@ public enum N2VerifiedIndicatorWorkbook {
             }) {throw Failure.invalidReconciliation}
         }
         let atSite=active.filter{string($0["subdivision"])==subdivision}
-        guard atSite.contains(where:{string($0["kind"])=="review" &&
+        guard allowPending || atSite.contains(where:{string($0["kind"])=="review" &&
                  string($0["date"])==start &&
                  string($0["periodEnd"])==end}) else{
             throw Failure.unreviewedPeriod
@@ -359,9 +375,10 @@ public enum N2VerifiedIndicatorWorkbook {
                                    "receipts":income,"receiptDetails":receipts]
             if let opening=openings.first,let quantity=integer(opening["quantity"]) {
                 let final=quantity+income-used
-                guard final>=0 else{throw Failure.invalidReconciliation}
+                guard final>=0 || allowPending else{throw Failure.invalidReconciliation}
                 openingCount+=1
-                row["opening"]=quantity;row["closing"]=final
+                row["opening"]=quantity
+                if !allowPending {row["closing"]=final}
                 if let count=ending.first,let actual=integer(count["quantity"]) {
                     row["difference"]=final-actual
                 }
@@ -372,14 +389,14 @@ public enum N2VerifiedIndicatorWorkbook {
             }
             summary[code]=row
         }
-        guard openingCount>0,closingCount>0 else {
+        guard allowPending || (openingCount>0 && closingCount>0) else {
             throw Failure.invalidReconciliation
         }
         let manifest:[String:Any]=[
             "schema":1,"catalog":catalogue,"byCode":summary,
-            "reviewed":true,"provisional":false,
+            "reviewed":!allowPending,"provisional":allowPending,
             "start":start,"end":end,"subdivision":subdivision,
-            "rows":output.count,"plan":["lines":output]
+            "rows":output.count,"plan":["lines":output],"pendingNotes":pendingNotes
         ]
         let data=try JSONSerialization.data(withJSONObject:manifest)
         let built=try N1sFullExcelWriter.exportIndicator(base:template,manifest:data)
@@ -387,8 +404,9 @@ public enum N2VerifiedIndicatorWorkbook {
               built.xlsx.count>20_000,built.xlsx.starts(with:[0x50,0x4B,0x03,0x04]) else{
             throw Failure.invalidWorkbook
         }
-        return Result(xlsx:built.xlsx,rows:output.count,visits:selected.count,
+        return Result(xlsx:built.xlsx,provisional:allowPending,pendingLines:pendingLines,rows:output.count,visits:selected.count,
                       missingOpening:432-openingCount,
                       missingClosingCount:432-closingCount)
     }
 }
+

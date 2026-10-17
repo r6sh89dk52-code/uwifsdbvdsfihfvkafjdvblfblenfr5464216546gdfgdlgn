@@ -8,6 +8,7 @@ struct N2NativeInventoryView:View {
     @State private var context:N2FormContext?
     @State private var mode="lot"
     @State private var materialCode=""
+    @State private var site=""
     @State private var container="unidad"
     @State private var unit="UND"
     @State private var lotNumber=""
@@ -52,7 +53,7 @@ struct N2NativeInventoryView:View {
     private var valid:Bool {
         guard context != nil,!busy,let values=counts else{return false}
         if mode=="lot"{
-            return material != nil && values.2<=Double(values.3)
+            return material != nil && !site.isEmpty && values.2<=Double(values.3)
         }
         guard !selectedLotID.isEmpty &&
               reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8 else{
@@ -67,7 +68,7 @@ struct N2NativeInventoryView:View {
 
     var body:some View {
         Form {
-            Section("Inventario nativo · bóveda cifrada N2") {
+            Section("Inventario y lotes") {
                 Label("Kardex físico de enfermería · 98 materiales",
                       systemImage:"lock.shield.fill")
                 Text("Toda alta, ingreso y ajuste se confirma en una sola generación cifrada. No se infiere cuántos mL contiene un frasco o cuántas unidades contiene una caja.")
@@ -87,6 +88,11 @@ struct N2NativeInventoryView:View {
                         Label(material.map{$0.name+" · "+$0.id} ??
                               "Seleccionar material oficial",
                               systemImage:"magnifyingglass")
+                    }
+                    Picker("Sede del inventario",selection:$site) {
+                        Text("Seleccionar").tag("")
+                        Text("Fundo La Venturosa").tag("LA VENTUROSA")
+                        Text("Planta La Venturosa").tag("PLVENTUROSA")
                     }
                     TextField("N.º de lote o referencia",text:$lotNumber)
                     Picker("U.M. del producto",selection:$unit) {
@@ -231,6 +237,7 @@ struct N2NativeInventoryView:View {
                 let record:[String:Any]=[
                     "id":lotID,"code":material.id,"name":material.name,
                     "catalogUnit":unit,"lot":lotNumber,
+                    "site":site,
                     "expires":expiryEnabled ? localDay(expiry) : "",
                     "container":container,"unitsPerContainer":values.3,
                     "sealedContainers":values.0,"looseUnits":values.1,
@@ -273,3 +280,4 @@ struct N2NativeInventoryView:View {
         }
     }
 }
+

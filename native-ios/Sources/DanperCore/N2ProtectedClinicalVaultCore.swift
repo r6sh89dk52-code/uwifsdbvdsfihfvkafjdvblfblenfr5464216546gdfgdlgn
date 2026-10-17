@@ -3,6 +3,13 @@ import Foundation
 /// Strongly isolated N2 native clinical vault. This API never opens the old
 /// hybrid app's files or Keychain; all content is local AES-GCM ciphertext.
 /// The caller MUST gate real source admission with explicit user consent.
+public struct N2DispensingLine:Identifiable,Sendable {
+    public let id:String
+    public let name:String
+    public let code:String
+    public let quantity:Double
+    public let result:String
+}
 public struct N2ProtectedStoreSummary: Sendable {
     public let revision:Int
     public let workers:Int
@@ -53,6 +60,27 @@ public final class N2ProtectedClinicalVaultCore {
         }
         return try N2NativeDraftRecovery.read(active.snapshot)
     }
+    public func dispensingLines(visitID:String)throws->[N2DispensingLine] {
+        guard let active=try journal.recover(),
+              let root=try JSONSerialization.jsonObject(with:active.snapshot) as? [String:Any],
+              let visits=root["attentions"] as? [[String:Any]],
+              let visit=visits.first(where:{$0["id"] as? String==visitID}),
+              let items=visit["items"] as? [[String:Any]],
+              let movements=root["stockMovements"] as? [[String:Any]] else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        let outcomes=visit["nativeDispensing"] as? [String:String] ?? [:]
+        return items.map { item in
+            let id=item["id"] as? String ?? ""
+            let linked=movements.contains { m in
+                guard let ref=m["dispenseRef"] as? [String:Any] else{return false}
+                return ref["attentionId"] as? String==visitID && ref["itemId"] as? String==id
+            }
+            return N2DispensingLine(id:id,name:item["name"] as? String ?? "",
+                code:item["code"] as? String ?? "",quantity:(item["quantity"] as? NSNumber)?.doubleValue ?? 0,
+                result:linked ? "Descontado" : (outcomes[id] ?? "Pendiente de conciliar: registro histórico sin salida verificada"))
+        }
+    }
     public func dispensingStatus(visitID:String)throws->[String:String] {
         guard let active=try journal.recover(),
               let root=try JSONSerialization.jsonObject(with:active.snapshot) as? [String:Any],
@@ -94,7 +122,7 @@ public final class N2ProtectedClinicalVaultCore {
     }
     public func exportVerifiedIndicatorWorkbook(
         products:Data,mappings:Data,template:Data,
-        start:String,end:String,subdivision:String,ids:Set<String>)throws
+        start:String,end:String,subdivision:String,ids:Set<String>,allowPending:Bool=false)throws
         -> N2VerifiedIndicatorWorkbook.Result {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
@@ -103,7 +131,7 @@ public final class N2ProtectedClinicalVaultCore {
             snapshot:active.snapshot,products:products,
             mappings:mappings,template:template,
             start:start,end:end,subdivision:subdivision,
-            selectedVisitIDs:ids)
+            selectedVisitIDs:ids,allowPending:allowPending)
     }
 
     public func exportVerifiedDailyNursingWorkbook(

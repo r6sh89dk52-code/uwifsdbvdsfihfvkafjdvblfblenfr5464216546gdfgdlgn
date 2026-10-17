@@ -186,7 +186,12 @@ public enum N2NativeClinicalTransaction {
                 mark("Cantidad física no verificada.");continue
             }
             let allowable=Set(candidates.map{$0.kardexCode})
+            let scope=new["dispensingSite"] as? String ?? ""
+            if !scope.isEmpty && !["LA VENTUROSA","PLVENTUROSA"].contains(scope) {
+                mark("Tópico de dispensación no verificado.");continue
+            }
             let eligible=lots.filter {l in
+                if !scope.isEmpty && l["site"] as? String != scope {return false}
                 guard let lc=str(l["code"]),let ln=str(l["name"]),
                       allowable.contains(lc),
                       candidates.contains(where:{$0.kardexCode==lc && $0.kardexName==ln}),
@@ -199,6 +204,9 @@ public enum N2NativeClinicalTransaction {
                         stock=="PAR" : ["UND","TBL"].contains(stock)
                 }
                 return true
+            }
+            if eligible.isEmpty && !scope.isEmpty {
+                mark("Sin stock vigente con sede verificada en el tópico elegido. No se usa stock ajeno ni de sede desconocida.");continue
             }
             let chosen=eligible.first(where:{$0["id"] as? String == selected})
             if explicit != nil && (selected==nil || chosen==nil) {

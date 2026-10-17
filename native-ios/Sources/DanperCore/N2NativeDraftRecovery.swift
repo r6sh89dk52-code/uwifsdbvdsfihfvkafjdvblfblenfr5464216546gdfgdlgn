@@ -35,6 +35,7 @@ public enum N2NativeDraftRecovery {
             draft.dni=worker["dni"] as? String ?? ""
             draft.date=record["date"] as? String ?? ""
             draft.time=record["time"] as? String ?? ""
+            draft.dispensingSite=record["dispensingSite"] as? String ?? ""
             draft.category=record["category"] as? String ?? ""
             draft.system=record["system"] as? String ?? ""
             draft.segment=record["segment"] as? String ?? ""
