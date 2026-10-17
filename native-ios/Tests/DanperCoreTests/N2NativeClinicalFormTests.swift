@@ -42,6 +42,33 @@ final class N2NativeClinicalFormTests:XCTestCase {
             code:"16000182",quantity:2,procedure:"OBSERVACION")]}
         return(draft,context)
     }
+    func testDraftRecoveryRetainsMultipleProceduresAndPhysicalChoices()throws {
+        var (draft,ctx)=try form()
+        draft.procedures=["OBSERVACION","CURACION DE HERIDA","CONTROL"]
+        draft.items[0].selectedLotID="lot-selected"
+        draft.items[0].physicalQuantity=2.5
+        draft.items[0].approveOpening=true
+        let original=try source("n1e-clinical-stock.json")
+        let next=try N2SnapshotEditor.upsertDraft(snapshot:original,id:draft.id,
+            changes:draft.makeDraftPatch(context:ctx),at:at())
+        let projected=try N2NativeDraftRecovery.read(next)
+        let restored=try XCTUnwrap(projected.first{$0.id==draft.id})
+        XCTAssertEqual(restored.form.procedures,draft.procedures)
+        XCTAssertEqual(restored.form.dni,draft.dni)
+        XCTAssertEqual(restored.form.items.count,1)
+        XCTAssertEqual(restored.form.items[0].selectedLotID,"lot-selected")
+        XCTAssertEqual(restored.form.items[0].physicalQuantity,2.5)
+        XCTAssertTrue(restored.form.items[0].approveOpening)
+        let clean=try N2SnapshotEditor.deleteDraft(snapshot:next,id:draft.id)
+        XCTAssertFalse(try N2NativeDraftRecovery.read(clean).contains{$0.id==draft.id})
+    }
+    func testEmptyVisitWithoutAnyProcedureOrMedicationIsRejected()throws {
+        var (draft,context)=try form(with:false)
+        draft.procedures=[]
+        XCTAssertThrowsError(try draft.makeSavedVisit(context:context)) {
+            XCTAssertEqual($0 as? N2FormError,.invalidVisit)
+        }
+    }
     func testClinicalFormCreatesTSCompatibleVisitAndVerifiedStock()throws {
         let (form,context)=try self.form()
         XCTAssertEqual(context.revision,7)

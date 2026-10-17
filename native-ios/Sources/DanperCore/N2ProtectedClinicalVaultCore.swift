@@ -42,6 +42,12 @@ public final class N2ProtectedClinicalVaultCore {
         guard let record=try journal.recover() else{return nil}
         return try summary(record)
     }
+    public func readDrafts()throws->[N2RecoverableDraft] {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2NativeDraftRecovery.read(active.snapshot)
+    }
     public func readIndex()throws->N2NativeReadModel? {
         guard let active=try journal.recover() else{return nil}
         return try N2NativeSnapshotReader.read(active.snapshot)

@@ -30,6 +30,9 @@ struct N2NativeClinicalFormView:View {
     @State private var status="Abriendo bóveda cifrada N2…"
     @State private var chooseWorker=false
     @State private var chooseProduct=false
+    @State private var chooseDraft=false
+    @State private var draftToDelete:String?
+    @State private var drafts=[N2RecoverableDraft]()
     @State private var search=""
     @State private var allergyStatus="unknown"
     @State private var allergySubstances=""
@@ -60,6 +63,16 @@ struct N2NativeClinicalFormView:View {
                             .foregroundStyle(brand)
                         Text(status).font(.footnote)
                             .foregroundStyle(fault ? Color.red : Color.secondary)
+                    }
+                    if !saved && !drafts.isEmpty {
+                        Section("Registros pendientes") {
+                            Button {
+                                chooseDraft=true
+                            } label: {
+                                Label("Retomar borrador cifrado (\(drafts.count))",
+                                      systemImage:"arrow.uturn.backward.doc")
+                            }
+                        }
                     }
                     if saved {
                         Section {
@@ -132,6 +145,53 @@ struct N2NativeClinicalFormView:View {
                             ToolbarItem(placement:.topBarTrailing) {
                                 Button("Cerrar"){chooseProduct=false}
                             }
+                        }
+                    }
+                }
+                .sheet(isPresented:$chooseDraft) {
+                    NavigationStack {
+                        List {
+                            ForEach(drafts) { entry in
+                                HStack {
+                                    Button {
+                                        resume(entry)
+                                    } label: {
+                                        VStack(alignment:.leading,spacing:3) {
+                                            Text(entry.workerName.isEmpty ? "Registro sin trabajador" : entry.workerName)
+                                                .foregroundStyle(.primary)
+                                            Text(entry.form.date+" "+entry.form.time)
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    Button(role:.destructive) {
+                                        draftToDelete=entry.id
+                                    } label: {
+                                        Image(systemName:"trash")
+                                    }
+                                    .disabled(busy)
+                                }
+                            }
+                        }
+                        .navigationTitle("Borradores cifrados")
+                        .toolbar {
+                            ToolbarItem(placement:.topBarTrailing) {
+                                Button("Cerrar"){chooseDraft=false}
+                            }
+                        }
+                        .confirmationDialog("¿Eliminar este borrador?",isPresented:Binding(
+                            get:{draftToDelete != nil},
+                            set:{if !$0 {draftToDelete=nil}}
+                        ),titleVisibility:.visible) {
+                            Button("Eliminar borrador",role:.destructive) {
+                                if let id=draftToDelete {
+                                    draftToDelete=nil
+                                    Task {await deleteRecoveredDraft(id)}
+                                }
+                            }
+                            Button("Cancelar",role:.cancel){draftToDelete=nil}
+                        } message: {
+                            Text("Esta acción no elimina atenciones ya guardadas.")
                         }
                     }
                 }
@@ -350,6 +410,7 @@ struct N2NativeClinicalFormView:View {
         do {
             let source=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
             context=source
+            drafts=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
             let (date,time)=limaClock()
             form.date=date
             form.time=time
@@ -379,8 +440,13 @@ struct N2NativeClinicalFormView:View {
             fault=true
         }
     }
+    private var meaningfulDraft:Bool {
+        !form.dni.isEmpty || !form.category.isEmpty || !form.system.isEmpty ||
+        !form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ||
+        !form.items.isEmpty
+    }
     private func scheduleDraft(immediate:Bool=false) {
-        guard let context,!busy,!saved,!fault else{return}
+        guard let context,!busy,!saved,!fault,meaningfulDraft else{return}
         autosaveTask?.cancel()
         let version=form
         autosaveTask=Task { @MainActor in
@@ -422,12 +488,50 @@ struct N2NativeClinicalFormView:View {
             saved=true
             N2DraftReminder.cancel(id:form.id)
             self.context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            drafts=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
             status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."
         }catch {
             status="No se pudo confirmar la atención. La operación fue rechazada y el stock no se debe descontar parcialmente."
             fault=true
         }
     }
+    @MainActor
+    private func resume(_ record:N2RecoverableDraft) {
+        autosaveTask?.cancel()
+        form=record.form
+        step=0
+        chooseDraft=false
+        fault=false
+        status="Borrador cifrado recuperado. Revisa la información antes de guardar."
+    }
+
+    @MainActor
+    private func deleteRecoveredDraft(_ id:String) async {
+        guard !busy else{return}
+        busy=true
+        defer {busy=false}
+        do {
+            let fresh=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            _=try await N2ProtectedClinicalIOSVault.shared.deleteDraft(
+                id:id,expectedRevision:fresh.revision)
+            N2DraftReminder.cancel(id:id)
+            drafts=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
+            context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            if form.id==id {
+                autosaveTask?.cancel()
+                form=N2NativeFormDraft()
+                let (date,time)=limaClock()
+                form.date=date
+                form.time=time
+                step=0
+            }
+            status="Borrador eliminado de la bóveda cifrada."
+        }catch {
+            fault=true
+            status="No se pudo eliminar el borrador. Revisa la bóveda antes de editar."
+        }
+    }
+
     private func startAnother() {
         saved=false
         fault=false

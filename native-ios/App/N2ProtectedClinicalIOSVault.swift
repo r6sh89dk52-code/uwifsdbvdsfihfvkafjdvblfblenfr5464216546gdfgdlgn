@@ -78,6 +78,9 @@ actor N2ProtectedClinicalIOSVault {
         return try N2ProtectedClinicalVaultCore(keyData:secret)
             .activateSingleVerifiedSource(source,explicitConsent:approvedByUser)
     }
+    func readDrafts()throws->[N2RecoverableDraft] {
+        try protectedStore().readDrafts()
+    }
     func readHistory()throws->N2NativeReadModel? {
         guard let secret=try deviceKey(create:false) else{return nil}
         return try N2ProtectedClinicalVaultCore(keyData:secret).readIndex()
