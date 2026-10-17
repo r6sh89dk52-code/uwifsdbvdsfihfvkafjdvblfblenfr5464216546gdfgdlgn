@@ -218,6 +218,34 @@ public final class N2ProtectedClinicalVaultCore {
                 newSealed:sealed,newLoose:loose,newOpened:opened,reason:reason)
         }
     }
+    public func readPendingClinicalCorrection(visitID:String)throws
+        ->N2PendingClinicalCorrection? {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2ClinicalCorrections.pendingDraft(
+            snapshot:active.snapshot,visitID:visitID)
+    }
+    @discardableResult
+    public func savePendingClinicalCorrection(visitID:String,changes:Data,
+        reason:String,operatorName:String,medicationDiscrepancy:String,
+        expectedEffectiveSHA:String,at:Int64,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2ClinicalCorrections.savePendingDraft(
+                snapshot:$0,visitID:visitID,changes:changes,reason:reason,
+                operatorName:operatorName,
+                medicationDiscrepancy:medicationDiscrepancy,
+                expectedEffectiveSHA:expectedEffectiveSHA,at:at)
+        }
+    }
+    public func deletePendingClinicalCorrection(visitID:String,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2ClinicalCorrections.deletePendingDraft(
+                snapshot:$0,visitID:visitID)
+        }
+    }
     public func readCorrectionDetail(visitID:String)throws->N2CorrectionDetail {
         guard let active=try journal.recover() else {
             throw N2ProtectedStoreError.absentSource

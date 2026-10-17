@@ -38,6 +38,14 @@ public struct N2CorrectionDetail:Sendable {
     public let pendingMedicationDiscrepancy:Bool
     public let effectiveSHA256:String
 }
+public struct N2PendingClinicalCorrection:Sendable {
+    public let visitID:String
+    public let changes:Data
+    public let reason:String
+    public let operatorName:String
+    public let medicationDiscrepancy:String
+    public let updatedAt:Int64
+}
 public enum N2ClinicalCorrections {
     private static let editableText:Set<String> = [
         "category","system","segment","diagnosis","permission",
@@ -225,6 +233,93 @@ public enum N2ClinicalCorrections {
     public static func pendingDiscrepancies(_ snapshot:Data)throws->Set<String> {
         try project(json(snapshot)).pending
     }
+    /// A correction draft is stored only within the encrypted N2 journal.
+    /// It never creates a second clinical attendance or physical movement.
+    public static func pendingDraft(snapshot:Data,visitID:String)throws
+        ->N2PendingClinicalCorrection? {
+        let root=try json(snapshot)
+        let current=try project(root)
+        guard let original=current.rows.first(where:{$0["id"] as? String==visitID}),
+              original["status"] as? String=="saved" else{
+            throw N2CorrectionError.missingVisit
+        }
+        guard root["clinicalCorrectionDrafts"] == nil ||
+              root["clinicalCorrectionDrafts"] is [[String:Any]] else{
+            throw N2CorrectionError.brokenHistory
+        }
+        let all=root["clinicalCorrectionDrafts"] as? [[String:Any]] ?? []
+        guard all.count<=100,all.filter({$0["visitID"] as? String==visitID}).count<=1 else{
+            throw N2CorrectionError.brokenHistory
+        }
+        guard let found=all.first(where:{$0["visitID"] as? String==visitID})
+        else{return nil}
+        guard let patch=found["changes"] as? [String:Any],
+              let expected=found["expectedEffectiveSHA"] as? String,
+              expected==(try digest(original)),
+              let reason=found["reason"] as? String,reason.utf8.count<=1500,
+              let user=found["operator"] as? String,user.utf8.count<=120,
+              let note=found["medicationDiscrepancy"] as? String,
+              note.utf8.count<=1500,
+              let millis=found["updatedAt"] as? NSNumber,millis.int64Value>0,
+              (try? corrected(original,changes:patch,allowUnchanged:true)) != nil else {
+            throw N2CorrectionError.brokenHistory
+        }
+        return N2PendingClinicalCorrection(
+            visitID:visitID,
+            changes:try JSONSerialization.data(withJSONObject:patch),
+            reason:reason,operatorName:user,medicationDiscrepancy:note,
+            updatedAt:millis.int64Value)
+    }
+    public static func savePendingDraft(snapshot:Data,visitID:String,changes:Data,
+        reason:String,operatorName:String,medicationDiscrepancy:String,
+        expectedEffectiveSHA:String,at:Int64)throws->Data {
+        guard at>0,reason.utf8.count<=1500,operatorName.utf8.count<=120,
+              medicationDiscrepancy.utf8.count<=1500,
+              let change=try? JSONSerialization.jsonObject(with:changes)
+                 as? [String:Any] else{throw N2CorrectionError.invalidChanges}
+        var source=try json(snapshot)
+        let current=try project(source)
+        guard let saved=current.rows.first(where:{$0["id"] as? String==visitID}),
+              saved["status"] as? String=="saved" else{
+            throw N2CorrectionError.notSaved
+        }
+        guard try digest(saved)==expectedEffectiveSHA else{
+            throw N2CorrectionError.staleCorrection
+        }
+        _=try corrected(saved,changes:change,allowUnchanged:true)
+        guard source["clinicalCorrectionDrafts"] == nil ||
+              source["clinicalCorrectionDrafts"] is [[String:Any]] else{
+            throw N2CorrectionError.brokenHistory
+        }
+        var drafts=source["clinicalCorrectionDrafts"] as? [[String:Any]] ?? []
+        guard drafts.count<100 else{throw N2CorrectionError.brokenHistory}
+        let row:[String:Any]=[
+            "visitID":visitID,"changes":change,
+            "reason":reason,"operator":operatorName,
+            "medicationDiscrepancy":medicationDiscrepancy,
+            "expectedEffectiveSHA":expectedEffectiveSHA,"updatedAt":at
+        ]
+        if let index=drafts.firstIndex(where:{$0["visitID"] as? String==visitID}) {
+            drafts[index]=row
+        }else{drafts.append(row)}
+        source["clinicalCorrectionDrafts"]=drafts
+        let bytes=try JSONSerialization.data(withJSONObject:source,options:[.sortedKeys])
+        _=try N1eLegacyClinicalAudit.inspect(bytes)
+        _=try N1fLosslessFieldGate.inspect(bytes)
+        return bytes
+    }
+    public static func deletePendingDraft(snapshot:Data,visitID:String)throws->Data {
+        var source=try json(snapshot)
+        let drafts=source["clinicalCorrectionDrafts"] as? [[String:Any]] ?? []
+        guard drafts.contains(where:{$0["visitID"] as? String==visitID}) else{
+            throw N2CorrectionError.missingVisit
+        }
+        source["clinicalCorrectionDrafts"]=drafts.filter{$0["visitID"] as? String != visitID}
+        let bytes=try JSONSerialization.data(withJSONObject:source,options:[.sortedKeys])
+        _=try N1eLegacyClinicalAudit.inspect(bytes)
+        _=try N1fLosslessFieldGate.inspect(bytes)
+        return bytes
+    }
     public static func append(snapshot:Data,eventID:String,visitID:String,
                               changes:Data,reason:String,operatorName:String,
                               medicationDiscrepancy:String,
@@ -270,6 +365,13 @@ public enum N2ClinicalCorrections {
         guard history.count<10000 else{throw N2CorrectionError.brokenHistory}
         history.append(record)
         obj["clinicalCorrectionLog"]=history
+        // The committed amendment atomically retires only its own
+        // unfinished draft. Other saved attentions and drafts remain intact.
+        if let pending=obj["clinicalCorrectionDrafts"] as? [[String:Any]] {
+            obj["clinicalCorrectionDrafts"]=pending.filter{
+                $0["visitID"] as? String != visitID
+            }
+        }
         let result=try JSONSerialization.data(withJSONObject:obj,options:[.sortedKeys])
         _=try N1eLegacyClinicalAudit.inspect(result)
         _=try N1fLosslessFieldGate.inspect(result)

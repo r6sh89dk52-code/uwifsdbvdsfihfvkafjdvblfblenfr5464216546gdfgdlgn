@@ -122,6 +122,25 @@ actor N2ProtectedClinicalIOSVault {
         return try protectedStore().clinicalFormContext(
             products:products,nursing:nursing,mappings:mappings)
     }
+    func readPendingClinicalCorrection(visitID:String)throws
+        ->N2PendingClinicalCorrection? {
+        try protectedStore().readPendingClinicalCorrection(visitID:visitID)
+    }
+    func savePendingClinicalCorrection(visitID:String,changes:Data,
+        reason:String,operatorName:String,medicationDiscrepancy:String,
+        expectedEffectiveSHA:String,at:Int64,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().savePendingClinicalCorrection(
+            visitID:visitID,changes:changes,reason:reason,
+            operatorName:operatorName,medicationDiscrepancy:medicationDiscrepancy,
+            expectedEffectiveSHA:expectedEffectiveSHA,at:at,
+            expectedRevision:expectedRevision)
+    }
+    func deletePendingClinicalCorrection(visitID:String,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().deletePendingClinicalCorrection(
+            visitID:visitID,expectedRevision:expectedRevision)
+    }
     func readCorrectionDetail(visitID:String)throws->N2CorrectionDetail {
         try protectedStore().readCorrectionDetail(visitID:visitID)
     }

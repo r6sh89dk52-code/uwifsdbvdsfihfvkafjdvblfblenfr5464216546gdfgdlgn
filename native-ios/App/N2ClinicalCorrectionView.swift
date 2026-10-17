@@ -27,6 +27,10 @@ struct N2ClinicalCorrectionView:View {
     @State private var discrepancy=""
     @State private var operatorName="OPERADOR DANPER"
     @State private var eventID=UUID().uuidString
+    @State private var draftTask:Task<Void,Never>?
+    @State private var recovering=false
+    @State private var lastDraftAt:Int64=0
+    @Environment(\.scenePhase) private var scenePhase
     @State private var pendingConfirmation=false
     @State private var saving=false
     @State private var saved=false
@@ -142,9 +146,78 @@ struct N2ClinicalCorrectionView:View {
         }
         .navigationTitle("Rectificar atención N2")
         .task {await load()}
+        .onChange(of:autosaveFingerprint) {_,_ in
+            queueDraft()
+        }
+        .onChange(of:scenePhase) {_,phase in
+            if phase != .active {queueDraft(immediate:true)}
+        }
+        .onDisappear {queueDraft(immediate:true)}
+    }
+    private var autosaveFingerprint:String {
+        [
+            category,system,segment,diagnosis,permission,permissionTime,
+            responsible,responsibleDni,workStatus,blueBandage.description,
+            returned.description,photoSent.description,procedures,reason,
+            discrepancy,operatorName,
+            itemProcedures.keys.sorted().map{
+                $0+"="+(itemProcedures[$0] ?? "")
+            }.joined(separator:"|")
+        ].joined(separator:"\u{001F}")
+    }
+    private func editPacket()->[String:Any] {
+        let procedureRows=procedures.split(separator:"\n",
+            omittingEmptySubsequences:true).map{
+            $0.trimmingCharacters(in:.whitespacesAndNewlines)
+        }.filter{!$0.isEmpty}
+        return [
+            "category":category,"system":system,"segment":segment,
+            "diagnosis":diagnosis,"permission":permission,
+            "permissionTime":permissionTime,"responsible":responsible,
+            "responsibleDni":responsibleDni,
+            "workStatus":permission=="SI" ? "PERMISO" : "LABORANDO",
+            "blueBandage":blueBandage,"returned":returned,
+            "photoSent":photoSent,"standaloneProcedures":procedureRows,
+            "itemProcedures":itemProcedures
+        ]
+    }
+    private func queueDraft(immediate:Bool=false) {
+        guard detail != nil,!recovering,!saving,!saved,!failed else{return}
+        draftTask?.cancel()
+        let changes=editPacket()
+        let why=reason,op=operatorName,note=discrepancy
+        let expected=detail!.effectiveSHA256
+        draftTask=Task {@MainActor in
+            if !immediate {
+                do{try await Task.sleep(for:.milliseconds(650))}
+                catch{return}
+            }
+            guard !Task.isCancelled else{return}
+            do {
+                let ctx=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+                let millis=max(Int64(Date().timeIntervalSince1970*1000),
+                               lastDraftAt+1)
+                let raw=try JSONSerialization.data(withJSONObject:changes)
+                _=try await N2ProtectedClinicalIOSVault.shared
+                    .savePendingClinicalCorrection(
+                        visitID:visitID,changes:raw,reason:why,
+                        operatorName:op,medicationDiscrepancy:note,
+                        expectedEffectiveSHA:expected,at:millis,
+                        expectedRevision:ctx.revision)
+                lastDraftAt=millis
+                message="Rectificación en curso cifrada; aún no confirmada."
+            }catch{
+                if !Task.isCancelled {
+                    failed=true
+                    message="No pudo guardarse la rectificación en curso. Reabre la historia; los datos confirmados no cambiaron."
+                }
+            }
+        }
     }
     @MainActor
     private func load() async {
+        recovering=true
+        defer{recovering=false}
         do {
             let ctx=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
             let d=try await N2ProtectedClinicalIOSVault.shared
@@ -166,7 +239,35 @@ struct N2ClinicalCorrectionView:View {
             procedures=d.procedures.joined(separator:"\n")
             itemProcedures=Dictionary(uniqueKeysWithValues:
                 d.medications.map{($0.id,$0.procedure)})
-            message="Atención verificada; no se modificarán entregas ni existencias."
+            if let pending=try await N2ProtectedClinicalIOSVault.shared
+                   .readPendingClinicalCorrection(visitID:visitID),
+               let changes=try? JSONSerialization.jsonObject(
+                   with:pending.changes) as? [String:Any] {
+                category=changes["category"] as? String ?? category
+                system=changes["system"] as? String ?? system
+                segment=changes["segment"] as? String ?? segment
+                diagnosis=changes["diagnosis"] as? String ?? diagnosis
+                permission=changes["permission"] as? String ?? permission
+                permissionTime=changes["permissionTime"] as? String ?? permissionTime
+                responsible=changes["responsible"] as? String ?? responsible
+                responsibleDni=changes["responsibleDni"] as? String ?? responsibleDni
+                workStatus=changes["workStatus"] as? String ?? workStatus
+                blueBandage=changes["blueBandage"] as? Bool ?? blueBandage
+                returned=changes["returned"] as? Bool ?? returned
+                photoSent=changes["photoSent"] as? Bool ?? photoSent
+                procedures=(changes["standaloneProcedures"] as? [String] ?? d.procedures)
+                    .joined(separator:"\n")
+                itemProcedures=changes["itemProcedures"] as? [String:String]
+                    ?? itemProcedures
+                reason=pending.reason
+                operatorName=pending.operatorName
+                discrepancy=pending.medicationDiscrepancy
+                lastDraftAt=pending.updatedAt
+                message="Rectificación en curso recuperada desde la bóveda cifrada."
+            }else {
+                message="Atención verificada; no se modificarán entregas ni existencias."
+            }
+
             failed=false
         }catch {
             failed=true
@@ -175,26 +276,16 @@ struct N2ClinicalCorrectionView:View {
     }
     @MainActor
     private func confirm() async {
-        guard ready,let d=detail,let revision else{return}
+        guard ready,let d=detail else{return}
+        draftTask?.cancel()
         saving=true
         failed=false
         defer{saving=false}
         do {
-            let procedureRows=procedures.split(separator:"\n",
-                omittingEmptySubsequences:true).map{
-                $0.trimmingCharacters(in:.whitespacesAndNewlines)
-            }.filter{!$0.isEmpty}
-            let input:[String:Any]=[
-                "category":category,"system":system,"segment":segment,
-                "diagnosis":diagnosis,"permission":permission,
-                "permissionTime":permissionTime,"responsible":responsible,
-                "responsibleDni":responsibleDni,
-                "workStatus":permission=="SI" ? "PERMISO" : "LABORANDO",
-                "blueBandage":blueBandage,"returned":returned,
-                "photoSent":photoSent,"standaloneProcedures":procedureRows,
-                "itemProcedures":itemProcedures
-            ]
+            let input=editPacket()
             let patch=try JSONSerialization.data(withJSONObject:input)
+            let latest=try await N2ProtectedClinicalIOSVault.shared
+                .clinicalFormContext()
             let result=try await N2ProtectedClinicalIOSVault.shared
                 .saveClinicalCorrection(
                     visitID:visitID,eventID:eventID,changes:patch,
@@ -202,7 +293,7 @@ struct N2ClinicalCorrectionView:View {
                     medicationDiscrepancy:discrepancy,
                     expectedEffectiveSHA:d.effectiveSHA256,
                     at:Int64(Date().timeIntervalSince1970*1000),
-                    expectedRevision:revision)
+                    expectedRevision:latest.revision)
             saved=true
             message="Rectificación verificada. Revisión cifrada \(result.revision); sin segundos descuentos de medicamentos."
         }catch {
