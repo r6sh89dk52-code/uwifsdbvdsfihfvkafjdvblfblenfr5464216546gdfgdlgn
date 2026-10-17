@@ -203,7 +203,7 @@ struct N2NativeInventoryView:View {
     @MainActor
     private func load() async {
         do{
-            context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             message="Inventario verificado; lotes: \(context?.lots.count ?? 0)."
             failed=false
         }catch{
@@ -235,20 +235,20 @@ struct N2NativeInventoryView:View {
                     "openedRemaining":values.2,"updatedAt":movementAt
                 ]
                 let data=try JSONSerialization.data(withJSONObject:record)
-                result=try await N2ProtectedClinicalIOSVault.shared.addLot(
+                result=try await N2SyntheticTrialIOSVault.shared.addLot(
                     data,expectedRevision:current.revision)
             case "receipt":
-                result=try await N2ProtectedClinicalIOSVault.shared.receiveStock(
+                result=try await N2SyntheticTrialIOSVault.shared.receiveStock(
                     movementID:movementID,lotID:selectedLotID,at:movementAt,
                     sealedAdded:values.0,looseAdded:values.1,
                     reason:reason,expectedRevision:current.revision)
             default:
-                result=try await N2ProtectedClinicalIOSVault.shared.reconcileCount(
+                result=try await N2SyntheticTrialIOSVault.shared.reconcileCount(
                     movementID:movementID,lotID:selectedLotID,at:movementAt,
                     sealed:values.0,loose:values.1,opened:values.2,
                     reason:reason,expectedRevision:current.revision)
             }
-            context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             // Disable a second tap with stale quantities after a successful
             // receipt or lot creation. Failed writes retain the same ID/clock
             // so an uncertain network/UI retry cannot silently double-count.

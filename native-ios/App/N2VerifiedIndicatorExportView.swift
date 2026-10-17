@@ -127,7 +127,7 @@ struct N2VerifiedIndicatorExportView:View {
                 startDate=week.start
                 endDate=cal.date(byAdding:.day,value:6,to:week.start) ?? week.start
             }
-            guard let history=try await N2ProtectedClinicalIOSVault.shared
+            guard let history=try await N2SyntheticTrialIOSVault.shared
                     .readHistory() else {
                 throw N2VerifiedIndicatorWorkbook.Failure.invalidSnapshot
             }
@@ -152,7 +152,7 @@ struct N2VerifiedIndicatorExportView:View {
         status="Comprobando los 30 campos, entregas y cierre del período…"
         defer{working=false}
         do {
-            let result=try await N2ProtectedClinicalIOSVault.shared
+            let result=try await N2SyntheticTrialIOSVault.shared
                 .exportVerifiedIndicatorWorkbook(
                     start:local(startDate),end:local(endDate),
                     subdivision:site,ids:selected)

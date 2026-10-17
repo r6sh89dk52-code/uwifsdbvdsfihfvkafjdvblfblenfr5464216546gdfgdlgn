@@ -157,8 +157,8 @@ struct N2ReconciliationView:View {
     @MainActor
     private func load() async {
         do{
-            context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
-            events=try await N2ProtectedClinicalIOSVault.shared.reconciliationEvents()
+            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            events=try await N2SyntheticTrialIOSVault.shared.reconciliationEvents()
             status="Bóveda verificada. Eventos anteriores: \(events.count)."
         }catch{
             context=nil
@@ -187,10 +187,10 @@ struct N2ReconciliationView:View {
         ]
         do {
             let data=try JSONSerialization.data(withJSONObject:payload)
-            let next=try await N2ProtectedClinicalIOSVault.shared
+            let next=try await N2SyntheticTrialIOSVault.shared
                 .appendReconciliationEvent(data,expectedRevision:context.revision)
-            self.context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
-            events=try await N2ProtectedClinicalIOSVault.shared.reconciliationEvents()
+            self.context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            events=try await N2SyntheticTrialIOSVault.shared.reconciliationEvents()
             reason="";document="";quantity="0";selectedVoid=""
             status="Evento confirmado en generación cifrada \(next.revision)."
         }catch{

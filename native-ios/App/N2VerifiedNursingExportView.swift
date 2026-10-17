@@ -82,7 +82,7 @@ struct N2VerifiedNursingExportView:View {
         status="Comprobando movimientos cifrados y plantilla oficial…"
         defer{busy=false}
         do {
-            let result=try await N2ProtectedClinicalIOSVault.shared
+            let result=try await N2SyntheticTrialIOSVault.shared
                 .exportVerifiedDailyNursingWorkbook(
                     date:selectedDay,shift:shift,
                     responsible:responsible.trimmingCharacters(
