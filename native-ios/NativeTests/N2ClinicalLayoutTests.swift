@@ -75,5 +75,10 @@ import DanperCore
     func testWorkerAndAccessLayouts() async throws {
         try await capture(NavigationStack{N2NativeWorkerEditorView()},name:"Nuevo-trabajador",dark:false)
         try await capture(NativeFirstRunOnboarding{},name:"Bienvenida",dark:true)
+        let context=try context()
+        try await capture(NavigationStack {
+            N2NativeClinicalFormView(layoutContext:context,draft:N2NativeFormDraft(),step:0,
+                validationMessage:"Selecciona un trabajador. Confirma la revisión de alergias.")
+        },name:"Validacion",dark:false)
     }
 }

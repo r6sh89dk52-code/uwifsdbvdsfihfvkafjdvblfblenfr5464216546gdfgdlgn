@@ -8,12 +8,14 @@ struct N2NativeClinicalFormView:View {
     let requestedDraftID:String?
     init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
     #if DEBUG
-    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int) {
+    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="") {
         requestedDraftID=nil
         layoutOnly=true
         _context=State(initialValue:layoutContext)
         _form=State(initialValue:draft)
         _step=State(initialValue:step)
+        _validationMessage=State(initialValue:validationMessage)
+        _showValidation=State(initialValue:!validationMessage.isEmpty)
     }
     #endif
     private var layoutOnly=false
@@ -82,12 +84,14 @@ struct N2NativeClinicalFormView:View {
             if let context {
                 Form {
                     Section {
-                        DanperStatusBanner(
-                            symbol:fault ? "exclamationmark.shield.fill" : "lock.shield.fill",
-                            title:fault ? "Comprueba el almacenamiento" : "Modo de prueba — datos ficticios",
-                            detail:fault || saved ? status : "Guardado automático · datos protegidos")
+                        if fault || saved {
+                            DanperStatusBanner(symbol:fault ? "exclamationmark.shield.fill" : "checkmark.shield.fill",
+                                title:fault ? "Revisa el registro" : "Atención confirmada",detail:status)
+                        } else {
+                            Label("Prueba · datos ficticios",systemImage:"lock.shield")
+                                .font(.caption).foregroundStyle(DanperStyle.red)
+                        }
                     }
-                    .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                     if !saved && !drafts.isEmpty {
                         Section("Registros pendientes") {
@@ -124,6 +128,9 @@ struct N2NativeClinicalFormView:View {
                         if step==1 {clinicalSection()}
                         if step==2 {treatmentSection(context)}
                         if step==3 {reviewSection(context)}
+                        if dynamicTypeSize.isAccessibilitySize {
+                            Section {Button("Guardar borrador") {scheduleDraft(immediate:true)}}
+                        }
                     }
                 }
                 .navigationTitle("Nueva atención")
@@ -370,7 +377,7 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
             )) {
-                Text("Seleccionar sede del stock").tag("")
+                Text("Seleccionar").tag("")
                 Text("Fundo La Venturosa").tag("LA VENTUROSA")
                 Text("Planta La Venturosa").tag("PLVENTUROSA")
             }
@@ -454,8 +461,11 @@ struct N2NativeClinicalFormView:View {
                         form.items.removeAll{$0.id==med.id}
                     } label: {Image(systemName:"trash")}
                 }
-                TextField("Cantidad clínica",value:$med.quantity,format:.number)
-                    .keyboardType(.numberPad)
+                LabeledContent("Cantidad clínica") {
+                    TextField("Cantidad",value:$med.quantity,format:.number)
+                        .keyboardType(.numberPad).multilineTextAlignment(.trailing)
+                        .accessibilityLabel("Cantidad clínica")
+                }
                 Picker("Procedimiento del producto",selection:Binding(
                     get:{med.procedure},set:{med.procedure=$0;med.procedureConfirmed=true;med.procedureSource="manual"}
                 )) {
@@ -553,7 +563,9 @@ struct N2NativeClinicalFormView:View {
             HStack(spacing:12) {
                 if step>0 {
                     Button {withAnimation(DanperStyle.animation){step-=1}} label: {
-                        Label("Anterior",systemImage:"chevron.left")
+                        if dynamicTypeSize.isAccessibilitySize {
+                            Image(systemName:"chevron.left").accessibilityLabel("Anterior")
+                        } else {Label("Anterior",systemImage:"chevron.left")}
                     }
                     .buttonStyle(DanperSecondaryButton())
                 }
@@ -567,13 +579,19 @@ struct N2NativeClinicalFormView:View {
                         else {validationMessage=pendingRequirements.joined(separator:"\n");showValidation=true}
                     }
                 } label: {
-                    Label(step<3 ? "Siguiente" :
-                          (busy ? "Confirmando…" : "Guardar atención"),
-                          systemImage:step<3 ? "arrow.right" : "checkmark.shield.fill")
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text(step<3 ? "Siguiente" : (busy ? "Guardando…" : "Guardar"))
+                            .lineLimit(1).fixedSize(horizontal:false,vertical:true)
+                    } else {
+                        Label(step<3 ? "Siguiente" :
+                              (busy ? "Confirmando…" : "Guardar atención"),
+                              systemImage:step<3 ? "arrow.right" : "checkmark.shield.fill")
+                    }
                 }
                 .buttonStyle(DanperPrimaryButton())
                 .disabled(busy)
             }
+            if !dynamicTypeSize.isAccessibilitySize {
             Button {
                 scheduleDraft(immediate:true)
             }label:{
@@ -584,6 +602,7 @@ struct N2NativeClinicalFormView:View {
             .buttonStyle(.plain)
             .foregroundStyle(DanperStyle.red)
             .disabled(busy)
+            }
         }
         .padding(.horizontal,16)
         .padding(.top,10)

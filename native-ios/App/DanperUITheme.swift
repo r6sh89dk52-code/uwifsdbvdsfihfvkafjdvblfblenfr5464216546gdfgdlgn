@@ -58,10 +58,17 @@ extension View {
     func danperFormChrome()->some View {modifier(DanperFormChrome())}
 }
 struct DanperStepProgress:View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let step:Int
     let titles:[String]
     var body:some View {
         VStack(alignment:.leading,spacing:12) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment:.leading,spacing:8) {
+                    Text("PASO \(step+1) DE \(titles.count)").font(.caption.weight(.bold)).foregroundStyle(DanperStyle.red)
+                    Text(titles[step]).font(.headline).fixedSize(horizontal:false,vertical:true)
+                }.frame(maxWidth:.infinity,alignment:.leading)
+            } else {
             HStack(spacing:10) {
                 Image(systemName:["person.crop.rectangle","stethoscope",
                                   "cross.vial.fill","checkmark.shield.fill"][
@@ -83,6 +90,7 @@ struct DanperStepProgress:View {
                 Text("\(Int(Double(step+1)/Double(titles.count)*100)) %")
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.secondary)
+            }
             }
             GeometryReader { geo in
                 ZStack(alignment:.leading) {
@@ -119,3 +127,4 @@ struct DanperStatusBanner:View {
         .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:17))
     }
 }
+

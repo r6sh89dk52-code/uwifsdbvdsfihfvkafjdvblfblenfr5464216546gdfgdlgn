@@ -30,7 +30,7 @@ node scripts/prepare-n1s-ios-demo-resources.cjs
    -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
    -derivedDataPath "$WORK/Derived" CODE_SIGNING_ALLOWED=NO \
    CODE_SIGNING_REQUIRED=NO \
-   MARKETING_VERSION=0.4.0 CURRENT_PROJECT_VERSION=7 build
+   MARKETING_VERSION=0.4.0 CURRENT_PROJECT_VERSION=8 build
 )
 APP="$WORK/Derived/Build/Products/Release-iphoneos/DANPERNative.app"
 test -d "$APP"
