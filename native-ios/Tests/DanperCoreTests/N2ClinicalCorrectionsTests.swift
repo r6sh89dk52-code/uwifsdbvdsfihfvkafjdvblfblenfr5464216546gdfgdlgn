@@ -129,4 +129,68 @@ final class N2ClinicalCorrectionsTests:XCTestCase {
             XCTAssertEqual($0 as? N2CorrectionError,.invalidChanges)
         }
     }
+    func testDraftIsEncryptedSnapshotOnlyAndIsRemovedByAtomicAmendment()throws {
+        let source=try fixture()
+        let old=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")
+        let patch=try amendment(["diagnosis":"CORRECCIÓN PENDIENTE"])
+        let draft=try N2ClinicalCorrections.savePendingDraft(
+            snapshot:source,visitID:"fundo-unit",changes:patch,
+            reason:"Pendiente por auditoría clínica",
+            operatorName:"ENFERMERÍA DANPER",medicationDiscrepancy:"",
+            expectedEffectiveSHA:old.effectiveSHA256,at:1792050000000)
+        let recovered=try XCTUnwrap(N2ClinicalCorrections.pendingDraft(
+            snapshot:draft,visitID:"fundo-unit"))
+        XCTAssertEqual(recovered.changes,patch)
+        XCTAssertEqual(recovered.reason,"Pendiente por auditoría clínica")
+        XCTAssertEqual(try originalStocks(source).0,originalStocks(draft).0)
+        XCTAssertEqual(try originalStocks(source).2,originalStocks(draft).2)
+        let saved=try N2ClinicalCorrections.append(
+            snapshot:draft,eventID:"390bd7f9-d7da-4cc8-a0ba-1fd51f6423d7",
+            visitID:"fundo-unit",changes:patch,
+            reason:"Pendiente por auditoría clínica",
+            operatorName:"ENFERMERÍA DANPER",medicationDiscrepancy:"",
+            expectedEffectiveSHA:old.effectiveSHA256,at:1792050001000)
+        XCTAssertNil(try N2ClinicalCorrections.pendingDraft(
+            snapshot:saved,visitID:"fundo-unit"))
+        XCTAssertEqual(try N2ClinicalCorrections.detail(
+            snapshot:saved,visitID:"fundo-unit").diagnosis,"CORRECCIÓN PENDIENTE")
+        let restarted=try N2ClinicalCorrections.savePendingDraft(
+            snapshot:source,visitID:"fundo-unit",changes:patch,
+            reason:"Segundo borrador recuperable",
+            operatorName:"ENFERMERÍA DANPER",medicationDiscrepancy:"",
+            expectedEffectiveSHA:old.effectiveSHA256,at:1792050002000)
+        let cleared=try N2ClinicalCorrections.deletePendingDraft(
+            snapshot:restarted,visitID:"fundo-unit")
+        XCTAssertNil(try N2ClinicalCorrections.pendingDraft(
+            snapshot:cleared,visitID:"fundo-unit"))
+        XCTAssertEqual(try originalStocks(cleared).2,originalStocks(source).2)
+    }
+    func testInvalidDraftOrTamperedAuditMetadataFailClosed()throws {
+        let source=try fixture()
+        let initial=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")
+        XCTAssertThrowsError(try N2ClinicalCorrections.savePendingDraft(
+            snapshot:source,visitID:"fundo-unit",
+            changes:amendment(["diagnosis":"OTRA IMPRESIÓN"]),
+            reason:"Registro no autorizado",operatorName:"ENFERMERÍA DANPER",
+            medicationDiscrepancy:"",
+            expectedEffectiveSHA:String(repeating:"0",count:64),
+            at:1792050003000)){
+            XCTAssertEqual($0 as? N2CorrectionError,.staleCorrection)
+        }
+        let changed=try N2ClinicalCorrections.append(
+            snapshot:source,eventID:"c5e959a2-5bb4-4589-a48d-25675e4c0a71",
+            visitID:"fundo-unit",
+            changes:amendment(["diagnosis":"REGISTRO AUDITADO"]),
+            reason:"Rectificación respaldada por revisión",
+            operatorName:"ENFERMERÍA DANPER",medicationDiscrepancy:"",
+            expectedEffectiveSHA:initial.effectiveSHA256,at:1792050004000)
+        var obj=try XCTUnwrap(JSONSerialization.jsonObject(with:changed) as? [String:Any])
+        var log=try XCTUnwrap(obj["clinicalCorrectionLog"] as? [[String:Any]])
+        log[0]["reason"]="Motivo alterado fuera del flujo"
+        obj["clinicalCorrectionLog"]=log
+        XCTAssertThrowsError(try N2ClinicalCorrections.effectiveSnapshot(
+            amendment(obj))){
+            XCTAssertEqual($0 as? N2CorrectionError,.brokenHistory)
+        }
+    }
 }

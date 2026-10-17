@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 import Crypto
 
 /// Append-only, encrypted-snapshot clinical rectification ledger.
