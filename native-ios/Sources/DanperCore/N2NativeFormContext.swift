@@ -205,9 +205,10 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "procedureSource":med.procedureSource
             ]
             if !med.selectedLotID.isEmpty {
-                guard context.options(for:med.code,at:date,site:dispensingSite).contains(where:{
-                    $0.id==med.selectedLotID
-                }),med.physicalQuantity>0,med.physicalQuantity.isFinite else{
+                // Preserve the operator's clinical record if stock changed
+                // while editing. The transactional engine verifies identity,
+                // availability and scope and records a pending reason instead.
+                guard med.physicalQuantity>0,med.physicalQuantity.isFinite else{
                     throw N2FormError.invalidProduct
                 }
                 row["physicalUse"]=[
