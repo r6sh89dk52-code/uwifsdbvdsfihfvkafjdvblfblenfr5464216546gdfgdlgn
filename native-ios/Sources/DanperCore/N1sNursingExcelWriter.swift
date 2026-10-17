@@ -140,7 +140,7 @@ internal enum N1sNursingExcelWriter {
     }
     /// Create ONE Excel number format, keeping the official template's other
     /// style indexes unchanged. Date cells stay numeric and sortable in Excel.
-    private static func appendPeruvianDateStyle(_ source:String)throws -> (String,Int) {
+    static func appendPeruvianDateStyle(_ source:String)throws -> (String,Int) {
         var xml=source
         let used=try match(#"<numFmt\b[^>]*\bnumFmtId=\"([0-9]+)\""#,in:xml)
             .compactMap {m -> Int? in
