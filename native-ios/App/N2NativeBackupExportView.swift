@@ -74,7 +74,8 @@ struct N2NativeBackupExportView:View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Respaldo cifrado N2")
+        .navigationTitle("Respaldo cifrado")
+        .danperFormChrome()
         .sheet(item:$share,onDismiss:clearTemporary){share in
             N2SecureBackupActivity(file:share.url)
         }
