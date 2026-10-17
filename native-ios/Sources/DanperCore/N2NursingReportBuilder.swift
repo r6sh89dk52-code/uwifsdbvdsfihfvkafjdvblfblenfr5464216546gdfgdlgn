@@ -222,8 +222,8 @@ public enum N2NursingReportBuilder {
                     if series[j-1].stockKnown != series[j].stockKnown ||
                       (series[j-1].stockKnown &&
                        rounded(series[j-1].closing) != rounded(series[j].initial)) {
-                        warnings.append(begin.name+": diferencia histórica entre "+
-                                        reports[j-1].date+" y "+reports[j].date)
+                        warnings.append(begin.name + ": diferencia histórica entre " +
+                                        reports[j-1].date + " y " + reports[j].date)
                     }
                 }
             }
