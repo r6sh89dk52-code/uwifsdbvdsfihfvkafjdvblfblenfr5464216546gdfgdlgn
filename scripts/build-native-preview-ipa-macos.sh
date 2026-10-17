@@ -29,7 +29,8 @@ node scripts/prepare-n1s-ios-demo-resources.cjs
  xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
    -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
    -derivedDataPath "$WORK/Derived" CODE_SIGNING_ALLOWED=NO \
-   CODE_SIGNING_REQUIRED=NO build
+   CODE_SIGNING_REQUIRED=NO \
+   MARKETING_VERSION=0.2.0 CURRENT_PROJECT_VERSION=2 build
 )
 APP="$WORK/Derived/Build/Products/Release-iphoneos/DANPERNative.app"
 test -d "$APP"
