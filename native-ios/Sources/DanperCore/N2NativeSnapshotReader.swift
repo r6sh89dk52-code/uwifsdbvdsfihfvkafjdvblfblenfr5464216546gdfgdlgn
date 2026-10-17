@@ -76,7 +76,7 @@ public enum N2NativeSnapshotReader {
                 area:w["area"] as? String ?? "",site:w["site"] as? String ?? "",
                 labor:w["labor"] as? String ?? "",
                 rosterStatus:w["rosterStatus"] as? String ?? "")
-        }.sorted{$0.name.localizedStandardCompare($1.name)== .orderedAscending}
+        }.sorted{$0.name.localizedStandardCompare($1.name) == .orderedAscending}
         guard roster.count==workers.count else{throw N2NativeReadError.invalidSnapshot}
         let official=roster.contains{$0.rosterStatus=="official"}
         let searchable=roster.filter{
