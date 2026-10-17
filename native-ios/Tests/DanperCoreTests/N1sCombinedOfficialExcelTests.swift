@@ -178,4 +178,36 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
             }
         }
     }
+    func testBothOfficialWorkbooksKeepDatesNumericAndDisplayDDMMYYYY() throws {
+        var plan=try manifest("n1s-nursing-plan.json")
+        var rows=try XCTUnwrap(plan["rows"] as? [[String:Any]])
+        rows[0]["expiry"]="2026-10-18"
+        plan["rows"]=rows
+        let nursing=try N1sNursingExcelWriter.export(
+            base:fixture("n1s-nursing-template-store.zip"),
+            manifest:JSONSerialization.data(withJSONObject:plan))
+        let entries=try N1rStoredZip.unpack(nursing.xlsx)
+        let sheet=try XCTUnwrap(String(data:XCTUnwrap(
+            entries.first(where:{$0.name=="xl/worksheets/sheet2.xml"})?.data),
+            encoding:.utf8))
+        let styles=try XCTUnwrap(String(data:XCTUnwrap(
+            entries.first(where:{$0.name=="xl/styles.xml"})?.data),
+            encoding:.utf8))
+        XCTAssertTrue(styles.contains("formatCode=\"dd/mm/yyyy\""))
+        XCTAssertFalse(sheet.contains("2026-10-18"))
+        XCTAssertTrue(sheet.contains("<v>46313</v></c>"))
+        XCTAssertTrue(sheet.contains("r=\"I7\" s=\""))
+
+        let indicator=try N1sFullExcelWriter.exportIndicator(
+            base:fixture("n1s-indicator-template-store.zip"),
+            manifest:fixture("n1s-indicator-plan.json"))
+        let all=try N1rStoredZip.unpack(indicator.xlsx)
+        let stylesTen=try XCTUnwrap(String(data:XCTUnwrap(
+            all.first(where:{$0.name=="xl/styles.xml"})?.data),encoding:.utf8))
+        let consumos=try XCTUnwrap(String(data:XCTUnwrap(
+            all.first(where:{$0.name=="xl/worksheets/sheet5.xml"})?.data),
+            encoding:.utf8))
+        XCTAssertTrue(stylesTen.contains("formatCode=\"dd/mm/yyyy\""))
+        XCTAssertTrue(consumos.contains("r=\"F2\" s=\""))
+    }
 }
