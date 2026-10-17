@@ -46,6 +46,9 @@ jobs:
           test -f native-ios/App/N1sDemoResources/n1s-indicator-plan.json
           test -f native-ios/App/N1sDemoResources/n1s-nursing-plan.json
           test -f native-ios/App/N1sDemoResources/n2-synthetic-clinical.json
+          test -f native-ios/App/N1sDemoResources/n2-ambulatory-products.json
+          test -f native-ios/App/N1sDemoResources/n2-nursing-catalog.json
+          test -f native-ios/App/N1sDemoResources/n2-approved-mappings.json
       - name: Generate native Xcode project and official icon
         working-directory: native-ios
         run: |
@@ -75,6 +78,8 @@ jobs:
           test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n1s-indicator-plan.json"
           test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n1s-nursing-template-store.zip"
           test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n2-synthetic-clinical.json"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n2-nursing-catalog.json"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n2-approved-mappings.json"
           echo 'PASS: real Xcode SwiftUI/iOS Simulator compilation (no installation).'
       - name: Compile for generic iPhone with signing disabled (no archive)
         working-directory: native-ios

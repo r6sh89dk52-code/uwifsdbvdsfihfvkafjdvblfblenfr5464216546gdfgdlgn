@@ -17,6 +17,7 @@ on:
       - 'scripts/test-n1s-full-native-workbooks.cjs'
       - 'scripts/test-n1s-one-click-container-consent.cjs'
       - 'scripts/generate-n2-approved-fixture.cjs'
+      - 'scripts/generate-n2-nursing-parity.cjs'
       - 'src/automaticClinicalDispensing.ts'
       - 'src/ClinicalStockChoice.tsx'
       - 'src/main.tsx'
@@ -48,6 +49,7 @@ jobs:
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1r-stored-xlsx-template.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n1s-official-excel-fixtures.cjs
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n2-approved-fixture.cjs
+          DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/generate-n2-nursing-parity.cjs
       - name: Compile production TypeScript and verify one-click container opening
         run: |
           npm run build

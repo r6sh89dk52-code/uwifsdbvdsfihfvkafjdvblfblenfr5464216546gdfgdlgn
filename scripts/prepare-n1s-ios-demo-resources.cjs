@@ -44,12 +44,24 @@ try{
  assert.equal(synthetic.stockLots.length,5);
  assert.equal(synthetic.stockMovements.length,synthetic.stockMovements.filter(m=>m.dispenseRef).length);
  fs.writeFileSync(path.join(output,'n2-synthetic-clinical.json'),JSON.stringify(synthetic));
+ const {load}=require('./ambulatory-test-helpers.cjs');
+ const products=require('../src/products.json');
+ const nurseCatalog=load('src/kardexCatalog.ts').kardexCatalog;
+ const approved=load('src/reviewedKardexAssociations.ts').reviewedAssociations;
+ assert.equal(products.length,432);
+ assert.equal(nurseCatalog.length,98);
+ assert.equal(approved.length,86);
+ assert(!approved.some(a=>a.kardexCode==='E-68'));
+ fs.writeFileSync(path.join(output,'n2-ambulatory-products.json'),JSON.stringify(products));
+ fs.writeFileSync(path.join(output,'n2-nursing-catalog.json'),JSON.stringify(nurseCatalog));
+ fs.writeFileSync(path.join(output,'n2-approved-mappings.json'),JSON.stringify(approved));
  assert.deepEqual(fs.readdirSync(output).sort(),[
   'n1s-indicator-plan.json','n1s-indicator-template-store.zip',
   'n1s-nursing-plan.json','n1s-nursing-template-store.zip',
-  'n2-synthetic-clinical.json'
+  'n2-synthetic-clinical.json','n2-ambulatory-products.json',
+  'n2-nursing-catalog.json','n2-approved-mappings.json'
  ].sort());
- console.log('PASS: five sanctioned synthetic iOS resources; no real worker or patient data.');
+ console.log('PASS: eight sanitized preview resources; no real worker or patient data.');
 } finally {
  fs.rmSync(temporary,{recursive:true,force:true});
 }
