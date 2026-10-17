@@ -61,6 +61,30 @@ struct NativeRootView: View {
                         .frame(maxWidth:.infinity,alignment:.leading)
                     }
                     readOnlyBackupLink
+                    GroupBox("CLÍNICA N2 · BÓVEDA PROTEGIDA") {
+                        VStack(alignment:.leading,spacing:12) {
+                            Text("Acceso nativo independiente de la demostración. Se necesita importar una sola copia cifrada y revisada antes de trabajar con datos clínicos.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            NavigationLink {
+                                N2NativeActivationView()
+                            } label: {
+                                Label("Revisar / activar fuente clínica N2",systemImage:"lock.shield")
+                            }
+                            NavigationLink {
+                                N2NativeHistoryView(useProtectedVault:true)
+                            } label: {
+                                Label("Consultar historial cifrado N2",systemImage:"person.text.rectangle")
+                            }
+                            NavigationLink {
+                                N2NativeClinicalFormView()
+                            } label: {
+                                Label("Atención clínica N2",systemImage:"cross.case.fill")
+                            }
+                            Text("La atención ficticia de las otras pestañas sigue separada. Esta compilación todavía NO sustituye la build 222.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth:.infinity,alignment:.leading)
+                    }
                     StatusCard(icon:"person.text.rectangle",title:"Trabajadores y atenciones",
                         detail:"Formulario nativo guiado en entorno ficticio, separado de los datos reales.")
                     StatusCard(icon:"pills",title:"FEFO nativo",
