@@ -63,6 +63,13 @@ jobs:
           test "$BUNDLE" = 'pe.danper.saludmovil.native.preview'
           test -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
           test -f "$APP/N1sDemoResources/n1s-indicator-template-store.zip"
+          # Regression: the first installed IPA appeared letterboxed on iPhone.
+          # A real full-screen launch storyboard must be packaged, not just
+          # named in the Info.plist metadata.
+          LAUNCH=$(/usr/libexec/PlistBuddy -c 'Print :UILaunchStoryboardName' "$APP/Info.plist")
+          test "$LAUNCH" = 'LaunchScreen'
+          find "$APP" -name 'LaunchScreen.storyboardc' -type d | grep -q .
+          echo 'PASS: full-screen iPhone launch storyboard embedded'
           if codesign --verify "$APP" >/dev/null 2>&1; then
             echo 'FAIL: an unexpectedly signed beta cannot be distributed under this pipeline'
             exit 1
