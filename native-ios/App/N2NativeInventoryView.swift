@@ -249,10 +249,21 @@ struct N2NativeInventoryView:View {
                     reason:reason,expectedRevision:current.revision)
             }
             context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
+            // Disable a second tap with stale quantities after a successful
+            // receipt or lot creation. Failed writes retain the same ID/clock
+            // so an uncertain network/UI retry cannot silently double-count.
             movementID=UUID().uuidString
             lotID=UUID().uuidString
             movementAt=0
             reason=""
+            materialCode=""
+            selectedLotID=""
+            lotNumber=""
+            cap="1"
+            sealed="0"
+            loose="0"
+            opened="0"
+            expiryEnabled=false
             message="Movimiento o lote cifrado y auditado · revisión \(result.revision)."
         }catch {
             failed=true
