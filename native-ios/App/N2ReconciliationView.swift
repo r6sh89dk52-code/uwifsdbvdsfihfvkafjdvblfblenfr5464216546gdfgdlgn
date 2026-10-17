@@ -115,8 +115,9 @@ struct N2ReconciliationView:View {
                 ForEach(events.prefix(20)) { event in
                     VStack(alignment:.leading,spacing:3) {
                         Text(event.kind+" · "+event.date+" · "+event.code)
-                        Text("Cantidad: \(event.quantity) · "+event.subdivision+
-                             (event.voided ? " · ANULADO":""))
+                        Text("Cantidad: \(event.quantity) · " +
+                             event.subdivision +
+                             (event.voided ? " · ANULADO" : ""))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
