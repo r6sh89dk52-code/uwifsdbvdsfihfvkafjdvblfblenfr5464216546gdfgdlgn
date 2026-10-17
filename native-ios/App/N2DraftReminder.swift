@@ -13,7 +13,7 @@ enum N2DraftReminder {
         let notification=UNMutableNotificationContent()
         notification.title="DANPER Salud"
         notification.body="Tienes un registro pendiente por revisar."
-        notification.sound=.default
+        notification.sound = .default
         let request=UNNotificationRequest(
             identifier:"danper.n2.pending."+id,
             content:notification,
