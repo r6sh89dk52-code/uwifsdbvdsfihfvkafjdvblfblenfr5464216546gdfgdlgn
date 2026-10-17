@@ -66,7 +66,7 @@ struct NativeRootView: View {
                     StatusCard(icon:"pills",title:"FEFO nativo",
                         detail:"Reglas Swift probadas en Linux con inventario ficticio.")
                     StatusCard(icon:"tablecells",title:"Indicador y Kardex",
-                        detail:"El formato oficial y la conciliación clínica siguen pendientes de migración.")
+                        detail:"Los dos libros se generan con datos ficticios; falta validar el uso clínico en iPhone.")
                 }
                 .padding()
             }
@@ -139,6 +139,24 @@ struct NativeRootView: View {
                     NavigationLink {
                         N1nInactivePreparationView()
                     } label: { Label("Preparar respaldo cifrado · inactivo",systemImage:"lock.doc") }
+                    NavigationLink {
+                        N2NativeHistoryView()
+                    } label: { Label("Personal e historial N2 · ficticio",systemImage:"person.text.rectangle") }
+                    NavigationLink {
+                        N2NativeActivationView()
+                    } label: { Label("Importación única a bóveda N2",systemImage:"lock.shield") }
+                    NavigationLink {
+                        N2NativeHistoryView(useProtectedVault:true)
+                    } label: { Label("Historial cifrado N2 · lectura",systemImage:"doc.text.magnifyingglass") }
+                    NavigationLink {
+                        N2NativeWorkerEditorView()
+                    } label: { Label("Registrar trabajador N2",systemImage:"person.badge.plus") }
+                    NavigationLink {
+                        N2NativeClinicalFormView()
+                    } label: { Label("Nueva atención clínica N2",systemImage:"cross.case.fill") }
+                    NavigationLink {
+                        N1sDemoExportView()
+                    } label: { Label("Exportar dos Excel ficticios",systemImage:"tablecells") }
                     NavigationLink {
                         NativeStorageLabView().navigationTitle("Laboratorio")
                     } label: { Label("Laboratorio N1 aislado",systemImage:"externaldrive") }

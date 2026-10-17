@@ -1,7 +1,7 @@
 name: DANPER Native - Xcode Integration Audit (NO IPA)
 on:
   push:
-    branches: [native/swiftui-n1n-inactive-backup-preparation]
+    branches: [native/swiftui-n1s-complete-excel-and-container-gate]
     paths:
       - 'native-ios/**'
       - '.github/workflows/native-swiftui-xcode-audit.yml'
@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: danper-native-n1n-xcode
+  group: danper-native-n1s-xcode
   cancel-in-progress: true
 jobs:
   xcode-audit:
@@ -36,6 +36,19 @@ jobs:
           grep -q 'INFOPLIST_KEY_NSFaceIDUsageDescription' native-ios/project.yml
           test -f native-ios/App/NativeFirstRunOnboarding.swift
           test -f native-ios/App/Assets.xcassets/BrandLogo.imageset/danper-logo.png
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assemble isolated synthetic N1s workbook templates for iPhone preview
+        run: |
+          npm ci --no-fund --ignore-scripts
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          test -f native-ios/App/N1sDemoResources/n1s-indicator-plan.json
+          test -f native-ios/App/N1sDemoResources/n1s-nursing-plan.json
+          test -f native-ios/App/N1sDemoResources/n2-synthetic-clinical.json
+          test -f native-ios/App/N1sDemoResources/n2-ambulatory-products.json
+          test -f native-ios/App/N1sDemoResources/n2-nursing-catalog.json
+          test -f native-ios/App/N1sDemoResources/n2-approved-mappings.json
       - name: Generate native Xcode project and official icon
         working-directory: native-ios
         run: |
@@ -62,6 +75,11 @@ jobs:
               exit 1
             }
           test -d "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n1s-indicator-plan.json"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n1s-nursing-template-store.zip"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n2-synthetic-clinical.json"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n2-nursing-catalog.json"
+          test -f "$RUNNER_TEMP/danper-xcode-simulator/Build/Products/Debug-iphonesimulator/DANPERNative.app/N1sDemoResources/n2-approved-mappings.json"
           echo 'PASS: real Xcode SwiftUI/iOS Simulator compilation (no installation).'
       - name: Compile for generic iPhone with signing disabled (no archive)
         working-directory: native-ios
@@ -83,6 +101,30 @@ jobs:
             }
           test -d "$RUNNER_TEMP/danper-xcode-iphone/Build/Products/Debug-iphoneos/DANPERNative.app"
           echo 'PASS: real Xcode generic iPhone compilation (unsigned, no IPA).'
+      - name: Run real iOS Simulator XCTest for portable .danperbackup interop
+        working-directory: native-ios
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          SIM_ID="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([0-9A-F-]{36})\).*/\1/p' | head -n 1)"
+          test -n "$SIM_ID" || { echo 'No available iPhone Simulator device; test is NOT waived.'; exit 1; }
+          xcodebuild \
+            -project DANPERNative.xcodeproj \
+            -scheme DANPERNative \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -destination-timeout 180 \
+            -parallel-testing-enabled NO \
+            -derivedDataPath "$RUNNER_TEMP/danper-xcode-simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test > "$RUNNER_TEMP/n2-ios-xctest.log" 2>&1 || {
+              grep -E -A 7 '(error:|failed|FAIL|TEST FAILED|Testing failed)' "$RUNNER_TEMP/n2-ios-xctest.log" | tail -n 150 || true
+              exit 1
+            }
+          grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/n2-ios-xctest.log"
+          echo 'PASS N2: iOS simulator portable backup native→build222 reader roundtrip.'
       - name: Audit app privacy metadata and zero IPA packaging
         run: |
           set -euo pipefail

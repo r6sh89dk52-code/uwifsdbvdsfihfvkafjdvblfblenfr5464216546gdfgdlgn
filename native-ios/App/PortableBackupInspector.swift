@@ -54,6 +54,28 @@ enum PortableBackupInspector {
         return try await N1mRealClinicalStagingIOSVault.shared.prepareSingleSource(raw)
     }
 
+    /// Explicit one-source native clinical activation. Entirely local:
+    /// decrypt, audit before any Keychain creation, and copy into a DIFFERENT
+    /// encrypted vault. Does not read or alter the installed build222 app.
+    static func activateProtectedSource(url:URL,password:String,
+                                        explicitConsent:Bool) async throws
+        -> N2ProtectedStoreSummary {
+        guard explicitConsent else{throw BackupInspectionError.invalidSnapshot}
+        var raw=try auditedSnapshot(url:url,password:password).0
+        defer {raw.resetBytes(in:0..<raw.count)}
+        let check=try N1lRealSnapshotGate.audit(raw,destination:.verifiedEmpty)
+        guard check.isStructurallyEligibleForReview,
+              check.obviousDemoWorkerMarkers==0,
+              check.obviousDemoClinicalMarkers==0,
+              check.missingRosterReferences==0,
+              check.danglingCorrections==0 else {
+            throw BackupInspectionError.invalidSnapshot
+        }
+        _=try N1eLegacyClinicalAudit.inspect(raw)
+        return try await N2ProtectedClinicalIOSVault.shared
+            .activateOnlyWithConsent(raw,approvedByUser:explicitConsent)
+    }
+
     private static func auditedSnapshot(url:URL,password:String)
         throws -> (Data,N1lSourceAudit) {
         guard password.count >= 14 && password.count <= 200 else {
