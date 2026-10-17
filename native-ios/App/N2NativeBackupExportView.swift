@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import UIKit
 import LocalAuthentication
+import DanperCore
 
 /// Exports only authenticated ciphertext from the independent N2 clinical vault.
 /// No plaintext, patient names or identifiers are written to the shared folder.
