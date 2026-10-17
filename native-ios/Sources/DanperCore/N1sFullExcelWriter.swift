@@ -252,7 +252,7 @@ internal enum N1sFullExcelWriter {
               let reviewed=bool(root["reviewed"]),
               let provisional=bool(root["provisional"]),
               let start=string(root["start"]),let end=string(root["end"]),start<=end,
-              string(root["subdivision"])=="LA VENTUROSA",
+              ["LA VENTUROSA","PLVENTUROSA"].contains(string(root["subdivision"]) ?? ""),
               let rowsExpected=root["rows"] as? Int else {
             throw N1sExcelError.invalidManifest
         }

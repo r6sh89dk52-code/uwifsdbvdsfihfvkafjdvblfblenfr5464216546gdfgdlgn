@@ -95,6 +95,12 @@ struct NativeRootView: View {
                             } label: {
                                 Label("Exportar Kardex diario desde N2",systemImage:"tablecells")
                             }
+                            NavigationLink {
+                                N2VerifiedIndicatorExportView()
+                            } label: {
+                                Label("Indicador Ambulatorio N2 · 10 hojas",
+                                      systemImage:"tablecells.fill")
+                            }
                             Text("La atención ficticia de las otras pestañas sigue separada. Esta compilación todavía NO sustituye la build 222.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -200,6 +206,12 @@ struct NativeRootView: View {
                         N2VerifiedNursingExportView()
                     } label: {
                         Label("Kardex de enfermería N2 auditado",systemImage:"tablecells")
+                    }
+                    NavigationLink {
+                        N2VerifiedIndicatorExportView()
+                    } label: {
+                        Label("Indicador Ambulatorio N2 real · 10 hojas",
+                              systemImage:"tablecells.fill")
                     }
                     NavigationLink {
                         N1sDemoExportView()

@@ -148,6 +148,21 @@ actor N2ProtectedClinicalIOSVault {
     }
     /// May only be invoked from a Face ID/code authenticated screen after
     /// the user chooses a new passphrase; never persists plaintext to Files.
+    func exportVerifiedIndicatorWorkbook(
+        start:String,end:String,subdivision:String,ids:Set<String>)throws
+        -> N2VerifiedIndicatorWorkbook.Result {
+        guard let url=Bundle.main.url(
+            forResource:"n1s-indicator-template-store",
+            withExtension:"zip",subdirectory:"N1sDemoResources") else{
+            throw Failure.blockedMigration
+        }
+        return try protectedStore().exportVerifiedIndicatorWorkbook(
+            products:resource("n2-ambulatory-products"),
+            mappings:resource("n2-approved-mappings"),
+            template:Data(contentsOf:url),
+            start:start,end:end,subdivision:subdivision,ids:ids)
+    }
+
     func exportVerifiedDailyNursingWorkbook(date:String,shift:String,
         responsible:String)throws->N2VerifiedNursingWorkbook.Result {
         guard let source=Bundle.main.url(

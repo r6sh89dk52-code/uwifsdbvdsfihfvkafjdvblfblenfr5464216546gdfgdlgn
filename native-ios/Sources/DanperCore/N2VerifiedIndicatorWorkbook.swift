@@ -73,10 +73,10 @@ public enum N2VerifiedIndicatorWorkbook {
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>)throws->Result {
         try period(start,end)
-        guard subdivision=="LA VENTUROSA",!selectedVisitIDs.isEmpty else {
-            throw subdivision=="LA VENTUROSA" ? Failure.missingSelection :
-                Failure.ambiguousSite
+        guard ["LA VENTUROSA","PLVENTUROSA"].contains(subdivision) else{
+            throw Failure.ambiguousSite
         }
+        guard !selectedVisitIDs.isEmpty else{throw Failure.missingSelection}
         let parity=try N1eLegacyClinicalAudit.inspect(snapshot)
         _=try N1fLosslessFieldGate.inspect(snapshot)
         guard let source=try? JSONSerialization.jsonObject(with:snapshot)
@@ -321,6 +321,9 @@ public enum N2VerifiedIndicatorWorkbook {
                 row["count"]=count
             }
             summary[code]=row
+        }
+        guard openingCount>0,closingCount>0 else {
+            throw Failure.invalidReconciliation
         }
         let manifest:[String:Any]=[
             "schema":1,"catalog":catalogue,"byCode":summary,

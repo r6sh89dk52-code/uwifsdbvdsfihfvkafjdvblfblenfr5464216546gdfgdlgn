@@ -7,6 +7,40 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
         let dir=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
         return try Data(contentsOf:URL(fileURLWithPath:dir).appendingPathComponent(name))
     }
+    func testPlantSiteUsesSameOfficialTenSheetTemplateAfterReview() throws {
+        var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        let proof=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
+        let events:[[String:Any]]=[
+          ["id":"n2-pl-open","kind":"opening","subdivision":"PLVENTUROSA",
+           "code":"16000182","date":"2026-10-09","at":1791504000000,
+           "quantity":22,"reason":"Conteo verificado",
+           "document":"","expires":"","periodEnd":"","voidOf":""],
+          ["id":"n2-pl-count","kind":"count","subdivision":"PLVENTUROSA",
+           "code":"16000182","date":"2026-11-08","at":1794182400000,
+           "quantity":10,"reason":"Conteo verificado",
+           "document":"","expires":"","periodEnd":"","voidOf":""],
+          ["id":"n2-pl-review","kind":"review","subdivision":"PLVENTUROSA",
+           "code":"","date":"2026-10-09","at":1794182400100,
+           "quantity":0,"reason":"Cierre revisado",
+           "document":"","expires":"","periodEnd":"2026-11-08","voidOf":""]
+        ]
+        snapshot["ambulatoryReconciliation"]=events
+        let raw=try JSONSerialization.data(withJSONObject:snapshot)
+        let catalog=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
+        let x=try N2VerifiedIndicatorWorkbook.export(
+            snapshot:raw,products:catalog,
+            mappings:fixture("n2-reviewed-approved.json"),
+            template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-10-09",end:"2026-11-08",
+            subdivision:"PLVENTUROSA",
+            selectedVisitIDs:Set(["planta-open","planta-tablet-carton"]))
+        XCTAssertEqual(x.visits,2)
+        XCTAssertEqual(x.rows,2)
+        XCTAssertEqual(x.missingOpening,431)
+        XCTAssertEqual(x.missingClosingCount,431)
+    }
     func testTenSheetWriterRejectsUnreviewedAndPendingPhysical()throws {
         let expected=try XCTUnwrap(JSONSerialization.jsonObject(
             with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
