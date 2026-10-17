@@ -52,7 +52,8 @@ final class N2PortableBackupInteropTests:XCTestCase {
         XCTAssertEqual(again.revision,created.revision)
         // The fictional startup does not create or import the protected
         // clinical vault of the old build222 or native real-source flow.
-        XCTAssertNil(try await N2ProtectedClinicalIOSVault.shared.inspect())
+        let actualRealSource=try await N2ProtectedClinicalIOSVault.shared.inspect()
+        XCTAssertNil(actualRealSource)
     }
     func testUnsafePasswordAndPlaintextAreRejected() throws {
         XCTAssertThrowsError(try N2NativePortableBackupMaker.createVerified(
