@@ -187,6 +187,27 @@ struct DanperChoiceField:View {
     }
 }
 
+private struct DanperRevealKey:EnvironmentKey {static let defaultValue:(String)->Void={_ in}}
+extension EnvironmentValues {
+    var danperReveal:(String)->Void {
+        get{self[DanperRevealKey.self]}
+        set{self[DanperRevealKey.self]=newValue}
+    }
+}
+/// Scrolls suggestions above the keyboard, rather than revealing only the input.
+struct DanperScrollView<Content:View>:View {
+    @ViewBuilder let content:Content
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body:some View {
+        ScrollViewReader {proxy in
+            ScrollView {content}
+                .environment(\.danperReveal,{id in
+                    withAnimation(reduceMotion ? nil : DanperStyle.animation){proxy.scrollTo(id,anchor:.top)}
+                })
+        }
+    }
+}
+
 /// Inline autocomplete used by clinical, inventory and reconciliation catalogs.
 struct DanperSearchOption:Identifiable {
     let id:String
@@ -201,6 +222,16 @@ struct DanperInlineSearch:View {
     var onClose:(()->Void)?=nil
     @State private var query=""
     @FocusState private var focused:Bool
+    @State private var revealTask:Task<Void,Never>?
+    @State private var searchAnchor="inline-"+UUID().uuidString
+    @Environment(\.danperReveal) private var reveal
+    private func revealResults() {
+        revealTask?.cancel()
+        revealTask=Task { @MainActor in
+            do {try await Task.sleep(for:.milliseconds(220))} catch{return}
+            if focused {reveal(searchAnchor)}
+        }
+    }
     private var matches:[DanperSearchOption] {
         let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
         return options.filter {q.isEmpty || $0.title.localizedStandardContains(q) || $0.id.localizedStandardContains(q)}
@@ -239,6 +270,10 @@ struct DanperInlineSearch:View {
                 }.frame(maxHeight:240)
             }
         }
+        .id(searchAnchor)
+        .onChange(of:query){_,_ in revealResults()}
+        .onChange(of:focused){_,isFocused in if isFocused {revealResults()}}
+        .onDisappear{revealTask?.cancel()}
     }
 }
 struct DanperCheckRow<Content:View>:View {

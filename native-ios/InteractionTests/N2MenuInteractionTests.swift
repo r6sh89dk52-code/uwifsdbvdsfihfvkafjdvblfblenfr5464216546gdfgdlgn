@@ -31,6 +31,8 @@ final class N2MenuInteractionTests:XCTestCase {
         XCTAssertTrue(query.waitForExistence(timeout:4));query.tap();query.typeText("Paracetamol")
         let product=app.buttons["suggestion-16000182"]
         XCTAssertTrue(product.waitForExistence(timeout:4))
+        let visible=XCTNSPredicateExpectation(predicate:NSPredicate(format:"hittable == true"),object:product)
+        XCTAssertEqual(XCTWaiter.wait(for:[visible],timeout:5),.completed,"La sugerencia debe quedar visible sobre el teclado sin desplazamiento manual")
         capture(app,"Autocompletado-paracetamol-teclado")
         product.tap()
         XCTAssertTrue(app.staticTexts["Seleccionados: 1"].waitForExistence(timeout:4))

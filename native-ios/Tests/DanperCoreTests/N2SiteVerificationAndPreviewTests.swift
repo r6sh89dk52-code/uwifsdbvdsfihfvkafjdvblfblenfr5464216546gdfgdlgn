@@ -65,7 +65,7 @@ final class N2SiteVerificationAndPreviewTests:XCTestCase {
         XCTAssertEqual(try core.inspect()?.revision,1)
         XCTAssertEqual(try core.sourceForEncryptedBackup(),source)
         _=try core.saveAttention(visit,approvedCatalog:catalog,at:at,expectedRevision:1)
-        XCTAssertEqual(try core.sourceForEncryptedBackup(),preview.snapshot)
+        XCTAssertEqual(try bytes(dict(core.sourceForEncryptedBackup())),try bytes(dict(preview.snapshot)))
         let committed=try core.sourceForEncryptedBackup()
         _=try core.saveAttention(visit,approvedCatalog:catalog,at:at,expectedRevision:2)
         XCTAssertEqual(try core.sourceForEncryptedBackup(),committed)

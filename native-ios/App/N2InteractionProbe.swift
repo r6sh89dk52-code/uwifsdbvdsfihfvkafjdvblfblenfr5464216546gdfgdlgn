@@ -19,7 +19,7 @@ struct N2InteractionProbe:View {
     }
     var body:some View {
         NavigationStack {
-            ScrollView {
+            DanperScrollView {
                 VStack(spacing:16) {
                     DanperPanel("Evaluación") {
                         DanperChoiceField(title:"Tipo de atención",selection:$category,options:N2ClinicalFormOptions.categories)
@@ -32,7 +32,7 @@ struct N2InteractionProbe:View {
                     }
                 }.padding(16)
             }.navigationTitle("Prueba de interacción").danperFormChrome()
-        }
+        }.preferredColorScheme(.dark)
     }
 }
 #endif

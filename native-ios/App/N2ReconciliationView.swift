@@ -10,6 +10,7 @@ struct N2ReconciliationView:View {
     init(layoutContext:N2FormContext,operation:String?=nil) {
         layoutOnly=true
         _context=State(initialValue:layoutContext)
+        _status=State(initialValue:"Registro de conciliación disponible")
     }
     #endif
     @State private var context:N2FormContext?
@@ -28,7 +29,7 @@ struct N2ReconciliationView:View {
     @State private var search=""
     @State private var pickProduct=false
     @State private var busy=false
-    @State private var status="Verificando libro de conciliación N2…"
+    @State private var status="Cargando conciliación…"
     @State private var failed=false
 
     private func localDay(_ d:Date)->String {
@@ -50,10 +51,10 @@ struct N2ReconciliationView:View {
                 document.trimmingCharacters(in:.whitespaces).count>=3))))
     }
     var body:some View {
-        ScrollView {
+        DanperScrollView {
           VStack(alignment:.leading,spacing:16) {
             DanperPanel("Conciliación auditable · 432 productos") {
-                Label("Fuente N2 cifrada independiente",systemImage:"lock.shield.fill")
+                Label("Registro protegido del inventario",systemImage:"lock.shield.fill")
                 Text("Todo ajuste se añade como evento con fecha y justificación. Para corregir, anula el evento: la historia original nunca se borra.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Text(status).font(.footnote)
@@ -108,10 +109,10 @@ struct N2ReconciliationView:View {
                 Button {
                     Task {await save()}
                 }label:{
-                    Label(busy ? "Verificando…" : "Confirmar evento cifrado",
+                    Label(busy ? "Verificando…" : "Guardar evento",
                           systemImage:"checkmark.shield.fill")
                 }.buttonStyle(DanperPrimaryButton()).disabled(!enabled)
-                Text("El registro queda en una sola generación cifrada. Este formulario no modifica las atenciones ni las salidas del Kardex.")
+                Text("Estos eventos respaldan el reporte Excel. Para registrar existencias físicas o ingresos, usa Inventario y lotes.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             DanperPanel("Historial de eventos") {
@@ -129,7 +130,7 @@ struct N2ReconciliationView:View {
             }
           }.padding(16)
         }
-        .navigationTitle("Conciliación de inventario")
+        .navigationTitle("Conciliación").navigationBarTitleDisplayMode(.inline)
         .danperFormChrome()
         .task {if !layoutOnly {await load()}}
     }

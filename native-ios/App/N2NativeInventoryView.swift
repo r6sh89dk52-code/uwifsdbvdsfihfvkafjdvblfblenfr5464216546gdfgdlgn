@@ -11,6 +11,7 @@ struct N2NativeInventoryView:View {
     init(layoutContext:N2FormContext,operation:String?=nil) {
         layoutOnly=true
         _context=State(initialValue:layoutContext)
+        _message=State(initialValue:"\(layoutContext.lots.count) lotes disponibles")
         if let operation {_workspace=State(initialValue:"edit");_mode=State(initialValue:operation)}
     }
     #endif
@@ -37,7 +38,7 @@ struct N2NativeInventoryView:View {
     @State private var picking=false
     @State private var busy=false
     @State private var failed=false
-    @State private var message="Verificando la bóveda y el catálogo oficial…"
+    @State private var message="Cargando inventario…"
 
     private var material:N2NursingCatalogProduct? {
         context?.products.nursing.first{$0.id==materialCode}
@@ -79,12 +80,12 @@ struct N2NativeInventoryView:View {
     }
 
     var body:some View {
-        ScrollView {
+        DanperScrollView {
           VStack(alignment:.leading,spacing:16) {
             DanperPanel("Inventario y lotes") {
                 Label("Kardex físico de enfermería · 98 materiales",
                       systemImage:"lock.shield.fill")
-                Text("Toda alta, ingreso y ajuste se confirma en una sola generación cifrada. No se infiere cuántos mL contiene un frasco o cuántas unidades contiene una caja.")
+                Text("Registra existencias y revisa los lotes de cada sede. La capacidad de cajas y frascos se indica al registrar el lote.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Text(message).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
@@ -187,7 +188,7 @@ struct N2NativeInventoryView:View {
                 Button {
                     Task {await commit()}
                 } label: {
-                    Label(busy ? "Guardando…" : "Confirmar en inventario N2",
+                    Label(busy ? "Guardando…" : "Guardar movimiento",
                           systemImage:"checkmark.shield.fill")
                 }.buttonStyle(DanperPrimaryButton()).disabled(!valid)
             }
@@ -210,7 +211,7 @@ struct N2NativeInventoryView:View {
                                 .font(.caption).foregroundStyle(.secondary)
                             Text("Lote: "+lot.id+" · Vence: "+DanperDatePresentation.display(lot.expires))
                                 .font(.caption2).foregroundStyle(.secondary)
-                        }
+                        }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
                     }
                 }
             }
@@ -275,6 +276,7 @@ struct N2NativeInventoryView:View {
                     sealed:values.0,loose:values.1,opened:values.2,
                     reason:reason,expectedRevision:current.revision)
             }
+            _ = result
             context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
             // Disable a second tap with stale quantities after a successful
             // receipt or lot creation. Failed writes retain the same ID/clock
@@ -292,7 +294,7 @@ struct N2NativeInventoryView:View {
             loose="0"
             opened="0"
             expiryEnabled=false
-            message="Movimiento o lote cifrado y auditado · revisión \(result.revision)."
+            message=mode=="site" ? "Sede original verificada. Las cantidades y movimientos se conservaron." : "Inventario actualizado correctamente."
         }catch {
             failed=true
             message="Operación no aplicada: verifica materiales, cantidades, lotes y revisión vigente. El identificador se conserva para impedir duplicar un ingreso al reintentar."

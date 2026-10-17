@@ -22,3 +22,5 @@ Pruebas nuevas: preservación exacta de cantidades/atenciones/movimientos al ver
 XCTest de interfaz pulsa los menús y selecciona enfermedad, sistema osteomuscular y permiso; escribe Paracetamol/Diclofenaco en el autocompletado y agrega dos líneas, con capturas del teclado y menús abiertos. El arnés no toca bóvedas y su ruta está excluida de Release. Capturas adicionales: acceso, inventario, conciliación, exportación Kardex, resumen y cierre.
 
 Pendiente físico: Face ID/Keychain con firma SideStore, tacto, VoiceOver, teclado y compartir Excel. No se considera aprobado por compilar.
+
+La revisión de capturas detectó sugerencias bajo el teclado: un contenedor de desplazamiento compartido revela el bloque de búsqueda al escribir. El XCTest exige que Paracetamol sea pulsable sin ningún gesto de desplazamiento manual antes de capturar y seleccionarlo.

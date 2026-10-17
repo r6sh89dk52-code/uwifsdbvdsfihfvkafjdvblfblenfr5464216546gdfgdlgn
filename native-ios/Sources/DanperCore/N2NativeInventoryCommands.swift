@@ -97,7 +97,7 @@ public enum N2NativeInventoryCommands {
         let event:[String:Any]=["id":eventID,"lotId":lotID,"site":site,"reason":reason,
                                 "operatorName":operatorName,"at":at,"scope":"original-location"]
         if let previous=events.first(where:{$0["id"] as? String==eventID}) {
-            guard NSDictionary(dictionary:previous).isEqual(to:event) else{throw N2InventoryError.duplicatedMovement}
+            guard try JSONSerialization.data(withJSONObject:previous,options:[.sortedKeys]) == JSONSerialization.data(withJSONObject:event,options:[.sortedKeys]) else{throw N2InventoryError.duplicatedMovement}
             return snapshot
         }
         let sites=try N2StockSiteEvidence.resolve(state)

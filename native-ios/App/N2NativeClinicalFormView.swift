@@ -95,7 +95,7 @@ struct N2NativeClinicalFormView:View {
     var body:some View {
         Group {
             if let context {
-                ScrollView {
+                DanperScrollView {
                   VStack(alignment:.leading,spacing:16) {
                     if fault {
                         DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
