@@ -5,11 +5,16 @@ on:
     paths:
       - 'native-ios/**'
       - '.github/workflows/native-swiftui-xcode-audit.yml'
+  pull_request:
+    branches: [native/swiftui-n1s-complete-excel-and-container-gate]
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/native-swiftui-xcode-audit.yml'
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: danper-native-n1s-xcode
+  group: danper-native-n1s-xcode-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   xcode-audit:
