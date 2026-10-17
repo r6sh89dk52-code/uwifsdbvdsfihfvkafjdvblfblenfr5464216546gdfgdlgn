@@ -38,6 +38,8 @@ public struct N2NursingReport:Sendable {
 
     /// N1s official 98-product writer consumes this exact manifest.
     public func manifest(shift:String,responsible:String)throws->Data {
+        // An interval cannot be represented as an official single-day XLSX.
+        guard periodEnd == nil else {throw N2NursingReportError.unsupportedRange}
         guard exportable,["MAÑANA","TARDE","NOCHE","CONSOLIDADO"].contains(shift),
               !responsible.trimmingCharacters(in:.whitespaces).isEmpty else {
             throw N2NursingReportError.incompleteHistory

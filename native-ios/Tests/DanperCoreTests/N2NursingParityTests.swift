@@ -75,6 +75,18 @@ final class N2NursingParityTests:XCTestCase {
                 shift:"CONSOLIDADO",responsible:"OPERADOR FICTICIO"))
         }
     }
+    func testRangeCannotMasqueradeAsOfficialSingleDayWorkbook() throws {
+        let source=try bytes("n1e-clinical-stock.json")
+        let (_,catalog)=try fixture()
+        let period=try N2NursingReportBuilder.range(
+            snapshot:source,catalog:catalog,
+            start:"2026-10-14",end:"2026-10-15")
+        XCTAssertEqual(period.periodEnd,"2026-10-15")
+        XCTAssertThrowsError(try period.manifest(
+            shift:"CONSOLIDADO",responsible:"OPERADOR FICTICIO")) {
+            XCTAssertEqual($0 as? N2NursingReportError,.unsupportedRange)
+        }
+    }
     func testInvalidPeriodsOrUnknownPhysicalCountsFailClosed()throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (_,catalog)=try fixture()
