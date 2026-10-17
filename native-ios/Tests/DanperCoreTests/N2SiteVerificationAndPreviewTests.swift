@@ -29,8 +29,8 @@ final class N2SiteVerificationAndPreviewTests:XCTestCase {
         for key in ["workers","attentions","allergies","stockMovements"] {
             XCTAssertEqual(try bytes(before[key]!),try bytes(after[key]!))
         }
-        var expected=lots;expected[0]["site"]="LA VENTUROSA"
-        XCTAssertEqual(try bytes(expected),try bytes(after["stockLots"]!))
+        XCTAssertEqual(try bytes(lots),try bytes(after["stockLots"]!))
+        XCTAssertEqual(try N2StockSiteEvidence.resolve(after)[id],"LA VENTUROSA")
         XCTAssertEqual((after["nativeStockSiteVerifications"] as? [[String:Any]])?.count,1)
         XCTAssertEqual(try N2NativeInventoryCommands.verifyOriginalSite(snapshot:result,eventID:"VERIFY-1",lotID:id,
             site:"LA VENTUROSA",reason:"Ubicación original verificada con conteo ficticio",operatorName:"OPERADOR FICTICIO",at:at),result)
@@ -55,7 +55,7 @@ final class N2SiteVerificationAndPreviewTests:XCTestCase {
     }
     func testPreviewNeverWritesAndPredictsActualAutomaticMovementExactly()throws {
         let (source,visit)=try sourceAndVisit(),catalog=try fixture("n2-reviewed-approved.json")
-        let dir=FileManager.default.temporaryDirectory.appendingPathComponent("preview-"+UUID().uuidString)
+        let dir=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-preview-"+UUID().uuidString)
         defer{try? FileManager.default.removeItem(at:dir)}
         let journal=try N2EncryptedClinicalJournal(directory:dir,secret:Data(repeating:0x43,count:32))
         _=try N2AtomicClinicalCoordinator(journal:journal).bootstrapFromVerifiedSingleSource(source)

@@ -13,7 +13,7 @@ La captura 2852 dice explícitamente que no hay stock vigente con sede verificad
 
 Ahora se ejecuta una previsualización pura del MISMO motor antes de guardar. Los resultados muestran qué se descontará automáticamente y por qué otra línea no puede hacerlo. El guardado original sigue siendo una sola transacción cifrada de atención y movimientos. Los casos excepcionales se identifican como guardar con pendientes; el resultado usa advertencia explícita, sin reloj. No se inventa stock, no se cambian las 86 equivalencias y no se reconstruyen automáticamente consumos históricos.
 
-Los lotes antiguos sin sede pueden recibir una verificación explícita de su ubicación original, con responsable, motivo y evento idempotente. Esta acción no traslada lotes con sede conocida ni cambia cantidades, vencimientos o movimientos; la sede verificada también delimita el historial del lote. Nunca se asigna por inferencia a partir del trabajador.
+Los lotes antiguos sin sede pueden recibir una verificación explícita de su ubicación original, con responsable, motivo y evento idempotente. La evidencia queda separada del lote original para conservar intacta la cadena canónica antes/después. Esta acción no traslada lotes con sede conocida ni cambia cantidades, vencimientos, lotes o movimientos; la sede verificada también delimita el historial del lote. Nunca se asigna por inferencia a partir del trabajador.
 
 ## Verificación
 

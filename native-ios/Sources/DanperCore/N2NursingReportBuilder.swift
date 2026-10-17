@@ -116,7 +116,8 @@ public enum N2NursingReportBuilder {
             throw N2NursingReportError.invalidSource
         }
         guard !site.isEmpty else{return(lots,movements,products)}
-        let scoped=lots.filter{$0["site"] as? String==site}
+        let sites=try N2StockSiteEvidence.resolve(data)
+        let scoped=lots.filter{sites[$0["id"] as? String ?? ""]==site}
         let ids=Set(scoped.compactMap{$0["id"] as? String})
         return(scoped,movements.filter{ids.contains($0["lotId"] as? String ?? "")},products)
     }

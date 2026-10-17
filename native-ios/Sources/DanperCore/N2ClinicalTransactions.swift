@@ -145,6 +145,7 @@ public enum N2NativeClinicalTransaction {
                 throw N2ClinicalError.invalidVisit
             }
         }
+        let verifiedSites=try N2StockSiteEvidence.resolve(root)
         let today=limaDay(at)
         var linked=0,pending=0,already=0,reasons:[String]=[],added=0
         var lineID=""
@@ -191,7 +192,7 @@ public enum N2NativeClinicalTransaction {
                 mark("Tópico de dispensación no verificado.");continue
             }
             let eligible=lots.filter {l in
-                if !scope.isEmpty && l["site"] as? String != scope {return false}
+                if !scope.isEmpty && verifiedSites[l["id"] as? String ?? ""] != scope {return false}
                 guard let lc=str(l["code"]),let ln=str(l["name"]),
                       allowable.contains(lc),
                       candidates.contains(where:{$0.kardexCode==lc && $0.kardexName==ln}),

@@ -90,6 +90,7 @@ public enum N2NativeFormContextReader {
             records[dni]=N2FormAllergy(status:status,
                                       substances:substances,reviewed:true)
         }
+        let sites=try N2StockSiteEvidence.resolve(root)
         let all=stock.compactMap { row->N2FormLot? in
             guard let id=row["id"] as? String,
                   let code=row["code"] as? String,
@@ -104,7 +105,7 @@ public enum N2NativeFormContextReader {
             }
             return N2FormLot(id:id,kardexCode:code,name:name,unit:unit,
                              expires:expiry,capacity:capacity,sealed:sealed,
-                             loose:loose,opened:opened,site:row["site"] as? String ?? "")
+                             loose:loose,opened:opened,site:sites[id] ?? "")
         }
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
         return N2FormContext(revision:revision,workers:people,
