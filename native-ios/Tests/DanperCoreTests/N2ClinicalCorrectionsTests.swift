@@ -118,7 +118,7 @@ final class N2ClinicalCorrectionsTests:XCTestCase {
         XCTAssertTrue(try N2ClinicalCorrections.pendingDiscrepancies(
             withNote).contains("fundo-unit"))
         XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(withNote).consumptionR,
-                       N1eLegacyClinicalAudit.inspect(source).consumptionR)
+                       try N1eLegacyClinicalAudit.inspect(source).consumptionR)
         let forbidden=try amendment(["items":[["id":"unit-5","quantity":999]]])
         XCTAssertThrowsError(try N2ClinicalCorrections.append(
             snapshot:source,eventID:"173c839c-bd9c-43f0-a42e-4b78a5dd618c",
@@ -142,8 +142,8 @@ final class N2ClinicalCorrectionsTests:XCTestCase {
             snapshot:draft,visitID:"fundo-unit"))
         XCTAssertEqual(recovered.changes,patch)
         XCTAssertEqual(recovered.reason,"Pendiente por auditoría clínica")
-        XCTAssertEqual(try originalStocks(source).0,originalStocks(draft).0)
-        XCTAssertEqual(try originalStocks(source).2,originalStocks(draft).2)
+        XCTAssertEqual(try originalStocks(source).0,try originalStocks(draft).0)
+        XCTAssertEqual(try originalStocks(source).2,try originalStocks(draft).2)
         let saved=try N2ClinicalCorrections.append(
             snapshot:draft,eventID:"390bd7f9-d7da-4cc8-a0ba-1fd51f6423d7",
             visitID:"fundo-unit",changes:patch,
@@ -163,7 +163,7 @@ final class N2ClinicalCorrectionsTests:XCTestCase {
             snapshot:restarted,visitID:"fundo-unit")
         XCTAssertNil(try N2ClinicalCorrections.pendingDraft(
             snapshot:cleared,visitID:"fundo-unit"))
-        XCTAssertEqual(try originalStocks(cleared).2,originalStocks(source).2)
+        XCTAssertEqual(try originalStocks(cleared).2,try originalStocks(source).2)
     }
     func testInvalidDraftOrTamperedAuditMetadataFailClosed()throws {
         let source=try fixture()
