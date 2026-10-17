@@ -60,6 +60,57 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
                            .unreviewedPeriod)
         }
     }
+    func testAmendedClinicalDiagnosisAppearsInOfficialExcelWithoutSecondStockIssue() throws {
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        let proof=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
+        root["ambulatoryReconciliation"]=proof["events"]
+        let source=try JSONSerialization.data(withJSONObject:root)
+        let detail=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")
+        let changed=try N2ClinicalCorrections.append(
+            snapshot:source,eventID:"ec7d8bc4-19d9-4cab-a9bf-088df8f0b22d",
+            visitID:"fundo-unit",
+            changes:JSONSerialization.data(withJSONObject:[
+                "diagnosis":"RECTIFICACION_XLSX_VERIFICADA",
+                "itemProcedures":["unit-5":"CONTROL"]
+            ]),
+            reason:"Rectificación de diagnóstico y procedimiento",
+            operatorName:"RESPONSABLE DANPER",medicationDiscrepancy:"",
+            expectedEffectiveSHA:detail.effectiveSHA256,at:1792060000000)
+        let before=try N1eLegacyClinicalAudit.inspect(source)
+        let after=try N1eLegacyClinicalAudit.inspect(changed)
+        XCTAssertEqual(after.consumptionR,before.consumptionR)
+        XCTAssertEqual(after.physicalMovements,before.physicalMovements)
+        let catalog=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
+        let map=try fixture("n2-reviewed-approved.json")
+        let template=try fixture("n1s-indicator-template-store.zip")
+        let ids:Set<String>=["fundo-unit","fundo-reuse"]
+        let result=try N2VerifiedIndicatorWorkbook.export(
+            snapshot:changed,products:catalog,mappings:map,template:template,
+            start:"2026-10-09",end:"2026-11-08",subdivision:"LA VENTUROSA",
+            selectedVisitIDs:ids)
+        XCTAssertEqual(result.rows,2)
+        let sheet=try XCTUnwrap(N1rStoredZip.unpack(result.xlsx)
+            .first(where:{$0.name=="xl/worksheets/sheet5.xml"}))
+        let xml=try XCTUnwrap(String(data:sheet.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("RECTIFICACION_XLSX_VERIFICADA"))
+        let current=try N2ClinicalCorrections.detail(snapshot:changed,visitID:"fundo-unit")
+        let disputed=try N2ClinicalCorrections.append(
+            snapshot:changed,eventID:"659ece9f-b1db-483c-8fd7-50e8422ae454",
+            visitID:"fundo-unit",changes:JSONSerialization.data(
+                withJSONObject:[:]),
+            reason:"Aclaración de cantidad real pendiente de revisión",
+            operatorName:"RESPONSABLE DANPER",
+            medicationDiscrepancy:"Se requiere conciliación de la dosis administrada",
+            expectedEffectiveSHA:current.effectiveSHA256,at:1792060001000)
+        XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
+            snapshot:disputed,products:catalog,mappings:map,template:template,
+            start:"2026-10-09",end:"2026-11-08",subdivision:"LA VENTUROSA",
+            selectedVisitIDs:ids)){
+            XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,.unverifiedDelivery)
+        }
+    }
     func testTenSheetWriterRejectsUnreviewedAndPendingPhysical()throws {
         let expected=try XCTUnwrap(JSONSerialization.jsonObject(
             with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
