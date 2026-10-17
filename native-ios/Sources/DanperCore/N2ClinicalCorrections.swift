@@ -381,8 +381,22 @@ public enum N2ClinicalCorrections {
         }
         guard let changes=try? JSONSerialization.jsonObject(with:changes) as? [String:Any]
         else{throw N2CorrectionError.invalidChanges}
-        guard !current.history.contains(where:{$0["id"] as? String==eventID}) else{
-            throw N2CorrectionError.duplicateCorrection
+        if let already=current.history.first(where:{$0["id"] as? String==eventID}) {
+            // A retry after commit must be exactly the same clinical action:
+            // same visit, source version, operator and clinical amendments.
+            // It must not create another revision or a second FEFO movement.
+            guard already["visitID"] as? String==visitID,
+                  already["beforeSHA256"] as? String==expectedEffectiveSHA,
+                  already["reason"] as? String ==
+                    reason.trimmingCharacters(in:.whitespacesAndNewlines),
+                  already["operator"] as? String ==
+                    operatorName.trimmingCharacters(in:.whitespacesAndNewlines),
+                  already["medicationDiscrepancy"] as? String==medicationDiscrepancy,
+                  let previous=already["changes"] as? [String:Any],
+                  (try? canonical(previous))==(try? canonical(changes)) else{
+                throw N2CorrectionError.duplicateCorrection
+            }
+            return snapshot
         }
         let before=current.rows[index]
         guard try digest(before)==expectedEffectiveSHA else{

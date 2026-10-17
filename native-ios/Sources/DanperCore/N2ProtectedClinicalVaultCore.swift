@@ -154,6 +154,8 @@ public final class N2ProtectedClinicalVaultCore {
             throw N2ProtectedStoreError.staleRevision
         }
         let next=try f(active.snapshot)
+        // Idempotent replay of a verified event must not waste a generation.
+        guard next != active.snapshot else{return try summary(active)}
         let revision=try journal.commit(next,expectedRevision:expectedRevision)
         guard let verified=try journal.recover(),verified.revision==revision else {
             throw N2ProtectedStoreError.unsafeSource

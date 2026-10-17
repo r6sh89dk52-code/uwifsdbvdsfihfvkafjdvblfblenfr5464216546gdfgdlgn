@@ -25,7 +25,7 @@ struct N2ClinicalCorrectionView:View {
     @State private var itemProcedures=[String:String]()
     @State private var reason=""
     @State private var discrepancy=""
-    @State private var operatorName="OPERADOR DANPER"
+    @State private var operatorName=""
     @State private var eventID=UUID().uuidString
     @State private var draftTask:Task<Void,Never>?
     @State private var history=[N2CorrectionHistoryEntry]()

@@ -44,6 +44,13 @@ final class N2ClinicalCorrectionsTests:XCTestCase {
         XCTAssertEqual(original.0,stocks.0)
         XCTAssertEqual(original.1,stocks.1)
         XCTAssertEqual(original.2,stocks.2)
+        let identicalRetry=try N2ClinicalCorrections.append(
+            snapshot:corrected,eventID:"034d91d8-881a-4faf-b5cc-6dc1d60d59a9",
+            visitID:"fundo-unit",changes:changes,
+            reason:"Rectificación tras revisión clínica documental",
+            operatorName:"ENFERMERÍA DANPER",medicationDiscrepancy:"",
+            expectedEffectiveSHA:before.effectiveSHA256,at:1792010009000)
+        XCTAssertEqual(identicalRetry,corrected)
         let projection=try N2NativeSnapshotReader.read(corrected)
         XCTAssertEqual(projection.visits.first{$0.id=="fundo-unit"}?.diagnosis,
                        "DIAGNÓSTICO CORREGIDO")
