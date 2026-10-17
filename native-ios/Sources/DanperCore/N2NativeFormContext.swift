@@ -163,6 +163,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             throw N2FormError.invalidDate
         }
         guard !category.isEmpty,!system.isEmpty,
+              (!procedures.isEmpty || !items.isEmpty),
               !diagnosis.trimmingCharacters(in:.whitespaces).isEmpty,
               ["NO","SI"].contains(permission),
               (permission != "SI" || permissionTime.range(of:

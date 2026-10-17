@@ -61,6 +61,16 @@ struct NativeRootView: View {
                         .frame(maxWidth:.infinity,alignment:.leading)
                     }
                     readOnlyBackupLink
+                    NavigationLink {
+                        N2NativeBackupExportView()
+                    } label: {
+                        Label("Crear respaldo clínico N2 cifrado",systemImage:"lock.doc.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(12)
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                            .background(Color(uiColor:.secondarySystemGroupedBackground),
+                                        in:RoundedRectangle(cornerRadius:12))
+                    }
                     GroupBox("CLÍNICA N2 · BÓVEDA PROTEGIDA") {
                         VStack(alignment:.leading,spacing:12) {
                             Text("Acceso nativo independiente de la demostración. Se necesita importar una sola copia cifrada y revisada antes de trabajar con datos clínicos.")
@@ -166,6 +176,9 @@ struct NativeRootView: View {
                     NavigationLink {
                         N2NativeHistoryView()
                     } label: { Label("Personal e historial N2 · ficticio",systemImage:"person.text.rectangle") }
+                    NavigationLink {
+                        N2NativeBackupExportView()
+                    } label: { Label("Respaldo portátil cifrado N2",systemImage:"lock.doc.fill") }
                     NavigationLink {
                         N2NativeActivationView()
                     } label: { Label("Importación única a bóveda N2",systemImage:"lock.shield") }

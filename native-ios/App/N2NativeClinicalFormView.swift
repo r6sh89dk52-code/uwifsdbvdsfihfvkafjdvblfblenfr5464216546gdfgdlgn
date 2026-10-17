@@ -226,12 +226,20 @@ struct N2NativeClinicalFormView:View {
     }
     private func treatmentSection(_ context:N2FormContext)->some View {
         Section("Procedimientos") {
-            Picker("Procedimiento principal",selection:Binding(
-                get:{form.procedures.first ?? "OBSERVACION"},
-                set:{form.procedures=[$0]}
-            )) {
-                ForEach(procedures,id:\.self){Text($0).tag($0)}
+            ForEach(procedures,id:\.self){option in
+                Toggle(option,isOn:Binding(
+                    get:{form.procedures.contains(option)},
+                    set:{checked in
+                        if checked {
+                            if !form.procedures.contains(option){form.procedures.append(option)}
+                        }else{
+                            form.procedures.removeAll{$0==option}
+                        }
+                    }
+                ))
             }
+            Text("Puedes seleccionar varios procedimientos. La opción del medicamento se registra por separado.")
+                .font(.caption).foregroundStyle(.secondary)
             if form.procedures.contains(where:{
                 $0.contains("HERIDA") || $0=="SUTURAS"
             }) {
@@ -390,6 +398,7 @@ struct N2NativeClinicalFormView:View {
                     id:version.id,changes:patch,at:timestamp,
                     expectedRevision:latest.revision)
                 lastAutosaveTimestamp=timestamp
+                await N2DraftReminder.schedule(id:version.id)
                 status="Borrador cifrado · revisión \(result.revision)."
             }catch{
                 if !Task.isCancelled && !saved {
@@ -411,6 +420,7 @@ struct N2NativeClinicalFormView:View {
             let outcome=try await N2ProtectedClinicalIOSVault.shared.saveAttention(
                 raw,at:now,expectedRevision:fresh.revision)
             saved=true
+            N2DraftReminder.cancel(id:form.id)
             self.context=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
             status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."
         }catch {
