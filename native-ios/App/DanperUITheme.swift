@@ -88,8 +88,7 @@ struct DanperStepProgress:View {
                 ZStack(alignment:.leading) {
                     Capsule().fill(DanperStyle.red.opacity(0.12))
                     Capsule().fill(DanperStyle.gradient)
-                        .frame(width:max(5,geo.size.width*
-                                        CGFloat(step+1)/CGFloat(titles.count)))
+                        .frame(width: max(CGFloat(5), geo.size.width * CGFloat(step + 1) / CGFloat(titles.count)))
                 }
             }
             .frame(height:6)
