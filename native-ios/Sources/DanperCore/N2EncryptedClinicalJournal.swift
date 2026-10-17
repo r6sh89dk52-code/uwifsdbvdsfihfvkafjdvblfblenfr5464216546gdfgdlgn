@@ -30,19 +30,53 @@ internal final class N2EncryptedClinicalJournal {
     private let activeName="active-n2.json"
     private let pendingName="pending-n2.json"
 
-    init(directory:URL,secret:Data) throws {
-        let path=directory.standardizedFileURL
-        guard path.deletingLastPathComponent() == fm.temporaryDirectory.standardizedFileURL,
-              path.lastPathComponent.hasPrefix("danper-n2-synthetic-") else {
-            throw Failure.unsafeLocation
+    convenience init(directory:URL,secret:Data) throws {
+        try self.init(location:directory,secret:secret,protected:false)
+    }
+    /// Dedicated App Support location is never the build222, N1i or N1m vault.
+    /// Only the explicit iOS Keychain adaptor is permitted to provide its key.
+    convenience init(protectedAppSupportDirectory:URL,secret:Data) throws {
+        try self.init(location:protectedAppSupportDirectory,secret:secret,protected:true)
+    }
+    private init(location:URL,secret:Data,protected:Bool) throws {
+        let path=location.standardizedFileURL
+        if protected {
+            guard let support=fm.urls(for:.applicationSupportDirectory,
+                                     in:.userDomainMask).first?.standardizedFileURL,
+                  path.deletingLastPathComponent()==support,
+                  path.lastPathComponent=="DANPER-N2-CLINICAL-VAULT" else {
+                throw Failure.unsafeLocation
+            }
+        }else {
+            guard path.deletingLastPathComponent() == fm.temporaryDirectory.standardizedFileURL,
+                  path.lastPathComponent.hasPrefix("danper-n2-synthetic-") else {
+                throw Failure.unsafeLocation
+            }
         }
         guard secret.count==32 else{throw Failure.invalidKey}
         if !fm.fileExists(atPath:path.path) {
+            #if os(iOS)
+            let attrs:[FileAttributeKey:Any] = protected
+                ? [.protectionKey: FileProtectionType.complete] : [:]
+            try fm.createDirectory(at:path,withIntermediateDirectories:false,
+                                   attributes:attrs)
+            #else
             try fm.createDirectory(at:path,withIntermediateDirectories:false)
+            #endif
         }
         let info=try path.resourceValues(forKeys:[.isDirectoryKey,.isSymbolicLinkKey])
         guard info.isDirectory == true,info.isSymbolicLink != true else{
             throw Failure.unsafeLocation
+        }
+        if protected {
+            #if os(iOS)
+            try fm.setAttributes([.protectionKey:FileProtectionType.complete],
+                                 ofItemAtPath:path.path)
+            #endif
+            var location=path
+            var backup=URLResourceValues()
+            backup.isExcludedFromBackup=true
+            try location.setResourceValues(backup)
         }
         self.root=path
         self.key=SymmetricKey(data:secret)
@@ -73,6 +107,12 @@ internal final class N2EncryptedClinicalJournal {
     }
     private func write(_ name:String,_ bytes:Data) throws {
         try bytes.write(to:file(name),options:.atomic)
+        #if os(iOS)
+        if root.lastPathComponent=="DANPER-N2-CLINICAL-VAULT" {
+            try fm.setAttributes([.protectionKey:FileProtectionType.complete],
+                                 ofItemAtPath:file(name).path)
+        }
+        #endif
         guard try read(name)==bytes else{throw Failure.corruptJournal}
     }
     private func checked(_ name:String)throws->Receipt? {
