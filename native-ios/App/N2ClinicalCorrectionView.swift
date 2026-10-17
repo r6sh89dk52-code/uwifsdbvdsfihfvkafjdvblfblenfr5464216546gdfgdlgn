@@ -178,9 +178,7 @@ struct N2ClinicalCorrectionView:View {
                                       systemImage:"exclamationmark.triangle.fill")
                                     .font(.caption).foregroundStyle(.orange)
                             }
-                            Text(Date(timeIntervalSince1970:
-                                Double(event.recordedAt)/1000)
-                                .formatted(date:.numeric,time:.shortened))
+                            Text(DanperDatePresentation.displayTimestamp(event.recordedAt))
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
