@@ -59,7 +59,7 @@ struct N2ClinicalCorrectionView:View {
                 if let detail {
                     LabeledContent("Trabajador",value:detail.workerName)
                     LabeledContent("Fecha y hora original",
-                                   value:detail.date+" · "+detail.time)
+                                   value:DanperDatePresentation.displayDateTime(detail.date,detail.time))
                     LabeledContent("ID original",value:detail.id)
                     LabeledContent("Rectificaciones previas",
                                    value:String(detail.previousCorrections))
@@ -178,9 +178,7 @@ struct N2ClinicalCorrectionView:View {
                                       systemImage:"exclamationmark.triangle.fill")
                                     .font(.caption).foregroundStyle(.orange)
                             }
-                            Text(Date(timeIntervalSince1970:
-                                Double(event.recordedAt)/1000)
-                                .formatted(date:.numeric,time:.shortened))
+                            Text(DanperDatePresentation.displayTimestamp(event.recordedAt))
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
@@ -195,7 +193,8 @@ struct N2ClinicalCorrectionView:View {
                 }
             }
         }
-        .navigationTitle("Rectificar atención N2")
+        .navigationTitle("Rectificar atención")
+        .danperFormChrome()
         .task {await load()}
         .onChange(of:autosaveFingerprint) {_,_ in
             queueDraft()

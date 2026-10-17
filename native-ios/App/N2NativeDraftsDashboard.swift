@@ -34,7 +34,7 @@ struct N2NativeDraftsDashboard:View {
                             Text(draft.workerName.isEmpty ?
                                 "Trabajador por seleccionar":draft.workerName)
                                 .font(.headline)
-                            Text(draft.form.date+" "+draft.form.time)
+                            Text(DanperDatePresentation.displayDateTime(draft.form.date,draft.form.time))
                                 .font(.caption).foregroundStyle(.secondary)
                             Text("Materiales: \(draft.form.items.count) · Procedimientos: \(draft.form.procedures.count)")
                                 .font(.caption2).foregroundStyle(.secondary)
@@ -52,7 +52,8 @@ struct N2NativeDraftsDashboard:View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Borradores N2")
+        .navigationTitle("Borradores")
+        .danperFormChrome()
         .refreshable {await load()}
         .task {await load()}
     }

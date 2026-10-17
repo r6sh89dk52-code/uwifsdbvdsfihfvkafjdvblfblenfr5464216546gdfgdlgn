@@ -81,4 +81,45 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
             XCTAssertEqual($0 as? N2EncryptedClinicalJournal.Failure,.authenticationFailed)
         }
     }
+    func testMissingApplicationSupportParentIsCreatedWithoutDestroyingData()throws {
+        // Regression: on a fresh iPhone install, Application Support is not
+        // necessarily present. The previous createDirectory(intermediates:false)
+        // returned NSCocoaErrorDomain 4 before the demo could start.
+        let sandbox=FileManager.default.temporaryDirectory
+            .appendingPathComponent("danper-n2-support-test-"+UUID().uuidString,
+                                    isDirectory:true)
+        defer{try? FileManager.default.removeItem(at:sandbox)}
+        let support=sandbox.appendingPathComponent("Library",isDirectory:true)
+            .appendingPathComponent("Application Support",isDirectory:true)
+        XCTAssertFalse(FileManager.default.fileExists(atPath:support.path))
+        try N2EncryptedClinicalJournal.ensureApplicationSupportDirectory(support)
+        var isDirectory:ObjCBool=false
+        XCTAssertTrue(FileManager.default.fileExists(atPath:support.path,
+                                                       isDirectory:&isDirectory))
+        XCTAssertTrue(isDirectory.boolValue)
+        let marker=support.appendingPathComponent("existing-encrypted-generation")
+        try Data([0x12,0x34,0x56]).write(to:marker)
+        try N2EncryptedClinicalJournal.ensureApplicationSupportDirectory(support)
+        XCTAssertEqual(try Data(contentsOf:marker),Data([0x12,0x34,0x56]))
+    }
+    func testApplicationSupportSymlinkIsRejectedWithoutDeletingTarget()throws {
+        let sandbox=FileManager.default.temporaryDirectory
+            .appendingPathComponent("danper-n2-support-link-"+UUID().uuidString,
+                                    isDirectory:true)
+        defer{try? FileManager.default.removeItem(at:sandbox)}
+        try FileManager.default.createDirectory(at:sandbox,
+                                                withIntermediateDirectories:true)
+        let target=sandbox.appendingPathComponent("safe",isDirectory:true)
+        try FileManager.default.createDirectory(at:target,
+                                                withIntermediateDirectories:false)
+        let support=sandbox.appendingPathComponent("Application Support",
+                                                   isDirectory:true)
+        try FileManager.default.createSymbolicLink(at:support,withDestinationURL:target)
+        XCTAssertThrowsError(
+            try N2EncryptedClinicalJournal.ensureApplicationSupportDirectory(support)
+        ) {
+            XCTAssertEqual($0 as? N2EncryptedClinicalJournal.Failure,.unsafeLocation)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath:target.path))
+    }
 }

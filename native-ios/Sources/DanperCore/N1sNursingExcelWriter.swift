@@ -40,7 +40,8 @@ internal enum N1sNursingExcelWriter {
     /// Scope every mutation to ONE Excel row. Searching globally for <c>
     /// can overrun a self-closing cell and accidentally consume adjacent rows.
     private static func patch(_ source:String,address:String,
-                              value:Any?,formula:String?=nil) throws -> String {
+                              value:Any?,formula:String?=nil,
+                              dateStyle:Int?=nil) throws -> String {
         guard let number=Int(address.drop(while:{$0.isLetter})),
               (1...104).contains(number) else {throw N1sExcelError.invalidTemplate}
         let prefix=String(address.prefix(while:{$0.isLetter}))
@@ -76,6 +77,7 @@ internal enum N1sNursingExcelWriter {
                 preservedStyle=" s=\""+String(tag[range])+"\""
             }
         }
+        if let dateStyle {preservedStyle=" s=\"\(dateStyle)\""}
         let head="<c r=\"\(address)\""+preservedStyle
         let rendered:String
         if let formula {
@@ -136,6 +138,66 @@ internal enum N1sNursingExcelWriter {
         }
         return xml
     }
+    /// Create ONE Excel number format, keeping the official template's other
+    /// style indexes unchanged. Date cells stay numeric and sortable in Excel.
+    static func appendPeruvianDateStyle(_ source:String)throws -> (String,Int) {
+        var xml=source
+        let used=try match(#"<numFmt\b[^>]*\bnumFmtId=\"([0-9]+)\""#,in:xml)
+            .compactMap {m -> Int? in
+                guard let r=Range(m.range(at:1),in:xml) else{return nil}
+                return Int(xml[r])
+            }
+        var formatID=164
+        while used.contains(formatID) {formatID+=1}
+        guard formatID<1000 else{throw N1sExcelError.invalidTemplate}
+        let dateElement="<numFmt numFmtId=\"\(formatID)\" formatCode=\"dd/mm/yyyy\"/>"
+        let openNum=try match(#"<numFmts\b[^>]*\bcount=\"([0-9]+)\"[^>]*>"#,in:xml)
+        if let entry=openNum.first,
+           let tagRange=Range(entry.range,in:xml),
+           let countRange=Range(entry.range(at:1),in:xml),
+           let count=Int(xml[countRange]),
+           let close=xml.range(of:"</numFmts>") {
+            let old=String(xml[tagRange])
+            let updated=old.replacingOccurrences(
+                of:#"count=\"[0-9]+\""#,with:"count=\"\(count+1)\"",
+                options:.regularExpression)
+            xml.replaceSubrange(tagRange,with:updated)
+            guard let newClose=xml.range(of:"</numFmts>") else{
+                throw N1sExcelError.invalidTemplate
+            }
+            _=close
+            xml.insert(contentsOf:dateElement,at:newClose.lowerBound)
+        }else if let selfClose=try firstRange(#"<numFmts\b[^>]*/>"#,in:xml) {
+            xml.replaceSubrange(selfClose,with:
+                "<numFmts count=\"1\">"+dateElement+"</numFmts>")
+        }else {
+            guard let header=try firstRange(#"<styleSheet\b[^>]*>"#,in:xml) else {
+                throw N1sExcelError.invalidTemplate
+            }
+            xml.insert(contentsOf:"<numFmts count=\"1\">"+dateElement+"</numFmts>",
+                        at:header.upperBound)
+        }
+        let matches=try match(#"<cellXfs\b[^>]*\bcount=\"([0-9]+)\"[^>]*>"#,in:xml)
+        guard matches.count==1,let entry=matches.first,
+              let tagRange=Range(entry.range,in:xml),
+              let countRange=Range(entry.range(at:1),in:xml),
+              let count=Int(xml[countRange]),count>=1,
+              xml.contains("</cellXfs>") else {
+            throw N1sExcelError.invalidTemplate
+        }
+        let old=String(xml[tagRange])
+        let updated=old.replacingOccurrences(
+            of:#"count=\"[0-9]+\""#,with:"count=\"\(count+1)\"",
+            options:.regularExpression)
+        xml.replaceSubrange(tagRange,with:updated)
+        guard let end=xml.range(of:"</cellXfs>") else {
+            throw N1sExcelError.invalidTemplate
+        }
+        xml.insert(contentsOf:
+            "<xf numFmtId=\"\(formatID)\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/>",
+            at:end.lowerBound)
+        return(xml,count)
+    }
     private static func dateLabel(_ date:String) throws -> String {
         let dateFormat=#"^\d{4}-\d{2}-\d{2}$"#
         guard date.range(of:dateFormat,options:.regularExpression) != nil
@@ -187,6 +249,12 @@ internal enum N1sNursingExcelWriter {
         sheet=try patch(sheet,address:"A3",value:"TURNO: "+shift)
         sheet=try patch(sheet,address:"A4",value:"RESPONSABLE: "+responsible)
         sheet=try patch(sheet,address:"I3",value:"FECHA: "+dateName)
+        guard let styleEntry=entries.firstIndex(where:{$0.name=="xl/styles.xml"}),
+              let styles=String(data:entries[styleEntry].data,encoding:.utf8)
+        else{throw N1sExcelError.invalidTemplate}
+        let (updatedStyles,dateStyle)=try appendPeruvianDateStyle(styles)
+        entries[styleEntry]=N1rStoredEntry(
+            name:entries[styleEntry].name,data:Data(updatedStyles.utf8))
         for (i,row) in rows.enumerated() {
             let n=String(i+7)
             let known=(row["stockKnown"] as? Bool)==true
@@ -197,7 +265,17 @@ internal enum N1sNursingExcelWriter {
             sheet=try patch(sheet,address:"G"+n,value:known ? row["consumed"] : nil)
             sheet=try patch(sheet,address:"H"+n,value:known ? row["final"] : nil,
                             formula:known ? "F"+n+"-G"+n : nil)
-            sheet=try patch(sheet,address:"I"+n,value:row["expiry"])
+            let expiry=(row["expiry"] as? String) ?? ""
+            let numericExpiry:Double?
+            if expiry.isEmpty {
+                numericExpiry=nil
+            }else{
+                guard let serial=DanperDatePresentation.numericExcelDate(expiry)
+                else{throw N1sExcelError.invalidManifest}
+                numericExpiry=serial
+            }
+            sheet=try patch(sheet,address:"I"+n,value:numericExpiry,
+                            dateStyle:dateStyle)
             sheet=try patch(sheet,address:"J"+n,value:row["fs"])
         }
         entries[offset]=N1rStoredEntry(name:entries[offset].name,data:Data(sheet.utf8))

@@ -78,7 +78,8 @@ struct N1sDemoExportView: View {
                     .font(.footnote)
             }
         }
-        .navigationTitle("Excel nativo · prueba")
+        .navigationTitle("Excel de prueba")
+        .danperFormChrome()
         .sheet(item: $shareItem, onDismiss: removeTemporaryFile) { item in
             N1sShareController(url: item.url)
         }

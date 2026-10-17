@@ -41,7 +41,8 @@ struct N2VerifiedNursingExportView:View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("Datos del corte diario") {
-                DatePicker("Fecha",selection:$day,displayedComponents:.date)
+                LabeledContent("Fecha de corte",value:DanperDatePresentation.display(selectedDay))
+                DatePicker("Cambiar fecha",selection:$day,displayedComponents:.date)
                 Picker("Turno",selection:$shift) {
                     ForEach(["MAÑANA","TARDE","NOCHE","CONSOLIDADO"],id:\.self) {
                         Text($0).tag($0)
@@ -59,6 +60,7 @@ struct N2VerifiedNursingExportView:View {
                     Label(busy ? "Verificando…" : "Exportar Excel y compartir",
                           systemImage:"square.and.arrow.up")
                 }
+                .buttonStyle(DanperPrimaryButton())
                 .disabled(busy || responsible.trimmingCharacters(
                     in:.whitespacesAndNewlines).isEmpty)
                 Text(status).font(.footnote)
@@ -67,7 +69,8 @@ struct N2VerifiedNursingExportView:View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Kardex diario N2")
+        .navigationTitle("Kardex diario")
+        .danperFormChrome()
         .sheet(item:$share,onDismiss:cleanup) { item in
             N2NursingActivity(file:item.file)
         }

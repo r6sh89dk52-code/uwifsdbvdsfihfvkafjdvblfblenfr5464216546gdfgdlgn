@@ -42,6 +42,24 @@ struct N2NativeClinicalFormView:View {
     @State private var autosaveTask:Task<Void,Never>?
     @State private var lastAutosaveTimestamp:Int64=0
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private let stepTitles=["Trabajador y alergias","Evaluación clínica",
+                            "Procedimientos y consumos","Confirmar atención"]
+    private var dateSelection:Binding<Date> {
+        Binding(get:{
+            let f=DateFormatter()
+            f.locale=Locale(identifier:"en_US_POSIX")
+            f.timeZone=TimeZone(identifier:"America/Lima")
+            f.dateFormat="yyyy-MM-dd"
+            return f.date(from:form.date) ?? Date()
+        },set:{date in
+            let f=DateFormatter()
+            f.locale=Locale(identifier:"en_US_POSIX")
+            f.timeZone=TimeZone(identifier:"America/Lima")
+            f.dateFormat="yyyy-MM-dd"
+            form.date=f.string(from:date)
+        })
+    }
 
     private var now:Int64 {Int64(Date().timeIntervalSince1970*1000)}
     private func limaClock()->(String,String) {
@@ -60,12 +78,13 @@ struct N2NativeClinicalFormView:View {
             if let context {
                 Form {
                     Section {
-                        Label("BÓVEDA N2 · DATOS CLÍNICOS LOCALES",
-                              systemImage:"lock.shield.fill")
-                            .foregroundStyle(brand)
-                        Text(status).font(.footnote)
-                            .foregroundStyle(fault ? Color.red : Color.secondary)
+                        DanperStatusBanner(
+                            symbol:fault ? "exclamationmark.shield.fill" : "lock.shield.fill",
+                            title:fault ? "Comprueba el almacenamiento" : "Registro clínico protegido",
+                            detail:status)
                     }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                     if !saved && !drafts.isEmpty {
                         Section("Registros pendientes") {
                             Button {
@@ -91,10 +110,19 @@ struct N2NativeClinicalFormView:View {
                         if step==1 {clinicalSection()}
                         if step==2 {treatmentSection(context)}
                         if step==3 {reviewSection(context)}
-                        actions(context)
                     }
                 }
-                .navigationTitle("Atención N2")
+                .navigationTitle("Nueva atención")
+                .navigationBarTitleDisplayMode(.inline)
+                .danperFormChrome()
+                .scrollDismissesKeyboard(.interactively)
+                .safeAreaInset(edge:.bottom,spacing:0) {
+                    if !saved {actions(context)}
+                }
+                .animation(DanperStyle.animation,value:step)
+                .sensoryFeedback(.selection,trigger:step)
+                .sensoryFeedback(.selection,trigger:form.procedures.count)
+                .sensoryFeedback(.success,trigger:saved)
                 .sheet(isPresented:$chooseWorker) {
                     NavigationStack {
                         List {
@@ -161,7 +189,7 @@ struct N2NativeClinicalFormView:View {
                                         VStack(alignment:.leading,spacing:3) {
                                             Text(entry.workerName.isEmpty ? "Registro sin trabajador" : entry.workerName)
                                                 .foregroundStyle(.primary)
-                                            Text(entry.form.date+" "+entry.form.time)
+                                            Text(DanperDatePresentation.displayDateTime(entry.form.date,entry.form.time))
                                                 .font(.caption).foregroundStyle(.secondary)
                                         }
                                     }
@@ -217,14 +245,10 @@ struct N2NativeClinicalFormView:View {
 
     private var stepHeading:some View {
         Section {
-            HStack {
-                Text(["1 · Trabajador y alergias","2 · Evaluación",
-                      "3 · Procedimientos y consumos","4 · Confirmar atención"][step])
-                    .font(.headline)
-                Spacer()
-                Text("\(step+1)/4").font(.caption).foregroundStyle(.secondary)
-            }
+            DanperStepProgress(step:step,titles:stepTitles)
         }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
     }
     private func workerSection(_ context:N2FormContext)->some View {
         Section("Identificación") {
@@ -262,8 +286,8 @@ struct N2NativeClinicalFormView:View {
     }
     private func clinicalSection()->some View {
         Section("Datos de la atención") {
-            TextField("Fecha AAAA-MM-DD",text:$form.date)
-                .keyboardType(.numbersAndPunctuation)
+            LabeledContent("Fecha",value:DanperDatePresentation.display(form.date))
+            DatePicker("Cambiar fecha",selection:dateSelection,displayedComponents:.date)
             TextField("Hora HH:mm",text:$form.time)
                 .keyboardType(.numbersAndPunctuation)
             Picker("Tipo de atención",selection:$form.category) {
@@ -288,19 +312,43 @@ struct N2NativeClinicalFormView:View {
     }
     private func treatmentSection(_ context:N2FormContext)->some View {
         Section("Procedimientos") {
-            ForEach(procedures,id:\.self){option in
-                Toggle(option,isOn:Binding(
-                    get:{form.procedures.contains(option)},
-                    set:{checked in
-                        if checked {
-                            if !form.procedures.contains(option){form.procedures.append(option)}
-                        }else{
+            LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ?
+                      [GridItem(.flexible())] :
+                      [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],
+                      spacing:10) {
+                ForEach(procedures,id:\.self){option in
+                    let selected=form.procedures.contains(option)
+                    Button {
+                        if selected {
                             form.procedures.removeAll{$0==option}
+                        }else {
+                            form.procedures.append(option)
                         }
+                    } label: {
+                        HStack(spacing:8) {
+                            Image(systemName:selected ? "checkmark.circle.fill" : "circle")
+                                .font(.headline)
+                                .foregroundStyle(selected ? DanperStyle.red : Color.secondary)
+                            Text(option.capitalized(with:Locale(identifier:"es_PE")))
+                                .font(.subheadline.weight(selected ? .semibold : .regular))
+                                .foregroundStyle(.primary)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength:0)
+                        }
+                        .padding(11)
+                        .frame(maxWidth:.infinity,minHeight:56,alignment:.leading)
+                        .background(selected ? DanperStyle.red.opacity(0.10) :
+                                    DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+                        .overlay(RoundedRectangle(cornerRadius:13)
+                            .strokeBorder(selected ? DanperStyle.red.opacity(0.38) :
+                                          Color.secondary.opacity(0.12),lineWidth:1))
                     }
-                ))
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
             }
-            Text("Puedes seleccionar varios procedimientos. La opción del medicamento se registra por separado.")
+            .padding(.vertical,5)
+            Text("Selecciona uno o varios procedimientos. Las entregas de medicamentos se registran por separado.")
                 .font(.caption).foregroundStyle(.secondary)
             if form.procedures.contains(where:{
                 $0.contains("HERIDA") || $0=="SUTURAS"
@@ -342,7 +390,7 @@ struct N2NativeClinicalFormView:View {
                 Picker("Lote físico FEFO",selection:$med.selectedLotID) {
                     Text("Pendiente / automático si es unidad").tag("")
                     ForEach(matches) {lot in
-                        Text(lot.name+" · "+lot.id+" · "+lot.expires)
+                        Text(lot.name+" · "+lot.id+" · "+DanperDatePresentation.display(lot.expires))
                             .tag(lot.id)
                     }
                 }
@@ -370,41 +418,79 @@ struct N2NativeClinicalFormView:View {
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }
+    private var pendingRequirements:[String] {
+        var missing=[String]()
+        if currentWorker==nil {missing.append("seleccionar trabajador")}
+        if form.category.isEmpty {missing.append("tipo de atención")}
+        if form.system.isEmpty {missing.append("sistema afectado")}
+        if form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
+            missing.append("diagnóstico presuntivo")
+        }
+        if form.procedures.isEmpty && form.items.isEmpty {
+            missing.append("al menos un procedimiento o medicamento")
+        }
+        if form.permission=="SI" && form.permissionTime.count != 5 {
+            missing.append("hora del permiso")
+        }
+        return missing
+    }
     private func reviewSection(_ context:N2FormContext)->some View {
         Section("Revisión antes de guardar") {
             LabeledContent("Trabajador",value:currentWorker?.name ?? "Pendiente")
-            LabeledContent("Fecha",value:form.date+" "+form.time)
+            LabeledContent("Fecha",value:DanperDatePresentation.displayDateTime(form.date,form.time))
             LabeledContent("Diagnóstico",value:form.diagnosis)
             LabeledContent("Medicamentos",value:String(form.items.count))
             LabeledContent("Procedimientos",value:form.procedures.joined(separator:", "))
+            if !pendingRequirements.isEmpty {
+                Label("Falta completar: "+pendingRequirements.joined(separator:", ")+".",
+                      systemImage:"exclamationmark.triangle.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal:false,vertical:true)
+            }
             Text("Al guardar, se realizará una transacción cifrada que incluye la atención y todos sus descuentos físicos válidos. Un envase nuevo exige la autorización anterior.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }
     private func actions(_ context:N2FormContext)->some View {
-        Section {
-            HStack {
+        VStack(spacing:8) {
+            HStack(spacing:12) {
                 if step>0 {
-                    Button("Anterior") {step-=1}
-                        .buttonStyle(.bordered)
+                    Button {withAnimation(DanperStyle.animation){step-=1}} label: {
+                        Label("Anterior",systemImage:"chevron.left")
+                    }
+                    .buttonStyle(DanperSecondaryButton())
                 }
-                Spacer()
-                if step<3 {
-                    Button("Siguiente") {step+=1}
-                        .buttonStyle(.borderedProminent)
-                }else{
-                    Button(busy ? "Confirmando…" : "Guardar atención") {
+                Button {
+                    if step<3 {
+                        withAnimation(DanperStyle.animation){step+=1}
+                    } else {
                         Task {await confirm()}
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(busy)
+                } label: {
+                    Label(step<3 ? "Siguiente" :
+                          (busy ? "Confirmando…" : "Guardar atención"),
+                          systemImage:step<3 ? "arrow.right" : "checkmark.shield.fill")
                 }
+                .buttonStyle(DanperPrimaryButton())
+                .disabled(busy || (step==3 && !pendingRequirements.isEmpty))
             }
-            Button("Guardar borrador ahora") {
+            Button {
                 scheduleDraft(immediate:true)
+            }label:{
+                Label("Guardar borrador",systemImage:"square.and.arrow.down")
+                    .font(.footnote.weight(.semibold))
+                    .frame(maxWidth:.infinity,minHeight:36)
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(DanperStyle.red)
             .disabled(busy)
         }
+        .padding(.horizontal,16)
+        .padding(.top,10)
+        .padding(.bottom,6)
+        .background(.regularMaterial)
+        .overlay(alignment:.top) {Rectangle().fill(.quaternary).frame(height:0.5)}
     }
 
     @MainActor

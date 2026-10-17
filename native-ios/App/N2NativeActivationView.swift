@@ -70,7 +70,8 @@ struct N2NativeActivationView:View {
                     .font(.footnote)
             }
         }
-        .navigationTitle("Fuente clínica nativa")
+        .navigationTitle("Importación protegida")
+        .danperFormChrome()
         .confirmationDialog("¿Crear la bóveda clínica N2?",isPresented:$confirming,
                             titleVisibility:.visible) {
             Button("Seleccionar mi .danperbackup") {choosing=true}

@@ -70,7 +70,8 @@ struct N2NativeHistoryView: View {
                         "Verificación de registros ficticios."))
             }
         }
-        .navigationTitle("Historial nativo N2")
+        .navigationTitle("Personal e historial")
+        .danperFormChrome()
         .task {await load()}
         .tint(accent)
     }
@@ -81,7 +82,7 @@ struct N2NativeHistoryView: View {
             HStack {
                 Text(visit.workerName).font(.subheadline.weight(.semibold))
                 Spacer()
-                Text(visit.date+" "+visit.time).font(.caption2).foregroundStyle(.secondary)
+                Text(DanperDatePresentation.displayDateTime(visit.date,visit.time)).font(.caption2).foregroundStyle(.secondary)
             }
             Text(visit.diagnosis.isEmpty ? "Borrador sin diagnóstico" : visit.diagnosis)
                 .font(.footnote)
@@ -136,7 +137,7 @@ private struct N2WorkerHistoryDetail:View {
                 ForEach(model.workerHistory(dni)) { visit in
                     VStack(alignment:.leading,spacing:6) {
                         HStack {
-                            Text(visit.date+" "+visit.time)
+                            Text(DanperDatePresentation.displayDateTime(visit.date,visit.time))
                                 .font(.headline)
                             Spacer()
                             if let frequency=visit.frequency {
@@ -167,6 +168,7 @@ private struct N2WorkerHistoryDetail:View {
                 }
             }
         }
-        .navigationTitle(realSource ? "Historia clínica N2" : "Historia · prueba")
+        .navigationTitle(realSource ? "Historia clínica" : "Historia de prueba")
+        .danperFormChrome()
     }
 }

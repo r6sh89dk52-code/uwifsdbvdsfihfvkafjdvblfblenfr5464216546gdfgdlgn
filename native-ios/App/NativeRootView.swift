@@ -47,28 +47,50 @@ struct NativeRootView:View {
             NavigationStack { toolsTab }
                 .tabItem{Label("Más",systemImage:"square.grid.2x2.fill")}.tag(4)
         }
-        .tint(danperAccent)
+        .tint(DanperStyle.red)
+        .environment(\.locale,Locale(identifier:"es_PE"))
+        .animation(DanperStyle.animation,value:tab)
+        .sensoryFeedback(.selection,trigger:tab)
         .task {await refresh()}
     }
 
     private var home:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
-                HStack(spacing:12) {
+                HStack(spacing:14) {
                     Image("BrandLogo").resizable().scaledToFit()
-                        .frame(width:56,height:56)
-                        .clipShape(RoundedRectangle(cornerRadius:13))
-                    VStack(alignment:.leading,spacing:3) {
-                        Text("DANPER Salud").font(.title2.bold())
+                        .frame(width:68,height:68)
+                        .clipShape(RoundedRectangle(cornerRadius:17))
+                        .overlay(RoundedRectangle(cornerRadius:17)
+                            .strokeBorder(.white.opacity(0.28),lineWidth:1))
+                    VStack(alignment:.leading,spacing:5) {
+                        Text("DANPER Salud")
+                            .font(.system(.title2,design:.rounded,weight:.bold))
+                            .foregroundStyle(.white)
                         Text("Tu espacio de enfermería")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.87))
+                        Label("Beta nativa SwiftUI",systemImage:"checkmark.shield.fill")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.9))
                     }
                     Spacer(minLength:0)
                 }
-                Label("VERSIÓN DE PRUEBA · DATOS FICTICIOS",
-                      systemImage:"checkmark.shield")
+                .padding(18)
+                .frame(maxWidth:.infinity,alignment:.leading)
+                .background(
+                    LinearGradient(colors:[danperAccent,Color(red:0.55,green:0.04,blue:0.14)],
+                                   startPoint:.topLeading,endPoint:.bottomTrailing),
+                    in:RoundedRectangle(cornerRadius:23)
+                )
+                .shadow(color:danperAccent.opacity(0.16),radius:14,y:6)
+                Label("MODO DE PRUEBAS · SOLO DATOS FICTICIOS",
+                      systemImage:"lock.shield")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(danperAccent)
+                    .padding(.horizontal,12)
+                    .padding(.vertical,8)
+                    .background(danperAccent.opacity(0.09),in:Capsule())
                 VStack(alignment:.leading,spacing:12) {
                     Text(isReady ? "Listo para comenzar" :
                         "Comienza a probar la aplicación")
@@ -88,7 +110,13 @@ struct NativeRootView:View {
                         }
                     }else if !problem.isEmpty {
                         Label(problem,systemImage:"exclamationmark.triangle")
-                            .font(.footnote).foregroundStyle(.orange)
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal:false,vertical:true)
+                            .padding(11)
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                            .background(Color.orange.opacity(0.08),
+                                        in:RoundedRectangle(cornerRadius:12))
                     }
                     if isReady {
                         Label("Demostración activa · \(summary?.workers ?? 0) trabajadores y \(summary?.attentions ?? 0) registros",
@@ -102,7 +130,7 @@ struct NativeRootView:View {
                                   systemImage:"cross.case.fill")
                                 .frame(maxWidth:.infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(DanperPrimaryButton())
                         .controlSize(.large)
                         .tint(danperAccent)
                         Button {
@@ -112,7 +140,7 @@ struct NativeRootView:View {
                                   systemImage:"person.text.rectangle")
                                 .frame(maxWidth:.infinity)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(DanperSecondaryButton())
                         .controlSize(.large)
                     }else{
                         Button {
@@ -122,7 +150,7 @@ struct NativeRootView:View {
                                   systemImage:"play.fill")
                                 .frame(maxWidth:.infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(DanperPrimaryButton())
                         .controlSize(.large)
                         .tint(danperAccent)
                         .disabled(loading || preparing)
@@ -131,14 +159,18 @@ struct NativeRootView:View {
                 .padding(18)
                 .frame(maxWidth:.infinity,alignment:.leading)
                 .background(Color(uiColor:.secondarySystemGroupedBackground),
-                            in:RoundedRectangle(cornerRadius:18))
+                            in:RoundedRectangle(cornerRadius:20))
+                .shadow(color:Color.black.opacity(0.055),radius:12,y:3)
                 VStack(alignment:.leading,spacing:12) {
-                    Text("¿Qué puedes hacer?")
-                        .font(.headline)
-                    quickInfo("1",title:"Personal",desc:"Buscar trabajadores ficticios y revisar sus atenciones.")
-                    quickInfo("2",title:"Atención",desc:"Registrar diagnósticos, procedimientos y medicamentos.")
-                    quickInfo("3",title:"Borradores",desc:"Continuar registros pendientes con seguridad.")
-                    quickInfo("4",title:"Más",desc:"Abrir inventario, Kardex, Excel y herramientas.")
+                    Text("Explora DANPER Salud")
+                        .font(.title3.weight(.bold))
+                    LazyVGrid(columns:[GridItem(.flexible(),spacing:12),
+                                       GridItem(.flexible(),spacing:12)],spacing:12) {
+                        quickInfo("1",title:"Personal",desc:"Trabajadores e historial.")
+                        quickInfo("2",title:"Atención",desc:"Diagnósticos y tratamientos.")
+                        quickInfo("3",title:"Borradores",desc:"Continúa registros pendientes.")
+                        quickInfo("4",title:"Más",desc:"Inventario, Kardex y Excel.")
+                    }
                 }
                 VStack(alignment:.leading,spacing:7) {
                     Label("Tus datos reales permanecen separados",
@@ -159,17 +191,43 @@ struct NativeRootView:View {
         .navigationBarTitleDisplayMode(.inline)
     }
     private func quickInfo(_ index:String,title:String,desc:String)->some View {
-        HStack(alignment:.top,spacing:12) {
-            Text(index).font(.subheadline.bold())
-                .foregroundStyle(.white)
-                .frame(width:28,height:28)
-                .background(danperAccent,in:Circle())
-            VStack(alignment:.leading,spacing:3) {
-                Text(title).font(.subheadline.bold())
-                Text(desc).font(.footnote).foregroundStyle(.secondary)
+        let symbols=["1":"person.2.fill","2":"cross.case.fill",
+                     "3":"doc.text.fill","4":"square.grid.2x2.fill"]
+        return Button {
+            if isReady,let next=Int(index) {tab=next}
+        } label: {
+            VStack(alignment:.leading,spacing:10) {
+                Image(systemName:symbols[index] ?? "square.grid.2x2")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(DanperStyle.red)
+                    .frame(width:43,height:43)
+                    .background(DanperStyle.red.opacity(0.1),
+                                in:RoundedRectangle(cornerRadius:13))
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                Text(desc)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal:false,vertical:true)
+                Spacer(minLength:0)
+                if isReady {
+                    Image(systemName:"arrow.up.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(DanperStyle.red)
+                        .frame(maxWidth:.infinity,alignment:.trailing)
+                }
             }
+            .padding(14)
+            .frame(maxWidth:.infinity,minHeight:150,alignment:.topLeading)
+            .background(DanperStyle.surface,
+                        in:RoundedRectangle(cornerRadius:19))
+            .overlay(RoundedRectangle(cornerRadius:19)
+                .strokeBorder(Color.secondary.opacity(0.08),lineWidth:1))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Abrir "+title)
+        .disabled(!isReady)
     }
     private func lockedTab(title:String,symbol:String)->some View {
         ContentUnavailableView {
@@ -249,6 +307,7 @@ struct NativeRootView:View {
         }
         .navigationTitle("Más")
         .navigationBarTitleDisplayMode(.inline)
+        .danperFormChrome()
     }
     @MainActor
     private func refresh() async {
@@ -259,7 +318,7 @@ struct NativeRootView:View {
             problem=""
         }catch {
             summary=nil
-            problem="No se pudo comprobar el espacio de prueba. Conservamos los datos y no hemos reiniciado nada."
+            problem=trialFailureMessage(error)
         }
     }
     @MainActor
@@ -271,7 +330,28 @@ struct NativeRootView:View {
             summary=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
             problem=""
         }catch {
-            problem="No fue posible preparar el ejemplo. No se borraron datos; intenta cerrar y abrir de nuevo."
+            problem=trialFailureMessage(error)
         }
+    }
+
+    /// Read-only diagnostic. Never deletes keys, overwrites encrypted trial data,
+    /// or attempts to access the real clinical vault.
+    private func trialFailureMessage(_ error:Error)->String {
+        if let issue=error as? N2SyntheticTrialIOSVault.Failure {
+            switch issue {
+            case .missingKey:
+                return "Se detectaron archivos ficticios anteriores sin su clave de prueba. Se conservaron. No desinstales la beta hasta revisar la recuperación."
+            case .unavailableKeychain:
+                return "iOS no pudo abrir el almacenamiento seguro de prueba. Mantén el iPhone desbloqueado e inténtalo otra vez."
+            case .keyInvalid:
+                return "La clave de prueba tiene un formato inesperado. Se conservaron los archivos."
+            case .blockedMigration:
+                return "El ejemplo ficticio no superó la validación. No se importaron ni modificaron datos."
+            case .keychainStatus(let code):
+                return "No se pudo acceder al Keychain de pruebas (código iOS: \(code)). Conservamos los archivos; comparte este código para corregir la activación."
+            }
+        }
+        let details=error as NSError
+        return "No se pudo iniciar la práctica (\(details.domain), código \(details.code)). Ningún dato fue borrado; comparte este diagnóstico."
     }
 }

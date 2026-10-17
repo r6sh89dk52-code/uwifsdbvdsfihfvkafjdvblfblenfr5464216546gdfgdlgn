@@ -74,7 +74,7 @@ struct NativeFirstRunOnboarding: View {
                         Label("Permitir notificaciones",systemImage:"bell.badge.fill")
                             .frame(maxWidth:.infinity)
                     }
-                    .buttonStyle(.borderedProminent).tint(accent)
+                    .buttonStyle(DanperPrimaryButton())
                     .disabled(requesting)
                     Button("Ahora no") { advance() }
                         .disabled(requesting)
@@ -84,7 +84,7 @@ struct NativeFirstRunOnboarding: View {
                             Label("Configurar Face ID o Touch ID",systemImage:"faceid")
                                 .frame(maxWidth:.infinity)
                         }
-                        .buttonStyle(.borderedProminent).tint(accent)
+                        .buttonStyle(DanperPrimaryButton())
                         .disabled(requesting)
                     }
                     Button(biometryAvailable ? "Continuar con código" : "Continuar") { advance() }
@@ -98,7 +98,7 @@ struct NativeFirstRunOnboarding: View {
                               systemImage: step == steps-1 ? "checkmark.seal.fill" : "arrow.right")
                             .frame(maxWidth:.infinity)
                     }
-                    .buttonStyle(.borderedProminent).tint(accent)
+                    .buttonStyle(DanperPrimaryButton())
                 }
                 Text(step == 1 ? "Si rechazas, podrás recibir avisos solo si lo permites después en Ajustes del iPhone." :
                      step == 2 ? "La biometría es opcional. No obtenemos ni almacenamos tu rostro." :
@@ -110,7 +110,9 @@ struct NativeFirstRunOnboarding: View {
             .padding(.horizontal,28)
             .padding(.bottom,38)
         }
-        .background(Color(uiColor:.systemGroupedBackground))
+        .background(DanperStyle.canvas)
+        .environment(\.locale,Locale(identifier:"es_PE"))
+        .sensoryFeedback(.selection,trigger:step)
         .task {
             let context = LAContext()
             biometryAvailable = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,error:nil)

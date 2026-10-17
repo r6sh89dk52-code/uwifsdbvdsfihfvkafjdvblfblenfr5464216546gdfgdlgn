@@ -55,9 +55,15 @@ assert.deepEqual([get(consumos,'R2'),get(consumos,'R3')],[ '5', '0' ]);
 const base=open('n1s-indicator-template-store.zip');
 for(const [key,bytes] of Object.entries(base)){
  if(/^xl\/worksheets\/sheet(2|3|4|5)\.xml$/.test(key)||key==='xl/workbook.xml'||
-    /^xl\/tables\/table\d+\.xml$/.test(key))continue;
+    key==='xl/styles.xml'||/^xl\/tables\/table\d+\.xml$/.test(key))continue;
  assert.ok(Buffer.from(actual[key]).equals(Buffer.from(bytes)),'changed template '+key);
 }
+// The date-only style is deliberately appended, not copied unchanged:
+ // Excel must see genuine sortable serial values shown as dd/mm/yyyy.
+const styles=Buffer.from(actual['xl/styles.xml']).toString('utf8');
+assert.match(styles,/formatCode="dd\/mm\/yyyy"/,'indicator must use Peru date display');
+assert.match(Buffer.from(actual['xl/worksheets/sheet5.xml']).toString('utf8'),
+  /<c r="F2" s="\d+">/,'CONSUMOS date cells must have a numeric date style');
 console.log('PASS N1s complete native indicator: 10 sheets, 19 tables, 432 material rows, original cell formulas and exact all verified materials/consumptions');
 // Nursing compare main daily 98 products with TS reference, styles/print.
 const nn=open('n1s-nursing-native.xlsx'),tn=open('n1s-nursing-reference.xlsx');
@@ -71,7 +77,14 @@ for(let row=7;row<=104;row++){
   const ref=col+row,source=tm.get(ref),target=nm.get(ref);
   assert.ok(target,'missing nursing '+ref);
   assert.equal(f(nm,ref),f(tm,ref),'nurse formula '+ref);
-  assert.equal(value(target),value(source),'nurse value '+ref);
+  const originalValue=value(source),renderedValue=value(target);
+  if(col==='I' && /^\d{4}-\d{2}-\d{2}$/.test(String(originalValue))){
+   const serial=(Date.parse(originalValue+'T00:00:00Z')-
+                 Date.UTC(1899,11,30))/86400000;
+   assert.equal(Number(renderedValue),serial,'sortable nursing expiry '+ref);
+  }else {
+   assert.equal(renderedValue,originalValue,'nurse value '+ref);
+  }
  }
 }
 assert.equal(get(nm,'D7'),'3');
@@ -79,6 +92,9 @@ assert.equal(get(nm,'G7'),'1');
 assert.equal(get(nm,'H7'),'2');
 assert.equal(f(nm,'F7'),'D7+E7');
 assert.equal(f(nm,'H7'),'F7-G7');
+const nursingStyles=Buffer.from(nn['xl/styles.xml']).toString('utf8');
+assert.match(nursingStyles,/formatCode="dd\/mm\/yyyy"/,
+  'nursing must have a dd/mm/yyyy Excel date number format');
 const xml=Buffer.from(nn['xl/worksheets/sheet2.xml']).toString('utf8');
 assert.ok(xml.includes('orientation="portrait"')&&xml.includes('scale="90"'));
 console.log('PASS N1s complete native nursing Kardex: 98 rows, 7 columns/row, original print/merged cells and formulas');

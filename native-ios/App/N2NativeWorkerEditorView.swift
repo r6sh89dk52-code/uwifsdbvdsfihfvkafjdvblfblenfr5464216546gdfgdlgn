@@ -64,7 +64,8 @@ struct N2NativeWorkerEditorView:View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Trabajador ficticio")
+        .navigationTitle("Nuevo trabajador")
+        .danperFormChrome()
         .task {
             do {
                 if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {

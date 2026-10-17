@@ -64,9 +64,11 @@ struct N2ReconciliationView:View {
                 }
             }
             Section("Datos comprobables") {
-                DatePicker("Fecha del evento",selection:$date,displayedComponents:.date)
+                LabeledContent("Fecha del evento",value:DanperDatePresentation.display(localDay(date)))
+                DatePicker("Cambiar fecha",selection:$date,displayedComponents:.date)
                 if kind=="review" {
-                    DatePicker("Fin del período",selection:$periodEnd,
+                    LabeledContent("Fin del período",value:DanperDatePresentation.display(localDay(periodEnd)))
+                    DatePicker("Cambiar fin",selection:$periodEnd,
                                displayedComponents:.date)
                     Text("El cierre confirma revisión de ingresos, pero no inventa cantidades faltantes.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -74,7 +76,7 @@ struct N2ReconciliationView:View {
                     Picker("Registro que se anula",selection:$selectedVoid) {
                         Text("Selecciona un evento").tag("")
                         ForEach(options){r in
-                            Text(r.kind+" · "+r.date+" · "+r.code+" ("+String(r.quantity)+")")
+                            Text(r.kind+" · "+DanperDatePresentation.display(r.date)+" · "+r.code+" ("+String(r.quantity)+")")
                                 .tag(r.id)
                         }
                     }
@@ -91,7 +93,8 @@ struct N2ReconciliationView:View {
                         TextField("Documento o guía",text:$document)
                         Toggle("Tiene vencimiento",isOn:$hasExpires)
                         if hasExpires {
-                            DatePicker("Vencimiento",selection:$expires,
+                            LabeledContent("Vencimiento",value:DanperDatePresentation.display(localDay(expires)))
+                            DatePicker("Cambiar vencimiento",selection:$expires,
                                        displayedComponents:.date)
                         }
                     }
@@ -114,7 +117,7 @@ struct N2ReconciliationView:View {
                     .font(.footnote).foregroundStyle(.secondary)
                 ForEach(events.prefix(20)) { event in
                     VStack(alignment:.leading,spacing:3) {
-                        Text(event.kind+" · "+event.date+" · "+event.code)
+                        Text(event.kind+" · "+DanperDatePresentation.display(event.date)+" · "+event.code)
                         Text("Cantidad: \(event.quantity) · " +
                              event.subdivision +
                              (event.voided ? " · ANULADO" : ""))
@@ -123,7 +126,8 @@ struct N2ReconciliationView:View {
                 }
             }
         }
-        .navigationTitle("Conciliar inventario N2")
+        .navigationTitle("Conciliación de inventario")
+        .danperFormChrome()
         .sheet(isPresented:$pickProduct) {
             NavigationStack {
                 List {

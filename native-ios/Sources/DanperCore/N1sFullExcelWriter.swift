@@ -152,7 +152,8 @@ internal enum N1sFullExcelWriter {
         return String(xml[r])
     }
     private static func sheetData(_ xml:String,headerRows:Int,rows:[[Any?]],
-                                  width:Int,reviewed:Bool,sheet:Int) throws -> String {
+                                  width:Int,reviewed:Bool,sheet:Int,
+                                  dateStyle:Int) throws -> String {
         var preserved=""
         for index in 1...headerRows {preserved += try existingRow(xml,index)}
         let prototype=try existingRow(xml,headerRows+1)
@@ -175,8 +176,13 @@ internal enum N1sFullExcelWriter {
                     formulaText=formula(sheet,label,row,reviewed:reviewed)
                 }
                 let input:Any?=i<rows.count ? rows[i][col] : nil
-                inserted += try xmlCell(reference,input,template:style[label],
-                                        formula:formulaText)
+                // Explicit numeric date style: do not depend on a template
+                // row accidentally configured as General or displaying ISO.
+                let isDate=(sheet==5 && col==5) ||
+                    (sheet==3 && [8,9,12,13,16,17,20,21].contains(col))
+                inserted += try xmlCell(reference,input,
+                    template:isDate ? String(dateStyle) : style[label],
+                    formula:formulaText)
             }
             inserted+="</row>"
         }
@@ -268,6 +274,13 @@ internal enum N1sFullExcelWriter {
             guard provisional else {throw N1sExcelError.unreviewedOfficial}
         }
         var archive=try N1rStoredZip.unpack(base)
+        guard let stylesIndex=archive.firstIndex(where:{$0.name=="xl/styles.xml"}),
+              let stylesXML=String(data:archive[stylesIndex].data,encoding:.utf8)
+        else{throw N1sExcelError.invalidTemplate}
+        let (updatedStyles,peruDateStyle)=try N1sNursingExcelWriter
+            .appendPeruvianDateStyle(stylesXML)
+        archive[stylesIndex]=N1rStoredEntry(
+            name:archive[stylesIndex].name,data:Data(updatedStyles.utf8))
         let listed=Set(archive.map{$0.name})
         guard (1...10).allSatisfy({listed.contains("xl/worksheets/sheet\($0).xml")}),
               listed.contains("xl/workbook.xml"),
@@ -336,7 +349,8 @@ internal enum N1sFullExcelWriter {
                     throw N1sExcelError.invalidTemplate
                 }
                 let rebuilt=try sheetData(xml,headerRows:header,rows:sheetRows[no] ?? [],
-                                          width:width,reviewed:formulasWritten,sheet:no)
+                                          width:width,reviewed:formulasWritten,sheet:no,
+                                          dateStyle:peruDateStyle)
                 archive[i]=N1rStoredEntry(name:path,data:Data(rebuilt.utf8))
                 continue
             }

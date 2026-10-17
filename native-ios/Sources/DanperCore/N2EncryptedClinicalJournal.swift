@@ -30,6 +30,21 @@ internal final class N2EncryptedClinicalJournal {
     private let activeName="active-n2.json"
     private let pendingName="pending-n2.json"
 
+    /// FileManager's Application Support URL is not guaranteed to exist on a
+    /// clean iPhone install. Create ONLY the approved container parent, then
+    /// verify it is an actual directory (never follow a substituted symlink).
+    /// Existing encrypted generations and Keychain keys are not modified.
+    static func ensureApplicationSupportDirectory(_ support:URL,
+                                                   using fm:FileManager = .default)throws {
+        if !fm.fileExists(atPath:support.path) {
+            try fm.createDirectory(at:support,withIntermediateDirectories:true)
+        }
+        let info=try support.resourceValues(forKeys:[.isDirectoryKey,.isSymbolicLinkKey])
+        guard info.isDirectory == true,info.isSymbolicLink != true else {
+            throw Failure.unsafeLocation
+        }
+    }
+    
     convenience init(directory:URL,secret:Data) throws {
         try self.init(location:directory,secret:secret,protected:false)
     }
@@ -55,6 +70,13 @@ internal final class N2EncryptedClinicalJournal {
             }
         }
         guard secret.count==32 else{throw Failure.invalidKey}
+        if protected {
+            // On the first launch, Application Support itself may be absent.
+            // Do not make the clinical/synthetic vault until its sandbox parent
+            // exists; the fixed-name path allowlist above remains mandatory.
+            try Self.ensureApplicationSupportDirectory(path.deletingLastPathComponent(),
+                                                       using:fm)
+        }
         if !fm.fileExists(atPath:path.path) {
             #if os(iOS)
             let attrs:[FileAttributeKey:Any] = protected

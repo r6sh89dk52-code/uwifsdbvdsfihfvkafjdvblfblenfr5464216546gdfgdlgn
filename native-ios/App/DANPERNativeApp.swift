@@ -12,6 +12,8 @@ struct DANPERNativeApp: App {
     @State private var hasUnlockedOnce = false
     @State private var unlocking = false
     @State private var authError = ""
+    @State private var autoAttemptedThisForeground = false
+    @State private var manualRetryAvailable = false
     @AppStorage("danper.native.onboarding.v1.finished") private var onboardingFinished = false
 
     var body: some Scene {
@@ -48,16 +50,24 @@ struct DANPERNativeApp: App {
                                 .foregroundStyle(.red)
                                 .multilineTextAlignment(.center)
                         }
-                        Button(action: authenticate) {
-                            Label(unlocking ? "Verificando…" : "Ingresar con Face ID o código",
-                                  systemImage: "faceid")
-                                .frame(maxWidth: .infinity)
-                                .padding(14)
+                        if unlocking {
+                            HStack(spacing: 12) {
+                                ProgressView()
+                                Text("Verificando identidad…")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .padding(14)
+                            .accessibilityLabel("Comprobando acceso seguro")
+                        } else if manualRetryAvailable {
+                            Button(action: authenticate) {
+                                Label("Reintentar Face ID o usar código", systemImage: "faceid")
+                                    .frame(maxWidth: .infinity)
+                                    .padding(14)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Brand.red)
+                            .padding(.horizontal, 25)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Brand.red)
-                        .disabled(unlocking)
-                        .padding(.horizontal, 25)
                         Spacer()
                         Text("Todavía es una versión nativa de evaluación; los respaldos reales se inspeccionan solo con tu autorización.")
                             .font(.caption2)
@@ -76,16 +86,32 @@ struct DANPERNativeApp: App {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
-                    // Obscure at inactive; require new authentication upon background.
                     authenticated = false
+                    autoAttemptedThisForeground = false
+                    manualRetryAvailable = false
+                } else if phase == .active {
+                    attemptAutomaticUnlock()
                 }
             }
+            .onChange(of: onboardingFinished) { _, finished in
+                if finished { attemptAutomaticUnlock() }
+            }
+            .task { attemptAutomaticUnlock() }
         }
+    }
+
+    private func attemptAutomaticUnlock() {
+        guard onboardingFinished, scenePhase == .active,
+              !authenticated, !autoAttemptedThisForeground else { return }
+        // One automatic attempt per foreground entry avoids Face ID cancellation loops.
+        autoAttemptedThisForeground = true
+        authenticate()
     }
 
     private func authenticate() {
         guard !unlocking else { return }
         unlocking = true
+        manualRetryAvailable = false
         authError = ""
         let context = LAContext()
         context.evaluatePolicy(.deviceOwnerAuthentication,
@@ -95,6 +121,7 @@ struct DANPERNativeApp: App {
                 authenticated = success
                 if success { hasUnlockedOnce = true }
                 if !success {
+                    manualRetryAvailable = true
                     authError = error?.localizedDescription ?? "No se pudo confirmar la autenticación del dispositivo."
                 }
             }
