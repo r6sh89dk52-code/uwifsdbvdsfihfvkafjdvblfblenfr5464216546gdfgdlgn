@@ -135,6 +135,35 @@ public final class N2ProtectedClinicalVaultCore {
             try N2SnapshotEditor.deleteDraft(snapshot:$0,id:id)
         }
     }
+    @discardableResult
+    public func registerStockLot(_ lot:Data,nursingCatalog:Data,
+                                 expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeInventoryCommands.registerLot(
+                snapshot:$0,lot:lot,catalogData:nursingCatalog)
+        }
+    }
+    @discardableResult
+    public func receiveStock(movementID:String,lotID:String,at:Int64,
+                             sealedAdded:Int,looseAdded:Double,reason:String,
+                             expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeInventoryCommands.extraordinary(snapshot:$0,
+                movementID:movementID,lotID:lotID,at:at,
+                sealedAdded:sealedAdded,looseAdded:looseAdded,reason:reason)
+        }
+    }
+    @discardableResult
+    public func reconcilePhysicalCount(movementID:String,lotID:String,at:Int64,
+                                      sealed:Int,loose:Double,opened:Double,
+                                      reason:String,expectedRevision:Int)throws
+        ->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeInventoryCommands.adjustment(snapshot:$0,
+                movementID:movementID,lotID:lotID,at:at,
+                newSealed:sealed,newLoose:loose,newOpened:opened,reason:reason)
+        }
+    }
     public func saveAttention(_ visit:Data,approvedCatalog:Data,at:Int64,
                               expectedRevision:Int)throws
         -> N2ProtectedStoreSummary {

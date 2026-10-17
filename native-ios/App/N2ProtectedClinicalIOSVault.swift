@@ -82,6 +82,60 @@ actor N2ProtectedClinicalIOSVault {
         guard let secret=try deviceKey(create:false) else{return nil}
         return try N2ProtectedClinicalVaultCore(keyData:secret).readIndex()
     }
+    private func protectedStore()throws->N2ProtectedClinicalVaultCore {
+        guard let secret=try deviceKey(create:false) else{
+            throw Failure.missingKey
+        }
+        return try N2ProtectedClinicalVaultCore(keyData:secret)
+    }
+    private func resource(_ name:String)throws->Data {
+        guard let source=Bundle.main.url(forResource:name,withExtension:"json",
+                   subdirectory:"N1sDemoResources") else{
+            throw Failure.blockedMigration
+        }
+        return try Data(contentsOf:source)
+    }
+    func registerWorker(_ worker:Data,at:Int64,expectedRevision:Int)
+        throws->N2ProtectedStoreSummary {
+        try protectedStore().registerWorker(worker,at:at,expectedRevision:expectedRevision)
+    }
+    func reviewAllergies(dni:String,status:String,substances:String,
+                        at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().reviewAllergies(dni:dni,status:status,
+                      substances:substances,at:at,expectedRevision:expectedRevision)
+    }
+    func saveDraft(id:String,changes:Data,at:Int64,expectedRevision:Int)
+        throws->N2ProtectedStoreSummary {
+        try protectedStore().saveDraft(id:id,changes:changes,at:at,
+                                      expectedRevision:expectedRevision)
+    }
+    func deleteDraft(id:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().removeDraft(id:id,expectedRevision:expectedRevision)
+    }
+    func saveAttention(_ attention:Data,at:Int64,expectedRevision:Int)
+        throws->N2ProtectedStoreSummary {
+        try protectedStore().saveAttention(attention,
+            approvedCatalog:resource("n2-approved-mappings"),
+            at:at,expectedRevision:expectedRevision)
+    }
+    func addLot(_ lot:Data,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().registerStockLot(lot,
+            nursingCatalog:resource("n2-nursing-catalog"),expectedRevision:expectedRevision)
+    }
+    func receiveStock(movementID:String,lotID:String,at:Int64,
+                      sealedAdded:Int,looseAdded:Double,reason:String,
+                      expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().receiveStock(movementID:movementID,lotID:lotID,at:at,
+            sealedAdded:sealedAdded,looseAdded:looseAdded,reason:reason,
+            expectedRevision:expectedRevision)
+    }
+    func reconcileCount(movementID:String,lotID:String,at:Int64,
+                        sealed:Int,loose:Double,opened:Double,reason:String,
+                        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().reconcilePhysicalCount(movementID:movementID,
+            lotID:lotID,at:at,sealed:sealed,loose:loose,opened:opened,
+            reason:reason,expectedRevision:expectedRevision)
+    }
     /// May only be invoked from a Face ID/code authenticated screen after
     /// the user chooses a new passphrase; never persists plaintext to Files.
     func exportPortableEncryptedBackup(password:String)throws->Data {

@@ -1,0 +1,103 @@
+import Foundation
+import SwiftUI
+import DanperCore
+
+/// Active ONLY after a verified one-source protected N2 vault exists.
+/// Writes a new manual worker atomically, never modifies worker identity.
+struct N2NativeWorkerEditorView:View {
+    @State private var dni=""
+    @State private var names=""
+    @State private var area=""
+    @State private var labor=""
+    @State private var site="LA VENTUROSA"
+    @State private var sex=""
+    @State private var age=""
+    @State private var ubigeo=""
+    @State private var revision:Int?
+    @State private var busy=false
+    @State private var status="Verificando bóveda clínica N2…"
+    @State private var failed=false
+
+    private var ready:Bool {
+        revision != nil && !busy && dni.count==8 &&
+        dni.utf8.allSatisfy{(48...57).contains($0)} &&
+        !names.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
+        (sex.isEmpty || ["M","F"].contains(sex)) &&
+        (age.isEmpty || (Int(age).map{(0...120).contains($0)} == true))
+    }
+    var body:some View {
+        Form {
+            Section("Fuente cifrada independiente") {
+                Label("No se escribe en la build 222",systemImage:"lock.shield")
+                    .foregroundStyle(.secondary)
+                Text(status).font(.footnote)
+                    .foregroundStyle(failed ? Color.red : Color.secondary)
+            }
+            Section("Identificación del trabajador") {
+                TextField("DNI · 8 dígitos",text:$dni)
+                    .keyboardType(.numberPad)
+                TextField("Apellidos y nombres",text:$names)
+                    .textInputAutocapitalization(.characters)
+                TextField("Área",text:$area)
+                TextField("Cargo / labor",text:$labor)
+                TextField("Sede",text:$site)
+                Picker("Sexo registrado",selection:$sex) {
+                    Text("No consignado").tag("")
+                    Text("M").tag("M")
+                    Text("F").tag("F")
+                }
+                TextField("Edad (opcional)",text:$age).keyboardType(.numberPad)
+                TextField("Ubigeo (opcional)",text:$ubigeo)
+            }
+            Section {
+                Button {
+                    save()
+                } label: {
+                    Label(busy ? "Guardando…" : "Guardar trabajador",
+                          systemImage:"checkmark.shield.fill")
+                }
+                .disabled(!ready)
+                Text("Rechaza DNI repetidos; la actualización se confirma solo cuando toda la generación cifrada ha sido verificada.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Nuevo trabajador N2")
+        .task {
+            do {
+                if let vault=try await N2ProtectedClinicalIOSVault.shared.inspect() {
+                    revision=vault.revision
+                }
+                status=revision==nil ? "Sin fuente clínica nativa verificada; registro bloqueado." :
+                    "Bóveda N2 verificada. Los datos se guardan solo en este iPhone."
+            }catch{
+                failed=true;status="Error de integridad de la bóveda. Registro bloqueado."
+            }
+        }
+    }
+    @MainActor
+    private func save() {
+        guard ready,let current=revision else{return}
+        let fields:[String:Any]=[
+            "dni":dni,"name":names.trimmingCharacters(in:.whitespacesAndNewlines),
+            "area":area,"labor":labor,"site":site,
+            "sex":sex,"age":age,"ubigeo":ubigeo
+        ]
+        guard let bytes=try? JSONSerialization.data(withJSONObject:fields) else{return}
+        busy=true
+        Task {
+            do {
+                let result=try await N2ProtectedClinicalIOSVault.shared.registerWorker(
+                    bytes,at:Int64(Date().timeIntervalSince1970*1000),
+                    expectedRevision:current)
+                revision=result.revision
+                failed=false
+                status="Nuevo trabajador guardado en revisión cifrada \(result.revision)."
+                dni="";names="";area="";labor="";sex="";age="";ubigeo=""
+            }catch{
+                failed=true
+                status="No se guardó: DNI repetido, datos inválidos o revisión obsoleta. Comprueba el directorio."
+            }
+            busy=false
+        }
+    }
+}

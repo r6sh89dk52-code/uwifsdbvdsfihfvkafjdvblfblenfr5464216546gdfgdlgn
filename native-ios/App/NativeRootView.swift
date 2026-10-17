@@ -143,6 +143,15 @@ struct NativeRootView: View {
                         N2NativeHistoryView()
                     } label: { Label("Personal e historial N2 · ficticio",systemImage:"person.text.rectangle") }
                     NavigationLink {
+                        N2NativeActivationView()
+                    } label: { Label("Importación única a bóveda N2",systemImage:"lock.shield") }
+                    NavigationLink {
+                        N2NativeHistoryView(useProtectedVault:true)
+                    } label: { Label("Historial cifrado N2 · lectura",systemImage:"doc.text.magnifyingglass") }
+                    NavigationLink {
+                        N2NativeWorkerEditorView()
+                    } label: { Label("Registrar trabajador N2",systemImage:"person.badge.plus") }
+                    NavigationLink {
                         N1sDemoExportView()
                     } label: { Label("Exportar dos Excel ficticios",systemImage:"tablecells") }
                     NavigationLink {

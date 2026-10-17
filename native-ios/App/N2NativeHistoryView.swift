@@ -5,6 +5,7 @@ import DanperCore
 /// The preview route always uses a bundled synthetic JSON sample. A future
 /// real vault must authenticate before handing a snapshot to this view.
 struct N2NativeHistoryView: View {
+    var useProtectedVault = false
     @State private var projection:N2NativeReadModel?
     @State private var query=""
     @State private var selectedDNI:String?
@@ -16,10 +17,10 @@ struct N2NativeHistoryView: View {
             if let projection {
                 List {
                     Section {
-                        Label("SOLO PRUEBA · TRABAJADORES FICTICIOS",
+                        Label(useProtectedVault ? "BÓVEDA CLÍNICA N2 · SOLO LECTURA" : "SOLO PRUEBA · TRABAJADORES FICTICIOS",
                               systemImage:"lock.shield.fill")
                             .foregroundStyle(.orange)
-                        Text("Se muestran registros sintéticos. No se leen ni guardan datos clínicos de tu iPhone.")
+                        Text(useProtectedVault ? "Datos locales desde la bóveda cifrada N2. No se modifica la build 222." : "Se muestran registros sintéticos. No se leen ni guardan datos clínicos de tu iPhone.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Section("Directorio · \(projection.searchableRoster.count) disponibles") {
@@ -66,7 +67,7 @@ struct N2NativeHistoryView: View {
             }
         }
         .navigationTitle("Historial nativo N2")
-        .task {load()}
+        .task {await load()}
         .tint(accent)
     }
 
@@ -92,9 +93,16 @@ struct N2NativeHistoryView: View {
         .padding(.vertical,3)
     }
 
-    private func load() {
+    private func load() async {
         guard projection==nil else {return}
         do {
+            if useProtectedVault {
+                guard let records=try await N2ProtectedClinicalIOSVault.shared.readHistory() else {
+                    hasError=true;return
+                }
+                projection=records
+                return
+            }
             guard let file=Bundle.main.url(forResource:"n2-synthetic-clinical",
                        withExtension:"json",subdirectory:"N1sDemoResources") else {
                 hasError=true;return
