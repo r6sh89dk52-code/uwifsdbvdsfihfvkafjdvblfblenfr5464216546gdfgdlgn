@@ -59,7 +59,7 @@ struct N2ClinicalCorrectionView:View {
                 if let detail {
                     LabeledContent("Trabajador",value:detail.workerName)
                     LabeledContent("Fecha y hora original",
-                                   value:detail.date+" · "+detail.time)
+                                   value:DanperDatePresentation.displayDateTime(detail.date,detail.time))
                     LabeledContent("ID original",value:detail.id)
                     LabeledContent("Rectificaciones previas",
                                    value:String(detail.previousCorrections))
