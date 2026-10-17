@@ -8,7 +8,7 @@ struct N2NativeHistoryView: View {
     @State private var projection:N2NativeReadModel?
     @State private var query=""
     @State private var selectedDNI:String?
-    @State private var error=false
+    @State private var hasError=false
     private let accent=Color(red:0.88,green:0.09,blue:0.16)
 
     var body:some View {
@@ -59,9 +59,9 @@ struct N2NativeHistoryView: View {
                     N2WorkerHistoryDetail(dni:dni,model:projection)
                 }
             } else {
-                ContentUnavailableView(error ? "No se pudo verificar la muestra" :
+                ContentUnavailableView(hasError ? "No se pudo verificar la muestra" :
                     "Abriendo historial nativo",systemImage:"lock.doc",
-                    description:Text(error ? "La demostración se bloqueó. No se modificó ningún archivo." :
+                    description:Text(hasError ? "La demostración se bloqueó. No se modificó ningún archivo." :
                                      "Verificación de registros ficticios."))
             }
         }
@@ -97,11 +97,11 @@ struct N2NativeHistoryView: View {
         do {
             guard let file=Bundle.main.url(forResource:"n2-synthetic-clinical",
                        withExtension:"json",subdirectory:"N1sDemoResources") else {
-                error=true;return
+                hasError=true;return
             }
             projection=try N2NativeSnapshotReader.read(Data(contentsOf:file))
         } catch {
-            error=true
+            hasError=true
         }
     }
 }
