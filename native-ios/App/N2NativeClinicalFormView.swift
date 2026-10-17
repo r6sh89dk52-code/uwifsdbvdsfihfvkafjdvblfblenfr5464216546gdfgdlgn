@@ -8,9 +8,10 @@ struct N2NativeClinicalFormView:View {
     let requestedDraftID:String?
     init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
     #if DEBUG
-    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="",saved:Bool=false,showCatalog:Bool=false) {
+    init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="",saved:Bool=false,showCatalog:Bool=false,detailOnly:Bool=false) {
         requestedDraftID=nil
         layoutOnly=true
+        layoutDetailOnly=detailOnly
         _saved=State(initialValue:saved)
         _chooseProduct=State(initialValue:showCatalog)
         _expandedMedication=State(initialValue:draft.items.first?.id)
@@ -22,6 +23,7 @@ struct N2NativeClinicalFormView:View {
     }
     #endif
     private var layoutOnly=false
+    private var layoutDetailOnly=false
     private let brand=Color(red:0.88,green:0.09,blue:0.16)
     private let categories=N2ClinicalFormOptions.categories
     private let systems=N2ClinicalFormOptions.systems
@@ -90,7 +92,7 @@ struct N2NativeClinicalFormView:View {
                   VStack(alignment:.leading,spacing:16) {
                     if fault {
                         DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
-                    } else if !saved {
+                    } else if !saved && !layoutDetailOnly {
                         Label("Prueba · datos ficticios",systemImage:"lock.shield")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -130,7 +132,7 @@ struct N2NativeClinicalFormView:View {
                                 .buttonStyle(DanperSecondaryButton())
                         }
                     } else {
-                        stepHeading
+                        if !layoutDetailOnly {stepHeading}
                         if step==0 {workerSection(context)}
                         if step==1 {clinicalSection()}
                         if step==2 {treatmentSection(context)}
@@ -141,6 +143,7 @@ struct N2NativeClinicalFormView:View {
                     }
                   }.padding(16)
                 }
+                .id("\(step)-\(saved)")
                 .navigationTitle(saved ? "Atención registrada" : "Nueva atención")
                 .navigationBarTitleDisplayMode(.inline)
                 .danperFormChrome()
@@ -297,14 +300,7 @@ struct N2NativeClinicalFormView:View {
                     scheduleDraft()
                 }
                 .alert("Completa este paso",isPresented:$showValidation) {
-                    Button("Revisar",role:.cancel) {
-                        if currentWorker==nil {chooseWorker=true}
-                        else if form.category.isEmpty {focusedField="category"}
-                        else if form.system.isEmpty {focusedField="system"}
-                        else if form.system=="OSTEOMUSCULAR" && form.segment.isEmpty {focusedField="segment"}
-                        else if form.diagnosis.isEmpty {focusedField="diagnosis"}
-                        else {focusedField="time"}
-                    }
+                    Button("Revisar",role:.cancel) {focusFirstMissing(context)}
                 } message: {Text(validationMessage)}
                 .onChange(of:scenePhase) {_,phase in
                     if phase != .active {scheduleDraft(immediate:true)}
@@ -330,6 +326,7 @@ struct N2NativeClinicalFormView:View {
                 Spacer(minLength:4)
                 Text("\(step+1) de 4").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
+            ScrollViewReader { proxy in
             ScrollView(.horizontal,showsIndicators:false) {
                 HStack(spacing:8) {
                     ForEach(0..<4) { target in
@@ -353,11 +350,13 @@ struct N2NativeClinicalFormView:View {
                             }.padding(10).frame(minHeight:44)
                                 .background(step==target ? DanperStyle.red.opacity(0.08) : DanperStyle.surface,in:RoundedRectangle(cornerRadius:14))
                                 .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(step==target ? DanperStyle.red.opacity(0.45) : Color.secondary.opacity(0.16)))
-                        }.buttonStyle(.plain).accessibilityAddTraits(step==target ? .isSelected : [])
+                        }.buttonStyle(.plain).accessibilityAddTraits(step==target ? .isSelected : []).id(target)
                     }
                 }
             }
-            if step>0,let worker=currentWorker {
+            .onAppear {proxy.scrollTo(step,anchor:.center)}
+            }
+            if step>0 && !dynamicTypeSize.isAccessibilitySize,let worker=currentWorker {
                 HStack(spacing:10) {
                     Image(systemName:"person.crop.circle").foregroundStyle(.secondary)
                     VStack(alignment:.leading,spacing:4) {
@@ -376,11 +375,11 @@ struct N2NativeClinicalFormView:View {
                 chooseWorker=true
             } label: {
                 HStack {
-                    Label(currentWorker?.name ?? "Buscar trabajador",systemImage:"person.crop.rectangle")
+                    Label(currentWorker?.name ?? "Buscar trabajador",systemImage:"person.crop.rectangle").foregroundStyle(.primary)
                     Spacer()
-                    Image(systemName:"magnifyingglass")
-                }
-            }
+                    Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
+                }.padding(12).background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+            }.buttonStyle(.plain)
             if let worker=currentWorker {
                 LabeledContent("DNI",value:worker.dni)
                 LabeledContent("Área",value:worker.area)
@@ -439,13 +438,13 @@ struct N2NativeClinicalFormView:View {
     }
     private func treatmentSection(_ context:N2FormContext)->some View {
         Group {
+        if !layoutDetailOnly {
         DanperPanel {
             Button {search="";chooseProduct=true} label: {
                 Label("Agregar medicamento o insumo",systemImage:"plus.circle.fill")
             }
             .buttonStyle(DanperPrimaryButton())
             .accessibilityIdentifier("add-clinical-product")
-            Text("Medicamentos e insumos").font(.headline)
             DanperChoiceField(title:"Tópico de dispensación",selection:Binding(
                 get:{form.dispensingSite},set:{site in
                     guard site != form.dispensingSite else{return}
@@ -456,8 +455,9 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
             ),options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
-            Text("Busca por nombre o código entre los \(context.products.clinical.count) productos. El consumo se confirma al guardar la atención.")
+            Text("\(context.products.clinical.count) productos · selección múltiple")
                 .font(.footnote).foregroundStyle(.secondary)
+        }
         }
         medicationFields(context)
         DanperPanel("Procedimientos") {
@@ -592,6 +592,17 @@ struct N2NativeClinicalFormView:View {
                 }
             }
         }
+    }
+    private func focusFirstMissing(_ context:N2FormContext) {
+        if currentWorker==nil {step=0;chooseWorker=true;return}
+        if !form.clinicalIssues(step:1,context:context).filter({$0.hasPrefix("allergy-")}).isEmpty {step=0;return}
+        if !form.clinicalIssues(step:1,context:context).isEmpty {step=1}
+        else if !form.clinicalIssues(step:2,context:context).isEmpty || !extraTreatmentRequirements.isEmpty {step=2}
+        else {step=3}
+        if form.category.isEmpty {focusedField="category"}
+        else if form.system=="OSTEOMUSCULAR" && form.segment.isEmpty {focusedField="segment"}
+        else if form.diagnosis.isEmpty {focusedField="diagnosis"}
+        else {focusedField="time"}
     }
     private var extraTreatmentRequirements:[String] {
         var missing=[String]()

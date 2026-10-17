@@ -18,6 +18,7 @@ import DanperCore
     }
     private func capture<V:View>(_ view:V,name:String,dark:Bool,large:Bool=false) async throws {
         let host=UIHostingController(rootView:view
+            .preferredColorScheme(dark ? .dark : .light)
             .environment(\.colorScheme,dark ? .dark : .light)
             .environment(\.locale,Locale(identifier:"es_PE"))
             .environment(\.dynamicTypeSize,large ? .accessibility3 : .large))
@@ -25,6 +26,8 @@ import DanperCore
         let window=UIWindow(windowScene:scene)
         window.frame=CGRect(x:0,y:0,width:393,height:852)
         window.windowLevel = .alert + 1
+        window.overrideUserInterfaceStyle=dark ? .dark : .light
+        host.overrideUserInterfaceStyle=dark ? .dark : .light
         window.rootViewController=host
         window.makeKeyAndVisible()
         defer {window.isHidden=true}
@@ -79,6 +82,9 @@ import DanperCore
                     N2NativeClinicalFormView(layoutContext:context,draft:form,step:step)
                 },name:"Paso-\(step+1)-\(dark ? "oscuro" : "claro")",dark:dark)
             }
+            try await capture(NavigationStack {
+                N2NativeClinicalFormView(layoutContext:context,draft:form,step:2,detailOnly:true)
+            },name:"Detalle-producto-\(dark ? "oscuro" : "claro")",dark:dark)
             try await capture(NavigationStack {
                 N2NativeClinicalFormView(layoutContext:context,draft:form,step:3,saved:true)
             },name:"Atencion-guardada-\(dark ? "oscuro" : "claro")",dark:dark)

@@ -35,31 +35,25 @@ struct N2VerifiedNursingExportView:View {
     }
 
     var body:some View {
-        Form {
-            Section("Kardex de enfermería") {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel("Kardex de enfermería") {
                 Label("98 productos de enfermería",systemImage:"lock.shield")
                 Text("Los saldos no acreditados se dejan en blanco. No se generan ceros ni se modifican existencias.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            Section("Datos del corte diario") {
-                Picker("Sede del inventario",selection:$site) {
-                    Text("Seleccionar").tag("")
-                    Text("Fundo La Venturosa").tag("LA VENTUROSA")
-                    Text("Planta La Venturosa").tag("PLVENTUROSA")
+            DanperPanel("Datos del corte diario") {
+                DanperChoiceField(title:"Sede del inventario",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
+                                  labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                DanperDateField(title:"Fecha de corte",selection:$day)
+                DanperChoiceField(title:"Turno",selection:$shift,options:["MAÑANA","TARDE","NOCHE","CONSOLIDADO"])
+                DanperField(title:"Responsable") {
+                    TextField("Nombre del responsable",text:$responsible).textInputAutocapitalization(.characters)
                 }
-                LabeledContent("Fecha de corte",value:DanperDatePresentation.display(selectedDay))
-                DatePicker("Cambiar fecha",selection:$day,displayedComponents:.date)
-                Picker("Turno",selection:$shift) {
-                    ForEach(["MAÑANA","TARDE","NOCHE","CONSOLIDADO"],id:\.self) {
-                        Text($0).tag($0)
-                    }
-                }
-                TextField("Responsable",text:$responsible)
-                    .textInputAutocapitalization(.characters)
                 Text("Un día por libro. Los intervalos aún no son un documento oficial.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Generar") {
+            DanperPanel("Generar") {
                 Button {
                     Task {await export()}
                 } label: {
@@ -74,6 +68,7 @@ struct N2VerifiedNursingExportView:View {
                 Text("Un Excel compartido puede contener datos del tópico. Envía el archivo solamente a destinatarios autorizados.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+          }.padding(16)
         }
         .navigationTitle("Kardex diario")
         .danperFormChrome()

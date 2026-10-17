@@ -145,7 +145,7 @@ struct DanperPanel<Content:View>:View {
         .frame(maxWidth:.infinity,alignment:.leading)
         .padding(16)
         .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
-        .overlay(RoundedRectangle(cornerRadius:20).strokeBorder(Color.secondary.opacity(0.16)))
+        .overlay(RoundedRectangle(cornerRadius:20).strokeBorder(Color.secondary.opacity(0.16)).allowsHitTesting(false))
     }
 }
 struct DanperField<Content:View>:View {
@@ -156,7 +156,7 @@ struct DanperField<Content:View>:View {
             Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
             content.padding(12).frame(maxWidth:.infinity,alignment:.leading)
                 .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-                .overlay(RoundedRectangle(cornerRadius:13).strokeBorder(Color.secondary.opacity(0.15)))
+                .overlay(RoundedRectangle(cornerRadius:13).strokeBorder(Color.secondary.opacity(0.15)).allowsHitTesting(false))
         }
     }
 }

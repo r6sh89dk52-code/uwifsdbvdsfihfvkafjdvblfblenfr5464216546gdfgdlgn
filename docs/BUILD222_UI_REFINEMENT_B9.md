@@ -18,3 +18,5 @@ Referencia congelada: `09fef294d73f6a1c655dc42865b6fa5c5e1f792a`. Se leyeron `sr
 No cambia motor clínico, 86 equivalencias, FEFO, persistencia, cifrado, apertura ni generador Excel. Los cambios de selección escriben los mismos estados. El guardado conserva la validación original y la transacción atómica.
 
 Verificación: capturas UIKit/SwiftUI en simulador claro/oscuro y accesibilidad; suite Linux, oráculo 3094 casos, Excel y compilación iPhone en Actions. El artefacto y resultado definitivo se enlazarán en PR #3. La captura demuestra composición, no pulsaciones físicas ni Face ID. Revisar en iPhone teclado, selección de varios productos, despliegue, guardar y navegación al historial.
+
+La revisión incluye pasos navegables con validación de las etapas intermedias, retorno al inicio al avanzar, corrección guiada del primer campo pendiente y recuperación del estado de alergias ya revisado al cambiar de trabajador. El historial enlazado tras guardar usa la bóveda activa, nunca la muestra estática.
