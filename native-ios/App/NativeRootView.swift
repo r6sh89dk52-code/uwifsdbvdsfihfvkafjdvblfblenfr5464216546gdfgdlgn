@@ -96,6 +96,11 @@ struct NativeRootView: View {
                                 Label("Exportar Kardex diario desde N2",systemImage:"tablecells")
                             }
                             NavigationLink {
+                                N2NativeInventoryView()
+                            } label: {
+                                Label("Inventario y lotes N2",systemImage:"shippingbox.fill")
+                            }
+                            NavigationLink {
                                 N2ReconciliationView()
                             } label: {
                                 Label("Conciliar inventario N2",systemImage:"checkmark.shield")
@@ -217,6 +222,12 @@ struct NativeRootView: View {
                         N2VerifiedNursingExportView()
                     } label: {
                         Label("Kardex de enfermería N2 auditado",systemImage:"tablecells")
+                    }
+                    NavigationLink {
+                        N2NativeInventoryView()
+                    } label: {
+                        Label("Registrar lotes, ingresos y conteo N2",
+                              systemImage:"shippingbox.fill")
                     }
                     NavigationLink {
                         N2ReconciliationView()
