@@ -60,7 +60,8 @@ struct N1nInactivePreparationView:View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Bóveda inactiva")
+        .navigationTitle("Revisión de bóveda")
+        .danperFormChrome()
         .confirmationDialog("Preparación cifrada, sin restauración",
                             isPresented:$confirming,titleVisibility:.visible) {
             Button("Seleccionar respaldo") { choosing=true }
