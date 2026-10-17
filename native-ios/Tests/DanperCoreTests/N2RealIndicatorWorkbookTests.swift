@@ -41,6 +41,25 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
         XCTAssertEqual(x.missingOpening,431)
         XCTAssertEqual(x.missingClosingCount,431)
     }
+    func testReviewedPeriodVoidedRequiresNewClosingReview()throws {
+        let proof=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1q-voided-expected.json")) as? [String:Any])
+        var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        snapshot["ambulatoryReconciliation"]=proof["events"]!
+        let source=try JSONSerialization.data(withJSONObject:snapshot)
+        let products=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
+        XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
+            snapshot:source,products:products,
+            mappings:fixture("n2-reviewed-approved.json"),
+            template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-10-09",end:"2026-11-08",
+            subdivision:"LA VENTUROSA",
+            selectedVisitIDs:Set(["fundo-unit","fundo-reuse"]))) {
+            XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,
+                           .unreviewedPeriod)
+        }
+    }
     func testTenSheetWriterRejectsUnreviewedAndPendingPhysical()throws {
         let expected=try XCTUnwrap(JSONSerialization.jsonObject(
             with:fixture("n1q-reviewed-expected.json")) as? [String:Any])

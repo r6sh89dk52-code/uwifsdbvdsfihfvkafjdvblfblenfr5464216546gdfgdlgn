@@ -156,8 +156,18 @@ public struct N2NativeFormDraft:Equatable,Sendable {
               (allergy.status != "known" || !allergy.substances.isEmpty) else {
             throw N2FormError.unreviewedAllergies
         }
+        let parts=date.split(separator:"-").compactMap{Int($0)}
+        var cal=Calendar(identifier:.gregorian)
+        cal.timeZone=TimeZone(secondsFromGMT:0)!
+        let parsed=parts.count==3 ? cal.date(from:DateComponents(
+            year:parts[0],month:parts[1],day:parts[2])) : nil
         guard date.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
                          options:.regularExpression) != nil,
+              parts.count==3,(1900...2100).contains(parts[0]),
+              let parsed,
+              cal.component(.year,from:parsed)==parts[0],
+              cal.component(.month,from:parsed)==parts[1],
+              cal.component(.day,from:parsed)==parts[2],
               time.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,
                         options:.regularExpression) != nil else {
             throw N2FormError.invalidDate

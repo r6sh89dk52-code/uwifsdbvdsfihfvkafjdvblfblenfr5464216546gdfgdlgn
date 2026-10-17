@@ -69,6 +69,13 @@ final class N2NativeClinicalFormTests:XCTestCase {
             XCTAssertEqual($0 as? N2FormError,.invalidVisit)
         }
     }
+    func testImpossibleCalendarDateIsRejectedBeforeSaving()throws {
+        var (draft,context)=try form()
+        draft.date="2026-02-30"
+        XCTAssertThrowsError(try draft.makeSavedVisit(context:context)){
+            XCTAssertEqual($0 as? N2FormError,.invalidDate)
+        }
+    }
     func testClinicalFormCreatesTSCompatibleVisitAndVerifiedStock()throws {
         let (form,context)=try self.form()
         XCTAssertEqual(context.revision,7)

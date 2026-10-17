@@ -242,28 +242,47 @@ public enum N2VerifiedIndicatorWorkbook {
 
         // Events are authoritative. A review only attests the exact date cut;
         // it never supplies a fabricated opening or count for missing products.
-        var ids=Set<String>(),keys=Set<String>(),active=[[String:Any]]()
+        var ids=Set<String>(),byID=[String:[String:Any]](),
+            voided=Set<String>()
         for event in recon {
             let id=string(event["id"]),kind=string(event["kind"]),
                 site=string(event["subdivision"]),date=string(event["date"]),
                 code=string(event["code"]),reason=string(event["reason"])
             guard !id.isEmpty,ids.insert(id).inserted,
-                  ["opening","receipt","count","review"].contains(kind),
+                  ["opening","receipt","count","review","void"].contains(kind),
                   ["LA VENTUROSA","PLVENTUROSA"].contains(site),
                   validDay(date),reason.count>=8,
                   let quantity=integer(event["quantity"]),
-                  numeric(event["at"]) != nil else{
+                  let time=numeric(event["at"]),time>0,
+                  time.rounded()==time else{
                 throw Failure.invalidReconciliation
             }
-            if kind=="review" {
+            if kind=="void" {
+                let target=string(event["voidOf"])
                 guard code.isEmpty,quantity==0,
+                      string(event["document"]).isEmpty,
+                      string(event["expires"]).isEmpty,
+                      string(event["periodEnd"]).isEmpty,
+                      let previous=byID[target],
+                      string(previous["kind"]) != "void",
+                      string(previous["subdivision"])==site,
+                      (numeric(previous["at"]) ?? 0)<=time,
+                      voided.insert(target).inserted else{
+                    throw Failure.invalidReconciliation
+                }
+            }else if kind=="review" {
+                guard code.isEmpty,quantity==0,
+                      string(event["document"]).isEmpty,
+                      string(event["expires"]).isEmpty,
+                      string(event["voidOf"]).isEmpty,
                       validDay(string(event["periodEnd"])),
                       string(event["periodEnd"])>=date else{
                     throw Failure.invalidReconciliation
                 }
             }else{
                 guard productMap[code] != nil,
-                      string(event["periodEnd"]).isEmpty else{
+                      string(event["periodEnd"]).isEmpty,
+                      string(event["voidOf"]).isEmpty else{
                     throw Failure.invalidReconciliation
                 }
                 if kind=="receipt" {
@@ -272,15 +291,39 @@ public enum N2VerifiedIndicatorWorkbook {
                             validDay(string(event["expires"])) else{
                         throw Failure.invalidReconciliation
                     }
+                }else {
+                    guard string(event["document"]).isEmpty,
+                          string(event["expires"]).isEmpty else{
+                        throw Failure.invalidReconciliation
+                    }
                 }
             }
-            let unique=[site,kind,date,code,
-                        kind=="review" ? string(event["periodEnd"]) :
-                            (kind=="receipt" ? string(event["document"]).uppercased() : "")].joined(separator:"|")
+            byID[id]=event
+        }
+        let active=recon.filter {
+            string($0["kind"]) != "void" &&
+            !voided.contains(string($0["id"]))
+        }
+        var keys=Set<String>()
+        for event in active {
+            let kind=string(event["kind"]),code=string(event["code"])
+            let unique=[
+                string(event["subdivision"]),kind,string(event["date"]),code,
+                kind=="review" ? string(event["periodEnd"]) :
+                     (kind=="receipt" ? string(event["document"]).uppercased() : "")
+            ].joined(separator:"|")
             guard keys.insert(unique).inserted else{
                 throw Failure.invalidReconciliation
             }
-            active.append(event)
+        }
+        let reviews=active.filter{string($0["kind"])=="review"}
+        for receipt in active where string(receipt["kind"])=="receipt" {
+            if reviews.contains(where: { r in
+                string(r["subdivision"])==string(receipt["subdivision"]) &&
+                string(receipt["date"])>=string(r["date"]) &&
+                string(receipt["date"])<=string(r["periodEnd"]) &&
+                (numeric(receipt["at"]) ?? 0)>(numeric(r["at"]) ?? 0)
+            }) {throw Failure.invalidReconciliation}
         }
         let atSite=active.filter{string($0["subdivision"])==subdivision}
         guard atSite.contains(where:{string($0["kind"])=="review" &&
