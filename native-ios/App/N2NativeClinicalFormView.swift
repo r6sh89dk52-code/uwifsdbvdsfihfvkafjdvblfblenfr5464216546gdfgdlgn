@@ -240,12 +240,6 @@ struct N2NativeClinicalFormView:View {
                         }
                     }
                 }
-                .onChange(of:form.dispensingSite) {_,_ in
-                    for i in form.items.indices {
-                        form.items[i].selectedLotID="";form.items[i].physicalQuantity=0
-                        form.items[i].approveOpening=false
-                    }
-                }
                 .onChange(of:form) {_,_ in
                     form.refreshProcedureSuggestions(catalog:context.products)
                     scheduleDraft()
@@ -366,7 +360,16 @@ struct N2NativeClinicalFormView:View {
             }
             .buttonStyle(DanperPrimaryButton())
             .accessibilityIdentifier("add-clinical-product")
-            Picker("Tópico de dispensación",selection:$form.dispensingSite) {
+            Picker("Tópico de dispensación",selection:Binding(
+                get:{form.dispensingSite},set:{site in
+                    guard site != form.dispensingSite else{return}
+                    form.dispensingSite=site
+                    for i in form.items.indices {
+                        form.items[i].selectedLotID="";form.items[i].physicalQuantity=0
+                        form.items[i].approveOpening=false
+                    }
+                }
+            )) {
                 Text("Seleccionar sede del stock").tag("")
                 Text("Fundo La Venturosa").tag("LA VENTUROSA")
                 Text("Planta La Venturosa").tag("PLVENTUROSA")

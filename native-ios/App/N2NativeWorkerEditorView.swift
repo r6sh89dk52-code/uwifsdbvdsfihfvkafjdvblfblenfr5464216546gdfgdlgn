@@ -5,6 +5,7 @@ import DanperCore
 /// Active ONLY after a verified one-source protected N2 vault exists.
 /// Writes a new manual worker atomically, never modifies worker identity.
 struct N2NativeWorkerEditorView:View {
+    @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var existingDNI=Set<String>()
     @State private var saved=false
     @State private var dni=""
@@ -71,7 +72,7 @@ struct N2NativeWorkerEditorView:View {
         }
         .navigationTitle("Nuevo trabajador")
         .danperFormChrome()
-        .sensoryFeedback(.success,trigger:saved)
+        .sensoryFeedback(.success,trigger:saved) {_,_ in haptics}
         .task {
             do {
                 if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {

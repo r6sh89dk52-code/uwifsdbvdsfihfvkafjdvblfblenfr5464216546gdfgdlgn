@@ -8,6 +8,7 @@ private enum Brand {
 @main
 struct DANPERNativeApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("danper.appearance") private var appearance="system"
     @State private var authCycle=UUID()
     @State private var activeContext:LAContext?
     @State private var authenticated = false
@@ -86,6 +87,7 @@ struct DANPERNativeApp: App {
                     .transition(.opacity)
                 }
             }
+            .preferredColorScheme(appearance=="dark" ? .dark : appearance=="light" ? .light : nil)
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     authCycle=UUID()

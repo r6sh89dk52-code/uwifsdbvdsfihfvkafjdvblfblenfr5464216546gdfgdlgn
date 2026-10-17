@@ -45,6 +45,7 @@ final class N2NativeClinicalFormTests:XCTestCase {
     func testDraftRecoveryRetainsMultipleProceduresAndPhysicalChoices()throws {
         var (draft,ctx)=try form()
         draft.procedures=["OBSERVACION","CURACION DE HERIDA","CONTROL"]
+        draft.dispensingSite="LA VENTUROSA"
         draft.items[0].selectedLotID="lot-selected"
         draft.items[0].physicalQuantity=2.5
         draft.items[0].approveOpening=true
@@ -56,6 +57,7 @@ final class N2NativeClinicalFormTests:XCTestCase {
         XCTAssertEqual(restored.form.procedures,draft.procedures)
         XCTAssertEqual(restored.form.dni,draft.dni)
         XCTAssertEqual(restored.form.items.count,1)
+        XCTAssertEqual(restored.form.dispensingSite,"LA VENTUROSA")
         XCTAssertEqual(restored.form.items[0].selectedLotID,"lot-selected")
         XCTAssertEqual(restored.form.items[0].physicalQuantity,2.5)
         XCTAssertTrue(restored.form.items[0].approveOpening)

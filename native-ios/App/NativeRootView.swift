@@ -24,6 +24,7 @@ struct NativeRootView:View {
     @State private var metrics:N2DashboardMetrics?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("danper.appearance") private var appearance="system"
     @AppStorage("danper.haptics.enabled") private var haptics=true
 
     private var isReady:Bool { summary != nil || layoutOnly }
@@ -295,7 +296,15 @@ struct NativeRootView:View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
-            Section("Preferencias") {Toggle("Respuesta háptica",isOn:$haptics)}
+            Section("Preferencias") {
+                Picker("Apariencia",selection:$appearance) {
+                    Text("Sistema").tag("system")
+                    Text("Claro").tag("light")
+                    Text("Oscuro").tag("dark")
+                }
+                Toggle("Respuesta háptica",isOn:$haptics)
+                LabeledContent("Responsable",value:"Felipe Azcárate Silva")
+            }
             Section {
                 Text("Versión beta SwiftUI · uso con información ficticia. No sustituye la build 222.")
                     .font(.footnote).foregroundStyle(.secondary)
