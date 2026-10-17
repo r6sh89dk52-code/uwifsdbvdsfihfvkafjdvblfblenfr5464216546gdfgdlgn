@@ -59,8 +59,10 @@ struct N2VerifiedIndicatorExportView:View {
                     Text("Fundo La Venturosa").tag("LA VENTUROSA")
                     Text("Planta La Venturosa").tag("PLVENTUROSA")
                 }
-                DatePicker("Desde",selection:$startDate,displayedComponents:.date)
-                DatePicker("Hasta",selection:$endDate,displayedComponents:.date)
+                LabeledContent("Desde",value:DanperDatePresentation.display(local(startDate)))
+                DatePicker("Cambiar inicio",selection:$startDate,displayedComponents:.date)
+                LabeledContent("Hasta",value:DanperDatePresentation.display(local(endDate)))
+                DatePicker("Cambiar fin",selection:$endDate,displayedComponents:.date)
                 Text("La selección inicial es esta semana (lunes a domingo). Para el corte mensual, elige día 9 a día 8.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
@@ -84,7 +86,7 @@ struct N2VerifiedIndicatorExportView:View {
                     )){
                         VStack(alignment:.leading,spacing:3) {
                             Text(v.workerName).font(.subheadline)
-                            Text(v.date+" "+v.time+" · "+v.diagnosis)
+                            Text(DanperDatePresentation.displayDateTime(v.date,v.time)+" · "+v.diagnosis)
                                 .font(.caption).foregroundStyle(.secondary)
                             if v.pendingPhysicalLines>0 {
                                 Label("Consumo físico pendiente: exportación se bloqueará",
@@ -108,7 +110,8 @@ struct N2VerifiedIndicatorExportView:View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Indicador N2 · Excel")
+        .navigationTitle("Indicador ambulatorio")
+        .danperFormChrome()
         .sheet(item:$share,onDismiss:cleanup){share in
             N2IndicatorShareSheet(file:share.file)
         }
