@@ -29,6 +29,14 @@ public enum DanperDatePresentation {
         let day=display(iso)
         return time.isEmpty ? day : day+" "+time
     }
+    public static func displayTimestamp(_ milliseconds:Int64)->String {
+        let formatter=DateFormatter()
+        formatter.locale=Locale(identifier:"es_PE")
+        formatter.timeZone=TimeZone(identifier:"America/Lima")
+        formatter.dateFormat="dd/MM/yyyy HH:mm"
+        return formatter.string(from:
+            Date(timeIntervalSince1970:Double(milliseconds)/1000))
+    }
     public static func numericExcelDate(_ iso:String)->Double? {
         guard let c=components(iso),
               let date=calendar.date(from:DateComponents(year:c.year,month:c.month,day:c.day)),
