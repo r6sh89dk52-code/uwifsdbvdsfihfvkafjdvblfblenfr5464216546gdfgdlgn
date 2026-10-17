@@ -8,3 +8,7 @@ outputs/
 .env.*
 .DS_Store
 *.tsbuildinfo
+
+# Generated from synthetic CI fixtures; no XLSX templates in Git history.
+native-ios/App/N1sDemoResources/
+native-ios/DANPERNative.xcodeproj/

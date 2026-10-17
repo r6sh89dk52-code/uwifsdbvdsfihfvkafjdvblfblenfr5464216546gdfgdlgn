@@ -1,0 +1,86 @@
+name: DANPER N2 - Beta iPhone IPA unsigned (solo pruebas)
+on:
+  push:
+    branches:
+      - native/swiftui-n1s-complete-excel-and-container-gate
+    paths:
+      - '.github/workflows/n2-iphone-beta-ipa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: danper-n2-beta-ipa
+  cancel-in-progress: false
+
+jobs:
+  unsigned-beta:
+    name: Build isolated unsigned IPA for SideStore signing
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout frozen validated SwiftUI branch
+        uses: actions/checkout@v4
+      - name: Verify beta branch, bundle isolation and correction implementation
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/native/swiftui-n1s-complete-excel-and-container-gate"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview' native-ios/project.yml
+          grep -q 'public enum N2ClinicalCorrections' native-ios/Sources/DanperCore/N2ClinicalCorrections.swift
+          grep -q 'N2ClinicalCorrectionView' native-ios/App/N2NativeHistoryView.swift
+          test -f scripts/build-native-preview-ipa-macos.sh
+      - name: Install XcodeGen if unavailable
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          xcodegen --version
+          xcodebuild -version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile Release and package SideStore-ready unsigned beta
+        env:
+          DANPER_PREVIEW_ACK: ACEPTO_SOLO_EVALUACION
+        run: |
+          set -euo pipefail
+          bash scripts/build-native-preview-ipa-macos.sh > "$RUNNER_TEMP/danper-beta-build.log" 2>&1 || {
+            tail -n 100 "$RUNNER_TEMP/danper-beta-build.log"
+            exit 1
+          }
+          tail -n 12 "$RUNNER_TEMP/danper-beta-build.log"
+      - name: Verify IPA payload, isolated bundle ID and lack of signing
+        run: |
+          set -euo pipefail
+          IPA="native-preview-artifacts/DANPER_N2_EVALUACION_UNSIGNED.ipa"
+          test -s "$IPA"
+          unzip -t "$IPA" >/dev/null
+          unzip -Z1 "$IPA" | grep -q '^Payload/DANPERNative.app/Info.plist$'
+          mkdir -p "$RUNNER_TEMP/n2-package-inspect"
+          unzip -q "$IPA" -d "$RUNNER_TEMP/n2-package-inspect"
+          APP="$RUNNER_TEMP/n2-package-inspect/Payload/DANPERNative.app"
+          test -d "$APP"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          test "$BUNDLE" = 'pe.danper.saludmovil.native.preview'
+          test -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
+          test -f "$APP/N1sDemoResources/n1s-indicator-template-store.zip"
+          # Regression: the first installed IPA appeared letterboxed on iPhone.
+          # A real full-screen launch storyboard must be packaged, not just
+          # named in the Info.plist metadata.
+          LAUNCH=$(/usr/libexec/PlistBuddy -c 'Print :UILaunchStoryboardName' "$APP/Info.plist")
+          test "$LAUNCH" = 'LaunchScreen'
+          find "$APP" -name 'LaunchScreen.storyboardc' -type d | grep -q .
+          echo 'PASS: full-screen iPhone launch storyboard embedded'
+          if codesign --verify "$APP" >/dev/null 2>&1; then
+            echo 'FAIL: an unexpectedly signed beta cannot be distributed under this pipeline'
+            exit 1
+          fi
+          echo "PASS isolated beta: $BUNDLE (UNSIGNED; SideStore must sign it)"
+          shasum -a 256 "$IPA"
+      - name: Publish unsigned IPA ZIP artifact for PRIVATE beta download
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_N2_BETA_IPHONE_UNSIGNED
+          path: native-preview-artifacts/DANPER_N2_EVALUACION_UNSIGNED.ipa
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

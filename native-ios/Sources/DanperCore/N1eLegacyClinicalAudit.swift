@@ -135,17 +135,22 @@ public enum N1eLegacyClinicalAudit {
             else { throw N1eParityError.invalidSnapshot }
             var itemIDs = Set<String>()
             for i in items {
-                guard let iid = str(i["id"]), itemIDs.insert(iid).inserted,
-                      let q = integer(i["quantity"]), q > 0,
+                guard let iid = str(i["id"]), itemIDs.insert(iid).inserted else {
+                    throw N1eParityError.invalidSnapshot
+                }
+                // The build222 autosave permits incomplete draft items. They
+                // are NEVER dispensed or included in the official R column.
+                // Requiring their dose/code/name here would silently prevent
+                // restoring genuine partial clinical drafts.
+                guard status == "saved" else { continue }
+                guard let q = integer(i["quantity"]), q > 0,
                       let code = str(i["code"]), let name = str(i["name"]),
                       let unit = str(i["unit"]) else {
                     throw N1eParityError.invalidSnapshot
                 }
-                if status == "saved" {
-                    let key = aid + "\u{001F}" + iid
-                    clinical[key] = Line(code: code, name: name, unit: unit, quantity: q)
-                    savedKeys.append(key)
-                }
+                let key = aid + "\u{001F}" + iid
+                clinical[key] = Line(code: code, name: name, unit: unit, quantity: q)
+                savedKeys.append(key)
             }
         }
         var lastAfter = [String: Data]()
