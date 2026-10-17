@@ -19,9 +19,11 @@ private struct N2IndicatorShareSheet:UIViewControllerRepresentable {
 /// missing review events, mixed sites, or invented official balances.
 struct N2VerifiedIndicatorExportView:View {
     private var layoutOnly=false
+    private var layoutSelectionOnly=false
     init() {}
     #if DEBUG
-    init(layoutVisits:[N2VisitIndexRow]) {
+    init(layoutVisits:[N2VisitIndexRow],selectionOnly:Bool=false) {
+        layoutSelectionOnly=selectionOnly
         layoutOnly=true
         _visits=State(initialValue:layoutVisits)
         _selected=State(initialValue:Set(layoutVisits.filter{$0.pendingPhysicalLines==0}.map(\.id)))
@@ -63,6 +65,7 @@ struct N2VerifiedIndicatorExportView:View {
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
+            if !layoutSelectionOnly {
             DanperPanel("Indicador ambulatorio · 10 hojas") {
                 Label("Modo de prueba — datos ficticios",
                       systemImage:"lock.shield.fill")
@@ -76,6 +79,7 @@ struct N2VerifiedIndicatorExportView:View {
                 DanperDateField(title:"Hasta",selection:$endDate)
                 Text("La selección inicial es esta semana (lunes a domingo). Para el corte mensual, elige día 9 a día 8.")
                     .font(.footnote).foregroundStyle(.secondary)
+            }
             }
             DanperPanel("Atenciones seleccionadas") {
                 HStack {

@@ -84,9 +84,12 @@ import DanperCore
             },name:"Atencion-guardada-\(dark ? "oscuro" : "claro")",dark:dark)
             let model=try N2NativeSnapshotReader.read(resource("n2-synthetic-clinical"))
             try await capture(NavigationStack {
-                N2VerifiedIndicatorExportView(layoutVisits:model.visits)
+                N2VerifiedIndicatorExportView(layoutVisits:model.visits,selectionOnly:true)
             },name:"Exportacion-\(dark ? "oscuro" : "claro")",dark:dark)
         }
+        try await capture(NavigationStack {
+            N2NativeClinicalFormView(layoutContext:context,draft:form,step:2,showCatalog:true)
+        },name:"Catalogo-oscuro",dark:true)
         try await capture(NavigationStack {
             N2NativeClinicalFormView(layoutContext:context,draft:form,step:3)
         },name:"Resumen-DynamicType",dark:false,large:true)

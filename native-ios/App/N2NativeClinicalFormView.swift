@@ -139,8 +139,8 @@ struct N2NativeClinicalFormView:View {
                             DanperPanel {Button("Guardar borrador") {scheduleDraft(immediate:true)}}
                         }
                     }
-                }
                   }.padding(16)
+                }
                 .navigationTitle(saved ? "Atención registrada" : "Nueva atención")
                 .navigationBarTitleDisplayMode(.inline)
                 .danperFormChrome()
@@ -197,6 +197,9 @@ struct N2NativeClinicalFormView:View {
                                 Text("Busca y agrega los productos que necesitas")
                                     .font(.subheadline).foregroundStyle(.secondary)
                                     .frame(maxWidth:.infinity,alignment:.leading)
+                                if context.products.clinicalMatches(search).isEmpty {
+                                    ContentUnavailableView.search(text:search)
+                                }
                                 ForEach(context.products.clinicalMatches(search)) {p in
                                     Button {
                                         let med=N2FormMedication(code:p.code)
@@ -227,6 +230,7 @@ struct N2NativeClinicalFormView:View {
                         }
                         .background(DanperStyle.canvas)
                         .searchable(text:$search,prompt:"Nombre o código del producto")
+                        .scrollDismissesKeyboard(.interactively)
                         .navigationTitle("Catálogo clínico").navigationBarTitleDisplayMode(.inline)
                         .safeAreaInset(edge:.bottom) {
                             Button {chooseProduct=false;search=""} label: {
@@ -283,7 +287,12 @@ struct N2NativeClinicalFormView:View {
                         }
                     }
                 }
+                .onChange(of:form.dni) {_,dni in
+                    allergyStatus=context.allergies[dni]?.status ?? "unknown"
+                    allergySubstances=context.allergies[dni]?.substances ?? ""
+                }
                 .onChange(of:form) {_,_ in
+                    if !form.blueBandage {form.returned=false}
                     form.refreshProcedureSuggestions(catalog:context.products)
                     scheduleDraft()
                 }
@@ -316,7 +325,11 @@ struct N2NativeClinicalFormView:View {
 
     private var stepHeading:some View {
         VStack(alignment:.leading,spacing:12) {
-            DanperStepProgress(step:step,titles:stepTitles)
+            HStack(alignment:.firstTextBaseline) {
+                Text(stepTitles[step]).font(.title3.bold())
+                Spacer(minLength:4)
+                Text("\(step+1) de 4").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
             ScrollView(.horizontal,showsIndicators:false) {
                 HStack(spacing:8) {
                     ForEach(0..<4) { target in
@@ -348,12 +361,12 @@ struct N2NativeClinicalFormView:View {
                 HStack(spacing:10) {
                     Image(systemName:"person.crop.circle").foregroundStyle(.secondary)
                     VStack(alignment:.leading,spacing:4) {
-                        Text(worker.name).font(.subheadline.weight(.semibold))
+                        Text(worker.name).font(.caption.weight(.semibold))
                         Text("DNI "+worker.dni).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer(minLength:4)
                     Button("Editar") {step=0}.font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                }.padding(14).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+                }.padding(12).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
             }
         }
     }

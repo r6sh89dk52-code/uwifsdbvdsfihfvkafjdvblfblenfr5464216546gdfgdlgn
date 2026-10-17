@@ -15,15 +15,16 @@ struct N2NativeHistoryView: View {
     var body:some View {
         Group {
             if let projection {
-                List {
-                    Section {
+                ScrollView {
+                  VStack(alignment:.leading,spacing:16) {
+                    DanperPanel {
                         Label(useProtectedVault ? "BÓVEDA CLÍNICA N2 · SOLO LECTURA" : "SOLO PRUEBA · TRABAJADORES FICTICIOS",
                               systemImage:"lock.shield.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.secondary)
                         Text(useProtectedVault ? "Datos locales desde la bóveda cifrada N2. No se modifica la build 222." : "Se muestran registros sintéticos. No se leen ni guardan datos clínicos de tu iPhone.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    Section("Directorio · \(projection.searchableRoster.count) disponibles") {
+                    DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
                         ForEach(projection.findWorkers(query)) { w in
                             Button {
                                 selectedDNI = w.dni
@@ -45,15 +46,18 @@ struct N2NativeHistoryView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    Section("Historial completo") {
+                    DanperPanel("Historial completo") {
                         Text("\(projection.visits.filter{$0.status=="saved"}.count) atenciones guardadas · \(projection.visits.filter{$0.status=="draft"}.count) borradores")
                             .font(.subheadline)
                         Text("\(projection.pendingClinicalLines) consumo(s) sin confirmación física; nunca se sustituyen por cero.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(projection.visits) { visit in
                             visitCell(visit)
+                                .padding(14).frame(maxWidth:.infinity,alignment:.leading)
+                                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
                         }
                     }
+                  }.padding(16)
                 }
                 .searchable(text:$query,prompt:"Buscar DNI, nombres o área")
                 .navigationDestination(item:$selectedDNI) { dni in
@@ -82,8 +86,9 @@ struct N2NativeHistoryView: View {
             HStack {
                 Text(visit.workerName).font(.subheadline.weight(.semibold))
                 Spacer()
-                Text(DanperDatePresentation.displayDateTime(visit.date,visit.time)).font(.caption2).foregroundStyle(.secondary)
+
             }
+            Text(DanperDatePresentation.displayDateTime(visit.date,visit.time)).font(.caption).foregroundStyle(.secondary)
             Text(visit.diagnosis.isEmpty ? "Borrador sin diagnóstico" : visit.diagnosis)
                 .font(.footnote)
             HStack(spacing:10) {

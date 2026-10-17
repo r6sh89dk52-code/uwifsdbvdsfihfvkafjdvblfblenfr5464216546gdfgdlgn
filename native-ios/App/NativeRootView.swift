@@ -238,15 +238,16 @@ struct NativeRootView:View {
         .navigationTitle(title)
     }
     private var toolsTab:some View {
-        List {
-            Section {
+        ScrollView {
+          VStack(alignment:.leading,spacing:16) {
+            DanperPanel {
                 Label(isReady ? "Pruebas ficticias habilitadas" :
                     "Inicia la práctica desde Inicio",systemImage:"info.circle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
             if isReady {
-                Section("Inventario y reportes de prueba") {
+                DanperPanel("Inventario y reportes de prueba") {
                     NavigationLink {
                         N2NativeInventoryView()
                     }label:{
@@ -278,7 +279,7 @@ struct NativeRootView:View {
                     }
                 }
             }
-            Section("Datos reales · no se mezclan con las pruebas") {
+            DanperPanel("Datos reales · no se mezclan con las pruebas") {
                 NavigationLink {
                     BackupPreviewView()
                 }label:{
@@ -296,7 +297,7 @@ struct NativeRootView:View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
-            Section("Preferencias") {
+            DanperPanel("Preferencias") {
                 Picker("Apariencia",selection:$appearance) {
                     Text("Sistema").tag("system")
                     Text("Claro").tag("light")
@@ -305,10 +306,11 @@ struct NativeRootView:View {
                 DanperCheckRow(selected:$haptics) {Text("Respuesta háptica")}
                 LabeledContent("Responsable",value:"Felipe Azcárate Silva")
             }
-            Section {
+            DanperPanel {
                 Text("Versión beta SwiftUI · uso con información ficticia. No sustituye la build 222.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+          }.padding(16)
         }
         .navigationTitle("Más")
         .navigationBarTitleDisplayMode(.inline)
