@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import DanperCore
 @testable import DANPERNative
 
 final class N2PortableBackupInteropTests:XCTestCase {
