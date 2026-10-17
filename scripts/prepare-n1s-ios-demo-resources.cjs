@@ -23,8 +23,8 @@ try{
   cwd:root,env:{...process.env,DANPER_N1_FIXTURE_DIR:temporary},
   stdio:'inherit',timeout:180000
  });
- // The template files have no patient history. Only these four items are
- // copied: no original workbooks, synthetic snapshots, or TS reference exports.
+ // Workbook references and an explicitly fictional clinical example are
+ // bundled only in this evaluation build, never in the production bundle.
  fs.mkdirSync(output,{recursive:true});
  for(const kind of ['indicator','nursing']){
   const prefix='n1s-'+kind;
@@ -37,8 +37,19 @@ try{
     path.join(output,prefix+'-template-store.zip'));
   fs.writeFileSync(path.join(output,prefix+'-plan.json'),JSON.stringify(input));
  }
- assert.equal(fs.readdirSync(output).length,4,'only four synthetic resources allowed');
- console.log('PASS: four sanitized synthetic N1s iOS demo resources; no backup or patient data.');
+ const synthetic=JSON.parse(fs.readFileSync(path.join(temporary,'n1e-clinical-stock.json'),'utf8'));
+ assert.equal(synthetic.workers.length,5);
+ assert(synthetic.workers.every(w=>w.name.startsWith('PERSONA FICTICIA ')&&/^0000000[1-5]$/.test(w.dni)));
+ assert(synthetic.attentions.every(a=>a.worker.name.startsWith('PERSONA FICTICIA ')));
+ assert.equal(synthetic.stockLots.length,5);
+ assert.equal(synthetic.stockMovements.length,synthetic.stockMovements.filter(m=>m.dispenseRef).length);
+ fs.writeFileSync(path.join(output,'n2-synthetic-clinical.json'),JSON.stringify(synthetic));
+ assert.deepEqual(fs.readdirSync(output).sort(),[
+  'n1s-indicator-plan.json','n1s-indicator-template-store.zip',
+  'n1s-nursing-plan.json','n1s-nursing-template-store.zip',
+  'n2-synthetic-clinical.json'
+ ].sort());
+ console.log('PASS: five sanctioned synthetic iOS resources; no real worker or patient data.');
 } finally {
  fs.rmSync(temporary,{recursive:true,force:true});
 }

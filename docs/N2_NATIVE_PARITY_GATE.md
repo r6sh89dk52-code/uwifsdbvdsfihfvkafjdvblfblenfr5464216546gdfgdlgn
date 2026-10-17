@@ -20,3 +20,9 @@
 - `N2AtomicClinicalCoordinator` enlaza guardado de atención FEFO en memoria con revisión cifrada completa, detecta cambios incompatibles de la misma visita y reconoce reintentos idénticos tras una interrupción posterior a la actualización del puntero.
 - Pruebas sintéticas: inicio, revisión esperada, sobrescritura obsoleta, autenticidad, corrupción, fallos tras cifrado/diario/puntero y verificación de que el historial y el stock siempre están en una misma generación.
 - **Restricciones:** el directorio solo admite prefijo temporal `danper-n2-synthetic-`, la clave es externa al código, ninguna pantalla clínica real llama al coordinador. No se generan ni firman IPA, ni se leen respaldos reales. La ausencia de un `fsync` explícito y las verificaciones físicas de iOS aún pendientes impiden declarar durabilidad eléctrica de producción.
+
+## N2: historial y frecuencia nativa
+
+- `N2NativeSnapshotReader` proyecta las nueve colecciones clínicas sin modificarlas; preserva diferencia entre `R=0` verificado y `R=nil` pendiente; aplica FRECUENCIA por trabajador/fecha ordenando por fecha, hora, ID de atención, no por cantidad de materiales consumidos.
+- Búsqueda de personal respeta activación del padrón oficial, sin borrar personal histórico ni atenciones antiguas.
+- La vista SwiftUI `N2NativeHistoryView` utiliza exclusivamente un snapshot ficticio construido en CI; el lector es reutilizable en una futura bóveda operativa autorizada. No importa ni expone datos reales.

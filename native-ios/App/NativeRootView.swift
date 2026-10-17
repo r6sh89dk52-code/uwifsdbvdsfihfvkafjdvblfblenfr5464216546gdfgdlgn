@@ -140,6 +140,9 @@ struct NativeRootView: View {
                         N1nInactivePreparationView()
                     } label: { Label("Preparar respaldo cifrado · inactivo",systemImage:"lock.doc") }
                     NavigationLink {
+                        N2NativeHistoryView()
+                    } label: { Label("Personal e historial N2 · ficticio",systemImage:"person.text.rectangle") }
+                    NavigationLink {
                         N1sDemoExportView()
                     } label: { Label("Exportar dos Excel ficticios",systemImage:"tablecells") }
                     NavigationLink {
