@@ -1,396 +1,277 @@
 import SwiftUI
 import DanperCore
 
-private let danperRed = Color(red: 0.88, green: 0.09, blue: 0.16)
+private let danperAccent=Color(red:0.88,green:0.09,blue:0.16)
 
-/// Smaller computed tabs avoid a SwiftUI type-checker explosion with
-/// a five-tab NavigationStack plus nested asynchronous state handlers.
-struct NativeRootView: View {
-    @State private var clinic = N1gClinic()
-    @State private var selectedTab = 0
-    @State private var demoReady = false
-    @State private var restoring = false
-    @State private var demoStorageMessage = "Abriendo almacenamiento cifrado de pruebas…"
-    @State private var writeTask: Task<Void, Never>?
-    @State private var demoClock = N1jRevisionClock()
-    @Environment(\.scenePhase) private var scenePhase
+/// A human-first beta: one explicit demo source, five clear navigation tabs.
+/// No clinical import occurs during launch. Real build222 data are never read.
+struct NativeRootView:View {
+    @State private var tab=0
+    @State private var summary:N2ProtectedStoreSummary?
+    @State private var loading=true
+    @State private var preparing=false
+    @State private var problem=""
+    @State private var showAdvanced=false
 
-    var body: some View {
-        TabView(selection:$selectedTab) {
-            homeTab
-            workersTab
-            attentionTab
-            draftsTab
-            toolsTab
-        }
-        .tint(danperRed)
-        .task { await loadDemo() }
-        .onChange(of: clinic.visits) { _, _ in scheduleDemoWrite() }
-        .onChange(of: clinic.workers) { _, _ in scheduleDemoWrite() }
-        .onChange(of: clinic.allergies) { _, _ in scheduleDemoWrite() }
-        .onChange(of: clinic.activeDraftID) { _, _ in scheduleDemoWrite() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase != .active { scheduleDemoWrite(immediately:true) }
-        }
-    }
-
-    private var homeTab: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment:.leading,spacing:17) {
-                    HStack(spacing:14) {
-                        Image(systemName:"cross.case.fill")
-                            .font(.largeTitle).foregroundStyle(danperRed)
-                        VStack(alignment:.leading) {
-                            Text("DANPER").font(.largeTitle.bold())
-                            Text("Salud Móvil Nativa").font(.subheadline)
-                                .foregroundStyle(.secondary)
+    private var isReady:Bool { summary != nil }
+    var body:some View {
+        TabView(selection:$tab) {
+            NavigationStack { home }
+                .tabItem{Label("Inicio",systemImage:"house.fill")}.tag(0)
+            NavigationStack {
+                if isReady {
+                    N2NativeHistoryView(useProtectedVault:true)
+                        .toolbar {
+                            ToolbarItem(placement:.topBarTrailing) {
+                                NavigationLink {
+                                    N2NativeWorkerEditorView()
+                                }label:{
+                                    Label("Nuevo trabajador ficticio",
+                                          systemImage:"person.badge.plus")
+                                }
+                            }
                         }
-                    }
-                    GroupBox("MIGRACIÓN SEGURA") {
-                        VStack(alignment:.leading,spacing:8) {
-                            Text("SwiftUI nativo · Sin WebView")
-                                .font(.headline)
-                            Text("La build 222 no se reemplaza ni se modifica.")
-                            Text(demoStorageMessage)
-                                .font(.footnote)
-                                .foregroundStyle(demoReady ? Color.secondary : Color.orange)
-                            Text("La gestión clínica real requiere todavía importación verificada y paridad del Kardex/Excel.")
-                                .font(.footnote)
-                        }
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                    }
-                    readOnlyBackupLink
-                    NavigationLink {
-                        N2NativeBackupExportView()
-                    } label: {
-                        Label("Crear respaldo clínico N2 cifrado",systemImage:"lock.doc.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(12)
-                            .frame(maxWidth:.infinity,alignment:.leading)
-                            .background(Color(uiColor:.secondarySystemGroupedBackground),
-                                        in:RoundedRectangle(cornerRadius:12))
-                    }
-                    GroupBox("CLÍNICA N2 · BÓVEDA PROTEGIDA") {
-                        VStack(alignment:.leading,spacing:12) {
-                            Text("Acceso nativo independiente de la demostración. Se necesita importar una sola copia cifrada y revisada antes de trabajar con datos clínicos.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                            NavigationLink {
-                                N2NativeActivationView()
-                            } label: {
-                                Label("Revisar / activar fuente clínica N2",systemImage:"lock.shield")
-                            }
-                            NavigationLink {
-                                N2NativeHistoryView(useProtectedVault:true)
-                            } label: {
-                                Label("Consultar historial cifrado N2",systemImage:"person.text.rectangle")
-                            }
-                            NavigationLink {
-                                N2NativeClinicalFormView()
-                            } label: {
-                                Label("Atención clínica N2",systemImage:"cross.case.fill")
-                            }
-                            NavigationLink {
-                                N2VerifiedNursingExportView()
-                            } label: {
-                                Label("Exportar Kardex diario desde N2",systemImage:"tablecells")
-                            }
-                            NavigationLink {
-                                N2NativeInventoryView()
-                            } label: {
-                                Label("Inventario y lotes N2",systemImage:"shippingbox.fill")
-                            }
-                            NavigationLink {
-                                N2ReconciliationView()
-                            } label: {
-                                Label("Conciliar inventario N2",systemImage:"checkmark.shield")
-                            }
-                            NavigationLink {
-                                N2VerifiedIndicatorExportView()
-                            } label: {
-                                Label("Indicador Ambulatorio N2 · 10 hojas",
-                                      systemImage:"tablecells.fill")
-                            }
-                            Text("La atención ficticia de las otras pestañas sigue separada. Esta compilación todavía NO sustituye la build 222.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                    }
-                    StatusCard(icon:"person.text.rectangle",title:"Trabajadores y atenciones",
-                        detail:"Directorio e historia N2 desde una fuente cifrada, únicamente tras importación verificada.")
-                    StatusCard(icon:"pills",title:"FEFO nativo",
-                        detail:"Motor de FEFO y entregas multilot integrado con la misma generación cifrada.")
-                    StatusCard(icon:"tablecells",title:"Indicador y Kardex",
-                        detail:"Kardex diario e Indicador Ambulatorio desde N2, con revisión obligatoria de stock y cierre.")
-                }
-                .padding()
+                }else{lockedTab(title:"Personal",symbol:"person.2")}
             }
-            .navigationTitle("Inicio")
-        }
-        .tabItem { Label("Inicio",systemImage:"house") }
-        .tag(0)
-    }
-
-    private var readOnlyBackupLink: some View {
-        NavigationLink {
-            BackupPreviewView()
-                .navigationTitle("Respaldo real · lectura")
-        } label: {
-            HStack(spacing:12) {
-                Image(systemName:"lock.doc.fill")
-                    .font(.title3).foregroundStyle(danperRed)
-                VStack(alignment:.leading,spacing:4) {
-                    Text("Comprobar respaldo real").font(.headline)
-                    Text("Solo lectura: inspecciona una copia local con contraseña sin restaurar ni alterar consumos.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength:0)
-                Image(systemName:"chevron.right").foregroundStyle(.tertiary)
+            .tabItem{Label("Personal",systemImage:"person.2.fill")}.tag(1)
+            NavigationStack {
+                if isReady {N2NativeClinicalFormView()}
+                else {lockedTab(title:"Atención",symbol:"cross.case")}
             }
-            .padding(14)
-            .background(Color(uiColor:.secondarySystemGroupedBackground),
-                        in:RoundedRectangle(cornerRadius:15))
+            .tabItem{Label("Atención",systemImage:"cross.case.fill")}.tag(2)
+            NavigationStack {
+                if isReady {N2NativeDraftsDashboard()}
+                else {lockedTab(title:"Borradores",symbol:"doc.text")}
+            }
+            .tabItem{Label("Borradores",systemImage:"doc.text.fill")}.tag(3)
+            NavigationStack { toolsTab }
+                .tabItem{Label("Más",systemImage:"square.grid.2x2.fill")}.tag(4)
         }
-        .buttonStyle(.plain)
+        .tint(danperAccent)
+        .task {await refresh()}
     }
 
-    private var workersTab: some View {
-        NavigationStack {
-            N2NativeHistoryView(useProtectedVault:true)
-                .toolbar {
-                    ToolbarItem(placement:.topBarTrailing) {
-                        NavigationLink {
-                            N2NativeWorkerEditorView()
-                        } label: {
-                            Label("Añadir trabajador",systemImage:"person.badge.plus")
+    private var home:some View {
+        ScrollView {
+            VStack(alignment:.leading,spacing:20) {
+                HStack(spacing:12) {
+                    Image("BrandLogo").resizable().scaledToFit()
+                        .frame(width:56,height:56)
+                        .clipShape(RoundedRectangle(cornerRadius:13))
+                    VStack(alignment:.leading,spacing:3) {
+                        Text("DANPER Salud").font(.title2.bold())
+                        Text("Tu espacio de enfermería")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength:0)
+                }
+                Label("VERSIÓN DE PRUEBA · DATOS FICTICIOS",
+                      systemImage:"checkmark.shield")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(danperAccent)
+                VStack(alignment:.leading,spacing:12) {
+                    Text(isReady ? "Listo para comenzar" :
+                        "Comienza a probar la aplicación")
+                        .font(.title3.bold())
+                    Text(isReady ?
+                         "Ya tienes un entorno de demostración cifrado. Puedes practicar atenciones, consultar el historial y revisar el inventario sin tocar tu aplicación anterior." :
+                         "Para registrar una atención de prueba, activa primero el ejemplo ficticio. No necesitas importar un respaldo ni configurar un inventario real.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal:false,vertical:true)
+                    if loading || preparing {
+                        HStack {
+                            ProgressView()
+                            Text(preparing ? "Creando práctica cifrada…" :
+                                 "Comprobando los datos locales…")
+                                .font(.footnote)
                         }
+                    }else if !problem.isEmpty {
+                        Label(problem,systemImage:"exclamationmark.triangle")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
+                    if isReady {
+                        Label("Demostración activa · \(summary?.workers ?? 0) trabajadores y \(summary?.attentions ?? 0) registros",
+                              systemImage:"checkmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.green)
+                        Button {
+                            tab=2
+                        }label:{
+                            Label("Registrar una atención",
+                                  systemImage:"cross.case.fill")
+                                .frame(maxWidth:.infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .tint(danperAccent)
+                        Button {
+                            tab=1
+                        }label:{
+                            Label("Buscar trabajador o historial",
+                                  systemImage:"person.text.rectangle")
+                                .frame(maxWidth:.infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                    }else{
+                        Button {
+                            Task {await startPractice()}
+                        }label:{
+                            Label("Empezar con datos ficticios",
+                                  systemImage:"play.fill")
+                                .frame(maxWidth:.infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .tint(danperAccent)
+                        .disabled(loading || preparing)
                     }
                 }
+                .padding(18)
+                .frame(maxWidth:.infinity,alignment:.leading)
+                .background(Color(uiColor:.secondarySystemGroupedBackground),
+                            in:RoundedRectangle(cornerRadius:18))
+                VStack(alignment:.leading,spacing:12) {
+                    Text("¿Qué puedes hacer?")
+                        .font(.headline)
+                    quickInfo("1",title:"Personal",desc:"Buscar trabajadores ficticios y revisar sus atenciones.")
+                    quickInfo("2",title:"Atención",desc:"Registrar diagnósticos, procedimientos y medicamentos.")
+                    quickInfo("3",title:"Borradores",desc:"Continuar registros pendientes con seguridad.")
+                    quickInfo("4",title:"Más",desc:"Abrir inventario, Kardex, Excel y herramientas.")
+                }
+                VStack(alignment:.leading,spacing:7) {
+                    Label("Tus datos reales permanecen separados",
+                          systemImage:"lock.shield")
+                        .font(.subheadline.weight(.semibold))
+                    Text("La build 222 sigue intacta. Esta beta no recupera datos reales automáticamente y todavía no reemplaza tu herramienta de trabajo.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(15)
+                .frame(maxWidth:.infinity,alignment:.leading)
+            }
+            .padding(.horizontal,16)
+            .padding(.vertical,18)
+            .frame(maxWidth:.infinity,alignment:.leading)
         }
-        .tabItem { Label("Personal",systemImage:"person.2") }
-        .tag(1)
+        .background(Color(uiColor:.systemGroupedBackground))
+        .navigationTitle("Inicio")
+        .navigationBarTitleDisplayMode(.inline)
     }
-
-    private var attentionTab: some View {
-        NavigationStack {
-            N2NativeClinicalFormView()
+    private func quickInfo(_ index:String,title:String,desc:String)->some View {
+        HStack(alignment:.top,spacing:12) {
+            Text(index).font(.subheadline.bold())
+                .foregroundStyle(.white)
+                .frame(width:28,height:28)
+                .background(danperAccent,in:Circle())
+            VStack(alignment:.leading,spacing:3) {
+                Text(title).font(.subheadline.bold())
+                Text(desc).font(.footnote).foregroundStyle(.secondary)
+                    .fixedSize(horizontal:false,vertical:true)
+            }
         }
-        .tabItem { Label("Atención",systemImage:"cross.case") }
-        .tag(2)
     }
-
-    private var draftsTab: some View {
-        NavigationStack {
-            N2NativeDraftsDashboard()
+    private func lockedTab(title:String,symbol:String)->some View {
+        ContentUnavailableView {
+            Label("Antes de empezar",systemImage:symbol)
+        }description:{
+            Text("Activa la demostración ficticia desde Inicio. Es gratuita, local y no necesita respaldo real.")
+        }actions:{
+            Button("Ir a Inicio") {tab=0}
+                .buttonStyle(.borderedProminent)
+                .tint(danperAccent)
         }
-        .tabItem { Label("Borradores",systemImage:"doc.text") }
-        .tag(3)
+        .navigationTitle(title)
     }
-
-    private var toolsTab: some View {
-        NavigationStack {
-            List {
-                Section("Herramientas nativas") {
-                    NavigationLink {
-                        FEFOSandboxView().navigationTitle("FEFO")
-                    } label: { Label("FEFO ficticio",systemImage:"shippingbox") }
-                    NavigationLink {
-                        BackupPreviewView().navigationTitle("Respaldo")
-                    } label: { Label("Inspección de respaldo real · solo lectura",systemImage:"lock.shield") }
-                    NavigationLink {
-                        N1nInactivePreparationView()
-                    } label: { Label("Preparar respaldo cifrado · inactivo",systemImage:"lock.doc") }
-                    NavigationLink {
-                        N2NativeHistoryView()
-                    } label: { Label("Personal e historial N2 · ficticio",systemImage:"person.text.rectangle") }
-                    NavigationLink {
-                        N2NativeBackupExportView()
-                    } label: { Label("Respaldo portátil cifrado N2",systemImage:"lock.doc.fill") }
-                    NavigationLink {
-                        N2NativeActivationView()
-                    } label: { Label("Importación única a bóveda N2",systemImage:"lock.shield") }
-                    NavigationLink {
-                        N2NativeHistoryView(useProtectedVault:true)
-                    } label: { Label("Historial cifrado N2 · lectura",systemImage:"doc.text.magnifyingglass") }
-                    NavigationLink {
-                        N2NativeWorkerEditorView()
-                    } label: { Label("Registrar trabajador N2",systemImage:"person.badge.plus") }
-                    NavigationLink {
-                        N2NativeClinicalFormView()
-                    } label: { Label("Nueva atención clínica N2",systemImage:"cross.case.fill") }
-                    NavigationLink {
-                        N2VerifiedNursingExportView()
-                    } label: {
-                        Label("Kardex de enfermería N2 auditado",systemImage:"tablecells")
-                    }
+    private var toolsTab:some View {
+        List {
+            Section {
+                Label(isReady ? "Pruebas ficticias habilitadas" :
+                    "Inicia la práctica desde Inicio",systemImage:"info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            if isReady {
+                Section("Inventario y reportes de prueba") {
                     NavigationLink {
                         N2NativeInventoryView()
-                    } label: {
-                        Label("Registrar lotes, ingresos y conteo N2",
-                              systemImage:"shippingbox.fill")
+                    }label:{
+                        Label("Inventario y lotes",systemImage:"shippingbox")
                     }
                     NavigationLink {
                         N2ReconciliationView()
-                    } label: { Label("Conciliar stock del Indicador N2",
-                                    systemImage:"checkmark.shield") }
-                    NavigationLink {
-                        N2VerifiedIndicatorExportView()
-                    } label: {
-                        Label("Indicador Ambulatorio N2 real · 10 hojas",
-                              systemImage:"tablecells.fill")
+                    }label:{
+                        Label("Conciliación de inventario",
+                              systemImage:"checkmark.shield")
                     }
                     NavigationLink {
-                        N1sDemoExportView()
-                    } label: { Label("Exportar dos Excel ficticios",systemImage:"tablecells") }
+                        N2VerifiedNursingExportView()
+                    }label:{
+                        Label("Kardex de enfermería",
+                              systemImage:"tablecells")
+                    }
                     NavigationLink {
-                        NativeStorageLabView().navigationTitle("Laboratorio")
-                    } label: { Label("Laboratorio N1 aislado",systemImage:"externaldrive") }
+                        N2VerifiedIndicatorExportView()
+                    }label:{
+                        Label("Indicador ambulatorio · Excel",
+                              systemImage:"doc.richtext")
+                    }
+                    NavigationLink {
+                        N2NativeBackupExportView()
+                    }label:{
+                        Label("Respaldar datos ficticios cifrados",
+                              systemImage:"lock.doc")
+                    }
                 }
-                Section("Seguridad") {
-                    Text("N1j cifra las simulaciones ficticias en un almacén independiente y protege las revisiones. La build 222 permanece intacta.")
+            }
+            Section("Datos reales · no se mezclan con las pruebas") {
+                NavigationLink {
+                    BackupPreviewView()
+                }label:{
+                    Label("Comprobar respaldo original (solo lectura)",
+                          systemImage:"doc.text.magnifyingglass")
+                }
+                DisclosureGroup("Configuración avanzada",isExpanded:$showAdvanced) {
+                    NavigationLink {
+                        N2NativeActivationView()
+                    }label:{
+                        Label("Importación protegida en bóveda independiente",
+                              systemImage:"lock.shield")
+                    }
+                    Text("Esta función es independiente de la demostración. No la necesitas para probar atenciones.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Herramientas")
-        }
-        .tabItem { Label("Más",systemImage:"square.grid.2x2") }
-        .tag(4)
-    }
-
-    @MainActor
-    private func loadDemo() async {
-        guard !demoReady && !restoring else { return }
-        restoring = true
-        defer { restoring = false }
-        do {
-            if let previous = try await N1iDemoDraftIOSVault.shared.loadWithRevision() {
-                demoClock = N1jRevisionClock(recoveredRevision:previous.revision)
-                clinic = previous.clinic
-                demoStorageMessage = "Simulación cifrada recuperada · revisión \(previous.revision)."
-            } else {
-                demoClock = N1jRevisionClock()
-                demoStorageMessage = "Almacén ficticio disponible: guardado cifrado por revisión."
-            }
-            demoReady = true
-        } catch {
-            demoReady = false
-            demoStorageMessage = "Error de verificación del almacén ficticio. Edición bloqueada."
-        }
-    }
-
-    private func scheduleDemoWrite(immediately: Bool = false) {
-        guard demoReady else { return }
-        let revision:Int64
-        do { revision = try demoClock.capture() }
-        catch {
-            demoReady = false
-            demoStorageMessage = "Se agotaron las revisiones de prueba. Edición bloqueada."
-            return
-        }
-        let snapshot = clinic
-        writeTask?.cancel()
-        writeTask = Task {
-            if !immediately {
-                do { try await Task.sleep(nanoseconds:650_000_000) }
-                catch { return }
-            }
-            guard !Task.isCancelled else { return }
-            do {
-                try await N1iDemoDraftIOSVault.shared.save(snapshot,revision:revision)
-                if demoClock.isLatest(revision) {
-                    demoStorageMessage = "Borrador ficticio cifrado · revisión \(revision) confirmada."
-                }
-            } catch N1iEncryptedDemoDraftVault.Failure.staleRevision {
-                if demoClock.isLatest(revision) {
-                    demoReady = false
-                    demoStorageMessage = "Existe una revisión cifrada más nueva. Edición bloqueada."
-                }
-            } catch {
-                if demoClock.isLatest(revision) {
-                    demoReady = false
-                    demoStorageMessage = "Falló el guardado cifrado de prueba. Edición bloqueada."
-                }
-            }
-        }
-    }
-}
-
-private struct StatusCard: View {
-    let icon: String
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(danperRed)
-                .frame(width: 34)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 16))
-    }
-}
-
-private struct FEFOSandboxView: View {
-    @State private var quantity: Double = 5
-    @State private var unit = "UND"
-
-    private var plan: FEFOPlan {
-        if unit == "UND" {
-            return FEFOPreview.plan(lots: [
-                NativeStockLot(id: "A-01", code: "E-22", name: "EJEMPLO",
-                    expires: "2026-12-01", catalogUnit: "UND", container: "unidad",
-                    unitsPerContainer: 1, sealedContainers: 0, looseUnits: 2, openedRemaining: 0),
-                NativeStockLot(id: "A-02", code: "E-22", name: "EJEMPLO",
-                    expires: "2027-12-01", catalogUnit: "UND", container: "unidad",
-                    unitsPerContainer: 1, sealedContainers: 0, looseUnits: 10, openedRemaining: 0)
-            ], kardexCode: "E-22", clinicalUnit: "UND",
-               physicalQuantity: quantity, atLocalDate: "2026-10-16")
-        }
-        return FEFOPreview.plan(lots: [
-            NativeStockLot(id: "CAJA-01", code: "E-57", name: "CAJA FICTICIA",
-                expires: "2027-12-01", catalogUnit: "CJA", container: "caja",
-                unitsPerContainer: 20, sealedContainers: 1, looseUnits: 0, openedRemaining: 0)
-        ], kardexCode: "E-57", clinicalUnit: "CJA",
-           physicalQuantity: quantity, atLocalDate: "2026-10-16")
-    }
-
-    var body: some View {
-        Form {
             Section {
-                Label("Simulación FEFO en memoria", systemImage: "shippingbox")
-                    .foregroundStyle(danperRed)
-                Text("Los lotes son ficticios. No se modifica el Kardex existente ni se guardan datos.")
+                Text("Versión beta SwiftUI · uso con información ficticia. No sustituye la build 222.")
                     .font(.footnote).foregroundStyle(.secondary)
-                Picker("Tipo", selection: $unit) {
-                    Text("Unidades").tag("UND")
-                    Text("Caja").tag("CJA")
-                }
-                .onChange(of: unit) { _, _ in quantity = unit == "UND" ? 5 : 1 }
-                Stepper("Consumo físico: \(Int(quantity))",
-                        value: $quantity, in: 1...10, step: 1)
             }
-            Section("Plan de salida") {
-                if plan.isReady {
-                    ForEach(Array(plan.issues.enumerated()), id: \.offset) { _, issue in
-                        LabeledContent(issue.lotID, value: "\(issue.physicalAmount.formatted()) usados · R = \(issue.excelR.formatted())")
-                    }
-                    LabeledContent("R total del Indicador", value: plan.totalR.formatted())
-                    Label("Solo cálculo: sin descuento real", systemImage: "checkmark.circle")
-                        .foregroundStyle(.green)
-                } else {
-                    Text(plan.pendingReason ?? "Pendiente")
-                        .foregroundStyle(.orange)
-                }
-            }
+        }
+        .navigationTitle("Más")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    @MainActor
+    private func refresh() async {
+        loading=true
+        defer{loading=false}
+        do {
+            summary=try await N2SyntheticTrialIOSVault.shared.inspect()
+            problem=""
+        }catch {
+            summary=nil
+            problem="No se pudo comprobar el espacio de prueba. Conservamos los datos y no hemos reiniciado nada."
+        }
+    }
+    @MainActor
+    private func startPractice() async {
+        guard !preparing else{return}
+        preparing=true
+        defer{preparing=false}
+        do {
+            summary=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+            problem=""
+        }catch {
+            problem="No fue posible preparar el ejemplo. No se borraron datos; intenta cerrar y abrir de nuevo."
         }
     }
 }
