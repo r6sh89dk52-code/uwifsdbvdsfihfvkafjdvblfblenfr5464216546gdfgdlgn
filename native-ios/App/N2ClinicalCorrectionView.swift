@@ -195,7 +195,8 @@ struct N2ClinicalCorrectionView:View {
                 }
             }
         }
-        .navigationTitle("Rectificar atención N2")
+        .navigationTitle("Rectificar atención")
+        .danperFormChrome()
         .task {await load()}
         .onChange(of:autosaveFingerprint) {_,_ in
             queueDraft()
