@@ -33,3 +33,13 @@
 - `N2ProtectedClinicalIOSVault` utiliza otro servicio Keychain `...preview.n2.clinical`; nunca crea una clave reemplazo si existe contenido que no puede descifrar.
 - La API de respaldo `N2NativePortableBackupMaker` implementa `.danperbackup` v1 compatible (PBKDF2-SHA256, 310.000 iteraciones, AES-256-GCM, sal de 16 bytes, nonce de 12 bytes); verifica descifrado antes de entregar el cifrado para compartir. No escribe respaldos sin contraseña ni incluye datos en el ejecutable.
 - **No conectado aún a los flujos operativos o pantallas de importación/exportación real.** Compilar iOS no sustituye una prueba de restauración real y una comparación completa de snapshots de origen/destino.
+
+## N2: formulario clínico nativo protegido y borradores
+
+- `N2NativeClinicalFormView`: cuatro pasos independientes de la app híbrida para trabajador/alergias, evaluación, procedimientos y medicamentos, confirmación de atención. Solo opera tras verificar una fuente clínica N2 importada con consentimiento.
+- `N2NativeFormContextReader` obtiene lista oficial de trabajadores, alergias y lotes compatibles del mismo snapshot cifrado; conserva las 432/98/86 equivalencias verificadas, sin emparejar productos por similitud textual.
+- `N2NativeFormDraft` genera registros compatibles con la estructura de CONSUMOS A–AD y parches cifrados para borradores; no inventa cantidades físicas ni abre un envase sin aprobación explícita. La foto se marca NO si no hay lesión/curación.
+- El motor de atención permite cero medicamentos cuando hay un procedimiento/observación válido; una atención sin medicamento no crea un movimiento de stock inexistente. La promoción de borrador a guardado es transaccional, no inserta un segundo ID ni pierde campos extendidos.
+- Las pruebas del modelo no reemplazan una revisión visual de iPhone; falta completar paridad de todos los campos de la build222, historial editable, cortes y reconciliación integral.
+
+**Bloqueo:** el uso clínico real permanece en evaluación mientras no se completen todas las pruebas de exportación/restauración y equivalencia de la build222. No generar IPA.

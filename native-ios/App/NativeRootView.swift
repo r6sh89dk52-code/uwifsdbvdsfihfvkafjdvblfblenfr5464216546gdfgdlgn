@@ -152,6 +152,9 @@ struct NativeRootView: View {
                         N2NativeWorkerEditorView()
                     } label: { Label("Registrar trabajador N2",systemImage:"person.badge.plus") }
                     NavigationLink {
+                        N2NativeClinicalFormView()
+                    } label: { Label("Nueva atención clínica N2",systemImage:"cross.case.fill") }
+                    NavigationLink {
                         N1sDemoExportView()
                     } label: { Label("Exportar dos Excel ficticios",systemImage:"tablecells") }
                     NavigationLink {

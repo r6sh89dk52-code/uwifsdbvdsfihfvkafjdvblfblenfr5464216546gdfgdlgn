@@ -108,12 +108,20 @@ final class N2AtomicClinicalCoordinatorTests:XCTestCase {
         let incomplete=try N2SnapshotEditor.upsertDraft(
             snapshot:original,id:"n2-promote",
             changes:json(["diagnosis":"INCOMPLETO",
-                          "items":[["id":"n2-promote-material","quantity":0]],
-                          "futureExtension":["retained":true]]),
+                          "items":[["id":"n2-promote-material","quantity":0]]]),
             at:at()-2000)
+        var draftRoot=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:incomplete) as? [String:Any])
+        var beforeVisits=draftRoot["attentions"] as! [[String:Any]]
+        let pos=try XCTUnwrap(beforeVisits.firstIndex{
+            $0["id"] as? String=="n2-promote"
+        })
+        beforeVisits[pos]["futureExtension"]=["retained":true]
+        draftRoot["attentions"]=beforeVisits
+        let sourceWithFuture=try json(draftRoot)
         let folder=try self.folder()
         let (journal,coordinator)=try connect(folder)
-        XCTAssertEqual(try coordinator.bootstrapFromVerifiedSingleSource(incomplete),1)
+        XCTAssertEqual(try coordinator.bootstrapFromVerifiedSingleSource(sourceWithFuture),1)
         let answer=try coordinator.save(visit:sample,approvedCatalog:catalog,
                                         at:at(),expectedRevision:1)
         XCTAssertEqual(answer.revision,2)

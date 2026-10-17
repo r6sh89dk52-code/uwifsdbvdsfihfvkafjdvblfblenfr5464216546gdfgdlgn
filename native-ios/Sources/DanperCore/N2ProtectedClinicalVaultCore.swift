@@ -46,6 +46,17 @@ public final class N2ProtectedClinicalVaultCore {
         guard let active=try journal.recover() else{return nil}
         return try N2NativeSnapshotReader.read(active.snapshot)
     }
+    public func clinicalFormContext(products:Data,nursing:Data,mappings:Data)
+        throws->N2FormContext {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        let catalog=try N2NativeCatalogLoader.load(
+            products:products,nursing:nursing,approvedMappings:mappings)
+        return try N2NativeFormContextReader.read(
+            snapshot:active.snapshot,revision:active.revision,products:catalog)
+    }
+
     /// Caller must reauthenticate and encrypt this data into a portable
     /// backup before ever writing to Files/Share; no plaintext export allowed.
     public func sourceForEncryptedBackup()throws->Data {

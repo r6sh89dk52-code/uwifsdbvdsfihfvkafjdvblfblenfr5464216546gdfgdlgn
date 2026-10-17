@@ -109,7 +109,7 @@ public enum N2NativeClinicalTransaction {
               let date=str(new["date"]),let worker=new["worker"] as? [String:Any],
               let dni=str(worker["dni"]),let name=str(worker["name"]),
               let items=new["items"] as? [[String:Any]],
-              !items.isEmpty,items.count<=100,visits.count<100_000
+              items.count<=100,visits.count<100_000
         else {throw N2ClinicalError.invalidVisit}
         guard workers.contains(where:{$0["dni"] as? String == dni &&
             $0["name"] as? String == name}) else {throw N2ClinicalError.wrongWorker}

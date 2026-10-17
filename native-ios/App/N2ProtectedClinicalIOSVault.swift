@@ -112,6 +112,13 @@ actor N2ProtectedClinicalIOSVault {
     func deleteDraft(id:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().removeDraft(id:id,expectedRevision:expectedRevision)
     }
+    func clinicalFormContext()throws->N2FormContext {
+        let products=try resource("n2-ambulatory-products")
+        let nursing=try resource("n2-nursing-catalog")
+        let mappings=try resource("n2-approved-mappings")
+        return try protectedStore().clinicalFormContext(
+            products:products,nursing:nursing,mappings:mappings)
+    }
     func saveAttention(_ attention:Data,at:Int64,expectedRevision:Int)
         throws->N2ProtectedStoreSummary {
         try protectedStore().saveAttention(attention,
