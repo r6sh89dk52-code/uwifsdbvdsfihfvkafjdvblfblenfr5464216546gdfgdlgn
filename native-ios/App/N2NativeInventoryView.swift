@@ -162,14 +162,15 @@ struct N2NativeInventoryView:View {
                             Text(lot.name+" · "+lot.kardexCode).font(.headline)
                             Text("Sello: \(lot.sealed) · Abierto: \(lot.opened) · Suelto: \(lot.loose)")
                                 .font(.caption).foregroundStyle(.secondary)
-                            Text("Lote: "+lot.id+" · Vence: "+lot.expires)
+                            Text("Lote: "+lot.id+" · Vence: "+DanperDatePresentation.display(lot.expires))
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
                 }
             }
         }
-        .navigationTitle("Inventario N2")
+        .navigationTitle("Inventario y lotes")
+        .danperFormChrome()
         .sheet(isPresented:$picking){
             NavigationStack {
                 List {
