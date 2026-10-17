@@ -57,13 +57,17 @@ struct N2NativeHistoryView: View {
                 }
                 .searchable(text:$query,prompt:"Buscar DNI, nombres o área")
                 .navigationDestination(item:$selectedDNI) { dni in
-                    N2WorkerHistoryDetail(dni:dni,model:projection)
+                    N2WorkerHistoryDetail(dni:dni,model:projection,realSource:useProtectedVault)
                 }
             } else {
-                ContentUnavailableView(hasError ? "No se pudo verificar la muestra" :
-                    "Abriendo historial nativo",systemImage:"lock.doc",
-                    description:Text(hasError ? "La demostración se bloqueó. No se modificó ningún archivo." :
-                                     "Verificación de registros ficticios."))
+                ContentUnavailableView(
+                    hasError ? (useProtectedVault ? "Bóveda clínica no disponible" :
+                                "No se pudo verificar la muestra") :
+                               "Abriendo historial nativo",
+                    systemImage:"lock.doc",
+                    description:Text(useProtectedVault ?
+                        "Activa una sola fuente clínica N2 cifrada antes de consultar su historial." :
+                        "Verificación de registros ficticios."))
             }
         }
         .navigationTitle("Historial nativo N2")
@@ -117,10 +121,11 @@ struct N2NativeHistoryView: View {
 private struct N2WorkerHistoryDetail:View {
     let dni:String
     let model:N2NativeReadModel
+    let realSource:Bool
     var body:some View {
         List {
             if let worker=model.roster.first(where:{$0.dni==dni}) {
-                Section("Trabajador ficticio") {
+                Section(realSource ? "Trabajador" : "Trabajador ficticio") {
                     LabeledContent("Nombre",value:worker.name)
                     LabeledContent("DNI",value:worker.dni)
                     LabeledContent("Área",value:worker.area)
@@ -154,6 +159,6 @@ private struct N2WorkerHistoryDetail:View {
                 }
             }
         }
-        .navigationTitle("Historia · prueba")
+        .navigationTitle(realSource ? "Historia clínica N2" : "Historia · prueba")
     }
 }

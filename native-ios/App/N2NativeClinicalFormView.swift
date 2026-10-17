@@ -5,6 +5,8 @@ import DanperCore
 /// Native N2 editor uses only an explicitly activated, isolated clinical
 /// vault. Nothing reads the build222 installation or N1g demo drafts.
 struct N2NativeClinicalFormView:View {
+    let requestedDraftID:String?
+    init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
     private let brand=Color(red:0.88,green:0.09,blue:0.16)
     private let categories=[
         "ACCIDENTE COMUN","ACCIDENTE DE TRABAJO","ENFERMEDAD",
@@ -411,10 +413,21 @@ struct N2NativeClinicalFormView:View {
             let source=try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
             context=source
             drafts=try await N2ProtectedClinicalIOSVault.shared.readDrafts()
-            let (date,time)=limaClock()
-            form.date=date
-            form.time=time
-            status="Bóveda cifrada disponible · revisión \(source.revision)"
+            if let requestedDraftID {
+                guard let recovered=drafts.first(where:{$0.id==requestedDraftID}) else {
+                    fault=true
+                    status="El borrador solicitado no existe o fue eliminado. No se han modificado registros."
+                    return
+                }
+                form=recovered.form
+                step=0
+                status="Borrador cifrado recuperado · revisión \(source.revision)"
+            } else {
+                let (date,time)=limaClock()
+                form.date=date
+                form.time=time
+                status="Bóveda cifrada disponible · revisión \(source.revision)"
+            }
         }catch{
             fault=true
             status="No hay una fuente clínica N2 verificada o su integridad falló. No se guardó ningún dato."

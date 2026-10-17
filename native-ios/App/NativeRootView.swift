@@ -112,11 +112,11 @@ struct NativeRootView: View {
                         .frame(maxWidth:.infinity,alignment:.leading)
                     }
                     StatusCard(icon:"person.text.rectangle",title:"Trabajadores y atenciones",
-                        detail:"Formulario nativo guiado en entorno ficticio, separado de los datos reales.")
+                        detail:"Directorio e historia N2 desde una fuente cifrada, únicamente tras importación verificada.")
                     StatusCard(icon:"pills",title:"FEFO nativo",
-                        detail:"Reglas Swift probadas en Linux con inventario ficticio.")
+                        detail:"Motor de FEFO y entregas multilot integrado con la misma generación cifrada.")
                     StatusCard(icon:"tablecells",title:"Indicador y Kardex",
-                        detail:"Los dos libros se generan con datos ficticios; falta validar el uso clínico en iPhone.")
+                        detail:"Kardex diario e Indicador Ambulatorio desde N2, con revisión obligatoria de stock y cierre.")
                 }
                 .padding()
             }
@@ -151,8 +151,16 @@ struct NativeRootView: View {
 
     private var workersTab: some View {
         NavigationStack {
-            N1gRosterScreen(clinic:$clinic,selectedTab:$selectedTab)
-                .disabled(!demoReady)
+            N2NativeHistoryView(useProtectedVault:true)
+                .toolbar {
+                    ToolbarItem(placement:.topBarTrailing) {
+                        NavigationLink {
+                            N2NativeWorkerEditorView()
+                        } label: {
+                            Label("Añadir trabajador",systemImage:"person.badge.plus")
+                        }
+                    }
+                }
         }
         .tabItem { Label("Personal",systemImage:"person.2") }
         .tag(1)
@@ -160,8 +168,7 @@ struct NativeRootView: View {
 
     private var attentionTab: some View {
         NavigationStack {
-            N1gAttentionScreen(clinic:$clinic)
-                .disabled(!demoReady)
+            N2NativeClinicalFormView()
         }
         .tabItem { Label("Atención",systemImage:"cross.case") }
         .tag(2)
@@ -169,8 +176,7 @@ struct NativeRootView: View {
 
     private var draftsTab: some View {
         NavigationStack {
-            N1gHistoryScreen(clinic:$clinic,selectedTab:$selectedTab)
-                .disabled(!demoReady)
+            N2NativeDraftsDashboard()
         }
         .tabItem { Label("Borradores",systemImage:"doc.text") }
         .tag(3)
