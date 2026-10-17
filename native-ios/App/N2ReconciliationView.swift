@@ -64,9 +64,11 @@ struct N2ReconciliationView:View {
                 }
             }
             Section("Datos comprobables") {
-                DatePicker("Fecha del evento",selection:$date,displayedComponents:.date)
+                LabeledContent("Fecha del evento",value:DanperDatePresentation.display(localDay(date)))
+                DatePicker("Cambiar fecha",selection:$date,displayedComponents:.date)
                 if kind=="review" {
-                    DatePicker("Fin del período",selection:$periodEnd,
+                    LabeledContent("Fin del período",value:DanperDatePresentation.display(localDay(periodEnd)))
+                    DatePicker("Cambiar fin",selection:$periodEnd,
                                displayedComponents:.date)
                     Text("El cierre confirma revisión de ingresos, pero no inventa cantidades faltantes.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -91,7 +93,8 @@ struct N2ReconciliationView:View {
                         TextField("Documento o guía",text:$document)
                         Toggle("Tiene vencimiento",isOn:$hasExpires)
                         if hasExpires {
-                            DatePicker("Vencimiento",selection:$expires,
+                            LabeledContent("Vencimiento",value:DanperDatePresentation.display(localDay(expires)))
+                            DatePicker("Cambiar vencimiento",selection:$expires,
                                        displayedComponents:.date)
                         }
                     }
