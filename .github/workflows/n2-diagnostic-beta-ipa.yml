@@ -1,4 +1,4 @@
-name: DANPER N2 - Correccion de boveda iPhone build4 (unsigned)
+name: DANPER N2 - SwiftUI renovado y fechas build5 (unsigned)
 on:
   push:
     branches: [fix/n2-trial-onboarding-faceid-ui-20261017]
@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: danper-n2-boveda-build4
+  group: danper-n2-redesign-build5
   cancel-in-progress: false
 jobs:
   isolated-diagnostic-ipa:
@@ -25,6 +25,11 @@ jobs:
           ! grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.prototipo' native-ios/project.yml
           grep -q 'attemptAutomaticUnlock()' native-ios/App/DANPERNativeApp.swift
           grep -q 'trialFailureMessage(error)' native-ios/App/NativeRootView.swift
+          grep -q 'DanperStepProgress(step:step' native-ios/App/N2NativeClinicalFormView.swift
+          grep -q 'dd/mm/yyyy' native-ios/Sources/DanperCore/N1sNursingExcelWriter.swift
+          grep -q 'appendPeruvianDateStyle' native-ios/Sources/DanperCore/N1sFullExcelWriter.swift
+          test -f native-ios/App/DanperUITheme.swift
+          test -f native-ios/Sources/DanperCore/DanperDatePresentation.swift
           grep -q 'ensureApplicationSupportDirectory(path.deletingLastPathComponent()' native-ios/Sources/DanperCore/N2EncryptedClinicalJournal.swift
           test -f native-ios/App/LaunchScreen.storyboard
           test -f native-ios/App/Assets.xcassets/BrandLogo.imageset/danper-logo.png
@@ -44,7 +49,7 @@ jobs:
           node scripts/prepare-n1s-ios-demo-resources.cjs
           test -f native-ios/App/N1sDemoResources/n2-synthetic-clinical.json
           test -f native-ios/App/N1sDemoResources/n2-nursing-catalog.json
-      - name: Compile isolated unsigned diagnostic beta, version 0.2.2 build 4
+      - name: Compile isolated unsigned diagnostic beta, version 0.3.0 build 5
         run: |
           set -euo pipefail
           (
@@ -53,21 +58,21 @@ jobs:
             xcodegen generate --spec project.yml
             xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
               -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
-              -derivedDataPath "$RUNNER_TEMP/danper-n2-build4" \
+              -derivedDataPath "$RUNNER_TEMP/danper-n2-build5" \
               CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-              MARKETING_VERSION=0.2.2 CURRENT_PROJECT_VERSION=4 build
+              MARKETING_VERSION=0.3.0 CURRENT_PROJECT_VERSION=5 build
           )
       - name: Package and audit unsigned IPA without changing build222
         run: |
           set -euo pipefail
-          APP="$RUNNER_TEMP/danper-n2-build4/Build/Products/Release-iphoneos/DANPERNative.app"
+          APP="$RUNNER_TEMP/danper-n2-build5/Build/Products/Release-iphoneos/DANPERNative.app"
           test -d "$APP"
           BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
           VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
           BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
           test "$BUNDLE" = 'pe.danper.saludmovil.native.preview'
-          test "$VERSION" = '0.2.2'
-          test "$BUILD" = '4'
+          test "$VERSION" = '0.3.0'
+          test "$BUILD" = '5'
           test -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
           test -f "$APP/N1sDemoResources/n1s-indicator-template-store.zip"
           test "$(/usr/libexec/PlistBuddy -c 'Print :UILaunchStoryboardName' "$APP/Info.plist")" = 'LaunchScreen'
@@ -79,19 +84,19 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/danper-n2-package/Payload" native-preview-artifacts
           cp -R "$APP" "$RUNNER_TEMP/danper-n2-package/Payload/"
-          IPA="native-preview-artifacts/DANPER_N2_BOVEDA_CORREGIDA_BUILD4_UNSIGNED.ipa"
+          IPA="native-preview-artifacts/DANPER_N2_SWIFTUI_REDISENO_BUILD5_UNSIGNED.ipa"
           (cd "$RUNNER_TEMP/danper-n2-package" && ditto -c -k --sequesterRsrc --keepParent Payload "$GITHUB_WORKSPACE/$IPA")
           test -s "$IPA"
           unzip -t "$IPA" >/dev/null
           unzip -Z1 "$IPA" | grep -q '^Payload/DANPERNative.app/Info.plist$'
           shasum -a 256 "$IPA"
-          echo "PASS: isolated SwiftUI diagnostic beta 0.2.2 / build 4, unsigned; SideStore signing required."
+          echo "PASS: isolated SwiftUI diagnostic beta 0.3.0 / build 5, unsigned; SideStore signing required."
           echo "Evaluation with fictional data only. Do not replace build222 or enter real patients."
       - name: Upload private unsigned diagnostic IPA (7 days)
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER_N2_BOVEDA_CORREGIDA_IPHONE_BUILD4_UNSIGNED
-          path: native-preview-artifacts/DANPER_N2_BOVEDA_CORREGIDA_BUILD4_UNSIGNED.ipa
+          name: DANPER_N2_SWIFTUI_REDISENO_IPHONE_BUILD5_UNSIGNED
+          path: native-preview-artifacts/DANPER_N2_SWIFTUI_REDISENO_BUILD5_UNSIGNED.ipa
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
