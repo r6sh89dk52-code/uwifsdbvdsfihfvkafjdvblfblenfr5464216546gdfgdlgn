@@ -18,7 +18,8 @@ private struct N2NursingActivity:UIViewControllerRepresentable {
 /// Uses the encrypted N2 source, not the bundled synthetic test report.
 struct N2VerifiedNursingExportView:View {
     @State private var day=Date()
-    @State private var responsible=""
+    @State private var site=""
+    @State private var responsible="Felipe Azcárate Silva"
     @State private var shift="CONSOLIDADO"
     @State private var busy=false
     @State private var failed=false
@@ -35,12 +36,17 @@ struct N2VerifiedNursingExportView:View {
 
     var body:some View {
         Form {
-            Section("Kardex N2 desde bóveda protegida") {
+            Section("Kardex de enfermería") {
                 Label("98 productos de enfermería",systemImage:"lock.shield")
                 Text("Los saldos no acreditados se dejan en blanco. No se generan ceros ni se modifican existencias.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("Datos del corte diario") {
+                Picker("Sede del inventario",selection:$site) {
+                    Text("Seleccionar").tag("")
+                    Text("Fundo La Venturosa").tag("LA VENTUROSA")
+                    Text("Planta La Venturosa").tag("PLVENTUROSA")
+                }
                 LabeledContent("Fecha de corte",value:DanperDatePresentation.display(selectedDay))
                 DatePicker("Cambiar fecha",selection:$day,displayedComponents:.date)
                 Picker("Turno",selection:$shift) {
@@ -61,7 +67,7 @@ struct N2VerifiedNursingExportView:View {
                           systemImage:"square.and.arrow.up")
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy || responsible.trimmingCharacters(
+                .disabled(busy || site.isEmpty || responsible.trimmingCharacters(
                     in:.whitespacesAndNewlines).isEmpty)
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
@@ -89,7 +95,7 @@ struct N2VerifiedNursingExportView:View {
                 .exportVerifiedDailyNursingWorkbook(
                     date:selectedDay,shift:shift,
                     responsible:responsible.trimmingCharacters(
-                        in:.whitespacesAndNewlines))
+                        in:.whitespacesAndNewlines),site:site)
             cleanup()
             let dir=FileManager.default.temporaryDirectory
                 .appendingPathComponent("danper-n2-kardex-"+UUID().uuidString,
@@ -117,3 +123,4 @@ struct N2VerifiedNursingExportView:View {
         folder=nil
     }
 }
+

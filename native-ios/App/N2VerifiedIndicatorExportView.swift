@@ -149,7 +149,7 @@ struct N2VerifiedIndicatorExportView:View {
             visits=history.visits
             ready=true
             selectConfirmed()
-            status="Fuente N2 verificada. Revisa las atenciones y el cierre contable antes de exportar."
+            status="Datos verificados. Revisa las atenciones y el cierre contable antes de exportar."
         }catch{
             failed=true
             ready=false

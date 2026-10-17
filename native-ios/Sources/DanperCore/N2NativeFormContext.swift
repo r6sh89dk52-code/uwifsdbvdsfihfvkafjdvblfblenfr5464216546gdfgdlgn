@@ -180,7 +180,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                         options:.regularExpression) != nil else {
             throw N2FormError.invalidDate
         }
-        guard !category.isEmpty,!system.isEmpty,
+        guard (0...3).allSatisfy({clinicalIssues(step:$0,context:context).isEmpty}),
               (!procedures.isEmpty || !items.isEmpty),
               !diagnosis.trimmingCharacters(in:.whitespaces).isEmpty,
               ["NO","SI"].contains(permission),

@@ -18,16 +18,8 @@ struct N2NativeClinicalFormView:View {
     #endif
     private var layoutOnly=false
     private let brand=Color(red:0.88,green:0.09,blue:0.16)
-    private let categories=[
-        "ACCIDENTE COMUN","ACCIDENTE DE TRABAJO","ENFERMEDAD",
-        "TOMA DE PRESIÓN ARTERIAL","MATERNIDAD","OTROS"
-    ]
-    private let systems=[
-        "CEFALEA","CIRCULATORIO","DIGESTIVO","ENDOCRINOLOGO",
-        "ENFERMEDADES CRONICAS","GENITAL Y REPRODUCTIVO","NEUROLOGICO",
-        "OSTEOMUSCULAR","PIEL Y ANEXOS","RESPIRATORIO","SENSORIAL",
-        "URINARIO/RENAL","OTROS"
-    ]
+    private let categories=N2ClinicalFormOptions.categories
+    private let systems=N2ClinicalFormOptions.systems
     private let procedures=N2ProcedureRules.procedures
     @State private var context:N2FormContext?
     @State private var form=N2NativeFormDraft()
@@ -260,8 +252,10 @@ struct N2NativeClinicalFormView:View {
                 }
                 .alert("Completa este paso",isPresented:$showValidation) {
                     Button("Revisar",role:.cancel) {
-                        if form.category.isEmpty {focusedField="category"}
+                        if currentWorker==nil {chooseWorker=true}
+                        else if form.category.isEmpty {focusedField="category"}
                         else if form.system.isEmpty {focusedField="system"}
+                        else if form.system=="OSTEOMUSCULAR" && form.segment.isEmpty {focusedField="segment"}
                         else if form.diagnosis.isEmpty {focusedField="diagnosis"}
                         else {focusedField="time"}
                     }
@@ -334,13 +328,27 @@ struct N2NativeClinicalFormView:View {
                 Text("Seleccionar").tag("")
                 ForEach(categories,id:\.self){Text($0).tag($0)}
             }
-            Picker("Sistema afectado",selection:$form.system) {
-                Text("Seleccionar").tag("")
-                ForEach(systems,id:\.self){Text($0).tag($0)}
+            if N1hClinicalValidator.systemRequired.contains(form.category) {
+                Picker("Sistema afectado",selection:$form.system) {
+                    Text("Seleccionar").tag("")
+                    ForEach(systems,id:\.self){Text($0).tag($0)}
+                }
+                if form.system=="OSTEOMUSCULAR" {
+                    TextField("Segmento anatómico afectado",text:$form.segment).focused($focusedField,equals:"segment")
+                }
             }
-            TextField("Segmento anatómico (si corresponde)",text:$form.segment)
             TextField("Diagnóstico presuntivo",text:$form.diagnosis,axis:.vertical).focused($focusedField,equals:"diagnosis")
                 .lineLimit(2...5)
+            if !form.diagnosis.isEmpty {
+                let suggestions=N2ClinicalFormOptions.diagnoses.filter {
+                    $0.localizedStandardContains(form.diagnosis) && $0 != form.diagnosis
+                }
+                ForEach(Array(suggestions.prefix(5)),id:\.self) { diagnosis in
+                    Button {form.diagnosis=diagnosis;focusedField=nil} label: {
+                        Label(diagnosis,systemImage:"text.magnifyingglass")
+                    }.font(.subheadline)
+                }
+            }
             Picker("Permiso",selection:$form.permission) {
                 Text("No").tag("NO")
                 Text("Sí").tag("SI")
@@ -460,7 +468,15 @@ struct N2NativeClinicalFormView:View {
                     Button("Confirmar procedimiento") {med.procedureConfirmed=true}
                 }
                 let matches=context.options(for:med.code,at:form.date,site:form.dispensingSite)
-                Picker("Lote físico FEFO",selection:$med.selectedLotID) {
+                Picker("Presentación física · reparto FEFO",selection:Binding(
+                    get:{med.selectedLotID},set:{value in
+                        med.selectedLotID=value;med.approveOpening=false
+                        let unit=context.products.clinical.first{$0.code==med.code}?.unit ?? ""
+                        if ["UND","TBL","PAR"].contains(unit.uppercased()) {
+                            med.physicalQuantity=Double(med.quantity)
+                        }
+                    }
+                )) {
                     Text("Pendiente / automático si es unidad").tag("")
                     ForEach(matches) {lot in
                         Text(lot.name+" · "+lot.id+" · "+DanperDatePresentation.display(lot.expires))
@@ -493,42 +509,23 @@ struct N2NativeClinicalFormView:View {
             }
         }
     }
-    private var pendingRequirements:[String] {
+    private var extraTreatmentRequirements:[String] {
         var missing=[String]()
-        if let context, context.allergies[form.dni]?.reviewed != true {missing.append("confirmar revisión de alergias")}
-        if !form.items.isEmpty && form.dispensingSite.isEmpty {missing.append("seleccionar tópico de dispensación")}
-        if form.items.contains(where:{$0.procedure.isEmpty || $0.quantity<=0}) {missing.append("cantidad y procedimiento de cada producto")}
-        if form.hasWound && !form.photoReviewed {missing.append("indicar si se envió la foto")}
-        if currentWorker==nil {missing.append("seleccionar trabajador")}
-        if form.category.isEmpty {missing.append("tipo de atención")}
-        if form.system.isEmpty {missing.append("sistema afectado")}
-        if form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
-            missing.append("diagnóstico presuntivo")
-        }
-        if form.procedures.isEmpty && form.items.isEmpty {
-            missing.append("al menos un procedimiento o medicamento")
-        }
-        if form.permission=="SI" && form.permissionTime.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression)==nil {
-            missing.append("hora del permiso")
-        }
+        if form.procedures.isEmpty && form.items.isEmpty {missing.append("Selecciona al menos un procedimiento o producto.")}
+        if !form.items.isEmpty && form.dispensingSite.isEmpty {missing.append("Selecciona el tópico de dispensación.")}
+        if form.hasWound && !form.photoReviewed {missing.append("Indica si se envió la foto.")}
         return missing
     }
+    private var pendingRequirements:[String] {
+        guard let context else{return ["Espera a que termine la verificación de los datos."]}
+        return (0...3).flatMap{form.clinicalIssues(step:$0,context:context)}
+            .map{N2ClinicalFormOptions.messages[$0] ?? $0}+extraTreatmentRequirements
+    }
     private var stepRequirements:[String] {
-        switch step {
-        case 0:
-            var missing=[String]()
-            if currentWorker==nil {missing.append("Selecciona un trabajador.")}
-            if let context,context.allergies[form.dni]?.reviewed != true {missing.append("Confirma la revisión de alergias.")}
-            return missing
-        case 1:
-            var missing=[String]()
-            if form.time.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression)==nil {missing.append("Hora inválida: utiliza HH:mm.")}
-            if form.category.isEmpty {missing.append("Selecciona el tipo de atención.")}
-            if form.system.isEmpty {missing.append("Selecciona el sistema afectado.")}
-            if form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {missing.append("Escribe el diagnóstico presuntivo.")}
-            return missing
-        default:return pendingRequirements
-        }
+        guard let context else{return ["Espera a que termine la verificación de los datos."]}
+        let issues=form.clinicalIssues(step:step,context:context).map{N2ClinicalFormOptions.messages[$0] ?? $0}
+        let allergies=step==0 ? form.clinicalIssues(step:1,context:context).filter{$0.hasPrefix("allergy-")}.map{N2ClinicalFormOptions.messages[$0] ?? $0} : []
+        return issues+allergies+(step==2 ? extraTreatmentRequirements : [])
     }
     private func reviewSection(_ context:N2FormContext)->some View {
         Section("Revisión antes de guardar") {

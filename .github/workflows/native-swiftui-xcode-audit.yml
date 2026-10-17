@@ -145,12 +145,17 @@ jobs:
           echo 'PASS: native preview bundle verified, Face ID purpose text present.'
           echo 'PASS: NO signed installer, NO IPA, NO uploaded binary and NO iPhone installation.'
 
+      - name: Extract simulator layout PNG attachments
+        if: success()
+        run: |
+          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/danper-layout.xcresult" --output-path "$RUNNER_TEMP/danper-layout-png"
       - name: Publish simulator XCTest layout evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: DANPER_SWIFTUI_SIMULATOR_TEST_EVIDENCE
           path: |
+            ${{ runner.temp }}/danper-layout-png
             ${{ runner.temp }}/danper-layout.xcresult
             ${{ runner.temp }}/n2-ios-xctest.log
           if-no-files-found: warn

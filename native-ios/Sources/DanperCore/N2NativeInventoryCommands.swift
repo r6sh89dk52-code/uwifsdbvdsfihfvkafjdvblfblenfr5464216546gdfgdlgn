@@ -44,6 +44,7 @@ public enum N2NativeInventoryCommands {
               let opened=num(l["openedRemaining"]),opened>=0,opened<=cap,
               let at=num(l["updatedAt"]),at>=0,at.rounded()==at,
               balance(l)<=10_000_000_000 else{return false}
+        if let site=l["site"], !["LA VENTUROSA","PLVENTUROSA"].contains(site as? String ?? "") {return false}
         if !expiry.isEmpty {
             guard expiry.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
                 options:.regularExpression) != nil else{return false}
@@ -198,3 +199,4 @@ public enum N2NativeInventoryCommands {
         return try done(state)
     }
 }
+

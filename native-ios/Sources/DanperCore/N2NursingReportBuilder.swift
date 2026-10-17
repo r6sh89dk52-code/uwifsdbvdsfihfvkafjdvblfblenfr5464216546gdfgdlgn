@@ -96,7 +96,7 @@ public enum N2NursingReportBuilder {
         let open=count(l["openedRemaining"]) ?? 0
         return rounded(n*c+loose+open)
     }
-    private static func decoded(_ snapshot:Data,_ catalog:Data)throws
+    private static func decoded(_ snapshot:Data,_ catalog:Data,site:String="")throws
         -> ([[String:Any]],[[String:Any]],[[String:Any]]) {
         guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
@@ -112,7 +112,13 @@ public enum N2NursingReportBuilder {
                 throw N2NursingReportError.invalidCatalog
             }
         }
-        return(lots,movements,products)
+        guard site.isEmpty || ["LA VENTUROSA","PLVENTUROSA"].contains(site) else {
+            throw N2NursingReportError.invalidSource
+        }
+        guard !site.isEmpty else{return(lots,movements,products)}
+        let scoped=lots.filter{$0["site"] as? String==site}
+        let ids=Set(scoped.compactMap{$0["id"] as? String})
+        return(scoped,movements.filter{ids.contains($0["lotId"] as? String ?? "")},products)
     }
     private static func day(lots:[[String:Any]],moves:[[String:Any]],
                             catalog:[[String:Any]],date:String,
@@ -186,17 +192,17 @@ public enum N2NursingReportBuilder {
         return N2NursingReport(date:date,periodEnd:nil,rows:rows,warnings:warnings)
     }
     public static func daily(snapshot:Data,catalog:Data,date:String,
-                             physicalCounts:[String:Double]=[:])throws->N2NursingReport {
-        let (lots,moves,products)=try decoded(snapshot,catalog)
+                             physicalCounts:[String:Double]=[:],site:String="")throws->N2NursingReport {
+        let (lots,moves,products)=try decoded(snapshot,catalog,site:site)
         return try day(lots:lots,moves:moves,catalog:products,date:date,
                        counts:physicalCounts)
     }
     public static func range(snapshot:Data,catalog:Data,start:String,end:String,
-                             physicalCounts:[String:Double]=[:])throws->N2NursingReport {
+                             physicalCounts:[String:Double]=[:],site:String="")throws->N2NursingReport {
         guard iso(start),iso(end),start<=end else{
             throw N2NursingReportError.invalidDay
         }
-        let (lots,moves,products)=try decoded(snapshot,catalog)
+        let (lots,moves,products)=try decoded(snapshot,catalog,site:site)
         let df=ISO8601DateFormatter()
         df.formatOptions=[.withFullDate]
         guard let begin=df.date(from:start),let finish=df.date(from:end) else{
@@ -250,3 +256,4 @@ public enum N2NursingReportBuilder {
                                rows:resulting,warnings:unique)
     }
 }
+

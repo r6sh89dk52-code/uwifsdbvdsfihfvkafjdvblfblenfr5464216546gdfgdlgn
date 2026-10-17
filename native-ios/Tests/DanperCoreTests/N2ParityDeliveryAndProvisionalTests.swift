@@ -60,4 +60,38 @@ final class N2ParityDeliveryAndProvisionalTests:XCTestCase {
         // Export is pure and cannot change a single physical movement.
         XCTAssertEqual(snapshot,try fixture("n1e-clinical-stock.json"))
     }
+    func testScopedNursingReportDoesNotMergeOtherOrUnknownSiteStocks()throws {
+        let plan=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture("n2-nursing-parity.json")) as? [String:Any])
+        let catalog=try XCTUnwrap(plan["catalog"] as? [[String:Any]])
+        let lot:[String:Any]=["id":"SITE-TEST","code":"E-1","name":catalog[0]["name"]!,
+            "catalogUnit":"UND","lot":"FICTICIO","expires":"2028-01-01",
+            "container":"unidad","unitsPerContainer":1,"sealedContainers":0,
+            "looseUnits":10,"openedRemaining":0,"updatedAt":1791982800000,
+            "site":"LA VENTUROSA"]
+        let snapshot=try N2NativeInventoryCommands.registerLot(snapshot:fixture("n1e-clinical-stock.json"),
+            lot:bytes(lot),catalogData:bytes(catalog))
+        let fundo=try N2NursingReportBuilder.daily(snapshot:snapshot,catalog:bytes(catalog),date:"2026-10-14",site:"LA VENTUROSA")
+        let planta=try N2NursingReportBuilder.daily(snapshot:snapshot,catalog:bytes(catalog),date:"2026-10-14",site:"PLVENTUROSA")
+        XCTAssertEqual(fundo.rows.filter(\.stockKnown).count,1)
+        XCTAssertEqual(planta.rows.filter(\.stockKnown).count,0)
+    }
+    func testFrequencyPreservesEarlierVisitWhenExportingOnlyLaterSelection()throws {
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        var visits=root["attentions"] as! [[String:Any]]
+        var later=visits.first{$0["id"] as? String=="pending-stock"}!
+        later["id"]="later-same-day";later["time"]="23:50"
+        var items=later["items"] as! [[String:Any]]
+        items[0]["id"]="later-pending-item";later["items"]=items
+        visits.append(later);root["attentions"]=visits
+        let plan=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture("n1s-indicator-plan.json")) as? [String:Any])
+        let result=try N2VerifiedIndicatorWorkbook.export(snapshot:bytes(root),products:bytes(plan["catalog"]!),
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-10-09",end:"2026-11-08",subdivision:"LA VENTUROSA",
+            selectedVisitIDs:["later-same-day"],allowPending:true)
+        let parts=try N1rStoredZip.unpack(result.xlsx)
+        let xml=String(decoding:parts.first{$0.name=="xl/worksheets/sheet5.xml"}!.data,as:UTF8.self)
+        XCTAssertTrue(xml.contains("SEGUNDA"))
+        XCTAssertFalse(xml.contains("PRIMERA"))
+    }
+
 }

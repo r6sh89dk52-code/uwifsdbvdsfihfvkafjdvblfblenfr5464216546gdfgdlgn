@@ -6,6 +6,15 @@ private let danperAccent=Color(red:0.88,green:0.09,blue:0.16)
 /// A human-first beta: one explicit demo source, five clear navigation tabs.
 /// No clinical import occurs during launch. Real build222 data are never read.
 struct NativeRootView:View {
+    init() {}
+    #if DEBUG
+    init(layoutMetrics:N2DashboardMetrics) {
+        layoutOnly=true
+        _metrics=State(initialValue:layoutMetrics)
+        _loading=State(initialValue:false)
+    }
+    #endif
+    private var layoutOnly=false
     @State private var tab=0
     @State private var summary:N2ProtectedStoreSummary?
     @State private var loading=true
@@ -17,7 +26,7 @@ struct NativeRootView:View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("danper.haptics.enabled") private var haptics=true
 
-    private var isReady:Bool { summary != nil }
+    private var isReady:Bool { summary != nil || layoutOnly }
     var body:some View {
         TabView(selection:$tab) {
             NavigationStack { home }
@@ -72,7 +81,7 @@ struct NativeRootView:View {
                         Text("DANPER Salud")
                             .font(.system(.title2,design:.rounded,weight:.bold))
                             .foregroundStyle(.white)
-                        Text("Tu espacio de enfermería")
+                        Text("Bienvenido, Felipe")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.87))
                         Label("Salud ocupacional",systemImage:"checkmark.shield.fill")
@@ -98,9 +107,18 @@ struct NativeRootView:View {
                     .background(danperAccent.opacity(0.09),in:Capsule())
                 if isReady {
                     Button {tab=2} label: {
-                        Label("Nueva atención",systemImage:"plus.circle.fill")
-                    }
-                    .buttonStyle(DanperPrimaryButton())
+                        HStack {
+                            VStack(alignment:.leading,spacing:7) {
+                                Text("ACCESO RÁPIDO").font(.caption.weight(.bold))
+                                Text("Nueva atención").font(.system(.title,design:.rounded,weight:.bold))
+                                Text("Evaluación, tratamiento y consumo").font(.subheadline)
+                            }
+                            Spacer()
+                            Image(systemName:"plus").font(.title.weight(.semibold))
+                        }.foregroundStyle(.white).padding(22)
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                            .background(DanperStyle.gradient,in:RoundedRectangle(cornerRadius:23))
+                    }.buttonStyle(.plain)
                     if let metrics {
                         ViewThatFits(in:.horizontal) {
                             HStack(spacing:10) {
@@ -116,76 +134,18 @@ struct NativeRootView:View {
                         }
                     }
                 }
-                VStack(alignment:.leading,spacing:12) {
-                    Text(isReady ? "Listo para comenzar" :
-                        "Comienza a probar la aplicación")
-                        .font(.title3.bold())
-                    Text(isReady ?
-                         "Atenciones, tratamientos y consumos en un solo flujo. Semana de lunes a domingo, hora de Perú." :
-                         "Para registrar una atención de prueba, activa primero el ejemplo ficticio. No necesitas importar un respaldo ni configurar un inventario real.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal:false,vertical:true)
-                    if loading || preparing {
-                        HStack {
-                            ProgressView()
-                            Text(preparing ? "Creando práctica cifrada…" :
-                                 "Comprobando los datos locales…")
-                                .font(.footnote)
-                        }
-                    }else if !problem.isEmpty {
-                        Label(problem,systemImage:"exclamationmark.triangle")
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal:false,vertical:true)
-                            .padding(11)
-                            .frame(maxWidth:.infinity,alignment:.leading)
-                            .background(Color.orange.opacity(0.08),
-                                        in:RoundedRectangle(cornerRadius:12))
-                    }
-                    if isReady {
-                        Label("Demostración activa · \(summary?.workers ?? 0) trabajadores y \(summary?.attentions ?? 0) registros",
-                              systemImage:"checkmark.circle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(.green)
-                        Button {
-                            tab=2
-                        }label:{
-                            Label("Registrar una atención",
-                                  systemImage:"cross.case.fill")
-                                .frame(maxWidth:.infinity)
-                        }
-                        .buttonStyle(DanperPrimaryButton())
-                        .controlSize(.large)
-                        .tint(danperAccent)
-                        Button {
-                            tab=1
-                        }label:{
-                            Label("Buscar trabajador o historial",
-                                  systemImage:"person.text.rectangle")
-                                .frame(maxWidth:.infinity)
-                        }
-                        .buttonStyle(DanperSecondaryButton())
-                        .controlSize(.large)
-                    }else{
-                        Button {
-                            Task {await startPractice()}
-                        }label:{
-                            Label("Empezar con datos ficticios",
-                                  systemImage:"play.fill")
-                                .frame(maxWidth:.infinity)
-                        }
-                        .buttonStyle(DanperPrimaryButton())
-                        .controlSize(.large)
-                        .tint(danperAccent)
-                        .disabled(loading || preparing)
-                    }
+                if !isReady {
+                    VStack(alignment:.leading,spacing:14) {
+                        Text("Comienza tu prueba").font(.title3.bold())
+                        Text("Activa el ejemplo ficticio para registrar atenciones y probar los consumos.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        if loading || preparing {ProgressView("Preparando datos protegidos…")}
+                        if !problem.isEmpty {Text(problem).font(.footnote).foregroundStyle(.orange)}
+                        Button {Task {await startPractice()}} label: {
+                            Label("Empezar con datos ficticios",systemImage:"play.fill")
+                        }.buttonStyle(DanperPrimaryButton()).disabled(loading || preparing)
+                    }.padding(18).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
                 }
-                .padding(18)
-                .frame(maxWidth:.infinity,alignment:.leading)
-                .background(Color(uiColor:.secondarySystemGroupedBackground),
-                            in:RoundedRectangle(cornerRadius:20))
-                .shadow(color:Color.black.opacity(0.055),radius:12,y:3)
                 VStack(alignment:.leading,spacing:12) {
                     Text("Explora DANPER Salud")
                         .font(.title3.weight(.bold))
@@ -197,15 +157,16 @@ struct NativeRootView:View {
                         quickInfo("4",title:"Más",desc:"Inventario, Kardex y Excel.")
                     }
                 }
-                VStack(alignment:.leading,spacing:7) {
-                    Label("Tus datos reales permanecen separados",
-                          systemImage:"lock.shield")
-                        .font(.subheadline.weight(.semibold))
-                    Text("La build 222 sigue intacta. Esta beta no recupera datos reales automáticamente y todavía no reemplaza tu herramienta de trabajo.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                if isReady {
+                    HStack(spacing:12) {
+                        NavigationLink {N2NativeInventoryView()} label: {
+                            Label("Inventario",systemImage:"shippingbox.fill")
+                        }.buttonStyle(DanperSecondaryButton())
+                        NavigationLink {N2VerifiedIndicatorExportView()} label: {
+                            Label("Excel",systemImage:"tablecells.fill")
+                        }.buttonStyle(DanperSecondaryButton())
+                    }
                 }
-                .padding(15)
-                .frame(maxWidth:.infinity,alignment:.leading)
             }
             .padding(.horizontal,16)
             .padding(.vertical,18)
@@ -346,6 +307,7 @@ struct NativeRootView:View {
     }
     @MainActor
     private func refresh() async {
+        guard !layoutOnly else{return}
         loading=true
         defer{loading=false}
         do {

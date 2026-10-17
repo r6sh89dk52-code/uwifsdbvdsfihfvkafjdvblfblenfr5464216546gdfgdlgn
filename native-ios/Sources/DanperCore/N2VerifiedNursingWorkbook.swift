@@ -13,9 +13,9 @@ public enum N2VerifiedNursingWorkbook {
         public let day:String
     }
     public static func export(snapshot:Data,catalog:Data,template:Data,
-                              date:String,shift:String,responsible:String)throws->Result {
+                              date:String,shift:String,responsible:String,site:String="")throws->Result {
         let report=try N2NursingReportBuilder.daily(
-            snapshot:snapshot,catalog:catalog,date:date)
+            snapshot:snapshot,catalog:catalog,date:date,site:site)
         guard report.rows.count==98 else{throw Failure.incompleteOrUnreconciled}
         let known=report.rows.filter{$0.stockKnown}.count
         guard known>0 else{throw Failure.noPhysicalHistory}
@@ -30,3 +30,4 @@ public enum N2VerifiedNursingWorkbook {
                       stockUnknownRows:98-known,day:date)
     }
 }
+

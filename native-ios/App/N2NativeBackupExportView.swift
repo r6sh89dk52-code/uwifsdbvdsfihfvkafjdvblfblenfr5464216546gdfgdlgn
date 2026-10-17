@@ -36,8 +36,8 @@ struct N2NativeBackupExportView:View {
 
     var body:some View {
         Form {
-            Section("Respaldo N2 · datos protegidos") {
-                Label("Solo el contenido de la bóveda clínica N2",
+            Section("Respaldo cifrado") {
+                Label("Datos protegidos del modo de prueba",
                       systemImage:"lock.shield.fill")
                     .font(.headline)
                 if let summary {
@@ -152,3 +152,4 @@ struct N2NativeBackupExportView:View {
         temporaryDirectory=nil
     }
 }
+

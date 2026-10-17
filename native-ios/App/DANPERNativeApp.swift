@@ -8,6 +8,8 @@ private enum Brand {
 @main
 struct DANPERNativeApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    @State private var authCycle=UUID()
+    @State private var activeContext:LAContext?
     @State private var authenticated = false
     @State private var hasUnlockedOnce = false
     @State private var unlocking = false
@@ -36,10 +38,10 @@ struct DANPERNativeApp: App {
                             .clipShape(RoundedRectangle(cornerRadius: 24))
                         Text("DANPER")
                             .font(.system(size: 40, weight: .heavy, design: .rounded))
-                        Text("SALUD MÓVIL · SWIFTUI")
+                        Text("SALUD MÓVIL")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
-                        Text("Versión nativa de evaluación. No reemplaza tu aplicación actual ni modifica su inventario.")
+                        Text("Modo de prueba — datos ficticios. Acceso protegido con Face ID o código.")
                             .multilineTextAlignment(.center)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -69,7 +71,7 @@ struct DANPERNativeApp: App {
                             .padding(.horizontal, 25)
                         }
                         Spacer()
-                        Text("Todavía es una versión nativa de evaluación; los respaldos reales se inspeccionan solo con tu autorización.")
+                        Text("DANPER · Salud ocupacional")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -86,6 +88,10 @@ struct DANPERNativeApp: App {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
+                    authCycle=UUID()
+                    activeContext?.invalidate()
+                    activeContext=nil
+                    unlocking=false
                     authenticated = false
                     autoAttemptedThisForeground = false
                     manualRetryAvailable = false
@@ -114,9 +120,13 @@ struct DANPERNativeApp: App {
         manualRetryAvailable = false
         authError = ""
         let context = LAContext()
+        activeContext=context
+        let cycle=authCycle
         context.evaluatePolicy(.deviceOwnerAuthentication,
             localizedReason: "Proteger el acceso a DANPER Salud Móvil Nativa") { success, error in
             DispatchQueue.main.async {
+                guard cycle==authCycle else{return}
+                activeContext=nil
                 unlocking = false
                 authenticated = success
                 if success { hasUnlockedOnce = true }
@@ -128,3 +138,4 @@ struct DANPERNativeApp: App {
         }
     }
 }
+

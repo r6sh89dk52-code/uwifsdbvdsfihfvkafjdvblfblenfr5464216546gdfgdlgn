@@ -21,7 +21,10 @@ import DanperCore
             .environment(\.colorScheme,dark ? .dark : .light)
             .environment(\.locale,Locale(identifier:"es_PE"))
             .environment(\.dynamicTypeSize,large ? .accessibility3 : .large))
-        let window=UIWindow(frame:CGRect(x:0,y:0,width:393,height:852))
+        let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
+        let window=UIWindow(windowScene:scene)
+        window.frame=CGRect(x:0,y:0,width:393,height:852)
+        window.windowLevel = .alert + 1
         window.rootViewController=host
         window.makeKeyAndVisible()
         defer {window.isHidden=true}
@@ -33,6 +36,9 @@ import DanperCore
             window.drawHierarchy(in:window.bounds,afterScreenUpdates:true)
         }
         XCTAssertGreaterThan(image.pngData()?.count ?? 0,5000)
+        let pixels=try XCTUnwrap(image.cgImage?.dataProvider?.data)
+        let sample=Data(bytes:CFDataGetBytePtr(pixels)!,count:CFDataGetLength(pixels))
+        XCTAssertGreaterThan(Set(sample).count,32,"Blank capture is not layout evidence")
         let attachment=XCTAttachment(image:image)
         attachment.name=name
         attachment.lifetime = .keepAlways
@@ -58,6 +64,13 @@ import DanperCore
         try await capture(NavigationStack {
             N2NativeClinicalFormView(layoutContext:context,draft:form,step:2)
         },name:"Tratamiento-DynamicType",dark:false,large:true)
+    }
+    func testHomeLayouts() async throws {
+        let snapshot=try resource("n2-synthetic-clinical")
+        let model=try N2NativeSnapshotReader.read(snapshot)
+        let metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())
+        try await capture(NativeRootView(layoutMetrics:metrics),name:"Inicio-claro",dark:false)
+        try await capture(NativeRootView(layoutMetrics:metrics),name:"Inicio-oscuro",dark:true)
     }
     func testWorkerAndAccessLayouts() async throws {
         try await capture(NavigationStack{N2NativeWorkerEditorView()},name:"Nuevo-trabajador",dark:false)
