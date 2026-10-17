@@ -101,4 +101,57 @@ final class N2AtomicClinicalCoordinatorTests:XCTestCase {
             }
         }
     }
+    func testAutosavedIncompleteDraftPromotionIsAtomicAndIdempotent()throws {
+        let original=try fixture("n1e-clinical-stock.json")
+        let catalog=try fixture("n2-reviewed-approved.json")
+        let sample=visit(original,id:"n2-promote")
+        let incomplete=try N2SnapshotEditor.upsertDraft(
+            snapshot:original,id:"n2-promote",
+            changes:json(["diagnosis":"INCOMPLETO",
+                          "items":[["id":"n2-promote-material","quantity":0]],
+                          "futureExtension":["retained":true]]),
+            at:at()-2000)
+        let folder=try self.folder()
+        let (journal,coordinator)=try connect(folder)
+        XCTAssertEqual(try coordinator.bootstrapFromVerifiedSingleSource(incomplete),1)
+        let answer=try coordinator.save(visit:sample,approvedCatalog:catalog,
+                                        at:at(),expectedRevision:1)
+        XCTAssertEqual(answer.revision,2)
+        XCTAssertEqual(answer.linked,1)
+        XCTAssertEqual(answer.addedMovements,1)
+        let current=try XCTUnwrap(journal.recover())
+        let root=try XCTUnwrap(JSONSerialization.jsonObject(with:current.snapshot) as? [String:Any])
+        let visits=root["attentions"] as! [[String:Any]]
+        XCTAssertEqual(visits.filter{$0["id"] as? String=="n2-promote"}.count,1)
+        let promoted=try XCTUnwrap(visits.first{$0["id"] as? String=="n2-promote"})
+        XCTAssertEqual(promoted["status"] as? String,"saved")
+        XCTAssertNotNil(promoted["futureExtension"])
+        let again=try coordinator.save(visit:sample,approvedCatalog:catalog,
+                                       at:at(),expectedRevision:1)
+        XCTAssertTrue(again.alreadyCommitted)
+        XCTAssertEqual(again.addedMovements,0)
+        XCTAssertEqual(try journal.recover()?.revision,2)
+    }
+    func testCorrectionDraftCannotBePromotedWithoutAudit()throws {
+        let original=try fixture("n1e-clinical-stock.json")
+        let catalog=try fixture("n2-reviewed-approved.json")
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        var visits=root["attentions"] as! [[String:Any]]
+        var correction=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:visit(original,id:"n2-correction")) as? [String:Any])
+        correction["status"]="draft"
+        correction["originId"]="fundo-unit"
+        visits.append(correction)
+        root["attentions"]=visits
+        let before=try json(root)
+        let folder=try self.folder()
+        let (_,coordinator)=try connect(folder)
+        _=try coordinator.bootstrapFromVerifiedSingleSource(before)
+        correction["status"]="saved"
+        XCTAssertThrowsError(try coordinator.save(visit:json(correction),
+                             approvedCatalog:catalog,at:at(),expectedRevision:1)) {
+            XCTAssertEqual($0 as? N2AtomicClinicalCoordinator.Failure,
+                           .duplicateChangedVisit)
+        }
+    }
 }

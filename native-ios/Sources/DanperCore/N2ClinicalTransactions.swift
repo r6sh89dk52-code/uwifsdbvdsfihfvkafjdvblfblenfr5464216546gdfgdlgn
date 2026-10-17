@@ -114,10 +114,21 @@ public enum N2NativeClinicalTransaction {
         guard workers.contains(where:{$0["dni"] as? String == dni &&
             $0["name"] as? String == name}) else {throw N2ClinicalError.wrongWorker}
         if append {
-            guard !visits.contains(where:{$0["id"] as? String == id}) else {
-                throw N2ClinicalError.duplicateVisit
+            if let existingIndex=visits.firstIndex(where:{$0["id"] as? String == id}) {
+                let draft=visits[existingIndex]
+                // An unsigned, incomplete draft is promoted in ONE stock and
+                // clinical transaction. Saved and correction drafts are never
+                // silently overwritten or used to re-dispense.
+                guard draft["status"] as? String == "draft",
+                      draft["originId"] == nil else {
+                    throw N2ClinicalError.duplicateVisit
+                }
+                var merged=draft
+                for (key,value) in new {merged[key]=value}
+                visits[existingIndex]=merged
+            }else {
+                visits.append(new)
             }
-            visits.append(new)
         }else {
             guard let old=visits.first(where:{$0["id"] as? String == id}),
                   let previous=try? JSONSerialization.data(withJSONObject:old,options:[.sortedKeys]),

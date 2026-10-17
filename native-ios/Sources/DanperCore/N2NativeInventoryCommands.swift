@@ -23,8 +23,11 @@ public enum N2NativeInventoryCommands {
         return String(format:"%04d-%02d-%02d",d.year!,d.month!,d.day!)
     }
     private static func balance(_ x:[String:Any])->Double {
-        triple((num(x["sealedContainers"]) ?? 0)*(num(x["unitsPerContainer"]) ?? 0)+
-               (num(x["looseUnits"]) ?? 0)+(num(x["openedRemaining"]) ?? 0))
+        let sealed=num(x["sealedContainers"]) ?? 0
+        let capacity=num(x["unitsPerContainer"]) ?? 0
+        let loose=num(x["looseUnits"]) ?? 0
+        let opened=num(x["openedRemaining"]) ?? 0
+        return triple(sealed * capacity + loose + opened)
     }
     private static func validLot(_ l:[String:Any])->Bool {
         guard let id=l["id"] as? String,!id.isEmpty,

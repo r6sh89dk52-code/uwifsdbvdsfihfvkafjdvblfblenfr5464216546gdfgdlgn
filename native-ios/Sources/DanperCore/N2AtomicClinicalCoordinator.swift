@@ -19,8 +19,8 @@ internal final class N2AtomicClinicalCoordinator {
         return try store.commit(source,expectedRevision:0)
     }
     private func sameJSON(_ a:Any,_ b:Any)->Bool {
-        guard let x=try? JSONSerialization.data(withJSONObject:a,options:[.sortedKeys]),
-              let y=try? JSONSerialization.data(withJSONObject:b,options:[.sortedKeys])
+        guard let x=try? JSONSerialization.data(withJSONObject:a,options:[.sortedKeys,.fragmentsAllowed]),
+              let y=try? JSONSerialization.data(withJSONObject:b,options:[.sortedKeys,.fragmentsAllowed])
         else{return false}
         return x==y
     }
@@ -37,9 +37,21 @@ internal final class N2AtomicClinicalCoordinator {
             throw Failure.invalidRequest
         }
         if let prior=visits.first(where:{$0["id"] as? String==id}) {
-            guard sameJSON(prior,request) else{throw Failure.duplicateChangedVisit}
-            return Commit(revision:active.revision,alreadyCommitted:true,
-                          linked:0,pending:0,addedMovements:0)
+            if prior["status"] as? String == "saved" {
+                // A saved visit is immutable. Extra metadata retained from a
+                // draft does not turn an otherwise exact retry into a duplicate.
+                let matches=request.allSatisfy{ key,value in
+                    guard let previous=prior[key] else{return false}
+                    return sameJSON(previous,value)
+                }
+                guard matches else{throw Failure.duplicateChangedVisit}
+                return Commit(revision:active.revision,alreadyCommitted:true,
+                              linked:0,pending:0,addedMovements:0)
+            }
+            guard prior["status"] as? String == "draft",
+                  prior["originId"] == nil else {
+                throw Failure.duplicateChangedVisit
+            }
         }
         // An old form cannot overwrite a newer encrypted generation.
         guard active.revision==expectedRevision else{
