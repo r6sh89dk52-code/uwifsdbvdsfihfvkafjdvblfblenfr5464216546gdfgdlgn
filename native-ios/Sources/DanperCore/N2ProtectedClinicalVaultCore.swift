@@ -18,13 +18,18 @@ public enum N2ProtectedStoreError:Error,Equatable {
 public final class N2ProtectedClinicalVaultCore {
     private let journal:N2EncryptedClinicalJournal
     private let directory:URL
-    public init(keyData:Data) throws {
+    public enum Namespace:Sendable {
+        case clinical
+        case synthetic
+    }
+    public init(keyData:Data,namespace:Namespace = .clinical) throws {
         guard let appSupport=FileManager.default.urls(
             for:.applicationSupportDirectory,in:.userDomainMask).first else {
             throw N2ProtectedStoreError.unsafeSource
         }
         directory=appSupport.appendingPathComponent(
-            "DANPER-N2-CLINICAL-VAULT",isDirectory:true)
+            (namespace == .clinical ? "DANPER-N2-CLINICAL-VAULT" :
+              "DANPER-N2-SYNTHETIC-VAULT"),isDirectory:true)
         journal=try N2EncryptedClinicalJournal(
             protectedAppSupportDirectory:directory,secret:keyData)
     }
@@ -109,6 +114,37 @@ public final class N2ProtectedClinicalVaultCore {
         _=try N1eLegacyClinicalAudit.inspect(active.snapshot)
         return active.snapshot
     }
+    /// Explicitly start an isolated sandbox containing ONLY the five documented
+    /// fictional employees. This path cannot restore or mix actual patient
+    /// records, and is physically separate from the clinical vault.
+    @discardableResult
+    public func activateSyntheticFixture(_ source:Data,confirmed:Bool)throws
+        ->N2ProtectedStoreSummary {
+        guard confirmed,directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT",
+              try journal.recover()==nil,
+              let root=try? JSONSerialization.jsonObject(with:source)
+                 as? [String:Any],
+              let workers=root["workers"] as? [[String:Any]],
+              workers.count==5,Set(workers.compactMap{$0["dni"] as? String})
+                 == Set(["00000001","00000002","00000003","00000004","00000005"]),
+              workers.allSatisfy {
+                ($0["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
+              },
+              let visits=root["attentions"] as? [[String:Any]],
+              visits.allSatisfy { v in
+                let w=v["worker"] as? [String:Any] ?? [:]
+                return (w["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
+              } else {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        _=try N1eLegacyClinicalAudit.inspect(source)
+        _=try N1fLosslessFieldGate.inspect(source)
+        let n=try journal.commit(source,expectedRevision:0)
+        guard let active=try journal.recover(),active.revision==n,
+              active.snapshot==source else{throw N2ProtectedStoreError.unsafeSource}
+        return try summary(active)
+    }
+
     /// Admission of ONE previously verified complete backup, never a merge.
     /// No silent bootstrap or automatic migration on first launch.
     @discardableResult

@@ -44,7 +44,8 @@ internal final class N2EncryptedClinicalJournal {
             guard let support=fm.urls(for:.applicationSupportDirectory,
                                      in:.userDomainMask).first?.standardizedFileURL,
                   path.deletingLastPathComponent()==support,
-                  path.lastPathComponent=="DANPER-N2-CLINICAL-VAULT" else {
+                  ["DANPER-N2-CLINICAL-VAULT",
+                   "DANPER-N2-SYNTHETIC-VAULT"].contains(path.lastPathComponent) else {
                 throw Failure.unsafeLocation
             }
         }else {
@@ -108,7 +109,8 @@ internal final class N2EncryptedClinicalJournal {
     private func write(_ name:String,_ bytes:Data) throws {
         try bytes.write(to:file(name),options:.atomic)
         #if os(iOS)
-        if root.lastPathComponent=="DANPER-N2-CLINICAL-VAULT" {
+        if ["DANPER-N2-CLINICAL-VAULT",
+            "DANPER-N2-SYNTHETIC-VAULT"].contains(root.lastPathComponent) {
             try fm.setAttributes([.protectionKey:FileProtectionType.complete],
                                  ofItemAtPath:file(name).path)
         }

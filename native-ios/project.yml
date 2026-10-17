@@ -28,6 +28,8 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+        INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_CFBundleDisplayName: "DANPER Nativa Prueba"
         INFOPLIST_KEY_NSFaceIDUsageDescription: "DANPER Salud Móvil utiliza Face ID para restringir el acceso a la aplicación."
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
