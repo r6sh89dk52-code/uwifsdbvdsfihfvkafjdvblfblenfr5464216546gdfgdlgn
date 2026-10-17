@@ -1,0 +1,253 @@
+import Foundation
+import Crypto
+
+/// Append-only, encrypted-snapshot clinical rectification ledger.
+/// The original saved visit, its identity, recorded administration and every
+/// FEFO physical movement remain immutable. There is no second dispensing.
+public enum N2CorrectionError:Error,Equatable {
+    case invalidSnapshot,missingVisit,notSaved,invalidChanges,invalidReason
+    case staleCorrection,duplicateCorrection,brokenHistory,unchanged
+}
+public struct N2CorrectionField:Sendable,Equatable {
+    public let id:String
+    public let code:String
+    public let name:String
+    public let quantity:Int
+    public let procedure:String
+}
+public struct N2CorrectionDetail:Sendable {
+    public let id:String
+    public let workerName:String
+    public let date:String
+    public let time:String
+    public let category:String
+    public let system:String
+    public let segment:String
+    public let diagnosis:String
+    public let permission:String
+    public let permissionTime:String
+    public let responsible:String
+    public let responsibleDni:String
+    public let workStatus:String
+    public let blueBandage:Bool
+    public let returned:Bool
+    public let photoSent:Bool
+    public let procedures:[String]
+    public let medications:[N2CorrectionField]
+    public let previousCorrections:Int
+    public let pendingMedicationDiscrepancy:Bool
+}
+public enum N2ClinicalCorrections {
+    private static let editableText:Set<String> = [
+        "category","system","segment","diagnosis","permission",
+        "permissionTime","responsible","responsibleDni","workStatus"
+    ]
+    private static let editableBools:Set<String> = [
+        "blueBandage","returned","photoSent"
+    ]
+    private static func json(_ data:Data)throws->[String:Any] {
+        guard let obj=try? JSONSerialization.jsonObject(with:data) as? [String:Any],
+              obj["attentions"] is [[String:Any]],obj["stockMovements"] is [[String:Any]],
+              (try? N1eLegacyClinicalAudit.inspect(data)) != nil,
+              (try? N1fLosslessFieldGate.inspect(data)) != nil else {
+            throw N2CorrectionError.invalidSnapshot
+        }
+        return obj
+    }
+    private static func canonical(_ row:[String:Any])throws->Data {
+        try JSONSerialization.data(withJSONObject:row,options:[.sortedKeys])
+    }
+    private static func digest(_ row:[String:Any])throws->String {
+        SHA256.hash(data:try canonical(row)).map{String(format:"%02x",$0)}.joined()
+    }
+    private static func nonempty(_ x:Any?)->String? {
+        guard let s=x as? String,!s.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return nil}
+        return s
+    }
+    private static func corrected(_ before:[String:Any],changes:[String:Any])throws->[String:Any] {
+        var next=before
+        guard !changes.isEmpty,changes.count<=20,
+              changes.keys.allSatisfy({
+                editableText.contains($0) || editableBools.contains($0) ||
+                $0=="standaloneProcedures" || $0=="itemProcedures"
+              }) else{throw N2CorrectionError.invalidChanges}
+        for (key,v) in changes {
+            if editableText.contains(key) {
+                guard let s=v as? String,s.utf8.count<=2048,
+                      !s.contains("\0") else{throw N2CorrectionError.invalidChanges}
+                next[key]=s
+            }else if editableBools.contains(key) {
+                guard let n=v as? NSNumber, CFGetTypeID(n)==CFBooleanGetTypeID() else{
+                    throw N2CorrectionError.invalidChanges
+                }
+                next[key]=n.boolValue
+            }else if key=="standaloneProcedures" {
+                guard let arr=v as? [String],arr.count<=30,
+                      arr.allSatisfy({!$0.isEmpty && $0.utf8.count<=180}) else{
+                    throw N2CorrectionError.invalidChanges
+                }
+                next[key]=arr
+            }else if key=="itemProcedures" {
+                guard let index=v as? [String:String],index.count<=100,
+                      let items=before["items"] as? [[String:Any]] else{
+                    throw N2CorrectionError.invalidChanges
+                }
+                let originalIDs=Set(items.compactMap{$0["id"] as? String})
+                guard Set(index.keys).isSubset(of:originalIDs),
+                      index.values.allSatisfy({!$0.isEmpty && $0.utf8.count<=180}) else{
+                    throw N2CorrectionError.invalidChanges
+                }
+                next["items"]=items.map{row in
+                    var item=row
+                    if let id=row["id"] as? String,let p=index[id]{
+                        item["procedure"]=p
+                    }
+                    return item
+                }
+            }
+        }
+        // A clinical correction must never recalculate stock, change the
+        // worker, shift the original visit between dates or change FEFO refs.
+        guard nonempty(next["diagnosis"]) != nil,
+              nonempty(next["category"]) != nil,
+              nonempty(next["system"]) != nil,
+              ["NO","SI"].contains(next["permission"] as? String ?? ""),
+              (next["permission"] as? String != "SI" ||
+               (next["permissionTime"] as? String ?? "").range(
+                of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression) != nil),
+              nonempty(next["responsible"]) != nil,
+              try canonical(before) != canonical(next) else{
+            throw N2CorrectionError.unchanged
+        }
+        return next
+    }
+    private static func project(_ original:[String:Any])throws->
+        (rows:[[String:Any]],history:[[String:Any]],pending:Set<String>) {
+        guard let visits=original["attentions"] as? [[String:Any]],
+              let history=original["clinicalCorrectionLog"] as? [[String:Any]] ?? [] as [[String:Any]]?
+        else{throw N2CorrectionError.brokenHistory}
+        var byID=[String:Int]()
+        for (i,v) in visits.enumerated() {
+            guard let id=v["id"] as? String,byID[id]==nil else{
+                throw N2CorrectionError.brokenHistory
+            }
+            byID[id]=i
+        }
+        var current=visits,events=Set<String>(),latest=Set<String>(),
+            pending=Set<String>()
+        for event in history {
+            guard let id=nonempty(event["id"]),UUID(uuidString:id) != nil,
+                  events.insert(id).inserted,
+                  let visitID=nonempty(event["visitID"]),let idx=byID[visitID],
+                  current[idx]["status"] as? String=="saved",
+                  let reason=nonempty(event["reason"]),reason.utf8.count<=1500,
+                  let op=nonempty(event["operator"]),op.utf8.count<=120,
+                  let millis=event["recordedAt"] as? NSNumber,
+                  millis.int64Value>0,
+                  let oldSHA=event["beforeSHA256"] as? String,
+                  let newSHA=event["afterSHA256"] as? String,
+                  let change=event["changes"] as? [String:Any],
+                  oldSHA==digest(current[idx]),
+                  let next=try? corrected(current[idx],changes:change),
+                  newSHA==digest(next),
+                  let note=event["medicationDiscrepancy"] as? String,
+                  note.utf8.count<=1500 else{
+                throw N2CorrectionError.brokenHistory
+            }
+            if !note.isEmpty {pending.insert(visitID)}
+            current[idx]=next
+            latest.insert(visitID)
+        }
+        return(current,history,pending)
+    }
+    public static func detail(snapshot:Data,visitID:String)throws->N2CorrectionDetail {
+        let obj=try json(snapshot)
+        let evaluated=try project(obj)
+        guard let visit=evaluated.rows.first(where:{$0["id"] as? String==visitID})
+        else{throw N2CorrectionError.missingVisit}
+        guard visit["status"] as? String=="saved" else{throw N2CorrectionError.notSaved}
+        guard let worker=visit["worker"] as? [String:Any],
+              let items=visit["items"] as? [[String:Any]] else{
+            throw N2CorrectionError.invalidSnapshot
+        }
+        let lines=try items.map{v -> N2CorrectionField in
+            guard let id=v["id"] as? String,let code=v["code"] as? String,
+                  let name=v["name"] as? String,let quantity=v["quantity"] as? Int else{
+                throw N2CorrectionError.invalidSnapshot
+            }
+            return N2CorrectionField(id:id,code:code,name:name,
+                quantity:quantity,procedure:v["procedure"] as? String ?? "")
+        }
+        func s(_ key:String)->String{visit[key] as? String ?? ""}
+        return N2CorrectionDetail(id:visitID,workerName:worker["name"] as? String ?? "",
+            date:s("date"),time:s("time"),category:s("category"),system:s("system"),
+            segment:s("segment"),diagnosis:s("diagnosis"),permission:s("permission"),
+            permissionTime:s("permissionTime"),responsible:s("responsible"),
+            responsibleDni:s("responsibleDni"),workStatus:s("workStatus"),
+            blueBandage:visit["blueBandage"] as? Bool ?? false,
+            returned:visit["returned"] as? Bool ?? false,
+            photoSent:visit["photoSent"] as? Bool ?? false,
+            procedures:visit["standaloneProcedures"] as? [String] ?? [],
+            medications:lines,
+            previousCorrections:evaluated.history.filter{
+                $0["visitID"] as? String==visitID
+            }.count,
+            pendingMedicationDiscrepancy:evaluated.pending.contains(visitID))
+    }
+    /// For history/export projections only; the encrypted saved source stays
+    /// immutable and its original physical R links are authoritative.
+    public static func effectiveSnapshot(_ snapshot:Data)throws->Data {
+        let obj=try json(snapshot)
+        let projected=try project(obj)
+        var next=obj
+        next["attentions"]=projected.rows
+        return try JSONSerialization.data(withJSONObject:next,options:[.sortedKeys])
+    }
+    public static func pendingDiscrepancies(_ snapshot:Data)throws->Set<String> {
+        try project(json(snapshot)).pending
+    }
+    public static func append(snapshot:Data,eventID:String,visitID:String,
+                              changes:Data,reason:String,operatorName:String,
+                              medicationDiscrepancy:String,at:Int64)throws->Data {
+        guard UUID(uuidString:eventID) != nil,at>0,
+              (8...1500).contains(reason.trimmingCharacters(
+                in:.whitespacesAndNewlines).utf8.count),
+              (3...120).contains(operatorName.trimmingCharacters(
+                in:.whitespacesAndNewlines).utf8.count),
+              medicationDiscrepancy.utf8.count<=1500 else{
+            throw N2CorrectionError.invalidReason
+        }
+        var obj=try json(snapshot)
+        let current=try project(obj)
+        guard let index=current.rows.firstIndex(where:{$0["id"] as? String==visitID})
+        else{throw N2CorrectionError.missingVisit}
+        guard current.rows[index]["status"] as? String=="saved" else{
+            throw N2CorrectionError.notSaved
+        }
+        guard let changes=try? JSONSerialization.jsonObject(with:changes) as? [String:Any]
+        else{throw N2CorrectionError.invalidChanges}
+        guard !current.history.contains(where:{$0["id"] as? String==eventID}) else{
+            throw N2CorrectionError.duplicateCorrection
+        }
+        let before=current.rows[index]
+        let after=try corrected(before,changes:changes)
+        let record:[String:Any]=[
+            "id":eventID,"visitID":visitID,"recordedAt":at,
+            "reason":reason.trimmingCharacters(in:.whitespacesAndNewlines),
+            "operator":operatorName.trimmingCharacters(in:.whitespacesAndNewlines),
+            "medicationDiscrepancy":medicationDiscrepancy,
+            "beforeSHA256":try digest(before),"afterSHA256":try digest(after),
+            "changes":changes
+        ]
+        var history=current.history
+        guard history.count<10000 else{throw N2CorrectionError.brokenHistory}
+        history.append(record)
+        obj["clinicalCorrectionLog"]=history
+        let result=try JSONSerialization.data(withJSONObject:obj,options:[.sortedKeys])
+        _=try N1eLegacyClinicalAudit.inspect(result)
+        _=try N1fLosslessFieldGate.inspect(result)
+        // Audit the entire chain including this newly appended revision.
+        _=try project(obj)
+        return result
+    }
+}
