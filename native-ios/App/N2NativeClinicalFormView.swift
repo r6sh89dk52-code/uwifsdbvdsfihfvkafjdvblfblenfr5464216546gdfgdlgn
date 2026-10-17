@@ -418,6 +418,22 @@ struct N2NativeClinicalFormView:View {
                 .font(.footnote).foregroundStyle(.secondary)
         }
     }
+    private var pendingRequirements:[String] {
+        var missing=[String]()
+        if currentWorker==nil {missing.append("seleccionar trabajador")}
+        if form.category.isEmpty {missing.append("tipo de atención")}
+        if form.system.isEmpty {missing.append("sistema afectado")}
+        if form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
+            missing.append("diagnóstico presuntivo")
+        }
+        if form.procedures.isEmpty && form.items.isEmpty {
+            missing.append("al menos un procedimiento o medicamento")
+        }
+        if form.permission=="SI" && form.permissionTime.count != 5 {
+            missing.append("hora del permiso")
+        }
+        return missing
+    }
     private func reviewSection(_ context:N2FormContext)->some View {
         Section("Revisión antes de guardar") {
             LabeledContent("Trabajador",value:currentWorker?.name ?? "Pendiente")
@@ -425,6 +441,13 @@ struct N2NativeClinicalFormView:View {
             LabeledContent("Diagnóstico",value:form.diagnosis)
             LabeledContent("Medicamentos",value:String(form.items.count))
             LabeledContent("Procedimientos",value:form.procedures.joined(separator:", "))
+            if !pendingRequirements.isEmpty {
+                Label("Falta completar: "+pendingRequirements.joined(separator:", ")+".",
+                      systemImage:"exclamationmark.triangle.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal:false,vertical:true)
+            }
             Text("Al guardar, se realizará una transacción cifrada que incluye la atención y todos sus descuentos físicos válidos. Un envase nuevo exige la autorización anterior.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
@@ -450,7 +473,7 @@ struct N2NativeClinicalFormView:View {
                           systemImage:step<3 ? "arrow.right" : "checkmark.shield.fill")
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy)
+                .disabled(busy || (step==3 && !pendingRequirements.isEmpty))
             }
             Button {
                 scheduleDraft(immediate:true)
