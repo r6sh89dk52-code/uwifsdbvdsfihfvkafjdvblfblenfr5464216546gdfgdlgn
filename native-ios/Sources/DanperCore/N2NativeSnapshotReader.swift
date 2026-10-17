@@ -61,10 +61,12 @@ public enum N2NativeSnapshotReader {
         let physical:[Double?]
     }
     public static func read(_ data:Data)throws->N2NativeReadModel {
-        // Both audits are required: field loss, movement provenance and Excel R.
-        guard let parity=try? N1eLegacyClinicalAudit.inspect(data),
-              (try? N1fLosslessFieldGate.inspect(data)) != nil,
-              let root=try? JSONSerialization.jsonObject(with:data) as? [String:Any],
+        // Never mutate source visits. Apply the validated append-only clinical
+        // correction ledger to the displayed history only.
+        let clinical=try N2ClinicalCorrections.effectiveSnapshot(data)
+        guard let parity=try? N1eLegacyClinicalAudit.inspect(clinical),
+              (try? N1fLosslessFieldGate.inspect(clinical)) != nil,
+              let root=try? JSONSerialization.jsonObject(with:clinical) as? [String:Any],
               let workers=root["workers"] as? [[String:Any]],
               let visits=root["attentions"] as? [[String:Any]] else {
             throw N2NativeReadError.invalidSnapshot

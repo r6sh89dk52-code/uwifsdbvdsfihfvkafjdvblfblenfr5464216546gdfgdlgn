@@ -77,9 +77,16 @@ public enum N2VerifiedIndicatorWorkbook {
             throw Failure.ambiguousSite
         }
         guard !selectedVisitIDs.isEmpty else{throw Failure.missingSelection}
-        let parity=try N1eLegacyClinicalAudit.inspect(snapshot)
-        _=try N1fLosslessFieldGate.inspect(snapshot)
-        guard let source=try? JSONSerialization.jsonObject(with:snapshot)
+        // Source quantities remain tied to the original FEFO movements.
+        // Any disputed medication/dose is barred from the official workbook.
+        let pending=try N2ClinicalCorrections.pendingDiscrepancies(snapshot)
+        guard pending.isDisjoint(with:selectedVisitIDs) else{
+            throw Failure.unverifiedDelivery
+        }
+        let clinical=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
+        let parity=try N1eLegacyClinicalAudit.inspect(clinical)
+        _=try N1fLosslessFieldGate.inspect(clinical)
+        guard let source=try? JSONSerialization.jsonObject(with:clinical)
                     as? [String:Any],
               let visits=source["attentions"] as? [[String:Any]],
               let movement=source["stockMovements"] as? [[String:Any]],

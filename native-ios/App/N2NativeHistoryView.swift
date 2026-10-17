@@ -144,6 +144,14 @@ private struct N2WorkerHistoryDetail:View {
                             }
                         }
                         Text(visit.diagnosis.isEmpty ? "Borrador incompleto" : visit.diagnosis)
+                        if realSource && visit.status=="saved" {
+                            NavigationLink {
+                                N2ClinicalCorrectionView(visitID:visit.id)
+                            } label: {
+                                Label("Rectificar con historial auditado",
+                                      systemImage:"square.and.pencil")
+                            }
+                        }
                         if visit.status=="saved" {
                             Text("Ítems clínicos: \(visit.clinicalLines)")
                             Text("Confirmados: \(visit.confirmedPhysicalLines) · Pendientes: \(visit.pendingPhysicalLines)")

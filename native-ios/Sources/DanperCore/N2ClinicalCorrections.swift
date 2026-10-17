@@ -36,6 +36,7 @@ public struct N2CorrectionDetail:Sendable {
     public let medications:[N2CorrectionField]
     public let previousCorrections:Int
     public let pendingMedicationDiscrepancy:Bool
+    public let effectiveSHA256:String
 }
 public enum N2ClinicalCorrections {
     private static let editableText:Set<String> = [
@@ -64,9 +65,10 @@ public enum N2ClinicalCorrections {
         guard let s=x as? String,!s.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{return nil}
         return s
     }
-    private static func corrected(_ before:[String:Any],changes:[String:Any])throws->[String:Any] {
+    private static func corrected(_ before:[String:Any],changes:[String:Any],
+                                  allowUnchanged:Bool=false)throws->[String:Any] {
         var next=before
-        guard !changes.isEmpty,changes.count<=20,
+        guard changes.count<=20,
               changes.keys.allSatisfy({
                 editableText.contains($0) || editableBools.contains($0) ||
                 $0=="standaloneProcedures" || $0=="itemProcedures"
@@ -116,16 +118,21 @@ public enum N2ClinicalCorrections {
                (next["permissionTime"] as? String ?? "").range(
                 of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression) != nil),
               nonempty(next["responsible"]) != nil,
-              try canonical(before) != canonical(next) else{
+              (allowUnchanged || (try canonical(before)) != (try canonical(next))) else{
             throw N2CorrectionError.unchanged
         }
         return next
     }
     private static func project(_ original:[String:Any])throws->
         (rows:[[String:Any]],history:[[String:Any]],pending:Set<String>) {
-        guard let visits=original["attentions"] as? [[String:Any]],
-              let history=original["clinicalCorrectionLog"] as? [[String:Any]] ?? [] as [[String:Any]]?
-        else{throw N2CorrectionError.brokenHistory}
+        guard let visits=original["attentions"] as? [[String:Any]] else{
+            throw N2CorrectionError.brokenHistory
+        }
+        if original["clinicalCorrectionLog"] != nil &&
+           !(original["clinicalCorrectionLog"] is [[String:Any]]) {
+            throw N2CorrectionError.brokenHistory
+        }
+        let history=original["clinicalCorrectionLog"] as? [[String:Any]] ?? []
         var byID=[String:Int]()
         for (i,v) in visits.enumerated() {
             guard let id=v["id"] as? String,byID[id]==nil else{
@@ -147,11 +154,12 @@ public enum N2ClinicalCorrections {
                   let oldSHA=event["beforeSHA256"] as? String,
                   let newSHA=event["afterSHA256"] as? String,
                   let change=event["changes"] as? [String:Any],
-                  oldSHA==digest(current[idx]),
-                  let next=try? corrected(current[idx],changes:change),
-                  newSHA==digest(next),
                   let note=event["medicationDiscrepancy"] as? String,
-                  note.utf8.count<=1500 else{
+                  note.utf8.count<=1500,
+                  oldSHA==(try? digest(current[idx])),
+                  let next=try? corrected(current[idx],changes:change,
+                                          allowUnchanged:!note.isEmpty),
+                  newSHA==(try? digest(next)) else{
                 throw N2CorrectionError.brokenHistory
             }
             if !note.isEmpty {pending.insert(visitID)}
@@ -192,7 +200,8 @@ public enum N2ClinicalCorrections {
             previousCorrections:evaluated.history.filter{
                 $0["visitID"] as? String==visitID
             }.count,
-            pendingMedicationDiscrepancy:evaluated.pending.contains(visitID))
+            pendingMedicationDiscrepancy:evaluated.pending.contains(visitID),
+            effectiveSHA256:try digest(visit))
     }
     /// For history/export projections only; the encrypted saved source stays
     /// immutable and its original physical R links are authoritative.
@@ -208,7 +217,9 @@ public enum N2ClinicalCorrections {
     }
     public static func append(snapshot:Data,eventID:String,visitID:String,
                               changes:Data,reason:String,operatorName:String,
-                              medicationDiscrepancy:String,at:Int64)throws->Data {
+                              medicationDiscrepancy:String,
+                              expectedEffectiveSHA:String,
+                              at:Int64)throws->Data {
         guard UUID(uuidString:eventID) != nil,at>0,
               (8...1500).contains(reason.trimmingCharacters(
                 in:.whitespacesAndNewlines).utf8.count),
@@ -230,7 +241,11 @@ public enum N2ClinicalCorrections {
             throw N2CorrectionError.duplicateCorrection
         }
         let before=current.rows[index]
-        let after=try corrected(before,changes:changes)
+        guard try digest(before)==expectedEffectiveSHA else{
+            throw N2CorrectionError.staleCorrection
+        }
+        let after=try corrected(before,changes:changes,
+                                  allowUnchanged:!medicationDiscrepancy.isEmpty)
         let record:[String:Any]=[
             "id":eventID,"visitID":visitID,"recordedAt":at,
             "reason":reason.trimmingCharacters(in:.whitespacesAndNewlines),
