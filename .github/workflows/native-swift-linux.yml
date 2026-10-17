@@ -23,6 +23,11 @@ on:
       - 'src/ClinicalStockChoice.tsx'
       - 'src/main.tsx'
       - '.github/workflows/native-swift-linux.yml'
+  pull_request:
+    branches: [native/swiftui-n1s-complete-excel-and-container-gate]
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/native-swift-linux.yml'
   workflow_dispatch:
 permissions:
   contents: read
