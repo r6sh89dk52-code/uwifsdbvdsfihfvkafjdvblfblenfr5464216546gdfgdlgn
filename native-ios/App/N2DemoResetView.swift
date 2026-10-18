@@ -134,13 +134,11 @@ struct N2DemoResetView:View {
                 hasError=true
                 return
             }
-            // Collect only DEMO draft IDs. Never clear all app notifications,
-            // since clinical reminders may belong to another namespace.
-            let demoDraftIDs=(try? await N2SyntheticTrialIOSVault.shared.readDrafts())?
-                .map(\.id) ?? []
             try await N2SyntheticTrialIOSVault.shared.eraseEntireDemo(
                 confirmation:phrase)
-            for id in demoDraftIDs {N2DraftReminder.cancel(id:id)}
+            // Even if the encrypted draft index was corrupt, cancel every
+            // DEMO reminder without touching the CLINICAL notification ids.
+            await N2DraftReminder.cancelAllDemo()
             let remaining=try await N2SyntheticTrialIOSVault.shared.inspect()
             guard remaining==nil else {
                 throw N2SyntheticTrialIOSVault.Failure.resetIncomplete
