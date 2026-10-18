@@ -40,7 +40,7 @@ struct NativeRootView:View {
                                 NavigationLink {
                                     N2NativeWorkerEditorView()
                                 }label:{
-                                    Label("Nuevo trabajador ficticio",
+                                    Label("Nuevo trabajador",
                                           systemImage:"person.badge.plus")
                                 }
                             }
@@ -99,7 +99,7 @@ struct NativeRootView:View {
                     in:RoundedRectangle(cornerRadius:23)
                 )
                 .shadow(color:danperAccent.opacity(0.16),radius:14,y:6)
-                Label("MODO DE PRUEBAS · SOLO DATOS FICTICIOS",
+                Label("DANPER SALUD MÓVIL",
                       systemImage:"lock.shield")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(danperAccent)
@@ -138,12 +138,12 @@ struct NativeRootView:View {
                 if !isReady {
                     VStack(alignment:.leading,spacing:14) {
                         Text("Comienza tu prueba").font(.title3.bold())
-                        Text("Activa el ejemplo ficticio para registrar atenciones y probar los consumos.")
+                        Text("Registra atenciones, administra el personal y consulta los reportes.")
                             .font(.subheadline).foregroundStyle(.secondary)
                         if loading || preparing {ProgressView("Preparando datos protegidos…")}
                         if !problem.isEmpty {Text(problem).font(.footnote).foregroundStyle(.orange)}
                         Button {Task {await startPractice()}} label: {
-                            Label("Empezar con datos ficticios",systemImage:"play.fill")
+                            Label("Comenzar",systemImage:"play.fill")
                         }.buttonStyle(DanperPrimaryButton()).disabled(loading || preparing)
                     }.padding(18).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
                 }
@@ -241,18 +241,18 @@ struct NativeRootView:View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
             DanperPanel {
-                Label(isReady ? "Pruebas ficticias habilitadas" :
+                Label(isReady ? "Herramientas disponibles" :
                     "Inicia la práctica desde Inicio",systemImage:"info.circle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
             if isReady {
-                DanperPanel("Inventario y reportes de prueba") {
+                DanperPanel("Inventario y reportes") {
                     DanperToolLink(title:"Inventario y lotes",symbol:"shippingbox") {N2NativeInventoryView()}
                     DanperToolLink(title:"Conciliación de inventario",symbol:"checkmark.shield") {N2ReconciliationView()}
                     DanperToolLink(title:"Kardex de enfermería",symbol:"tablecells") {N2VerifiedNursingExportView()}
                     DanperToolLink(title:"Indicador ambulatorio · Excel",symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
-                    DanperToolLink(title:"Respaldar datos ficticios cifrados",symbol:"lock.doc") {N2NativeBackupExportView()}
+                    DanperToolLink(title:"Respaldo cifrado",symbol:"lock.doc") {N2NativeBackupExportView()}
                 }
             }
             DanperPanel("Datos reales · no se mezclan con las pruebas") {
