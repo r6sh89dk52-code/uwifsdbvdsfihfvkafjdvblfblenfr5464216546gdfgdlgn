@@ -37,6 +37,9 @@ struct N2NativeWorkerEditorView:View {
     @State private var savedDNI=""
     @State private var status=""
     @State private var failed=false
+    @State private var showSaveError=false
+    @State private var validationAttempted=false
+    @State private var saveIssues=[String]()
 
     private func iso(_ date:Date)->String {
         let f=DateFormatter()
@@ -62,13 +65,16 @@ struct N2NativeWorkerEditorView:View {
         manualAgeText.isEmpty ||
         N2WorkerBirthDateEntry.manualAge(manualAgeText) != nil
     }
+    private var registrationIssues:[String] {
+        N2WorkerRegistrationGate.issues(
+            dni:dni.trimmingCharacters(in:.whitespacesAndNewlines),
+            names:names,site:site, isBirthDateKnown:hasBirthDate,
+            birthDateValid:!birthISO.isEmpty,
+            manuallyEnteredAge:manualAgeText,knownDNI:existingDNI,
+            storeAvailable:revision != nil)
+    }
     private var ready:Bool {
-        revision != nil && !busy && savedDNI.isEmpty &&
-        !existingDNI.contains(dni) && dni.count==8 && dni.hasPrefix("000000") &&
-        dni.utf8.allSatisfy{(48...57).contains($0)} &&
-        names.trimmingCharacters(in:.whitespacesAndNewlines).count>=5 &&
-        (sex.isEmpty || ["M","F"].contains(sex)) &&
-        (hasBirthDate ? !birthISO.isEmpty : ageEntryIsValid)
+        !busy && savedDNI.isEmpty && registrationIssues.isEmpty
     }
     private var areaSuggestions:[String] {
         guard areaSuggestionsVisible else{return []}
@@ -86,14 +92,42 @@ struct N2NativeWorkerEditorView:View {
                             .fixedSize(horizontal:false,vertical:true)
                     }
                 }
+                if validationAttempted && !saveIssues.isEmpty {
+                    DanperPanel("Revisa el registro") {
+                        ForEach(saveIssues,id:\.self) { message in
+                            Label(message,systemImage:"exclamationmark.circle.fill")
+                                .font(.footnote).foregroundStyle(.orange)
+                                .fixedSize(horizontal:false,vertical:true)
+                        }
+                    }
+                    .accessibilityIdentifier("worker-registration-validation")
+                }
                 DanperPanel("Identificación") {
                     DanperField(title:"DNI") {
                         TextField("Ej. 00000006",text:$dni)
                             .keyboardType(.numberPad)
                             .disabled(!savedDNI.isEmpty)
                     }
-                    Text("En esta beta utiliza un DNI de ocho cifras que comience por 000000.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    HStack(alignment:.center,spacing:8) {
+                        Text("Para esta evaluación se utilizan identificadores de prueba.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer(minLength:0)
+                        Button("Generar DNI") {
+                            if let sample=N2WorkerRegistrationGate.availableDemoDNI(excluding:existingDNI) {
+                                dni=sample
+                                saveIssues=[]
+                                failed=false
+                            } else {
+                                status="No quedan identificadores disponibles para esta evaluación."
+                                failed=true
+                                showSaveError=true
+                            }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.bordered)
+                        .tint(DanperStyle.red)
+                        .accessibilityIdentifier("generate-demo-worker-dni")
+                    }
                     if existingDNI.contains(dni) {
                         Label("Este DNI ya está registrado.",systemImage:"person.crop.circle.badge.exclamationmark")
                             .font(.footnote).foregroundStyle(.orange)
@@ -244,21 +278,44 @@ struct N2NativeWorkerEditorView:View {
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge:.bottom) {
             VStack(spacing:8) {
-                if let onSaved, !savedDNI.isEmpty {
-                    Button {onSaved(savedDNI)} label: {
-                        Label("Continuar atención",systemImage:"arrow.right.circle.fill")
-                    }.buttonStyle(DanperPrimaryButton())
+                if !savedDNI.isEmpty {
+                    if let onSaved {
+                        Button {onSaved(savedDNI)} label: {
+                            Label("Continuar atención",systemImage:"arrow.right.circle.fill")
+                        }
+                        .buttonStyle(DanperPrimaryButton())
+                        .accessibilityIdentifier("worker-continue-attention")
+                    } else {
+                        Label("Puedes consultar este trabajador desde Personal o iniciar una atención.",
+                              systemImage:"checkmark.seal.fill")
+                            .font(.footnote).foregroundStyle(.green)
+                        Button {prepareNextWorker()} label: {
+                            Label("Registrar otro trabajador",systemImage:"person.badge.plus")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                    }
                 } else {
                     Button {save()} label: {
-                        Label(busy ? "Guardando…" : "Guardar trabajador",
-                              systemImage:"person.badge.plus")
-                    }.buttonStyle(DanperPrimaryButton()).disabled(!ready)
+                        HStack {
+                            if busy {ProgressView().tint(.white)}
+                            Label(busy ? "Guardando trabajador…" : "Guardar trabajador",
+                                  systemImage:busy ? "hourglass" : "person.badge.plus")
+                        }
+                    }
+                    .buttonStyle(DanperPrimaryButton())
+                    .disabled(busy)
+                    .accessibilityIdentifier("worker-save")
                 }
             }.padding(16).background(.regularMaterial)
         }
         .navigationTitle("Nuevo trabajador")
         .danperFormChrome()
         .sensoryFeedback(.success,trigger:savedDNI) {_,_ in haptics}
+        .alert("No se pudo guardar",isPresented:$showSaveError) {
+            Button("Entendido",role:.cancel) {}
+        } message: {
+            Text(status.isEmpty ? "Revisa los datos del trabajador.":status)
+        }
         .task {await load()}
         .onChange(of:site) {previous,newValue in
             if previous != newValue {
@@ -356,10 +413,46 @@ struct N2NativeWorkerEditorView:View {
                           .map(\.area))
         existingAreas=Dictionary(uniqueKeysWithValues:unique.map{($0,$0)})
     }
+
+    @MainActor
+    private func prepareNextWorker() {
+        dni=""
+        names=""
+        area=""
+        labor=""
+        sex=""
+        hasBirthDate=false
+        birthDateText=""
+        manualAgeText=""
+        ubigeo=""
+        savedDNI=""
+        status=""
+        failed=false
+        showSaveError=false
+        validationAttempted=false
+        saveIssues=[]
+        areaSuggestionsVisible=true
+        Task {await load()}
+    }
+
     @MainActor
     private func save() {
-        guard ready,let current=revision else{return}
-        let candidate=dni
+        guard !busy,savedDNI.isEmpty else{return}
+        validationAttempted=true
+        saveIssues=registrationIssues
+        if !saveIssues.isEmpty {
+            status=saveIssues.first ?? "Comprueba los datos del registro."
+            failed=true
+            showSaveError=true
+            return
+        }
+        guard let current=revision else {
+            status="No se pudieron verificar los datos locales. Cierra el formulario y vuelve a intentarlo."
+            failed=true
+            showSaveError=true
+            return
+        }
+        let candidate=dni.trimmingCharacters(in:.whitespacesAndNewlines)
         let fields:[String:Any]=[
             "dni":candidate,
             "name":names.trimmingCharacters(in:.whitespacesAndNewlines),
@@ -374,22 +467,71 @@ struct N2NativeWorkerEditorView:View {
             "birthDate":birthISO,
             "ubigeo":ubigeo.trimmingCharacters(in:.whitespacesAndNewlines)
         ]
-        guard let bytes=try? JSONSerialization.data(withJSONObject:fields) else{return}
+        guard let bytes=try? JSONSerialization.data(withJSONObject:fields) else {
+            status="No se pudieron preparar los datos. Comprueba los campos y vuelve a intentarlo."
+            failed=true
+            showSaveError=true
+            return
+        }
         busy=true
-        Task {
+        failed=false
+        status="Guardando…"
+        Task { @MainActor in
             defer {busy=false}
             do {
-                let result=try await N2SyntheticTrialIOSVault.shared.registerWorker(
-                    bytes,at:Int64(Date().timeIntervalSince1970*1000),
-                    expectedRevision:current)
+                var expected=current
+                var stored:N2ProtectedStoreSummary?
+                do {
+                    stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
+                        bytes,at:Int64(Date().timeIntervalSince1970*1000),
+                        expectedRevision:expected)
+                } catch N2ProtectedStoreError.staleRevision {
+                    // Another tab may have saved a draft in the meantime.
+                    // Retry one time with the latest revision, without
+                    // resetting or replacing the existing encrypted data.
+                    let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                    if fresh.workers.contains(where:{$0.dni==candidate}) {
+                        throw N2SnapshotEditError.duplicateWorker
+                    }
+                    expected=fresh.revision
+                    stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
+                        bytes,at:Int64(Date().timeIntervalSince1970*1000),
+                        expectedRevision:expected)
+                }
+                guard let result=stored else {throw N2SnapshotEditError.validationFailed}
+                // Read back the persisted record before claiming success.
+                let confirmed=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                guard confirmed.workers.contains(where:{$0.dni==candidate}) else {
+                    throw N2SnapshotEditError.validationFailed
+                }
                 revision=result.revision
                 existingDNI.insert(candidate)
+                workers=confirmed.workers
+                updateAreas()
                 savedDNI=candidate
                 failed=false
-                status="Trabajador registrado correctamente."
+                saveIssues=[]
+                status="Trabajador guardado correctamente. DNI \(candidate)."
             } catch {
                 failed=true
-                status="No se pudo registrar. Comprueba el DNI y vuelve a intentarlo."
+                switch error {
+                case N2SnapshotEditError.duplicateWorker:
+                    status="Este DNI ya está registrado. Regresa a Personal para seleccionarlo."
+                    existingDNI.insert(candidate)
+                case N2SnapshotEditError.invalidWorker:
+                    status="El registro contiene datos no válidos. Verifica el DNI de prueba, la edad y la fecha de nacimiento."
+                case N2SnapshotEditError.validationFailed:
+                    status="No se pudo confirmar el guardado. Los registros anteriores se conservan."
+                case N2ProtectedStoreError.staleRevision:
+                    status="El historial cambió mientras guardabas. Vuelve a intentarlo."
+                default:
+                    status="No fue posible guardar este trabajador. Comprueba el almacenamiento y vuelve a intentarlo."
+                }
+                saveIssues=[status]
+                showSaveError=true
+                #if DEBUG
+                print("DANPER trabajador: "+String(reflecting:error))
+                #endif
             }
         }
     }
