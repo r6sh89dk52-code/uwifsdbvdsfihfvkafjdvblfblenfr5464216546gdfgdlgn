@@ -33,7 +33,7 @@ struct N2VerifiedIndicatorExportView:View {
         _endDate=State(initialValue:f.date(from:"2026-10-31")!)
     }
     #endif
-    @State private var site="LA VENTUROSA"
+    @State private var site="AMBAS"
     @State private var startDate=Date()
     @State private var endDate=Date()
     @State private var visits=[N2VisitIndexRow]()
@@ -57,7 +57,7 @@ struct N2VerifiedIndicatorExportView:View {
         let a=local(startDate),b=local(endDate)
         return visits.filter {
             $0.status=="saved" && $0.date>=a && $0.date<=b &&
-            ($0.workerSite.isEmpty || $0.workerSite==site)
+            (site=="AMBAS" || $0.workerSite.isEmpty || $0.workerSite==site)
         }
     }
     private var enabled:Bool {
@@ -71,12 +71,15 @@ struct N2VerifiedIndicatorExportView:View {
             DanperPanel("Indicador ambulatorio · 10 hojas") {
                 Label("Exportar libro de 10 hojas",systemImage:"doc.richtext")
                     .font(.subheadline.weight(.semibold))
-                Text("Elige la sede y las atenciones. El reporte oficial requiere consumos conciliados y cierre de inventario.")
+                Text("Puedes exportar Ambas sedes en un libro único. Cada atención conserva su sede; ambos cierres físicos deben estar verificados.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             DanperPanel("Seleccionar período y sede") {
-                DanperChoiceField(title:"Sede",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
-                                  labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                DanperChoiceField(title:"Ámbito del informe",selection:$site,
+                                  options:["AMBAS","LA VENTUROSA","PLVENTUROSA"],
+                                  labels:["AMBAS":"Ambas sedes (libro conjunto)",
+                                          "LA VENTUROSA":"Fundo La Venturosa",
+                                          "PLVENTUROSA":"Planta La Venturosa"])
                 DanperDateField(title:"Desde",selection:$startDate)
                 DanperDateField(title:"Hasta",selection:$endDate)
                 Text("Corte mensual sugerido: día 9 al día 8 del siguiente mes. Puedes ajustar las fechas para una revisión puntual.")
@@ -86,9 +89,15 @@ struct N2VerifiedIndicatorExportView:View {
             }
             DanperPanel("Atenciones seleccionadas") {
                 HStack {
-                    Text("\(selected.count) elegidas de \(inRange.count) en esta sede")
+                    Text("\(selected.count) elegidas de \(inRange.count) en \(site == "AMBAS" ? "ambas sedes" : "esta sede")")
                     Spacer()
                     Button("Solo confirmadas") {selectConfirmed()}
+                }
+                if site=="AMBAS" &&
+                   inRange.contains(where:{!["LA VENTUROSA","PLVENTUROSA"].contains($0.workerSite)}) {
+                    Label("Hay atenciones sin sede verificada. No se incluirán en el libro oficial hasta corregir su ubicación.",
+                          systemImage:"exclamationmark.triangle.fill")
+                        .font(.footnote).foregroundStyle(.orange)
                 }
                 if inRange.isEmpty {
                     Text("Sin atenciones en estas fechas.")
@@ -104,6 +113,9 @@ struct N2VerifiedIndicatorExportView:View {
                     )){
                         VStack(alignment:.leading,spacing:3) {
                             Text(v.workerName).font(.subheadline)
+                            Text(v.workerSite.isEmpty ? "Sede sin verificar" : v.workerSite)
+                                .font(.caption2)
+                                .foregroundStyle(v.workerSite.isEmpty ? Color.orange : Color.secondary)
                             Text(DanperDatePresentation.displayDateTime(v.date,v.time)+" · "+v.diagnosis)
                                 .font(.caption).foregroundStyle(.secondary)
                             if v.pendingPhysicalLines>0 {
@@ -217,7 +229,8 @@ struct N2VerifiedIndicatorExportView:View {
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
             let url=dir.appendingPathComponent(
-                (result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_")+local(startDate)+"_"+local(endDate)+".xlsx")
+                (result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_")+
+                (site=="AMBAS" ? "AMBAS_" : "")+local(startDate)+"_"+local(endDate)+".xlsx")
             try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
             status=(result.provisional ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. " : "")+"Generado: \(result.visits) atenciones / \(result.rows) filas. " +
                 "Materiales sin stock inicial: \(result.missingOpening); " +
@@ -239,13 +252,13 @@ struct N2VerifiedIndicatorExportView:View {
         }
         switch failure {
         case .unreviewedPeriod:
-            return "Falta registrar la revisión de cierre para esta sede y este intervalo. Hazlo desde Conciliación de inventario o genera un libro provisional."
+            return "Falta revisión de cierre del período. En el libro conjunto se requiere tanto Fundo como Planta. Revísalos por separado desde Conciliación."
         case .invalidReconciliation:
             return "Falta stock inicial o recuento final verificable, o hay un movimiento de conciliación inconsistente. Revisa Conciliación de inventario."
         case .unverifiedDelivery:
             return "Una atención seleccionada tiene un consumo sin entrega confirmada o una corrección pendiente. Desmárcala o usa un libro provisional cuando corresponda."
         case .invalidVisit:
-            return "Hay una atención con sede distinta o datos clínicos obligatorios incompletos. Comprueba las fichas elegidas."
+            return "Una atención tiene sede no verificada o datos obligatorios incompletos. Confirma la ubicación en Personal antes de exportar ambas sedes."
         case .invalidPeriod:
             return "El período de fechas no es válido. Comprueba Desde y Hasta."
         case .missingSelection:
