@@ -62,19 +62,56 @@ struct N2NativeWorkerEditorView:View {
         (sex.isEmpty || ["M","F"].contains(sex)) &&
         (!hasBirthDate || N2WorkerAge.years(birthDate:birthISO,on:today) != nil)
     }
+    // Extra search terms suggested by the operator, not verified official UO codes.
+    // They are never sent to Excel as organization codes.
+    private let commonAreaLabels=[
+        "Fitosanidad",
+        "Servicio de Salud",
+        "Departamento de Operaciones",
+        "Mantenimiento de Sistema de Riego",
+        "Producción Agrícola Palto"
+    ]
+    private func normalizeArea(_ text:String)->String {
+        text.folding(options:[.diacriticInsensitive,.caseInsensitive],
+                     locale:Locale(identifier:"es_PE"))
+            .trimmingCharacters(in:.whitespacesAndNewlines)
+            .split(whereSeparator:{$0.isWhitespace})
+            .joined(separator:" ")
+    }
+    private func areaMatches(_ candidate:String,_ needle:String)->Bool {
+        let normalized=normalizeArea(candidate)
+        return normalized.contains(needle)
+    }
+    private func areaRanking(_ candidate:String,_ needle:String)->Int {
+        let normalized=normalizeArea(candidate)
+        if normalized==needle {return 0}
+        if normalized.hasPrefix(needle) {return 1}
+        if normalized.split(separator:" ").contains(where:{$0.hasPrefix(needle)}) {return 2}
+        return 3
+    }
     private var areaSuggestions:[String] {
-        let term=area.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard term.count>=2,areaSuggestionsVisible else{return []}
-        let official=officialAreas.filter{$0.site==site}.map(\.area)
-        let candidates=Set(official+Array(existingAreas.keys))
-        let matched=candidates.filter { name in
-            name.localizedStandardContains(term) &&
-            name.localizedCaseInsensitiveCompare(area) != ComparisonResult.orderedSame
+        let needle=normalizeArea(area)
+        guard !needle.isEmpty && areaSuggestionsVisible else{return []}
+        // All official areas are searchable, regardless of the selected site.
+        // Export resolves a code only if area + selected site really match.
+        let preferred=officialAreas.filter{$0.site==site}.map(\.area)
+        let remaining=officialAreas.filter{$0.site != site}.map(\.area)
+        let combined=preferred+Array(existingAreas.keys)+remaining+commonAreaLabels
+        var unique=[String]()
+        var seen=Set<String>()
+        for candidate in combined {
+            let key=normalizeArea(candidate)
+            if !key.isEmpty && seen.insert(key).inserted {
+                unique.append(candidate)
+            }
         }
-        return Array(matched).sorted { left,right in
-            let first=left.localizedStandardCompare(right)
-            return first == ComparisonResult.orderedAscending
-        }.prefix(5).map{$0}
+        let matching=unique.filter{areaMatches($0,needle)}
+        return matching.sorted {first,second in
+            let rankA=areaRanking(first,needle)
+            let rankB=areaRanking(second,needle)
+            if rankA != rankB {return rankA<rankB}
+            return first.localizedStandardCompare(second)==.orderedAscending
+        }.prefix(8).map{$0}
     }
     var body:some View {
         DanperScrollView {
@@ -117,27 +154,38 @@ struct N2NativeWorkerEditorView:View {
                             .accessibilityIdentifier("worker-area-search")
                     }
                     if !areaSuggestions.isEmpty {
-                        VStack(spacing:0) {
-                            ForEach(areaSuggestions,id:\.self) { suggestion in
-                                Button {
-                                    area=suggestion
-                                    areaFocused=false
-                                    areaSuggestionsVisible=false
-                                } label: {
-                                    HStack {
-                                        Image(systemName:"building.2.crop.circle")
-                                            .foregroundStyle(.secondary)
-                                        Text(suggestion).foregroundStyle(.primary)
-                                        Spacer()
-                                        Image(systemName:"arrow.up.left").foregroundStyle(.secondary)
-                                    }.padding(.vertical,10)
-                                }.buttonStyle(.plain)
-                                if suggestion != areaSuggestions.last {Divider()}
-                            }
+                        ScrollView(.vertical) {
+                            LazyVStack(spacing:6) {
+                                ForEach(areaSuggestions,id:\.self) { suggestion in
+                                    Button {
+                                        area=suggestion
+                                        areaFocused=false
+                                        areaSuggestionsVisible=false
+                                    } label: {
+                                        HStack(spacing:10) {
+                                            Image(systemName:"building.2")
+                                                .foregroundStyle(.secondary)
+                                            Text(suggestion)
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                                .multilineTextAlignment(.leading)
+                                            Spacer(minLength:4)
+                                            Image(systemName:"arrow.up.left")
+                                                .foregroundStyle(.secondary)
+                                        }.padding(12)
+                                            .background(DanperStyle.canvas,
+                                                        in:RoundedRectangle(cornerRadius:12))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityIdentifier("area-option-"+normalizeArea(suggestion))
+                                }
+                            }.padding(6)
                         }
-                        .padding(.horizontal,12)
-                        .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-                        .frame(maxHeight:240)
+                        .frame(maxHeight:260)
+                        .background(DanperStyle.surface,
+                                    in:RoundedRectangle(cornerRadius:15))
+                        .overlay(RoundedRectangle(cornerRadius:15)
+                            .strokeBorder(Color.secondary.opacity(0.15)))
                         .id(areaAnchor)
                     }
                     Text("Puedes escribir un área nueva. Si no existe en el catálogo oficial, su código quedará vacío en Excel.")
