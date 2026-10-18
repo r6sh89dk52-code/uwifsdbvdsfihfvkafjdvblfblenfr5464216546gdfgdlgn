@@ -514,17 +514,22 @@ struct N2NativeWorkerEditorView:View {
                 status="Trabajador guardado correctamente. DNI \(candidate)."
             } catch {
                 failed=true
-                switch error {
-                case N2SnapshotEditError.duplicateWorker:
-                    status="Este DNI ya está registrado. Regresa a Personal para seleccionarlo."
-                    existingDNI.insert(candidate)
-                case N2SnapshotEditError.invalidWorker:
-                    status="El registro contiene datos no válidos. Verifica el DNI de prueba, la edad y la fecha de nacimiento."
-                case N2SnapshotEditError.validationFailed:
-                    status="No se pudo confirmar el guardado. Los registros anteriores se conservan."
-                case N2ProtectedStoreError.staleRevision:
+                if let failure=error as? N2SnapshotEditError {
+                    switch failure {
+                    case .duplicateWorker:
+                        status="Este DNI ya está registrado. Regresa a Personal para seleccionarlo."
+                        existingDNI.insert(candidate)
+                    case .invalidWorker:
+                        status="El registro contiene datos no válidos. Verifica el DNI de prueba, la edad y la fecha de nacimiento."
+                    case .validationFailed:
+                        status="No se pudo confirmar el guardado. Los registros anteriores se conservan."
+                    default:
+                        status="No se pudo guardar el trabajador. Revisa los datos e inténtalo nuevamente."
+                    }
+                } else if let failure=error as? N2ProtectedStoreError,
+                          failure == .staleRevision {
                     status="El historial cambió mientras guardabas. Vuelve a intentarlo."
-                default:
+                } else {
                     status="No fue posible guardar este trabajador. Comprueba el almacenamiento y vuelve a intentarlo."
                 }
                 saveIssues=[status]
