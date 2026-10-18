@@ -40,6 +40,7 @@ jobs:
           node scripts/audit-n2-workspace-routing.cjs
           node scripts/audit-n2-personal-import.cjs
           node scripts/audit-n2-build222-backup-restore.cjs
+          node scripts/audit-n2-joint-indicator.cjs
       - name: Generate synthetic fixture source only (never personal data)
         run: |
           mkdir -p "$RUNNER_TEMP/danper-b11-fixtures"
@@ -96,6 +97,7 @@ jobs:
           node scripts/audit-n2-workspace-routing.cjs
           node scripts/audit-n2-personal-import.cjs
           node scripts/audit-n2-build222-backup-restore.cjs
+          node scripts/audit-n2-joint-indicator.cjs
           node scripts/prepare-n1s-ios-demo-resources.cjs
           test "$(grep -c 'N2OfficialArea(site:' native-ios/App/N2GeneratedOfficialAreas.swift)" = 155
       - name: Generate Xcode project
