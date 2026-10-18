@@ -70,7 +70,8 @@ public enum N2SnapshotEditor {
             f.isLenient=false
             guard let parsed=f.date(from:birthday),
                   f.string(from:parsed)==birthday,
-                  N2WorkerAge.years(birthDate:birthday,on:"2100-12-31") != nil else {
+                  N2WorkerAge.years(birthDate:birthday,
+                      on:f.string(from:Date(timeIntervalSince1970:Double(at)/1000))) != nil else {
                 throw N2SnapshotEditError.invalidWorker
             }
         }
