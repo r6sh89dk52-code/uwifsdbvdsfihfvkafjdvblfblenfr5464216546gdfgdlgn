@@ -325,7 +325,13 @@ struct N2NativeWorkerEditorView:View {
             }
             updateAreas()
             areaSuggestionsVisible=true
+            revalidateAfterEdit()
         }
+        .onChange(of:dni) {_,_ in revalidateAfterEdit()}
+        .onChange(of:names) {_,_ in revalidateAfterEdit()}
+        .onChange(of:hasBirthDate) {_,_ in revalidateAfterEdit()}
+        .onChange(of:birthDateText) {_,_ in revalidateAfterEdit()}
+        .onChange(of:manualAgeText) {_,_ in revalidateAfterEdit()}
         .onChange(of:area) {_,_ in
             if areaFocused {areaSuggestionsVisible=true}
             requestAreaReveal()
@@ -412,6 +418,18 @@ struct N2NativeWorkerEditorView:View {
         let unique=Set(workers.filter{$0.site==site && !$0.area.isEmpty}
                           .map(\.area))
         existingAreas=Dictionary(uniqueKeysWithValues:unique.map{($0,$0)})
+    }
+
+    @MainActor
+    private func revalidateAfterEdit() {
+        guard validationAttempted,savedDNI.isEmpty else{return}
+        saveIssues=registrationIssues
+        if saveIssues.isEmpty {
+            failed=false
+            status=""
+        } else {
+            status=saveIssues.first ?? ""
+        }
     }
 
     @MainActor
