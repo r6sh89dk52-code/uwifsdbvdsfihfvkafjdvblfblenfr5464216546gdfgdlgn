@@ -41,6 +41,23 @@ try{
  assert.equal(synthetic.workers.length,5);
  assert(synthetic.workers.every(w=>w.name.startsWith('PERSONA FICTICIA ')&&/^0000000[1-5]$/.test(w.dni)));
  assert(synthetic.attentions.every(a=>a.worker.name.startsWith('PERSONA FICTICIA ')));
+ // Replace unnatural display placeholders only in the packaged synthetic iOS fixture.
+ // This does not mutate existing installed vaults or production/legacy backups.
+ const fictionalNames={
+  '00000001':'Mariana Torres Salazar',
+  '00000002':'Luis Paredes Rojas',
+  '00000003':'Daniela Campos Vega',
+  '00000004':'Carlos Mendoza Ruiz',
+  '00000005':'Valeria Ríos Medina'
+ };
+ for(const worker of synthetic.workers) {
+  assert(fictionalNames[worker.dni]);
+  worker.name=fictionalNames[worker.dni];
+ }
+ for(const visit of synthetic.attentions) {
+  assert(visit.worker && fictionalNames[visit.worker.dni]);
+  visit.worker.name=fictionalNames[visit.worker.dni];
+ }
  assert.equal(synthetic.stockLots.length,5);
  assert.equal(synthetic.stockMovements.length,synthetic.stockMovements.filter(m=>m.dispenseRef).length);
  // Two explicitly fictional site-scoped supplies for evaluating new visits.
