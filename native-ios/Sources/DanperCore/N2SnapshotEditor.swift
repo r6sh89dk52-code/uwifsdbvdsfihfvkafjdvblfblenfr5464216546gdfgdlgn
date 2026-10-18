@@ -62,6 +62,10 @@ public enum N2SnapshotEditor {
         for (key,value) in input where key != "dni" && key != "name" {
             guard value is String else{throw N2SnapshotEditError.invalidWorker}
         }
+        if let age=input["age"] as? String,!age.isEmpty,
+           N2WorkerBirthDateEntry.manualAge(age)==nil {
+            throw N2SnapshotEditError.invalidWorker
+        }
         if let birthday=input["birthDate"] as? String,!birthday.isEmpty {
             let f=DateFormatter()
             f.calendar=Calendar(identifier:.gregorian)
