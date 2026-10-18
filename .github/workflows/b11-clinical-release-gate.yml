@@ -1,0 +1,148 @@
+name: B11 - Clinical Parity Gate (NO IPA)
+on:
+  push:
+    branches:
+      - fix/b10-trabajadores-exportacion-ux-20261018
+    paths:
+      - 'native-ios/**'
+      - 'scripts/**'
+      - 'src/portableBackup.ts'
+      - '.github/workflows/b11-clinical-release-gate.yml'
+  pull_request:
+    paths:
+      - 'native-ios/**'
+      - 'scripts/**'
+      - 'src/portableBackup.ts'
+      - '.github/workflows/b11-clinical-release-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b11-clinical-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-swift:
+    name: Swift core and synthetic clinical regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies and inspect static clinical gates
+        run: |
+          npm ci --ignore-scripts --no-fund
+          node scripts/audit-n2-workspace-routing.cjs
+          node scripts/audit-n2-personal-import.cjs
+          node scripts/audit-n2-build222-backup-restore.cjs
+      - name: Generate synthetic fixture source only (never personal data)
+        run: |
+          mkdir -p "$RUNNER_TEMP/danper-b11-fixtures"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-b11-fixtures" >> "$GITHUB_ENV"
+          for generator in \
+            generate-native-compat-fixtures.cjs \
+            generate-n1e-clinical-fixtures.cjs \
+            generate-n1f-lossless-fixtures.cjs \
+            generate-n1h-clinical-parity.cjs \
+            generate-n1p-excel-parity.cjs \
+            generate-n1q-reconciliation-fixtures.cjs \
+            generate-n1r-stored-xlsx-template.cjs \
+            generate-n1s-official-excel-fixtures.cjs \
+            generate-n2-approved-fixture.cjs \
+            generate-n2-nursing-parity.cjs \
+            generate-n2-stock-commands-fixtures.cjs; do
+            DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node "scripts/$generator"
+          done
+          node scripts/generate-n2-procedure-parity.cjs
+      - name: Swift 6 Linux syntax of iOS views + all core XCTest suites
+        run: |
+          swift --version
+          swiftc -frontend -parse native-ios/App/*.swift
+          cd native-ios
+          swift test --jobs 2 2>&1 | tee "$RUNNER_TEMP/b11-linux-swift-test.log"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: B11_FAILED_LINUX_COMPILER_DIAGNOSTICS
+          path: ${{ runner.temp }}/b11-linux-swift-test.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  macos-swiftui:
+    name: Xcode B11 compile + backup and UI XCTest
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Xcode runtime and dependencies
+        run: |
+          xcodebuild -version
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+      - name: Check native source routing and encrypted backup compatibility
+        run: |
+          node scripts/audit-n2-workspace-routing.cjs
+          node scripts/audit-n2-personal-import.cjs
+          node scripts/audit-n2-build222-backup-restore.cjs
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          test "$(grep -c 'N2OfficialArea(site:' native-ios/App/N2GeneratedOfficialAreas.swift)" = 155
+      - name: Generate Xcode project
+        working-directory: native-ios
+        run: |
+          xcodegen generate --spec project.yml
+          xcodebuild -resolvePackageDependencies -project DANPERNative.xcodeproj -scheme DANPERNative
+      - name: Build actual SwiftUI native iPhone app for simulator (unsigned)
+        working-directory: native-ios
+        run: |
+          xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
+            CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/b11-ios-compile.log" 2>&1 || {
+              grep -nE '(error:|fatal error:|BUILD FAILED)' "$RUNNER_TEMP/b11-ios-compile.log" | tail -n 100 || true
+              exit 1
+            }
+          echo "PASS: B11 SwiftUI compiled with real Xcode type checker."
+      - name: Test native backup cipher and UI with clean simulator
+        working-directory: native-ios
+        timeout-minutes: 20
+        run: |
+          SIM="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([0-9A-F-]{36})\).*/\1/p' | head -n 1)"
+          test -n "$SIM" || { echo "No suitable iPhone simulator: NOT PASS"; exit 1; }
+          xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIM" \
+            -destination-timeout 180 -parallel-testing-enabled NO \
+            -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
+            CODE_SIGNING_ALLOWED=NO test > "$RUNNER_TEMP/b11-ios-tests.log" 2>&1 || {
+              grep -nE '(error:|failed|FAIL|Testing failed)' "$RUNNER_TEMP/b11-ios-tests.log" | tail -n 120 || true
+              exit 1
+            }
+          grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/b11-ios-tests.log"
+      - name: Reassert zero release artifacts and existing build222 isolation
+        run: |
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview' native-ios/project.yml
+          test ! -d native-preview-artifacts
+          test ! -d native-ios/outputs
+          echo "PASS: B11 compile and simulator tests only, no IPA, no production overwrite."
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B11_MACOS_XCODE_DIAGNOSTICS_ONLY
+          path: |
+            ${{ runner.temp }}/b11-ios-compile.log
+            ${{ runner.temp }}/b11-ios-tests.log
+          retention-days: 7
+          if-no-files-found: warn
