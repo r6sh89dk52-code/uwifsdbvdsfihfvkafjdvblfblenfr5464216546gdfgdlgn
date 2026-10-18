@@ -27,7 +27,7 @@ for(const item of views) {
         item+' must never bind directly to the CLINICAL vault');
  assert(source.includes('@Environment(\\.n2WorkspaceVault) private var vault'),
         item+' must declare the fixed source environment');
- assert(/\bawait vault\./.test(source),
+ assert(/\bawait\s+vault\s*\./.test(source),
         item+' must use a source-bound router');
 }
 const router=fs.readFileSync(path.join(app,'N2WorkspaceVault.swift'),'utf8');
