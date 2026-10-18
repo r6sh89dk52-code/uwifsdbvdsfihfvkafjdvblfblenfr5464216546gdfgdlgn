@@ -222,8 +222,7 @@ struct N2NativePersonalImportView:View {
             }
         } catch {
             failed=true
-            message="No se pudo interpretar PERSONAL: "+description(error)+
-                ". La bóveda clínica se mantiene intacta."
+            message="No se pudo interpretar PERSONAL: \(description(error)). La bóveda clínica se mantiene intacta."
         }
     }
 
@@ -240,8 +239,7 @@ struct N2NativePersonalImportView:View {
         } catch {
             comparison=nil
             failed=true
-            message="Conflicto con trabajadores existentes o fuente no disponible. "+
-                "Verifica nombres, sexo y sede; no se modificó ningún registro."
+            message="Conflicto con trabajadores existentes o fuente no disponible. Verifica nombres, sexo y sede; no se modificó ningún registro."
         }
     }
 
@@ -269,13 +267,11 @@ struct N2NativePersonalImportView:View {
             failed=false
             self.preview=nil
             comparison=nil
-            message="Padrón PERSONAL guardado en la bóveda clínica. "+
-                "Trabajadores registrados: \(after.workers)."
+            message="Padrón PERSONAL guardado en la bóveda clínica. Trabajadores registrados: \(after.workers)."
         } catch {
             imported=false
             failed=true
-            message="No se pudo confirmar PERSONAL: "+description(error)+
-                ". Se conservó la fuente previa. Revisa de nuevo antes de importar."
+            message="No se pudo confirmar PERSONAL: \(description(error)). Se conservó la fuente previa. Revisa de nuevo antes de importar."
         }
     }
 
