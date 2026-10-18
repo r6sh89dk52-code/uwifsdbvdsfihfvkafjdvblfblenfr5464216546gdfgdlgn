@@ -41,7 +41,7 @@ struct N2NativePersonalImportView:View {
                     Label(authenticated ? "Identidad comprobada" :
                           "Acceso restringido",
                           systemImage:authenticated ? "checkmark.shield" : "lock.shield")
-                        .foregroundStyle(authenticated ? .green : .secondary)
+                        .foregroundStyle(authenticated ? Color.green : Color.secondary)
                     Button {
                         Task {await authenticate()}
                     } label: {
@@ -164,8 +164,10 @@ struct N2NativePersonalImportView:View {
             failed=false
             if preview != nil {Task {await review()}}
         }
+        .opacity(scenePhase == .active ? 1 : 0)
+        .accessibilityHidden(scenePhase != .active)
         .onChange(of:scenePhase) {_,phase in
-            if phase != .active {
+            if phase == .background {
                 authenticated=false
                 preview=nil
                 comparison=nil
