@@ -91,7 +91,7 @@ final class N2NursingParityTests:XCTestCase {
             date:"2026-02-30",shift:"CONSOLIDADO",
             responsible:"OPERADOR FICTICIO"))
     }
-    func testRangeCannotMasqueradeAsOfficialSingleDayWorkbook() throws {
+    func testRangeIsAlwaysLabeledAsConsolidatedPeriod() throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (_,catalog)=try fixture()
         let period=try N2NursingReportBuilder.range(
@@ -99,9 +99,37 @@ final class N2NursingParityTests:XCTestCase {
             start:"2026-10-14",end:"2026-10-15")
         XCTAssertEqual(period.periodEnd,"2026-10-15")
         XCTAssertThrowsError(try period.manifest(
-            shift:"CONSOLIDADO",responsible:"OPERADOR FICTICIO")) {
+            shift:"MAÑANA",responsible:"OPERADOR FICTICIO")) {
             XCTAssertEqual($0 as? N2NursingReportError,.unsupportedRange)
         }
+        if period.exportable {
+            let manifest=try period.manifest(shift:"CONSOLIDADO",
+                                             responsible:"OPERADOR FICTICIO")
+            let obj=try XCTUnwrap(JSONSerialization.jsonObject(with:manifest) as? [String:Any])
+            XCTAssertEqual(obj["date"] as? String,"2026-10-14")
+            XCTAssertEqual(obj["periodEnd"] as? String,"2026-10-15")
+        } else {
+            XCTAssertThrowsError(try period.manifest(
+                shift:"CONSOLIDADO",responsible:"OPERADOR FICTICIO")) {
+                XCTAssertEqual($0 as? N2NursingReportError,.incompleteHistory)
+            }
+        }
+    }
+    func testAuditedRangeWritesConsolidatedDatesInNursingWorkbook()throws {
+        let source=try bytes("n1e-clinical-stock.json")
+        let (_,catalog)=try fixture()
+        let template=try bytes("n1s-nursing-template-store.zip")
+        let result=try N2VerifiedNursingWorkbook.exportRange(
+            snapshot:source,catalog:catalog,template:template,
+            start:"2026-10-14",end:"2026-10-14",
+            responsible:"OPERADOR FICTICIO")
+        XCTAssertEqual(result.stockKnownRows,2)
+        XCTAssertEqual(result.stockUnknownRows,96)
+        let entries=try N1rStoredZip.unpack(result.xlsx)
+        let sheet=try XCTUnwrap(entries.first(where:{$0.name=="xl/worksheets/sheet2.xml"}))
+        let xml=try XCTUnwrap(String(data:sheet.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("PERÍODO CONSOLIDADO"))
+        XCTAssertTrue(xml.contains("14/10/2026"))
     }
     func testInvalidPeriodsOrUnknownPhysicalCountsFailClosed()throws {
         let source=try bytes("n1e-clinical-stock.json")
