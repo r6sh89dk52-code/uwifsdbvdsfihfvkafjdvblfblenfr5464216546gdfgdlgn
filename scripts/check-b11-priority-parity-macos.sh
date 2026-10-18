@@ -11,6 +11,7 @@ for cmd in node xcodegen xcodebuild; do
     exit 1
   fi
 done
+node scripts/audit-n2-workspace-routing.cjs
 node scripts/prepare-n1s-ios-demo-resources.cjs
 COUNT="$(grep -c 'N2OfficialArea(site:' native-ios/App/N2GeneratedOfficialAreas.swift || true)"
 if [ "$COUNT" != "155" ]; then
@@ -33,8 +34,9 @@ xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
 CODE=$?
 set -e
 if [ "$CODE" -ne 0 ]; then
-  echo "ERROR: la compilación falló. Últimas 100 líneas:" >&2
-  tail -n 100 "$LOG" >&2
+  echo "ERROR: compilación fallida. Diagnósticos Swift/Xcode:" >&2
+  grep -n -E 'error:|fatal error:|BUILD FAILED' "$LOG" | tail -n 45 >&2 || true
+  echo "Log completo: $LOG" >&2
   exit "$CODE"
 fi
 echo "PASS: compilación Debug de B11 para iOS Simulator."
