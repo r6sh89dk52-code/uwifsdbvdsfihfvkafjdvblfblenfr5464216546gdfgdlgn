@@ -127,8 +127,15 @@ public enum N2PersonalWorkbookReader {
                             row += Array(repeating:"",count:col+1-row.count)
                         }
                         if hasFormula {
-                            // Never use possibly stale cached formulas for identity.
-                            row[col]=""
+                            // Excel may cache numeric EDAD AUTOMATIZADA as a
+                            // formula result. Preserve a tagged numeric result
+                            // ONLY for the optional age field. Never accept a
+                            // formula-derived DNI, name, sex, area or site.
+                            let numeric=cellValue.trimmingCharacters(in:.whitespaces)
+                            row[col]=(cellType.isEmpty || cellType=="n") &&
+                                !numeric.isEmpty &&
+                                numeric.utf8.allSatisfy({(48...57).contains($0)})
+                                ? N2PersonalWorkbookReader.ageFormulaPrefix+numeric : ""
                         } else if cellType=="s",let index=Int(cellValue),
                                   shared.indices.contains(index) {
                             row[col]=shared[index]
@@ -188,6 +195,8 @@ public enum N2PersonalWorkbookReader {
         }
         return result
     }
+    private static let ageFormulaPrefix="__N2_CACHED_AGE_FORMULA__"
+
     private static func cleaned(_ text:String)->String {
         String(text.trimmingCharacters(in:.whitespacesAndNewlines)
                 .split(whereSeparator:{$0.isWhitespace}).joined(separator:" ").prefix(220))
@@ -196,8 +205,15 @@ public enum N2PersonalWorkbookReader {
         cleaned(text).folding(options:[.diacriticInsensitive,.caseInsensitive],
                               locale:Locale(identifier:"es_PE")).uppercased()
     }
-    private static func cell(_ row:[String],_ col:Int)->String {
-        col>=0 && col<row.count ? cleaned(row[col]) : ""
+    private static func cell(_ row:[String],_ col:Int,
+                             allowCachedFormula:Bool=false)->String {
+        guard col>=0,col<row.count else{return ""}
+        let raw=row[col]
+        if raw.hasPrefix(ageFormulaPrefix) {
+            guard allowCachedFormula else{return ""}
+            return cleaned(String(raw.dropFirst(ageFormulaPrefix.count)))
+        }
+        return cleaned(raw)
     }
     private static func compile(_ rows:[[String]])throws->N2PersonalImportPreview {
         guard let headings=rows.first else {throw N2PersonalImportError.invalidHeaders}
@@ -231,7 +247,9 @@ public enum N2PersonalWorkbookReader {
             let normalizedSex=["M","F"].contains(gender) ? gender : ""
             if gender.isEmpty {stats.sexMissing+=1}
             else if normalizedSex.isEmpty {stats.sexInvalid+=1}
-            let candidateAge=cell(row,manual).isEmpty ? cell(row,auto) : cell(row,manual)
+            let candidateAge=cell(row,manual,allowCachedFormula:true).isEmpty
+                ? cell(row,auto,allowCachedFormula:true)
+                : cell(row,manual,allowCachedFormula:true)
             let validAge=Int(candidateAge).map{(0...120).contains($0)} ?? false
             let age=validAge && candidateAge.utf8.allSatisfy({(48...57).contains($0)})
                 ? candidateAge : ""
