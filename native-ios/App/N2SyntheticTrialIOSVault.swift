@@ -119,7 +119,7 @@ actor N2SyntheticTrialIOSVault {
               let dni=obj["dni"] as? String,
               let name=obj["name"] as? String,
               dni.count==8,dni.hasPrefix("000000"),
-              name.uppercased().hasPrefix("PERSONA FICTICIA ") else {
+              name.trimmingCharacters(in:.whitespacesAndNewlines).count>=5 else {
             throw Failure.blockedMigration
         }
         return try protectedStore().registerWorker(worker,at:at,expectedRevision:expectedRevision)
