@@ -102,8 +102,8 @@ public enum N2PersonalRosterImport {
                 throw N2PersonalImportError.needsReview
             }
             var result=previous
-            let manuallyCorrected=(previous["localCorrectionAt"] as? NSNumber)?
-                .int64Value ?? 0 > 0
+            let manuallyCorrected=((previous["localCorrectionAt"] as? NSNumber)?
+                .int64Value ?? 0)>0
             if manuallyCorrected{preserved+=1}
             result["rosterStatus"]="official"
             result["source"]=manuallyCorrected ? "manual" : "imported"
@@ -114,7 +114,11 @@ public enum N2PersonalRosterImport {
                     old : (candidate.isEmpty ? old : candidate)
             }
             if existingSex.isEmpty{result["sex"]=source.sex}
-            if result != previous {
+            let previousBytes=try JSONSerialization.data(
+                withJSONObject:previous,options:[.sortedKeys])
+            let currentBytes=try JSONSerialization.data(
+                withJSONObject:result,options:[.sortedKeys])
+            if currentBytes != previousBytes {
                 people[i]=result
                 updated+=1
             } else {unchanged+=1}
