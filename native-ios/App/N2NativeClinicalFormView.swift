@@ -255,8 +255,7 @@ struct N2NativeClinicalFormView:View {
                         allergyConfirmationProduct=nil
                     }
                 } message: {
-                    Text("Posible coincidencia con alergia declarada: "+allergyMatches.joined(separator:", ")+
-                         ". Esta alerta usa solo texto; no verifica principios activos ni reacciones cruzadas. Comprueba la indicación antes de cualquier administración.")
+                    Text("Posible coincidencia con alergia declarada: \(allergyMatches.joined(separator: ", ")). Esta alerta usa solo texto; no verifica principios activos ni reacciones cruzadas. Comprueba la indicación antes de cualquier administración.")
                 }
                 .alert("Trabajador no registrado",isPresented:$showMissingWorker) {
                     Button("Registrar trabajador") {
@@ -563,12 +562,7 @@ struct N2NativeClinicalFormView:View {
                 DanperInlineSearch(title:"Buscar medicamento o insumo",placeholder:"Ej. Paracetamol",
                     options:context.products.clinical.map{DanperSearchOption(id:$0.code,title:$0.name,detail:$0.unit+" · Código "+$0.code)},
                     onSelect:{code in
-                        let name=medicationName(code,context)
-                        let documented=context.allergies[form.dni]
-                        let current=allergyStatus=="known" ? allergySubstances : ""
-                        let prior=documented?.status=="known" ? documented?.substances ?? "" : ""
-                        let matches=N2MedicationAllergyTextMatch.matches(
-                            productName:name,substances:current+";"+prior)
+                        let matches=allergyTextMatches(code,context:context)
                         if matches.isEmpty {
                             appendClinicalMedication(code)
                         } else {
@@ -654,6 +648,14 @@ struct N2NativeClinicalFormView:View {
     private func medicationName(_ code:String,_ context:N2FormContext)->String {
         context.products.clinical.first(where:{$0.code==code})?.name ?? code
     }
+    private func allergyTextMatches(_ code:String,context:N2FormContext)->[String] {
+        let current=allergyStatus=="known" ? allergySubstances : ""
+        let record=context.allergies[form.dni]
+        let documented=record?.status=="known" ? (record?.substances ?? "") : ""
+        return N2MedicationAllergyTextMatch.matches(
+            productName:medicationName(code,context),
+            substances:current + ";" + documented)
+    }
     @ViewBuilder
     private func medicationFields(_ context:N2FormContext)->some View {
         ForEach($form.items) { $med in
@@ -668,11 +670,7 @@ struct N2NativeClinicalFormView:View {
                             Text(medicationName(med.code,context)).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
                             Text("Cantidad \(med.quantity) · \(med.procedure.isEmpty ? "Procedimiento pendiente" : med.procedure.capitalized)")
                                 .font(.caption).foregroundStyle(.secondary)
-                            if !N2MedicationAllergyTextMatch.matches(
-                                  productName:medicationName(med.code,context),
-                                  substances:(allergyStatus=="known" ? allergySubstances : "")+
-                                     ";"+(context.allergies[form.dni]?.status=="known" ?
-                                          context.allergies[form.dni]?.substances ?? "" : "")).isEmpty {
+                            if !allergyTextMatches(med.code,context:context).isEmpty {
                                 Label("Revisar posible coincidencia de alergia",systemImage:"exclamationmark.triangle.fill")
                                     .font(.caption).foregroundStyle(.orange)
                             }
