@@ -20,13 +20,15 @@ fi
 cd native-ios
 xcodegen generate --spec project.yml
 xcodebuild -resolvePackageDependencies -project DANPERNative.xcodeproj -scheme DANPERNative
-LOG="$ROOT/DANPER_B11_SIMULATOR_BUILD.log"
+BUILD_OUTPUT="${DANPER_B11_BUILD_OUTPUT:-$HOME/Downloads/DANPER_B11_SIM_BUILDS}"
+mkdir -p "$BUILD_OUTPUT"
+LOG="$BUILD_OUTPUT/DANPER_B11_SIMULATOR_BUILD.log"
 echo "Compilando iOS Simulator · log: $LOG"
 set +e
 xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
   -configuration Debug -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath "$ROOT/.build-b11-simulator" \
+  -derivedDataPath "$BUILD_OUTPUT/DerivedData" \
   CODE_SIGNING_ALLOWED=NO build >"$LOG" 2>&1
 CODE=$?
 set -e
