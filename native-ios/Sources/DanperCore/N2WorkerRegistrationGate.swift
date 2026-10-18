@@ -39,7 +39,7 @@ public enum N2WorkerRegistrationGate {
     }
 
     public static func availableDemoDNI(excluding existing:Set<String>)->String? {
-        for number in 0...99 {
+        for number in Array(6...99)+Array(0...5) {
             let candidate=String(format:"%08d",number)
             if !existing.contains(candidate) {return candidate}
         }
