@@ -157,15 +157,16 @@ public enum N2PersonalWorkbookReader {
         }
         func parse(_ data:Data)throws {
             guard !data.isEmpty,
-                !data.contains(Data("<!DOCTYPE".utf8)),
-                !data.contains(Data("<!ENTITY".utf8)) else {
+                let xml=String(data:data,encoding:.utf8),
+                xml.range(of:"<!DOCTYPE",options:.caseInsensitive)==nil,
+                xml.range(of:"<!ENTITY",options:.caseInsensitive)==nil else {
                 throw N2PersonalImportError.invalidXML
             }
             let parser=XMLParser(data:data)
             parser.delegate=self
             parser.shouldResolveExternalEntities=false
             guard parser.parse() else{throw N2PersonalImportError.invalidXML}
-            if mode == .worksheet && rows.count>31_000 {
+            if case .worksheet = mode,rows.count>31_000 {
                 throw N2PersonalImportError.tooLarge
             }
         }
@@ -177,7 +178,7 @@ public enum N2PersonalWorkbookReader {
             if optional {return Data()}
             throw N2PersonalImportError.invalidFile
         }
-        guard entry.type == .file,entry.uncompressedSize<=Int64(max) else {
+        guard entry.type == .file,entry.uncompressedSize<=UInt64(max) else {
             throw N2PersonalImportError.tooLarge
         }
         var result=Data()
