@@ -15,7 +15,8 @@ let package = Package(
                 dependencies: [.product(name: "Crypto", package: "swift-crypto"),
                                .product(name: "ZIPFoundation", package: "ZIPFoundation")],
                 path: "Sources/DanperCore"),
-        .testTarget(name: "DanperCoreTests", dependencies: ["DanperCore", .product(name: "Crypto", package: "swift-crypto")],
+        .testTarget(name: "DanperCoreTests", dependencies: ["DanperCore", .product(name: "Crypto", package: "swift-crypto"),
+                                                            .product(name: "ZIPFoundation", package: "ZIPFoundation")],
                     path: "Tests/DanperCoreTests")
     ]
 )
