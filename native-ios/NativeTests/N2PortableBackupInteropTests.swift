@@ -118,6 +118,10 @@ final class N2PortableBackupInteropTests:XCTestCase {
         try sealed.write(to:file,options:.atomic)
         defer {try? FileManager.default.removeItem(at:file)}
         let review=try PortableBackupInspector.review(url:file,password:pass)
+        let originalAudit=try N1lRealSnapshotGate.audit(
+            raw,destination:.verifiedEmpty)
+        XCTAssertEqual(review.audit.semanticSHA256,originalAudit.semanticSHA256,
+                       "El árbol completo debe conservar todos los campos y consumos")
         XCTAssertEqual(review.audit.manifest.workers,original.workers)
         XCTAssertEqual(review.audit.manifest.attentions,original.attentions)
         XCTAssertEqual(review.audit.manifest.movements,original.physicalMovements)
