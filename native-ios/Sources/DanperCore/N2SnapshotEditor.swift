@@ -122,6 +122,10 @@ public enum N2SnapshotEditor {
             throw N2SnapshotEditError.missingWorker
         }
         let previous=people[index]
+        if previous["rosterStatus"] as? String == "official",
+           name != (previous["name"] as? String ?? "") {
+            throw N2SnapshotEditError.invalidWorker
+        }
         var changes=[[String:String]]()
         for key in ["name","area","labor","sex","age","birthDate","ubigeo","site"] {
             let before=previous[key] as? String ?? ""
@@ -131,8 +135,8 @@ public enum N2SnapshotEditor {
             }
         }
         if changes.isEmpty{return snapshot}
-        guard var history=root["nativeWorkerCorrections"] as? [[String:Any]] ?? [],
-              history.count<10000 else{throw N2SnapshotEditError.validationFailed}
+        var history=root["nativeWorkerCorrections"] as? [[String:Any]] ?? []
+        guard history.count<10000 else{throw N2SnapshotEditError.validationFailed}
         var updated=previous
         for key in ["name","area","labor","sex","age","birthDate","ubigeo","site"] {
             updated[key]=incoming[key] as? String ?? ""
