@@ -14,6 +14,7 @@ struct N2NativeWorkerEditorView:View {
     @State private var existingDNI=Set<String>()
     @State private var existingAreas=[String:String]()
     @State private var officialAreas=[N2OfficialArea]()
+    @State private var areaCatalogIncomplete=false
     @State private var dni=""
     @State private var names=""
     @State private var area=""
@@ -101,6 +102,17 @@ struct N2NativeWorkerEditorView:View {
                             .textInputAutocapitalization(.words)
                             .focused($areaFocused)
                             .accessibilityIdentifier("worker-area-search")
+                    }
+                    if areaCatalogIncomplete {
+                        Label("No se cargó el catálogo completo de áreas. Puedes escribir el área manualmente.",
+                              systemImage:"exclamationmark.triangle")
+                            .font(.footnote).foregroundStyle(.orange)
+                    } else {
+                        let total=N2AreaAutocomplete.officialCount(site:site,official:officialAreas)
+                        if total>0 {
+                            Text("\(total) áreas oficiales disponibles para \(site=="PLVENTUROSA" ? "Planta La Venturosa" : "Fundo La Venturosa"). Toca el campo para explorar o escribe para filtrar.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     if !areaSuggestions.isEmpty {
                         ScrollView(.vertical) {
@@ -207,8 +219,13 @@ struct N2NativeWorkerEditorView:View {
         if let url=Bundle.main.url(forResource:"n2-organization-areas",
                                    withExtension:"json",subdirectory:"N1sDemoResources"),
            let data=try? Data(contentsOf:url),
-           let list=try? JSONDecoder().decode([N2OfficialArea].self,from:data) {
+           let list=try? JSONDecoder().decode([N2OfficialArea].self,from:data),
+           N2AreaAutocomplete.isComplete(official:list) {
             officialAreas=list
+            areaCatalogIncomplete=false
+        } else {
+            officialAreas=[]
+            areaCatalogIncomplete=true
         }
         do {
             if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
