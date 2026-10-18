@@ -36,6 +36,29 @@ final class N2NativeWorkerLookupTests:XCTestCase {
         XCTAssertEqual(N2NativeWorkerLookup.nameMatches("a",in:roster,limit:5).count,0)
         XCTAssertEqual(N2NativeWorkerLookup.nameMatches("ar",in:roster,limit:1).count,1)
     }
+    func testPersistenceOfOrdinaryDNIWithoutDemoPrefix() throws {
+        let dir=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
+        let data=try Data(contentsOf:URL(fileURLWithPath:dir)
+            .appendingPathComponent("n1e-clinical-stock.json"))
+        let worker:[String:String]=[
+            "dni":"41728463","name":"Mariana Torres Salazar",
+            "area":"Empaque","labor":"Empacador",
+            "site":"PLVENTUROSA","sex":"F","age":"27",
+            "birthDate":"","ubigeo":"130101"
+        ]
+        let after=try N2SnapshotEditor.addWorker(
+            snapshot:data,worker:JSONSerialization.data(withJSONObject:worker),
+            at:1792278000000)
+        let root=try XCTUnwrap(JSONSerialization.jsonObject(with:after) as? [String:Any])
+        let roster=try XCTUnwrap(root["workers"] as? [[String:Any]])
+        XCTAssertTrue(roster.contains(where:{$0["dni"] as? String=="41728463"}))
+        XCTAssertThrowsError(try N2SnapshotEditor.addWorker(
+            snapshot:after,worker:JSONSerialization.data(withJSONObject:worker),
+            at:1792278000000))
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(after).physicalMovements,
+                       try N1eLegacyClinicalAudit.inspect(data).physicalMovements)
+    }
+
     func testGateAllowsOrdinaryEightDigitDNIAndRejectsDuplicates() {
         func messages(_ dni:String,known:Set<String>=[])->[String] {
             N2WorkerRegistrationGate.issues(dni:dni,names:"Mariana Torres Salazar",
