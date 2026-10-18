@@ -2,6 +2,12 @@ import Foundation
 import SwiftUI
 import DanperCore
 
+private struct N2OfficialAreaOption:Decodable {
+    let site:String
+    let area:String
+    let code:String
+}
+
 /// Manual worker registration into the isolated clinical store.
 /// If entered from an attention, the completed person returns to that encounter.
 struct N2NativeWorkerEditorView:View {
@@ -13,6 +19,7 @@ struct N2NativeWorkerEditorView:View {
     @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var existingDNI=Set<String>()
     @State private var existingAreas=[String:String]()
+    @State private var officialAreas=[N2OfficialAreaOption]()
     @State private var dni=""
     @State private var names=""
     @State private var area=""
@@ -53,9 +60,15 @@ struct N2NativeWorkerEditorView:View {
     private var areaSuggestions:[String] {
         let term=area.trimmingCharacters(in:.whitespacesAndNewlines)
         guard term.count>=2 else{return []}
-        return existingAreas.keys
-            .filter{$0.localizedStandardContains(term) && $0.localizedCaseInsensitiveCompare(area) != .orderedSame}
-            .sorted{$0.localizedStandardCompare($1)==.orderedAscending}
+        let official=officialAreas.filter{$0.site==site}.map(\.area)
+        return Set(official+Array(existingAreas.keys))
+            .filter{$0.localizedStandardContains(term) &&
+                    $0.localizedCaseInsensitiveCompare(area) != .orderedSame}
+            .sorted {left,right in
+                let a=left.localizedStandardHasPrefix(term)
+                let b=right.localizedStandardHasPrefix(term)
+                return a == b ? left.localizedStandardCompare(right)==.orderedAscending : a
+            }
             .prefix(5).map{$0}
     }
     var body:some View {
@@ -169,6 +182,12 @@ struct N2NativeWorkerEditorView:View {
     }
     @MainActor
     private func load() async {
+        if let url=Bundle.main.url(forResource:"n2-organization-areas",
+                                   withExtension:"json",subdirectory:"N1sDemoResources"),
+           let data=try? Data(contentsOf:url),
+           let list=try? JSONDecoder().decode([N2OfficialAreaOption].self,from:data) {
+            officialAreas=list
+        }
         do {
             if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
                 revision=vault.revision
