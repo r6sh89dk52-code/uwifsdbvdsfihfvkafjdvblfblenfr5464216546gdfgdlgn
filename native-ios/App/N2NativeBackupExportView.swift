@@ -131,7 +131,8 @@ struct N2NativeBackupExportView:View {
                 .exportPortableEncryptedBackup(password:password)
             clearTemporary()
             let folder=FileManager.default.temporaryDirectory
-                .appendingPathComponent("danper-n2-encrypted-share-"+UUID().uuidString,
+                .appendingPathComponent((vault.isClinical ? "danper-n2-clinical-encrypted-share-" :
+                                           "danper-n2-demo-encrypted-share-")+UUID().uuidString,
                                         isDirectory:true)
             try FileManager.default.createDirectory(at:folder,
                 withIntermediateDirectories:true,
