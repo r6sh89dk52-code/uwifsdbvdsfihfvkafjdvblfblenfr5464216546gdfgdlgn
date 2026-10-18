@@ -10,7 +10,7 @@ public enum N2SnapshotEditError: Error, Equatable {
 }
 public enum N2SnapshotEditor {
     private static let allowedWorkerFields:Set<String> = [
-        "dni","name","area","labor","sex","age","ubigeo","site","source"
+        "dni","name","area","labor","sex","age","birthDate","ubigeo","site","source"
     ]
     private static let allowedDraftFields:Set<String> = [
         "worker","date","time","category","system","segment","diagnosis",
@@ -61,6 +61,18 @@ public enum N2SnapshotEditor {
         }
         for (key,value) in input where key != "dni" && key != "name" {
             guard value is String else{throw N2SnapshotEditError.invalidWorker}
+        }
+        if let birthday=input["birthDate"] as? String,!birthday.isEmpty {
+            let f=DateFormatter()
+            f.calendar=Calendar(identifier:.gregorian)
+            f.timeZone=TimeZone(secondsFromGMT:0)!
+            f.dateFormat="yyyy-MM-dd"
+            f.isLenient=false
+            guard let parsed=f.date(from:birthday),
+                  f.string(from:parsed)==birthday,
+                  N2WorkerAge.years(birthDate:birthday,on:"2100-12-31") != nil else {
+                throw N2SnapshotEditError.invalidWorker
+            }
         }
         // Identity comes from the local operator, never an inferred import.
         var final=input
