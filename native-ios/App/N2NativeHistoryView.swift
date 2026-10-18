@@ -71,7 +71,7 @@ struct N2NativeHistoryView: View {
                                "Abriendo historial nativo",
                     systemImage:"lock.doc",
                     description:Text(useProtectedVault ?
-                        "Activa el modo de prueba desde Inicio para consultar el historial." :
+                        "No hay un historial verificado disponible para esta bóveda." :
                         "Verificación de registros ficticios."))
             }
         }
