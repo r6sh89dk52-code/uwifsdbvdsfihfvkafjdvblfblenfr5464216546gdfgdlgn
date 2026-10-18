@@ -3,6 +3,7 @@ import DanperCore
 
 /// First-class encrypted N2 draft tab, never uses N1g demo drafts.
 struct N2NativeDraftsDashboard:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     @State private var records=[N2RecoverableDraft]()
     @State private var loading=true
     @State private var failed=false
@@ -60,7 +61,7 @@ struct N2NativeDraftsDashboard:View {
         loading=true
         defer {loading=false}
         do {
-            records=try await N2SyntheticTrialIOSVault.shared.readDrafts()
+            records=try await vault.readDrafts()
             failed=false
             message="Borradores recuperables: \(records.count). Desliza para actualizar."
         }catch{
