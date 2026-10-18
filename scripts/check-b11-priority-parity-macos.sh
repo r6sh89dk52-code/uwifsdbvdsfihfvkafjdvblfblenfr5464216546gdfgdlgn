@@ -13,6 +13,7 @@ for cmd in node xcodegen xcodebuild; do
 done
 node scripts/audit-n2-workspace-routing.cjs
 node scripts/audit-n2-personal-import.cjs
+node scripts/audit-n2-build222-backup-restore.cjs
 node scripts/prepare-n1s-ios-demo-resources.cjs
 COUNT="$(grep -c 'N2OfficialArea(site:' native-ios/App/N2GeneratedOfficialAreas.swift || true)"
 if [ "$COUNT" != "155" ]; then
