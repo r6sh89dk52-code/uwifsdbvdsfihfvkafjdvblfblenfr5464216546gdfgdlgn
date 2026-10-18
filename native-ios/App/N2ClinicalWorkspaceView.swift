@@ -232,6 +232,8 @@ private struct N2ClinicalWorkspaceRootView:View {
                             Text("No se permite mezclar ni importar archivos de la demostración.")
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
+                        DanperToolLink(title:"Importar / conciliar PERSONAL",
+                                       symbol:"person.crop.rectangle.stack") {N2NativePersonalImportView()}
                         DanperToolLink(title:"Inventario y lotes",
                                        symbol:"shippingbox") {N2NativeInventoryView()}
                         DanperToolLink(title:"Conciliación de inventario",
