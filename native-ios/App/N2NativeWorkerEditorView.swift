@@ -227,9 +227,15 @@ struct N2NativeWorkerEditorView:View {
     }
     @MainActor
     private func load() async {
-        // The official directory is generated twice from the same XLSX:
-        // as a root App JSON resource and inside N1sDemoResources.
-        // Try both to tolerate XcodeGen folder-resource packaging differences.
+        // The official catalog is also compiled into the Swift app target,
+        // so Xcode resource folder-reference behavior cannot hide it.
+        let compiled=N2GeneratedOfficialAreas.entries
+        if N2AreaAutocomplete.isComplete(official:compiled) {
+            officialAreas=compiled
+            areaCatalogIncomplete=false
+            areaCatalogDiagnostics=""
+        } else {
+        // Retain the legacy JSON resource locations only as a fallback.
         let locations:[URL?]=[
             Bundle.main.url(forResource:"DANPEROfficialAreas",withExtension:"json"),
             Bundle.main.url(forResource:"n2-organization-areas",withExtension:"json",
@@ -266,6 +272,7 @@ struct N2NativeWorkerEditorView:View {
             officialAreas=[]
             areaCatalogIncomplete=true
             areaCatalogDiagnostics=attempts.joined(separator:" · ")
+        }
         }
         do {
             if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
