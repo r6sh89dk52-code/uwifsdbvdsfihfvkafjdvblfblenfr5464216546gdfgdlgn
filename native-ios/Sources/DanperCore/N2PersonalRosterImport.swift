@@ -95,9 +95,11 @@ public enum N2PersonalRosterImport {
             let previous=people[i]
             let existingName=previous["name"] as? String ?? ""
             let existingSex=previous["sex"] as? String ?? ""
+            let existingSite=previous["site"] as? String ?? ""
             guard normalized(existingName)==normalized(source.name),
                   existingSex.isEmpty || source.sex.isEmpty ||
-                    existingSex==source.sex else {
+                    existingSex==source.sex,
+                  existingSite.isEmpty || existingSite==site else {
                 // Never silently overwrite identity from a second roster.
                 throw N2PersonalImportError.needsReview
             }
