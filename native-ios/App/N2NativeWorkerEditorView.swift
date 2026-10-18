@@ -23,6 +23,11 @@ struct N2NativeWorkerEditorView:View {
     @State private var dni=""
     @State private var names=""
     @State private var area=""
+    @FocusState private var areaFocused:Bool
+    @State private var areaSuggestionsVisible=true
+    @State private var areaRevealTask:Task<Void,Never>?
+    @Environment(\.danperReveal) private var reveal
+    private let areaAnchor="worker-area-suggestions"
     @State private var labor=""
     @State private var site="LA VENTUROSA"
     @State private var sex=""
@@ -59,7 +64,7 @@ struct N2NativeWorkerEditorView:View {
     }
     private var areaSuggestions:[String] {
         let term=area.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard term.count>=2 else{return []}
+        guard term.count>=2,areaSuggestionsVisible else{return []}
         let official=officialAreas.filter{$0.site==site}.map(\.area)
         let candidates=Set(official+Array(existingAreas.keys))
         let matched=candidates.filter { name in
@@ -72,7 +77,7 @@ struct N2NativeWorkerEditorView:View {
         }.prefix(5).map{$0}
     }
     var body:some View {
-        ScrollView {
+        DanperScrollView {
             VStack(alignment:.leading,spacing:16) {
                 if failed || !savedDNI.isEmpty {
                     DanperPanel {
@@ -108,12 +113,16 @@ struct N2NativeWorkerEditorView:View {
                     DanperField(title:"Área") {
                         TextField("Escribe o selecciona un área",text:$area)
                             .textInputAutocapitalization(.words)
+                            .focused($areaFocused)
+                            .accessibilityIdentifier("worker-area-search")
                     }
                     if !areaSuggestions.isEmpty {
                         VStack(spacing:0) {
                             ForEach(areaSuggestions,id:\.self) { suggestion in
                                 Button {
                                     area=suggestion
+                                    areaFocused=false
+                                    areaSuggestionsVisible=false
                                 } label: {
                                     HStack {
                                         Image(systemName:"building.2.crop.circle")
@@ -128,6 +137,8 @@ struct N2NativeWorkerEditorView:View {
                         }
                         .padding(.horizontal,12)
                         .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+                        .frame(maxHeight:240)
+                        .id(areaAnchor)
                     }
                     Text("Puedes escribir un área nueva. Si no existe en el catálogo oficial, su código quedará vacío en Excel.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -178,7 +189,21 @@ struct N2NativeWorkerEditorView:View {
         .danperFormChrome()
         .sensoryFeedback(.success,trigger:savedDNI) {_,_ in haptics}
         .task {await load()}
-        .onChange(of:site) {_,_ in updateAreas()}
+        .onChange(of:site) {_,_ in
+            updateAreas()
+            areaSuggestionsVisible=true
+        }
+        .onChange(of:area) {_,_ in
+            if areaFocused {areaSuggestionsVisible=true}
+            requestAreaReveal()
+        }
+        .onChange(of:areaFocused) {_,active in
+            if active {
+                areaSuggestionsVisible=true
+                requestAreaReveal()
+            }
+        }
+        .onDisappear {areaRevealTask?.cancel()}
     }
     @MainActor
     private func load() async {
@@ -199,6 +224,13 @@ struct N2NativeWorkerEditorView:View {
         } catch {
             failed=true
             status="No se pudo abrir Personal. Los registros existentes no se modificaron."
+        }
+    }
+    private func requestAreaReveal() {
+        areaRevealTask?.cancel()
+        areaRevealTask=Task { @MainActor in
+            do {try await Task.sleep(for:.milliseconds(260))} catch{return}
+            if areaFocused && !areaSuggestions.isEmpty {reveal(areaAnchor)}
         }
     }
     @State private var workers=[N2FormWorker]()
