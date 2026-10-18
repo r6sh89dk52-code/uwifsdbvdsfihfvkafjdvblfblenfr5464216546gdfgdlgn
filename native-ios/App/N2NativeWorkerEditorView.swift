@@ -566,7 +566,14 @@ struct N2NativeWorkerEditorView:View {
                 guard let result=stored else {throw N2SnapshotEditError.validationFailed}
                 // Read back the persisted record before claiming success.
                 let confirmed=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-                guard confirmed.workers.contains(where:{$0.dni==candidate}) else {
+                guard let verified=confirmed.workers.first(where:{$0.dni==candidate}),
+                      verified.name==(fields["name"] as? String),
+                      verified.area==(fields["area"] as? String),
+                      verified.labor==(fields["labor"] as? String),
+                      verified.site==(fields["site"] as? String),
+                      verified.sex==(fields["sex"] as? String),
+                      verified.birthDate==(fields["birthDate"] as? String),
+                      verified.ubigeo==(fields["ubigeo"] as? String) else {
                     throw N2SnapshotEditError.validationFailed
                 }
                 revision=result.revision
