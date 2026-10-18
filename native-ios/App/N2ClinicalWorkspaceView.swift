@@ -237,6 +237,9 @@ private struct N2ClinicalWorkspaceRootView:View {
         }
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
+        .opacity(scenePhase == .active ? 1 : 0)
+        .accessibilityHidden(scenePhase != .active)
+        .allowsHitTesting(scenePhase == .active)
         .onChange(of:tab) {old,current in
             if old==2 && current != 2 {registeredDNI=nil}
         }
