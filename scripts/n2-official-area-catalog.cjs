@@ -29,9 +29,16 @@ function inline(raw) {
  return Array.from(raw.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g),
         m=>decode(m[1])).join('');
 }
-const shared=Array.from(read('xl/sharedStrings.xml')
-   .matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g),
-   m=>inline(m[1]));
+// Shared strings are OPTIONAL in OOXML. The exact official DANPER workbook
+// stores organizational labels as inlineStr and has no sharedStrings.xml.
+// Match the validated TypeScript organizationDirectory.ts reader: use an empty
+// shared table when that optional archive part is absent.
+const sharedXML=workbook['xl/sharedStrings.xml'];
+const shared=sharedXML
+ ? Array.from(Buffer.from(sharedXML).toString('utf8')
+     .matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g),m=>inline(m[1]))
+ : [];
+if(!sharedXML)console.log('Catálogo OOXML: cadenas inline; sharedStrings.xml opcional y ausente.');
 function rows(filename) {
  return Array.from(read(filename).matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g),m=>{
   const result={};
