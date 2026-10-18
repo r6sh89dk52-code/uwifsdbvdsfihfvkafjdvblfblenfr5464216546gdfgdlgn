@@ -198,7 +198,12 @@ struct N2NativeWorkerEditorView:View {
         .danperFormChrome()
         .sensoryFeedback(.success,trigger:savedDNI) {_,_ in haptics}
         .task {await load()}
-        .onChange(of:site) {_,_ in
+        .onChange(of:site) {previous,newValue in
+            if previous != newValue {
+                // An area from Fundo cannot be carried silently into PL Venturosa.
+                area=""
+                areaFocused=false
+            }
             updateAreas()
             areaSuggestionsVisible=true
         }
