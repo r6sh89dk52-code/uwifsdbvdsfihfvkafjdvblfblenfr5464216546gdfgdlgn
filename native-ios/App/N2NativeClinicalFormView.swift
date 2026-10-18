@@ -50,6 +50,9 @@ struct N2NativeClinicalFormView:View {
     @State private var status="Abriendo bóveda cifrada N2…"
     @State private var expandedMedication:String?
     @State private var chooseWorker=false
+    @State private var showMissingWorker=false
+    @State private var showNewWorker=false
+    @State private var allergyFeedback=""
     @State private var chooseProduct=false
     @State private var chooseDraft=false
     @State private var draftToDelete:String?
@@ -188,22 +191,61 @@ struct N2NativeClinicalFormView:View {
                                 Button {
                                     form.dni=w.dni
                                     search=""
+                                    allergyFeedback=""
                                     chooseWorker=false
                                 } label:{
-                                    VStack(alignment:.leading) {
-                                        Text(w.name).foregroundStyle(.primary)
-                                        Text(w.dni+" · "+w.area)
-                                            .font(.caption).foregroundStyle(.secondary)
+                                    HStack(spacing:12) {
+                                        Image(systemName:"person.crop.circle.fill")
+                                            .font(.title3).foregroundStyle(.secondary)
+                                        VStack(alignment:.leading,spacing:4) {
+                                            Text(w.name).font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                            Text("DNI "+w.dni+" · "+w.area)
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName:"arrow.right.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    }.padding(.vertical,5)
+                                }
+                            }
+                            if !search.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
+                               !context.workers.contains(where:{
+                                   $0.dni.localizedStandardContains(search) ||
+                                   $0.name.localizedStandardContains(search)
+                               }) {
+                                Section {
+                                    ContentUnavailableView.search(text:search)
+                                    Button {
+                                        showMissingWorker=true
+                                    } label: {
+                                        Label("Registrar nuevo trabajador",systemImage:"person.badge.plus")
                                     }
+                                    .buttonStyle(DanperPrimaryButton())
                                 }
                             }
                         }
-                        .searchable(text:$search,prompt:"DNI o nombres")
-                        .navigationTitle("Seleccionar trabajador")
-                        .toolbar{
+                        .searchable(text:$search,prompt:"Escribe DNI o nombre")
+                        .tint(.primary)
+                        .navigationTitle("Buscar trabajador")
+                        .toolbar {
                             ToolbarItem(placement:.topBarTrailing) {
                                 Button("Cerrar"){chooseWorker=false}
                             }
+                        }
+                        .alert("Trabajador no encontrado",isPresented:$showMissingWorker) {
+                            Button("Registrar") {showNewWorker=true}
+                            Button("Cerrar",role:.cancel) {chooseWorker=false}
+                        } message: {
+                            Text("Puedes registrar a esta persona y continuar la atención sin volver a escribir sus datos.")
+                        }
+                        .navigationDestination(isPresented:$showNewWorker) {
+                            N2NativeWorkerEditorView(
+                                initialDNI:search.trimmingCharacters(in:.whitespacesAndNewlines)
+                                    .allSatisfy({$0.isNumber}) ? search : "",
+                                onSaved:{dni in
+                                    Task {await didRegisterWorker(dni)}
+                                })
                         }
                     }
                 }
@@ -257,6 +299,8 @@ struct N2NativeClinicalFormView:View {
                 .onChange(of:form.dni) {_,dni in
                     allergyStatus=context.allergies[dni]?.status ?? "unknown"
                     allergySubstances=context.allergies[dni]?.substances ?? ""
+                    allergyFeedback=context.allergies[dni]?.reviewed == true
+                        ? "Alergias revisadas" : ""
                 }
                 .task(id:form) {
                     if step==3 && !saved && !layoutOnly {
@@ -364,7 +408,13 @@ struct N2NativeClinicalFormView:View {
                     TextField("Indica las sustancias",text:$allergySubstances,axis:.vertical).lineLimit(2...5)
                 }
                 }
-                Button(editingAllergy ? "Verificando..." : "Confirmar revisión de alergias") {
+                if !allergyFeedback.isEmpty {
+                    Label(allergyFeedback,systemImage:"checkmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+                Button(editingAllergy ? "Guardando…" : "Guardar revisión de alergias") {
                     Task {await recordAllergy(worker.dni)}
                 }
                 .buttonStyle(DanperSecondaryButton())
@@ -740,12 +790,13 @@ struct N2NativeClinicalFormView:View {
                 }
                 form=recovered.form
                 step=0
-                status="Borrador cifrado recuperado · revisión \(source.revision)"
+                status="Borrador recuperado."
             } else {
                 let (date,time)=limaClock()
                 form.date=date
                 form.time=time
-                status="Bóveda cifrada disponible · revisión \(source.revision)"
+                status="Formulario preparado."
+                chooseWorker=true
             }
         }catch{
             fault=true
@@ -765,13 +816,35 @@ struct N2NativeClinicalFormView:View {
                     substances:normalized,at:now,
                     expectedRevision:fresh.revision)
             context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-            status="Alergias revisadas en revisión \(updated.revision)."
+            status="Revisión de alergias guardada."
+            allergyFeedback="Alergias revisadas y guardadas"
             fault=false
         }catch{
-            status="No se confirmó el registro de alergias. Verifica el estado de la bóveda."
+            status="No se pudo guardar la revisión de alergias."
+            allergyFeedback="No se guardaron los cambios. Intenta nuevamente."
             fault=true
         }
     }
+    @MainActor
+    private func didRegisterWorker(_ dni:String) async {
+        do {
+            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            guard fresh.workers.contains(where:{$0.dni==dni}) else{return}
+            context=fresh
+            form.dni=dni
+            allergyStatus=fresh.allergies[dni]?.status ?? "unknown"
+            allergySubstances=fresh.allergies[dni]?.substances ?? ""
+            allergyFeedback=""
+            search=""
+            showNewWorker=false
+            chooseWorker=false
+            step=0
+        } catch {
+            validationMessage="Se registró el trabajador, pero no se pudo actualizar su ficha. Vuelve a buscarlo en Personal."
+            showValidation=true
+        }
+    }
+
     private var meaningfulDraft:Bool {
         !form.dni.isEmpty || !form.category.isEmpty || !form.system.isEmpty ||
         !form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ||
