@@ -53,9 +53,13 @@ struct N2NativeClinicalFormView:View {
     @State private var fault=false
     @State private var status="Preparando el registro…"
     @State private var expandedMedication:String?
-    @State private var chooseWorker=false
     @State private var showMissingWorker=false
     @State private var showNewWorker=false
+    @State private var workerDNIInput=""
+    @State private var workerNameInput=""
+    @State private var notFoundDNI=""
+    @State private var dniLookupTask:Task<Void,Never>?
+    @FocusState private var workerDNIFocused:Bool
     @State private var allergyFeedback=""
     @State private var chooseProduct=false
     @State private var chooseDraft=false
@@ -98,6 +102,57 @@ struct N2NativeClinicalFormView:View {
     }
     private var currentWorker:N2FormWorker? {
         context?.workers.first(where:{$0.dni==form.dni})
+    }
+    private var nameSuggestions:[N2FormWorker] {
+        let query=workerNameInput.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard query.count>=2,form.dni.isEmpty else{return []}
+        return Array((context?.workers ?? []).filter {
+            $0.name.localizedStandardContains(query) ||
+            $0.dni.localizedStandardContains(query)
+        }.prefix(5))
+    }
+    private func selectWorker(_ worker:N2FormWorker) {
+        dniLookupTask?.cancel()
+        form.dni=worker.dni
+        workerDNIInput=worker.dni
+        workerNameInput=worker.name
+        workerDNIFocused=false
+        notFoundDNI=""
+        showMissingWorker=false
+    }
+    private func workerAgeDescription(_ worker:N2FormWorker)->String {
+        if let age=N2WorkerAge.years(birthDate:worker.birthDate,on:form.date) {
+            return "\(age) años"
+        }
+        if let age=Int(worker.age),(0...120).contains(age) {
+            return "\(age) años (declarada)"
+        }
+        return "No consignada"
+    }
+    private func enteredWorkerDNI(_ value:String) {
+        dniLookupTask?.cancel()
+        let digits=String(decoding:value.utf8.filter{(48...57).contains($0)}.prefix(8),
+                          as:UTF8.self)
+        if workerDNIInput != digits {workerDNIInput=digits}
+        if let worker=context?.workers.first(where:{$0.dni==digits}) {
+            selectWorker(worker)
+            return
+        }
+        form.dni=""
+        if digits.isEmpty {workerNameInput=""}
+        notFoundDNI=""
+        guard digits.count==8,!layoutOnly else{return}
+        dniLookupTask=Task { @MainActor in
+            do {try await Task.sleep(for:.milliseconds(400))}catch{return}
+            guard workerDNIInput==digits,!Task.isCancelled else{return}
+            if let worker=context?.workers.first(where:{$0.dni==digits}) {
+                selectWorker(worker)
+            } else {
+                notFoundDNI=digits
+                workerDNIFocused=false
+                showMissingWorker=true
+            }
+        }
     }
     var body:some View {
         Group {
@@ -185,71 +240,32 @@ struct N2NativeClinicalFormView:View {
                 .sensoryFeedback(.selection,trigger:step) {_,_ in haptics}
                 .sensoryFeedback(.selection,trigger:form.procedures.count) {_,_ in haptics}
                 .sensoryFeedback(.success,trigger:saved) {_,_ in haptics}
-                .sheet(isPresented:$chooseWorker) {
+                .alert("Trabajador no registrado",isPresented:$showMissingWorker) {
+                    Button("Registrar trabajador") {
+                        showNewWorker=true
+                    }
+                    Button("Cerrar",role:.cancel) {
+                        workerDNIInput=""
+                        workerNameInput=""
+                        notFoundDNI=""
+                        form.dni=""
+                    }
+                } message: {
+                    Text("No encontramos el DNI \(notFoundDNI) en Personal. Puedes registrarlo ahora y continuar esta misma atención.")
+                }
+                .sheet(isPresented:$showNewWorker) {
                     NavigationStack {
-                        List {
-                            ForEach(context.workers.filter{w in
-                                search.isEmpty || w.dni.localizedStandardContains(search) ||
-                                w.name.localizedStandardContains(search)
-                            }) {w in
-                                Button {
-                                    form.dni=w.dni
-                                    search=""
-                                    allergyFeedback=""
-                                    chooseWorker=false
-                                } label:{
-                                    HStack(spacing:12) {
-                                        Image(systemName:"person.crop.circle.fill")
-                                            .font(.title3).foregroundStyle(.secondary)
-                                        VStack(alignment:.leading,spacing:4) {
-                                            Text(w.name).font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(.primary)
-                                            Text("DNI "+w.dni+" · "+w.area)
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName:"arrow.right.circle.fill")
-                                            .foregroundStyle(.secondary)
-                                    }.padding(.vertical,5)
-                                }
-                            }
-                            if !search.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
-                               !context.workers.contains(where:{
-                                   $0.dni.localizedStandardContains(search) ||
-                                   $0.name.localizedStandardContains(search)
-                               }) {
-                                Section {
-                                    ContentUnavailableView.search(text:search)
-                                    Button {
-                                        showMissingWorker=true
-                                    } label: {
-                                        Label("Registrar nuevo trabajador",systemImage:"person.badge.plus")
-                                    }
-                                    .buttonStyle(DanperPrimaryButton())
-                                }
-                            }
-                        }
-                        .searchable(text:$search,prompt:"Escribe DNI o nombre")
-                        .tint(.primary)
-                        .navigationTitle("Buscar trabajador")
+                        N2NativeWorkerEditorView(
+                            initialDNI:notFoundDNI,
+                            onSaved:{dni in
+                                Task {await didRegisterWorker(dni)}
+                            })
                         .toolbar {
-                            ToolbarItem(placement:.topBarTrailing) {
-                                Button("Cerrar"){chooseWorker=false}
+                            ToolbarItem(placement:.topBarLeading) {
+                                Button("Cerrar") {
+                                    showNewWorker=false
+                                }
                             }
-                        }
-                        .alert("Trabajador no encontrado",isPresented:$showMissingWorker) {
-                            Button("Registrar") {showNewWorker=true}
-                            Button("Cerrar",role:.cancel) {chooseWorker=false}
-                        } message: {
-                            Text("Puedes registrar a esta persona y continuar la atención sin volver a escribir sus datos.")
-                        }
-                        .navigationDestination(isPresented:$showNewWorker) {
-                            N2NativeWorkerEditorView(
-                                initialDNI:search.trimmingCharacters(in:.whitespacesAndNewlines)
-                                    .allSatisfy({$0.isNumber}) ? search : "",
-                                onSaved:{dni in
-                                    Task {await didRegisterWorker(dni)}
-                                })
                         }
                     }
                 }
@@ -301,6 +317,10 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
                 .onChange(of:form.dni) {_,dni in
+                    if let worker=context.workers.first(where:{$0.dni==dni}) {
+                        workerDNIInput=dni
+                        workerNameInput=worker.name
+                    }
                     allergyStatus=context.allergies[dni]?.status ?? "unknown"
                     allergySubstances=context.allergies[dni]?.substances ?? ""
                     allergyFeedback=context.allergies[dni]?.reviewed == true
@@ -389,20 +409,72 @@ struct N2NativeClinicalFormView:View {
         }
     }
     private func workerSection(_ context:N2FormContext)->some View {
-        DanperPanel("Identificación") {
-            Button {
-                chooseWorker=true
-            } label: {
-                HStack {
-                    Label(currentWorker?.name ?? "Buscar trabajador",systemImage:"person.crop.rectangle").foregroundStyle(.primary)
-                    Spacer()
-                    Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
-                }.padding(12).background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-            }.buttonStyle(.plain)
+        DanperPanel("Identificación del trabajador") {
+            DanperField(title:"DNI") {
+                TextField("Introduce los 8 números del DNI",text:$workerDNIInput)
+                    .keyboardType(.numberPad)
+                    .textContentType(.none)
+                    .focused($workerDNIFocused)
+                    .accessibilityIdentifier("attention-worker-dni")
+                    .onChange(of:workerDNIInput) {_,value in
+                        enteredWorkerDNI(value)
+                    }
+            }
+            Text("El DNI carga automáticamente la ficha. Si no está registrado, podrás crearlo sin salir de la atención.")
+                .font(.caption).foregroundStyle(.secondary)
+            DanperField(title:"Nombres y apellidos") {
+                if let worker=currentWorker {
+                    Text(worker.name).foregroundStyle(.primary)
+                        .frame(maxWidth:.infinity,alignment:.leading)
+                        .accessibilityIdentifier("attention-worker-name")
+                } else {
+                    TextField("También puedes buscar por nombre",text:$workerNameInput)
+                        .textInputAutocapitalization(.words)
+                        .accessibilityIdentifier("attention-worker-name-query")
+                }
+            }
+            if !nameSuggestions.isEmpty {
+                VStack(spacing:5) {
+                    ForEach(nameSuggestions) { person in
+                        Button {selectWorker(person)} label: {
+                            HStack(spacing:10) {
+                                Image(systemName:"person.crop.circle").foregroundStyle(.secondary)
+                                VStack(alignment:.leading,spacing:3) {
+                                    Text(person.name).font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    Text("DNI "+person.dni).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName:"arrow.up.left").foregroundStyle(.secondary)
+                            }.padding(12)
+                        }.buttonStyle(.plain)
+                    }
+                }.background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+            }
+            if workerDNIInput.count==8 && currentWorker==nil && !showMissingWorker {
+                Button("Registrar DNI "+workerDNIInput) {
+                    notFoundDNI=workerDNIInput
+                    showMissingWorker=true
+                }
+                .buttonStyle(DanperSecondaryButton())
+            }
             if let worker=currentWorker {
-                LabeledContent("DNI",value:worker.dni)
-                LabeledContent("Área",value:worker.area)
-                LabeledContent("Sede",value:worker.site)
+                VStack(alignment:.leading,spacing:9) {
+                    Label("Trabajador identificado",systemImage:"checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.green)
+                    LabeledContent("DNI",value:worker.dni)
+                    LabeledContent("Área",value:worker.area.isEmpty ? "No consignada" : worker.area)
+                    LabeledContent("Labor / cargo",value:worker.labor.isEmpty ? "No consignada" : worker.labor)
+                    LabeledContent("Edad",value:workerAgeDescription(worker))
+                    LabeledContent("Sede",value:worker.site=="PLVENTUROSA" ?
+                                   "Planta La Venturosa" : "Fundo La Venturosa")
+                    LabeledContent("Ubicación / ubigeo",
+                                   value:worker.ubigeo.isEmpty ? "No consignada" : worker.ubigeo)
+                    LabeledContent("Sexo registrado",value:worker.sex=="M" ? "Masculino" :
+                                   worker.sex=="F" ? "Femenino" : "No consignado")
+                }
+                .padding(13)
+                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
                 Text("Alergias revisadas antes de registrar medicamentos.")
                     .font(.footnote).foregroundStyle(.secondary)
                 DanperChoiceField(title:"Revisión de alergias",selection:$allergyStatus,
@@ -629,7 +701,7 @@ struct N2NativeClinicalFormView:View {
         }
     }
     private func focusFirstMissing(_ context:N2FormContext) {
-        if currentWorker==nil {step=0;chooseWorker=true;return}
+        if currentWorker==nil {step=0;workerDNIFocused=true;return}
         if !form.clinicalIssues(step:1,context:context).filter({$0.hasPrefix("allergy-")}).isEmpty {step=0;return}
         if !form.clinicalIssues(step:1,context:context).isEmpty {step=1}
         else if !form.clinicalIssues(step:2,context:context).isEmpty || !extraTreatmentRequirements.isEmpty {step=2}
@@ -801,13 +873,13 @@ struct N2NativeClinicalFormView:View {
                 form.time=time
                 status="Formulario preparado."
                 if let initialWorkerDNI,
-                   context?.workers.contains(where:{$0.dni==initialWorkerDNI})==true {
-                    form.dni=initialWorkerDNI
+                   let worker=context?.workers.first(where:{$0.dni==initialWorkerDNI}) {
+                    selectWorker(worker)
                     allergyStatus=context?.allergies[initialWorkerDNI]?.status ?? "unknown"
                     allergySubstances=context?.allergies[initialWorkerDNI]?.substances ?? ""
-                    chooseWorker=false
                 } else {
-                    chooseWorker=true
+                    workerDNIInput=""
+                    workerNameInput=""
                 }
             }
         }catch{
@@ -847,9 +919,10 @@ struct N2NativeClinicalFormView:View {
             allergyStatus=fresh.allergies[dni]?.status ?? "unknown"
             allergySubstances=fresh.allergies[dni]?.substances ?? ""
             allergyFeedback=""
-            search=""
+            workerDNIInput=dni
+            workerNameInput=fresh.workers.first(where:{$0.dni==dni})?.name ?? ""
+            notFoundDNI=""
             showNewWorker=false
-            chooseWorker=false
             step=0
         } catch {
             validationMessage="Se registró el trabajador, pero no se pudo actualizar su ficha. Vuelve a buscarlo en Personal."
@@ -951,6 +1024,10 @@ struct N2NativeClinicalFormView:View {
     }
 
     private func startAnother() {
+        dniLookupTask?.cancel()
+        workerDNIInput=""
+        workerNameInput=""
+        notFoundDNI=""
         saved=false
         fault=false
         form=N2NativeFormDraft()
