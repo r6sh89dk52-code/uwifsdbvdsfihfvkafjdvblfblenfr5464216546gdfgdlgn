@@ -261,6 +261,18 @@ actor N2SyntheticTrialIOSVault {
             template:Data(contentsOf:source),
             date:date,shift:shift,responsible:responsible,site:site)
     }
+    func exportVerifiedRangeNursingWorkbook(start:String,end:String,
+        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
+        guard let source=Bundle.main.url(
+            forResource:"n1s-nursing-template-store",
+            withExtension:"zip",subdirectory:"N1sDemoResources") else {
+            throw Failure.blockedMigration
+        }
+        return try protectedStore().exportVerifiedRangeNursingWorkbook(
+            catalog:resource("n2-nursing-catalog"),
+            template:Data(contentsOf:source),
+            start:start,end:end,responsible:responsible,site:site)
+    }
     func exportPortableEncryptedBackup(password:String)throws->Data {
         guard let secret=try deviceKey(create:false) else{
             throw Failure.missingKey
