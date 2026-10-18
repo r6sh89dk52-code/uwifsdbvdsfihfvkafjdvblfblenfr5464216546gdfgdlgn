@@ -185,9 +185,9 @@ struct N2NativeWorkerEditorView:View {
     }
     @State private var workers=[N2FormWorker]()
     private func updateAreas() {
-        existingAreas=Dictionary(uniqueKeysWithValues:workers
-            .filter{$0.site==site && !$0.area.isEmpty}
-            .map{($0.area,$0.area)})
+        let unique=Set(workers.filter{$0.site==site && !$0.area.isEmpty}
+                          .map(\.area))
+        existingAreas=Dictionary(uniqueKeysWithValues:unique.map{($0,$0)})
     }
     @MainActor
     private func save() {
