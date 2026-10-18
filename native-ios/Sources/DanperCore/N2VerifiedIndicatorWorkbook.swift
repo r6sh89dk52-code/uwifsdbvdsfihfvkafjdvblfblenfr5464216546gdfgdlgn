@@ -75,7 +75,7 @@ public enum N2VerifiedIndicatorWorkbook {
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
         try period(start,end)
-        guard ["LA VENTUROSA","PLVENTUROSA"].contains(subdivision) else{
+        guard ["LA VENTUROSA","PLVENTUROSA","AMBAS"].contains(subdivision) else{
             throw Failure.ambiguousSite
         }
         guard !selectedVisitIDs.isEmpty else{throw Failure.missingSelection}
@@ -179,7 +179,8 @@ public enum N2VerifiedIndicatorWorkbook {
             frequencyByID[string(visit["id"])]=frequencies[key]
         }
         var seenIDs=Set<String>(),
-            consumption=[String:Int](),output=[[String:Any]]()
+            consumption=[String:Int](),consumptionBySite=[String:Int](),
+            output=[[String:Any]]()
         let freq=["PRIMERA","SEGUNDA","TERCERA","CUARTA","QUINTA"]
         for visit in selected {
             let aid=string(visit["id"]),iso=string(visit["date"])
@@ -191,9 +192,12 @@ public enum N2VerifiedIndicatorWorkbook {
                   !string(visit["diagnosis"]).isEmpty,
                   let items=visit["items"] as? [[String:Any]],
                   items.count<=1000,
-                  ["",subdivision].contains(string(worker["site"])) else{
+                  (subdivision=="AMBAS" ?
+                    ["LA VENTUROSA","PLVENTUROSA"].contains(string(worker["site"])) :
+                    ["",subdivision].contains(string(worker["site"]))) else{
                 throw Failure.invalidVisit
             }
+            let sourceSite=subdivision=="AMBAS" ? string(worker["site"]) : subdivision
             let count=frequencyByID[aid] ?? 1
             let ageString=String(describing:worker["age"] ?? "")
             let birthday=string(worker["birthDate"])
@@ -228,9 +232,11 @@ public enum N2VerifiedIndicatorWorkbook {
                        value.rounded()==value,value>=0 {
                         physical=value
                         consumption[code,default:0]+=Int(value)
+                        consumptionBySite[sourceSite+"|"+code,default:0]+=Int(value)
                     } else if allowPending,let declared=integer(row["quantity"]),declared>0 {
                         physical=declared
                         consumption[code,default:0]+=declared
+                        consumptionBySite[sourceSite+"|"+code,default:0]+=declared
                         pendingLines+=1
                         pendingNotes.append(aid+" / "+code+" / "+name+": R declarado, sin salida física confirmada")
                     } else {throw Failure.unverifiedDelivery}
@@ -243,7 +249,7 @@ public enum N2VerifiedIndicatorWorkbook {
                     ? "INSUMOS":"-"
                 let pTime=try time(string(visit["permissionTime"]),optional:true)
                 let fields:[Any]=[
-                    subdivision,string(worker["area"]),"","",
+                    sourceSite,string(worker["area"]),"","",
                     string(worker["labor"]),excelDate(iso),try time(string(visit["time"])),
                     dni,string(worker["name"]),age.map{$0 as Any} ?? "",
                     string(worker["sex"]),string(worker["ubigeo"]),
