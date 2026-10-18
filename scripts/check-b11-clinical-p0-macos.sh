@@ -12,6 +12,30 @@ command -v node >/dev/null || { echo 'Missing Node'; exit 1; }
 command -v xcrun >/dev/null || { echo 'Missing Xcode command line tools'; exit 1; }
 command -v python3 >/dev/null || { echo 'Missing python3'; exit 1; }
 bash "$ROOT/scripts/check-b11-priority-parity-macos.sh"
+node "$ROOT/scripts/audit-n2-joint-indicator.cjs"
+
+# Assemble ONLY synthetic, generated fixtures for the full clinical source
+# test suite. These paths never read real PERSONAL or build222 backups.
+FIXTURES="$DEST/SYNTHETIC_FIXTURES_B11"
+mkdir -p "$FIXTURES"
+export DANPER_N1_FIXTURE_DIR="$FIXTURES"
+for generator in \
+    generate-native-compat-fixtures.cjs \
+    generate-n1e-clinical-fixtures.cjs \
+    generate-n1f-lossless-fixtures.cjs \
+    generate-n1h-clinical-parity.cjs \
+    generate-n1p-excel-parity.cjs \
+    generate-n1q-reconciliation-fixtures.cjs \
+    generate-n1r-stored-xlsx-template.cjs \
+    generate-n1s-official-excel-fixtures.cjs \
+    generate-n2-approved-fixture.cjs \
+    generate-n2-nursing-parity.cjs \
+    generate-n2-stock-commands-fixtures.cjs; do
+    node "$ROOT/scripts/$generator"
+done
+node "$ROOT/scripts/generate-n2-procedure-parity.cjs"
+echo 'Running full synthetic clinical test suite including joint Fundo/Planta.'
+(cd "$ROOT/native-ios" && swift test --jobs 2)
 
 # Build a new, isolated simulator. Never boot or erase the user's existing one.
 TYPE="$(xcrun simctl list -j devicetypes | python3 -c '
