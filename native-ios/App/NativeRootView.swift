@@ -278,6 +278,11 @@ struct NativeRootView:View {
                 }
             }
             DanperPanel("Datos reales · no se mezclan con las pruebas") {
+                DanperToolLink(title:"Acceso al espacio clínico independiente",symbol:"cross.case.fill") {
+                    N2ClinicalWorkspaceGateView()
+                }
+                Text("Acceso mediante autenticación adicional y fuente clínica cifrada. Continúa en validación; no usar con pacientes reales.")
+                    .font(.caption).foregroundStyle(.orange)
                 DanperToolLink(title:"Comprobar respaldo original (solo lectura)",symbol:"doc.text.magnifyingglass") {BackupPreviewView()}
                 DisclosureGroup("Configuración avanzada",isExpanded:$showAdvanced) {
                     DanperToolLink(title:"Importación protegida en bóveda independiente",symbol:"lock.shield") {N2NativeActivationView()}
