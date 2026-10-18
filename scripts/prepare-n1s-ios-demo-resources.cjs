@@ -106,7 +106,7 @@ try{
  const swiftData=organization.map(entry=>
   '        N2OfficialArea(site:'+swiftQuote(entry.site)+
   ',area:'+swiftQuote(entry.area)+
-  ',code:'+swiftQuote(entry.code)+')').join(',\\n');
+  ',code:'+swiftQuote(entry.code)+')').join(',\n');
  const swiftSource=[
   '// GENERATED — DO NOT EDIT. Official areas only, no staff or patient data.',
   '// Source: verified 10-sheet DANPER workbook @subuo + @uo.',
@@ -117,7 +117,7 @@ try{
   '    ]',
   '}',
   ''
- ].join('\\n');
+ ].join('\n');
  const swiftPath=path.join(root,'native-ios','App','N2GeneratedOfficialAreas.swift');
  fs.writeFileSync(swiftPath,swiftSource);
  assert(swiftSource.includes('N2OfficialArea(site:"PLVENTUROSA"'));
