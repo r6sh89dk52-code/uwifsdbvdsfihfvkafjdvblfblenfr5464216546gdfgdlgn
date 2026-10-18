@@ -29,6 +29,12 @@ struct N2ClinicalWorkspaceGateView:View {
                 }
                 DanperPanel("Verificar la fuente") {
                     if let summary {
+                        NavigationLink {
+                            N2NativePersonalImportView()
+                        } label: {
+                            Label("Importar o conciliar Excel PERSONAL",systemImage:"person.2.arrow.trianglehead.counterclockwise")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
                         LabeledContent("Trabajadores",value:String(summary.workers))
                         LabeledContent("Atenciones",value:String(summary.attentions))
                         LabeledContent("Movimientos físicos",value:String(summary.physicalMovements))
