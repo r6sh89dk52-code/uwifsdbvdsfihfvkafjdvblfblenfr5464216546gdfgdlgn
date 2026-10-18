@@ -39,7 +39,8 @@ struct N2NativeBackupExportView:View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
             DanperPanel("Respaldo cifrado") {
-                Label("Datos protegidos del modo de prueba",
+                Label(vault.isClinical ? "Datos protegidos de la bóveda CLÍNICA" :
+                      "Datos protegidos del modo de prueba",
                       systemImage:"lock.shield.fill")
                     .font(.headline)
                 if let summary {
@@ -90,7 +91,7 @@ struct N2NativeBackupExportView:View {
             do {
                 summary=try await vault.inspect()
                 status=summary == nil
-                    ? "Sin bóveda clínica activa. No se ha creado ningún respaldo."
+                    ? "No existe una bóveda activa para esta fuente. No se ha creado ningún respaldo."
                     : "Bóveda verificada. Puedes generar una copia cifrada."
             }catch {
                 summary=nil
@@ -140,7 +141,9 @@ struct N2NativeBackupExportView:View {
             fmt.dateFormat="yyyyMMdd-HHmmss"
             fmt.timeZone=TimeZone(identifier:"America/Lima")
             let destination=folder.appendingPathComponent(
-                "DANPER_N2_CIFRADO_"+fmt.string(from:Date())+".danperbackup")
+                (vault.isClinical ? "DANPER_N2_CLINICA_CIFRADO_" :
+                                   "DANPER_N2_DEMO_CIFRADO_")+
+                fmt.string(from:Date())+".danperbackup")
             try bytes.write(to:destination,options:[.atomic,.completeFileProtection])
             status="Respaldo cifrado verificado. Abriendo Compartir…"
             share=N2SecureBackupShare(url:destination)
