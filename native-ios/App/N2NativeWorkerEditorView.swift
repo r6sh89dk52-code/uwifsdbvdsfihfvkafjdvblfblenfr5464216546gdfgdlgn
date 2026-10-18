@@ -61,21 +61,15 @@ struct N2NativeWorkerEditorView:View {
         let term=area.trimmingCharacters(in:.whitespacesAndNewlines)
         guard term.count>=2 else{return []}
         let official=officialAreas.filter{$0.site==site}.map(\.area)
-        return Set(official+Array(existingAreas.keys))
-            .filter{$0.localizedStandardContains(term) &&
-                    $0.localizedCaseInsensitiveCompare(area) != .orderedSame}
-            .sorted {left,right in
-                let a=left.folding(options:[.diacriticInsensitive,.caseInsensitive],
-                                   locale:Locale(identifier:"es_PE"))
-                          .hasPrefix(term.folding(options:[.diacriticInsensitive,.caseInsensitive],
-                                                  locale:Locale(identifier:"es_PE")))
-                let b=right.folding(options:[.diacriticInsensitive,.caseInsensitive],
-                                    locale:Locale(identifier:"es_PE"))
-                           .hasPrefix(term.folding(options:[.diacriticInsensitive,.caseInsensitive],
-                                                   locale:Locale(identifier:"es_PE")))
-                return a == b ? left.localizedStandardCompare(right)==.orderedAscending : a
-            }
-            .prefix(5).map{$0}
+        let candidates=Set(official+Array(existingAreas.keys))
+        let matched=candidates.filter { name in
+            name.localizedStandardContains(term) &&
+            name.localizedCaseInsensitiveCompare(area) != ComparisonResult.orderedSame
+        }
+        return Array(matched).sorted { left,right in
+            let first=left.localizedStandardCompare(right)
+            return first == ComparisonResult.orderedAscending
+        }.prefix(5).map{$0}
     }
     var body:some View {
         ScrollView {
