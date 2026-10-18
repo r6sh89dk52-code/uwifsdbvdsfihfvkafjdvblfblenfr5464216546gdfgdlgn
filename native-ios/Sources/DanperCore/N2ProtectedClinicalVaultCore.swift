@@ -222,6 +222,49 @@ public final class N2ProtectedClinicalVaultCore {
         return try summary(active)
     }
 
+    /// Initial PERSONAL import requires a genuinely empty CLINICAL domain.
+    /// Synthetic employees, histories and stock NEVER accompany these rows.
+    public func activateInitialPersonal(preview:N2PersonalImportPreview,
+                                        site:String,explicitConsent:Bool)throws
+        ->N2ProtectedStoreSummary {
+        guard directory.lastPathComponent=="DANPER-N2-CLINICAL-VAULT",
+              explicitConsent else{throw N2ProtectedStoreError.unsafeSource}
+        let source=try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:site)
+        return try activateSingleVerifiedSource(source,
+                                               explicitConsent:explicitConsent)
+    }
+    /// A read-only conflict check; no clinical source is ever returned to UI.
+    public func previewPersonalMerge(preview:N2PersonalImportPreview,
+                                     site:String)throws->N2PersonalImportResult {
+        guard let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2PersonalRosterImport.merge(
+            snapshot:active.snapshot,preview:preview,site:site).1
+    }
+    /// Single atomic generation; concurrent visits, stock or roster changes
+    /// cause staleRevision and must be re-reviewed rather than retried blindly.
+    public func mergePersonal(preview:N2PersonalImportPreview,site:String,
+                              expectedRevision:Int)throws->N2PersonalImportResult {
+        guard directory.lastPathComponent=="DANPER-N2-CLINICAL-VAULT",
+              let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        guard active.revision==expectedRevision else {
+            throw N2ProtectedStoreError.staleRevision
+        }
+        let (next,result)=try N2PersonalRosterImport.merge(
+            snapshot:active.snapshot,preview:preview,site:site)
+        guard next != active.snapshot else{return result}
+        let revision=try journal.commit(next,expectedRevision:expectedRevision)
+        guard let checked=try journal.recover(),checked.revision==revision,
+              checked.snapshot==next else {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        return result
+    }
+
     /// Every edit is validated and promoted with a single atomic generation;
     /// no independent asynchronous workers/stock saves may be interleaved.
     private func modify(expectedRevision:Int,
