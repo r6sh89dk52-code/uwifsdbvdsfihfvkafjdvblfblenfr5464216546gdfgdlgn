@@ -73,6 +73,11 @@ struct NativeRootView:View {
         .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
         .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
         .task(id:tab) {await refresh()}
+        .onChange(of:tab) {previous,newTab in
+            if previous==2 && newTab != 2 {
+                newlyRegisteredWorkerDNI=nil
+            }
+        }
         .onChange(of:scenePhase) {_,phase in if phase == .active {Task {await refresh()}}}
     }
 
