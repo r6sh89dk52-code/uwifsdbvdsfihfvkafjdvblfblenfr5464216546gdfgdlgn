@@ -24,6 +24,7 @@ public struct N2VisitIndexRow: Equatable, Sendable, Identifiable {
     public let confirmedPhysicalLines:Int
     public let pendingPhysicalLines:Int
     public let consumptionR:[Double?]
+    public var workerSite:String=""
 }
 public struct N2NativeReadModel: Sendable {
     public let roster:[N2WorkerIndexRow]
@@ -59,6 +60,7 @@ public enum N2NativeSnapshotReader {
         let diagnosis:String
         let status:String
         let physical:[Double?]
+        let site:String
     }
     public static func read(_ data:Data)throws->N2NativeReadModel {
         // Never mutate source visits. Apply the validated append-only clinical
@@ -103,7 +105,8 @@ public enum N2NativeSnapshotReader {
                               date:visit["date"] as? String ?? "",
                               time:visit["time"] as? String ?? "",
                               diagnosis:visit["diagnosis"] as? String ?? "",
-                              status:status,physical:amounts))
+                              status:status,physical:amounts,
+                              site:worker["site"] as? String ?? ""))
         }
         guard pointer==parity.consumptionR.count else{
             throw N2NativeReadError.mismatchedClinicalRows
@@ -123,14 +126,16 @@ public enum N2NativeSnapshotReader {
                 counts[key]=number
                 label=number<=5 ? labels[number-1] : "REVISAR"
             }
-            indexed.append(N2VisitIndexRow(
+            var record=N2VisitIndexRow(
                 id:row.id,workerDNI:row.workerDNI,workerName:row.workerName,
                 date:row.date,time:row.time,diagnosis:row.diagnosis,
                 status:row.status,frequency:label,
                 clinicalLines:row.physical.count,
                 confirmedPhysicalLines:row.physical.compactMap{$0}.count,
                 pendingPhysicalLines:row.physical.filter{$0==nil}.count,
-                consumptionR:row.physical))
+                consumptionR:row.physical)
+            record.workerSite=row.site
+            indexed.append(record)
         }
         let visible=indexed.reversed()
         return N2NativeReadModel(roster:roster,searchableRoster:searchable,
