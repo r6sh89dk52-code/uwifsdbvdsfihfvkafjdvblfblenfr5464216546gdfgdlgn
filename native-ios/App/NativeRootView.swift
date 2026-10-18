@@ -292,6 +292,25 @@ struct NativeRootView:View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            DanperPanel("Restablecer entorno de prueba") {
+                NavigationLink {
+                    N2DemoResetView(onDeleted:{
+                        // The demo workspace is never silently re-initialized.
+                        summary=nil
+                        metrics=nil
+                        newlyRegisteredWorkerDNI=nil
+                        tab=0
+                        Task {await refresh()}
+                    })
+                } label: {
+                    Label("Borrar TODOS los datos ficticios",
+                          systemImage:"trash")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.red)
+                }
+                Text("Solo elimina registros creados en la demostración B11. Las fuentes clínicas y la build 222 no se tocan. Se exige confirmación escrita y autenticación.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             DanperPanel("Preferencias") {
                 Picker("Apariencia",selection:$appearance) {
                     Text("Sistema").tag("system")
