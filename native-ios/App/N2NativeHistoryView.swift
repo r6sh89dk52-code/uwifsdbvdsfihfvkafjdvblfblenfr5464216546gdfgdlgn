@@ -77,7 +77,10 @@ struct N2NativeHistoryView: View {
         .navigationTitle("Personal e historial")
         .danperFormChrome()
         .task {await load()}
-        .tint(accent)
+        .onAppear {
+            if projection != nil {Task {await load(force:true)}}
+        }
+        .tint(.primary)
     }
 
     @ViewBuilder
@@ -103,8 +106,8 @@ struct N2NativeHistoryView: View {
         .padding(.vertical,3)
     }
 
-    private func load() async {
-        guard projection==nil else {return}
+    private func load(force:Bool=false) async {
+        guard force || projection==nil else {return}
         do {
             if useProtectedVault {
                 guard let records=try await N2SyntheticTrialIOSVault.shared.readHistory() else {
