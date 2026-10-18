@@ -19,6 +19,7 @@ private struct N2SecureBackupActivity: UIViewControllerRepresentable {
 }
 
 struct N2NativeBackupExportView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     @State private var password=""
     @State private var confirmation=""
     @State private var summary:N2ProtectedStoreSummary?
@@ -87,7 +88,7 @@ struct N2NativeBackupExportView:View {
         }
         .task {
             do {
-                summary=try await N2SyntheticTrialIOSVault.shared.inspect()
+                summary=try await vault.inspect()
                 status=summary == nil
                     ? "Sin bóveda clínica activa. No se ha creado ningún respaldo."
                     : "Bóveda verificada. Puedes generar una copia cifrada."
@@ -125,7 +126,7 @@ struct N2NativeBackupExportView:View {
                 failed=true
                 return
             }
-            let bytes=try await N2SyntheticTrialIOSVault.shared
+            let bytes=try await vault
                 .exportPortableEncryptedBackup(password:password)
             clearTemporary()
             let folder=FileManager.default.temporaryDirectory
