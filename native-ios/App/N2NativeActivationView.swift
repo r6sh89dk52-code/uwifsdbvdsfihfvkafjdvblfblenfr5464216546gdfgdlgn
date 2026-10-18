@@ -205,8 +205,9 @@ struct N2NativeActivationView:View {
                 status="Autenticación cancelada. No se leyó ni importó ninguna historia."
                 return
             }
+            let pass=password
             let answer=try await Task.detached(priority:.userInitiated) {
-                try PortableBackupInspector.review(url:url,password:password)
+                try PortableBackupInspector.review(url:url,password:pass)
             }.value
             guard scenePhase == .active else{return}
             // A second vault check occurs after decryption so another imported
