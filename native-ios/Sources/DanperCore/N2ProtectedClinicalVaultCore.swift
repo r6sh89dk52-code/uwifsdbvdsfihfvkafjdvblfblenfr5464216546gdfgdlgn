@@ -232,6 +232,13 @@ public final class N2ProtectedClinicalVaultCore {
         return try summary(verified)
     }
     @discardableResult
+    public func correctWorker(dni:String,worker:Data,at:Int64,
+                              expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2SnapshotEditor.correctWorker(snapshot:$0,dni:dni,worker:worker,at:at)
+        }
+    }
+    @discardableResult
     public func registerWorker(_ worker:Data,at:Int64,
                                expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try modify(expectedRevision:expectedRevision) {
