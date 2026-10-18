@@ -18,6 +18,9 @@ private struct N2NursingActivity:UIViewControllerRepresentable {
 /// Uses the encrypted N2 source, not the bundled synthetic test report.
 struct N2VerifiedNursingExportView:View {
     @State private var day=Date()
+    @State private var reportMode="daily"
+    @State private var rangeStart=Date()
+    @State private var rangeEnd=Date()
     @State private var site=""
     @State private var responsible="Felipe Azcárate Silva"
     @State private var shift="CONSOLIDADO"
@@ -34,6 +37,24 @@ struct N2VerifiedNursingExportView:View {
         return formatter.string(from:day)
     }
 
+    private var selectedPeriod:(start:String,end:String) {
+        if reportMode=="daily" {return (selectedDay,selectedDay)}
+        if reportMode=="custom" {
+            return (formatDay(rangeStart),formatDay(rangeEnd))
+        }
+        var cal=Calendar(identifier:.gregorian)
+        cal.timeZone=TimeZone(identifier:"America/Lima")!
+        cal.firstWeekday=2
+        let monday=cal.dateInterval(of:.weekOfYear,for:day)?.start ?? day
+        let sunday=cal.date(byAdding:.day,value:6,to:monday) ?? monday
+        return (formatDay(monday),formatDay(sunday))
+    }
+    private func formatDay(_ date:Date)->String {
+        let formatter=DateFormatter()
+        formatter.timeZone=TimeZone(identifier:"America/Lima")
+        formatter.dateFormat="yyyy-MM-dd"
+        return formatter.string(from:date)
+    }
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
@@ -43,14 +64,29 @@ struct N2VerifiedNursingExportView:View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
             DanperPanel("Datos del corte diario") {
+                DanperChoiceField(title:"Modalidad",selection:$reportMode,
+                    options:["daily","weekly","custom"],
+                    labels:["daily":"Diario","weekly":"Semanal","custom":"Rango personalizado"])
                 DanperChoiceField(title:"Sede del inventario",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
                                   labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
-                DanperDateField(title:"Fecha de corte",selection:$day)
-                DanperChoiceField(title:"Turno",selection:$shift,options:["MAÑANA","TARDE","NOCHE","CONSOLIDADO"])
+                if reportMode=="daily" {
+                    DanperDateField(title:"Fecha de corte",selection:$day)
+                    DanperChoiceField(title:"Turno",selection:$shift,
+                                      options:["MAÑANA","TARDE","NOCHE","CONSOLIDADO"])
+                } else if reportMode=="weekly" {
+                    DanperDateField(title:"Semana de referencia",selection:$day)
+                    Text("Consolidado semanal: "+selectedPeriod.start+" al "+selectedPeriod.end)
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    DanperDateField(title:"Desde",selection:$rangeStart)
+                    DanperDateField(title:"Hasta",selection:$rangeEnd)
+                }
                 DanperField(title:"Responsable") {
                     TextField("Nombre del responsable",text:$responsible).textInputAutocapitalization(.characters)
                 }
-                Text("Un día por libro. Los intervalos aún no son un documento oficial.")
+                Text(reportMode=="daily" ?
+                    "Kardex diario de 98 productos." :
+                    "Consolidado verificado de 98 productos; el Excel indicará claramente el intervalo y no se presentará como un solo día.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             DanperPanel("Generar") {
@@ -61,8 +97,9 @@ struct N2VerifiedNursingExportView:View {
                           systemImage:"square.and.arrow.up")
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy || site.isEmpty || responsible.trimmingCharacters(
-                    in:.whitespacesAndNewlines).isEmpty)
+                .disabled(busy || site.isEmpty ||
+                    selectedPeriod.start>selectedPeriod.end ||
+                    responsible.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
                 Text("Un Excel compartido puede contener datos del tópico. Envía el archivo solamente a destinatarios autorizados.")
@@ -86,11 +123,19 @@ struct N2VerifiedNursingExportView:View {
         status="Comprobando movimientos cifrados y plantilla oficial…"
         defer{busy=false}
         do {
-            let result=try await N2SyntheticTrialIOSVault.shared
-                .exportVerifiedDailyNursingWorkbook(
-                    date:selectedDay,shift:shift,
-                    responsible:responsible.trimmingCharacters(
-                        in:.whitespacesAndNewlines),site:site)
+            let result:N2VerifiedNursingWorkbook.Result
+            let operatorName=responsible.trimmingCharacters(in:.whitespacesAndNewlines)
+            if reportMode=="daily" {
+                result=try await N2SyntheticTrialIOSVault.shared
+                    .exportVerifiedDailyNursingWorkbook(
+                        date:selectedDay,shift:shift,
+                        responsible:operatorName,site:site)
+            } else {
+                result=try await N2SyntheticTrialIOSVault.shared
+                    .exportVerifiedRangeNursingWorkbook(
+                        start:selectedPeriod.start,end:selectedPeriod.end,
+                        responsible:operatorName,site:site)
+            }
             cleanup()
             let dir=FileManager.default.temporaryDirectory
                 .appendingPathComponent("danper-n2-kardex-"+UUID().uuidString,
@@ -100,7 +145,8 @@ struct N2VerifiedNursingExportView:View {
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
             let output=dir.appendingPathComponent(
-                "DANPER_KARDEX_N2_"+result.day+".xlsx")
+                "DANPER_KARDEX_N2_"+selectedPeriod.start+
+                (reportMode=="daily" ? "" : "_al_"+selectedPeriod.end)+".xlsx")
             try result.xlsx.write(to:output,
                 options:[.atomic,.completeFileProtection])
             status="Generado: \(result.stockKnownRows) productos con historial; " +
