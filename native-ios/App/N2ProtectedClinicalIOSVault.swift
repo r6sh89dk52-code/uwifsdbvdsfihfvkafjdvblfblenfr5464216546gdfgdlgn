@@ -78,6 +78,29 @@ actor N2ProtectedClinicalIOSVault {
         return try N2ProtectedClinicalVaultCore(keyData:secret)
             .activateSingleVerifiedSource(source,explicitConsent:approvedByUser)
     }
+    /// Only the encrypted CLINICAL namespace can create or merge PERSONAL.
+    /// Never uses or clears N2SyntheticTrialIOSVault, N1m or build222.
+    func activateInitialPersonal(_ preview:N2PersonalImportPreview,
+                                 site:String,approvedByUser:Bool)throws
+        ->N2ProtectedStoreSummary {
+        guard approvedByUser else{throw Failure.blockedMigration}
+        guard let secret=try deviceKey(create:true) else {
+            throw Failure.unavailableKeychain
+        }
+        return try N2ProtectedClinicalVaultCore(keyData:secret)
+            .activateInitialPersonal(preview:preview,site:site,
+                                     explicitConsent:approvedByUser)
+    }
+    func previewPersonalMerge(_ preview:N2PersonalImportPreview,
+                              site:String)throws->N2PersonalImportResult {
+        try protectedStore().previewPersonalMerge(preview:preview,site:site)
+    }
+    func mergePersonal(_ preview:N2PersonalImportPreview,
+                       site:String,expectedRevision:Int)throws->N2PersonalImportResult {
+        try protectedStore().mergePersonal(preview:preview,site:site,
+                                           expectedRevision:expectedRevision)
+    }
+
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
     }
