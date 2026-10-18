@@ -413,7 +413,6 @@ struct N2NativeClinicalFormView:View {
             DanperField(title:"DNI") {
                 TextField("Introduce los 8 números del DNI",text:$workerDNIInput)
                     .keyboardType(.numberPad)
-                    .textContentType(.none)
                     .focused($workerDNIFocused)
                     .accessibilityIdentifier("attention-worker-dni")
                     .onChange(of:workerDNIInput) {_,value in
