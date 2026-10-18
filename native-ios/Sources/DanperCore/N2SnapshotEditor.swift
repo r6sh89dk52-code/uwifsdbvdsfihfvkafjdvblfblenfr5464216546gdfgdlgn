@@ -87,6 +87,65 @@ public enum N2SnapshotEditor {
         root["workers"]=workers
         return try finish(root)
     }
+    /// Revises one existing DNI in-place. The worker ID and all historical
+    /// attention snapshots remain unchanged; an encrypted correction event
+    /// records the changed fields for recovery/audit.
+    public static func correctWorker(snapshot:Data,dni:String,worker:Data,at:Int64)throws->Data {
+        try clock(at)
+        guard isDni(dni),
+              let incoming=try? JSONSerialization.jsonObject(with:worker) as? [String:Any],
+              incoming["dni"] as? String == dni,
+              incoming.keys.allSatisfy({allowedWorkerFields.contains($0)}),
+              let name=incoming["name"] as? String,
+              name.trimmingCharacters(in:.whitespacesAndNewlines).count>=5,
+              incoming.keys.allSatisfy({key in
+                  key=="dni" || (incoming[key] is String)
+              }) else{throw N2SnapshotEditError.invalidWorker}
+        if let age=incoming["age"] as? String,!age.isEmpty,
+           N2WorkerBirthDateEntry.manualAge(age)==nil {
+            throw N2SnapshotEditError.invalidWorker
+        }
+        if let birthday=incoming["birthDate"] as? String,!birthday.isEmpty {
+            let f=DateFormatter()
+            f.calendar=Calendar(identifier:.gregorian)
+            f.timeZone=TimeZone(secondsFromGMT:0)!
+            f.dateFormat="yyyy-MM-dd"
+            f.isLenient=false
+            guard let value=f.date(from:birthday),f.string(from:value)==birthday,
+                  N2WorkerAge.years(birthDate:birthday,
+                      on:f.string(from:Date(timeIntervalSince1970:Double(at)/1000))) != nil
+            else{throw N2SnapshotEditError.invalidWorker}
+        }
+        var root=try parse(snapshot)
+        guard var people=root["workers"] as? [[String:Any]],
+              let index=people.firstIndex(where:{$0["dni"] as? String==dni}) else{
+            throw N2SnapshotEditError.missingWorker
+        }
+        let previous=people[index]
+        var changes=[[String:String]]()
+        for key in ["name","area","labor","sex","age","birthDate","ubigeo","site"] {
+            let before=previous[key] as? String ?? ""
+            let after=incoming[key] as? String ?? ""
+            if before != after {
+                changes.append(["field":key,"before":before,"after":after])
+            }
+        }
+        if changes.isEmpty{return snapshot}
+        guard var history=root["nativeWorkerCorrections"] as? [[String:Any]] ?? [],
+              history.count<10000 else{throw N2SnapshotEditError.validationFailed}
+        var updated=previous
+        for key in ["name","area","labor","sex","age","birthDate","ubigeo","site"] {
+            updated[key]=incoming[key] as? String ?? ""
+        }
+        updated["source"]="manual"
+        updated["localCorrectionAt"]=at
+        people[index]=updated
+        root["workers"]=people
+        history.append(["dni":dni,"at":at,"changes":changes])
+        root["nativeWorkerCorrections"]=history
+        return try finish(root)
+    }
+
     public static func reviewAllergies(snapshot:Data,dni:String,status:String,
                                        substances:String,at:Int64)throws->Data {
         try clock(at)
