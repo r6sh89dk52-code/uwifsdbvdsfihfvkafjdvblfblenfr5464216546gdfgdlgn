@@ -356,44 +356,80 @@ public enum N2VerifiedIndicatorWorkbook {
                 (numeric(receipt["at"]) ?? 0)>(numeric(r["at"]) ?? 0)
             }) {throw Failure.invalidReconciliation}
         }
-        let atSite=active.filter{string($0["subdivision"])==subdivision}
-        guard allowPending || atSite.contains(where:{string($0["kind"])=="review" &&
-                 string($0["date"])==start &&
-                 string($0["periodEnd"])==end}) else{
-            throw Failure.unreviewedPeriod
-        }
+        // Consolidation is not a transfer between stock sites. A single
+        // workbook can include both locations only with independent reviews,
+        // opening/closing evidence, and per-site physical consumption.
+        let sites=subdivision=="AMBAS"
+            ? ["LA VENTUROSA","PLVENTUROSA"] : [subdivision]
+        let inScope=active.filter{sites.contains(string($0["subdivision"]))}
+        guard allowPending || sites.allSatisfy({location in
+            inScope.contains(where:{string($0["kind"])=="review" &&
+                string($0["subdivision"])==location &&
+                string($0["date"])==start &&
+                string($0["periodEnd"])==end})
+        }) else {throw Failure.unreviewedPeriod}
         var summary=[String:[String:Any]]()
         var openingCount=0,closingCount=0
         for item in catalogue {
             let code=string(item["code"]),used=consumption[code] ?? 0
-            let openings=atSite.filter{string($0["kind"])=="opening" &&
-                string($0["code"])==code && string($0["date"])==start}
-            let ending=atSite.filter{string($0["kind"])=="count" &&
-                string($0["code"])==code && string($0["date"])==end}
-            let receipts=atSite.filter{string($0["kind"])=="receipt" &&
+            let receipts=inScope.filter{string($0["kind"])=="receipt" &&
                 string($0["code"])==code &&
                 string($0["date"])>=start && string($0["date"])<=end}
-                .sorted{ (string($0["date"]),numeric($0["at"]) ?? 0,string($0["id"])) <
-                         (string($1["date"]),numeric($1["at"]) ?? 0,string($1["id"])) }
-            guard openings.count<=1,ending.count<=1,receipts.count<=4 else {
-                throw Failure.invalidReconciliation
-            }
+                .sorted{(string($0["date"]),numeric($0["at"]) ?? 0,string($0["id"])) <
+                        (string($1["date"]),numeric($1["at"]) ?? 0,string($1["id"]))}
+            // The original RESU template only has four receipt groups. Never
+            // drop extra receipts from the consolidated book.
+            guard receipts.count<=4 else{throw Failure.invalidReconciliation}
             let income=receipts.reduce(0){$0+(integer($1["quantity"]) ?? 0)}
             var row:[String:Any]=["code":code,"consumed":used,
-                                   "receipts":income,"receiptDetails":receipts]
-            if let opening=openings.first,let quantity=integer(opening["quantity"]) {
-                let final=quantity+income-used
-                guard final>=0 || allowPending else{throw Failure.invalidReconciliation}
-                openingCount+=1
-                row["opening"]=quantity
-                if !allowPending {row["closing"]=final}
-                if let count=ending.first,let actual=integer(count["quantity"]) {
-                    row["difference"]=final-actual
+                                  "receipts":income,"receiptDetails":receipts]
+            var knownOpenings=0,knownClosings=0
+            var combinedOpening=0,combinedClosing=0,combinedFinal=0
+            for location in sites {
+                let opening=inScope.filter{string($0["kind"])=="opening" &&
+                    string($0["subdivision"])==location &&
+                    string($0["code"])==code && string($0["date"])==start}
+                let closing=inScope.filter{string($0["kind"])=="count" &&
+                    string($0["subdivision"])==location &&
+                    string($0["code"])==code && string($0["date"])==end}
+                guard opening.count<=1,closing.count<=1 else{
+                    throw Failure.invalidReconciliation
+                }
+                let receiptsForSite=receipts.filter{
+                    string($0["subdivision"])==location
+                }.reduce(0){$0+(integer($1["quantity"]) ?? 0)}
+                let usedForSite=consumptionBySite[location+"|"+code] ?? 0
+                if let opening=opening.first,
+                   let original=integer(opening["quantity"]) {
+                    let final=original+receiptsForSite-usedForSite
+                    guard final>=0 || allowPending else {
+                        throw Failure.invalidReconciliation
+                    }
+                    knownOpenings+=1
+                    combinedOpening+=original
+                    combinedFinal+=final
+                } else if !allowPending && usedForSite>0 {
+                    // A physically dispensed product without a verified
+                    // site-specific opening balance cannot be certified.
+                    throw Failure.invalidReconciliation
+                }
+                if let closing=closing.first,
+                   let actual=integer(closing["quantity"]) {
+                    knownClosings+=1
+                    combinedClosing+=actual
                 }
             }
-            if let ending=ending.first,let count=integer(ending["quantity"]) {
+            if knownOpenings==sites.count {
+                openingCount+=1
+                row["opening"]=combinedOpening
+                if !allowPending {row["closing"]=combinedFinal}
+            }
+            if knownClosings==sites.count {
                 closingCount+=1
-                row["count"]=count
+                row["count"]=combinedClosing
+            }
+            if knownOpenings==sites.count && knownClosings==sites.count {
+                row["difference"]=combinedFinal-combinedClosing
             }
             summary[code]=row
         }
