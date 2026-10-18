@@ -72,7 +72,6 @@ struct N2NativeWorkerEditorView:View {
                     DanperField(title:"DNI") {
                         TextField("Ej. 00000006",text:$dni)
                             .keyboardType(.numberPad)
-                            .textContentType(.none)
                             .disabled(!savedDNI.isEmpty)
                     }
                     Text("En esta beta utiliza un DNI de ocho cifras que comience por 000000.")
