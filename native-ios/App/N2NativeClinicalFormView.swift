@@ -68,6 +68,8 @@ struct N2NativeClinicalFormView:View {
     @State private var allergyStatus="unknown"
     @State private var allergySubstances=""
     @State private var editingAllergy=false
+    @State private var allergyConfirmationProduct:String?
+    @State private var allergyMatches=[String]()
     @State private var autosaveTask:Task<Void,Never>?
     @State private var lastAutosaveTimestamp:Int64=0
     @Environment(\.scenePhase) private var scenePhase
@@ -238,6 +240,24 @@ struct N2NativeClinicalFormView:View {
                 .sensoryFeedback(.selection,trigger:step) {_,_ in haptics}
                 .sensoryFeedback(.selection,trigger:form.procedures.count) {_,_ in haptics}
                 .sensoryFeedback(.success,trigger:saved) {_,_ in haptics}
+                .confirmationDialog("Revisar coincidencia textual de alergia",
+                    isPresented:Binding(
+                        get:{allergyConfirmationProduct != nil},
+                        set:{if !$0 {allergyConfirmationProduct=nil}}
+                    ),titleVisibility:.visible) {
+                    Button("Agregar y conservar advertencia") {
+                        if let code=allergyConfirmationProduct {
+                            appendClinicalMedication(code)
+                        }
+                        allergyConfirmationProduct=nil
+                    }
+                    Button("Cancelar",role:.cancel) {
+                        allergyConfirmationProduct=nil
+                    }
+                } message: {
+                    Text("Posible coincidencia con alergia declarada: "+allergyMatches.joined(separator:", ")+
+                         ". Esta alerta usa solo texto; no verifica principios activos ni reacciones cruzadas. Comprueba la indicación antes de cualquier administración.")
+                }
                 .alert("Trabajador no registrado",isPresented:$showMissingWorker) {
                     Button("Registrar trabajador") {
                         showNewWorker=true
@@ -543,9 +563,18 @@ struct N2NativeClinicalFormView:View {
                 DanperInlineSearch(title:"Buscar medicamento o insumo",placeholder:"Ej. Paracetamol",
                     options:context.products.clinical.map{DanperSearchOption(id:$0.code,title:$0.name,detail:$0.unit+" · Código "+$0.code)},
                     onSelect:{code in
-                        let med=N2FormMedication(code:code)
-                        form.items.append(med);expandedMedication=med.id
-                        form.refreshProcedureSuggestions(catalog:context.products)
+                        let name=medicationName(code,context)
+                        let documented=context.allergies[form.dni]
+                        let current=allergyStatus=="known" ? allergySubstances : ""
+                        let prior=documented?.status=="known" ? documented?.substances ?? "" : ""
+                        let matches=N2MedicationAllergyTextMatch.matches(
+                            productName:name,substances:current+";"+prior)
+                        if matches.isEmpty {
+                            appendClinicalMedication(code)
+                        } else {
+                            allergyMatches=Array(Set(matches)).sorted()
+                            allergyConfirmationProduct=code
+                        }
                     },onClose:{chooseProduct=false})
             }
 
@@ -616,6 +645,12 @@ struct N2NativeClinicalFormView:View {
         }
     }
         }
+    private func appendClinicalMedication(_ code:String) {
+        let med=N2FormMedication(code:code)
+        form.items.append(med)
+        expandedMedication=med.id
+        if let context {form.refreshProcedureSuggestions(catalog:context.products)}
+    }
     private func medicationName(_ code:String,_ context:N2FormContext)->String {
         context.products.clinical.first(where:{$0.code==code})?.name ?? code
     }
@@ -633,6 +668,13 @@ struct N2NativeClinicalFormView:View {
                             Text(medicationName(med.code,context)).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
                             Text("Cantidad \(med.quantity) · \(med.procedure.isEmpty ? "Procedimiento pendiente" : med.procedure.capitalized)")
                                 .font(.caption).foregroundStyle(.secondary)
+                            if allergyStatus=="known",
+                               !N2MedicationAllergyTextMatch.matches(
+                                  productName:medicationName(med.code,context),
+                                  substances:allergySubstances).isEmpty {
+                                Label("Revisar posible coincidencia de alergia",systemImage:"exclamationmark.triangle.fill")
+                                    .font(.caption).foregroundStyle(.orange)
+                            }
                         }.frame(maxWidth:.infinity,alignment:.leading)
                         Image(systemName:expandedMedication==med.id ? "chevron.up" : "chevron.down")
                             .font(.caption.weight(.bold)).foregroundStyle(.secondary)
