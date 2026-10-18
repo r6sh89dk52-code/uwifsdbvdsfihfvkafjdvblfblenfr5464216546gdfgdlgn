@@ -111,8 +111,13 @@ public enum N2NativeClinicalTransaction {
               let items=new["items"] as? [[String:Any]],
               items.count<=100,visits.count<100_000
         else {throw N2ClinicalError.invalidVisit}
+        // Existing saved encounters retain their original worker-name snapshot.
+        // Editing a profile must not invalidate an immutable old encounter.
+        // New encounters still require the current recorded DNI + name.
         guard workers.contains(where:{$0["dni"] as? String == dni &&
-            $0["name"] as? String == name}) else {throw N2ClinicalError.wrongWorker}
+            (!append || $0["name"] as? String == name)}) else {
+            throw N2ClinicalError.wrongWorker
+        }
         if append {
             if let existingIndex=visits.firstIndex(where:{$0["id"] as? String == id}) {
                 let draft=visits[existingIndex]
