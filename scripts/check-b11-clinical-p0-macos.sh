@@ -68,11 +68,8 @@ xcrun simctl boot "$SIM_ID"
 xcrun simctl bootstatus "$SIM_ID" -b
 cd "$ROOT/native-ios"
 LOG="$DEST/DANPER_B11_CLINICAL_P0_TEST.log"
-RESULT="$DEST/DANPER_B11_CLINICAL_P0_TEST.xcresult"
-if [ -e "$RESULT" ]; then
-    echo "Existing test result bundle retained. Move it before retrying: $RESULT" >&2
-    exit 1
-fi
+RESULT="$DEST/DANPER_B11_CLINICAL_P0_$(date +%Y%m%d_%H%M%S)_$.xcresult"
+echo "Preserving this run's isolated XCTest evidence: $RESULT"
 # Unit interop: build222 backup archive encryption, read-only inspection,
 # decryption with correct/incorrect password, integrity and clinical history.
 set +e
