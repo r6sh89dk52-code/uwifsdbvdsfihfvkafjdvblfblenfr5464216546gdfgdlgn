@@ -65,8 +65,13 @@ for(const site of sites) {
   seen.add(key);
   result.push({site:site.id,area:name,code:row.E});
  }
- assert(seen.size>0,'No official areas for site '+site.id);
+ const expected=site.id==='LA VENTUROSA'?31:124;
+ assert.strictEqual(seen.size,expected,
+  'Catálogo incompleto para '+site.id+': '+seen.size+' de '+expected+
+  ' áreas oficiales. Revisa @subuo/@uo de la plantilla.');
+
 }
+assert.strictEqual(result.length,155,'Deben existir 155 áreas oficiales (31 fundo + 124 planta).');
 assert(result.every(a=>/^\d{8}$/.test(a.code)));
 module.exports={result};
 if(require.main===module)console.log(JSON.stringify({count:result.length,perSite:sites.map(s=>({site:s.id,count:result.filter(a=>a.site===s.id).length}))}));
