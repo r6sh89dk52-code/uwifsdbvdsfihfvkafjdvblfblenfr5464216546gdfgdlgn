@@ -19,6 +19,27 @@ targets:
         type: folder
     dependencies:
       - package: DanperCore
+    preBuildScripts:
+      - name: "Verificar catálogo de áreas DANPER"
+        basedOnDependencyAnalysis: false
+        script: |
+          set -eu
+          ROOT="${PROJECT_DIR}/.."
+          ASSET="${PROJECT_DIR}/App/N1sDemoResources/n2-organization-areas.json"
+          export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+          if [ ! -s "$ASSET" ] || [ "$ROOT/scripts/n2-official-area-catalog.cjs" -nt "$ASSET" ] || [ "$ROOT/src/ambulatoryTemplate.json" -nt "$ASSET" ]; then
+            cd "$ROOT"
+            if [ ! -d node_modules/fflate ]; then
+              echo "error: Dependencias JavaScript ausentes. Ejecuta npm ci desde la raíz del proyecto."
+              exit 1
+            fi
+            node scripts/prepare-n1s-ios-demo-resources.cjs
+          fi
+          if [ ! -s "$ASSET" ]; then
+            echo "error: No se pudo generar el catálogo oficial de áreas."
+            exit 1
+          fi
+          echo "Catálogo organizativo listo para el simulador."
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview
