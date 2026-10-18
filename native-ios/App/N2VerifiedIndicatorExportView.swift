@@ -18,6 +18,7 @@ private struct N2IndicatorShareSheet:UIViewControllerRepresentable {
 /// Entirely native N2 selection screen. The builder refuses pending stock,
 /// missing review events, mixed sites, or invented official balances.
 struct N2VerifiedIndicatorExportView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     private var layoutOnly=false
     private var layoutSelectionOnly=false
     init() {}
@@ -177,7 +178,7 @@ struct N2VerifiedIndicatorExportView:View {
                     endDate=cal.date(byAdding:.day,value:-1,to:next) ?? start
                 } else {endDate=start}
             }
-            guard let history=try await N2SyntheticTrialIOSVault.shared
+            guard let history=try await vault
                     .readHistory() else {
                 throw N2VerifiedIndicatorWorkbook.Failure.invalidSnapshot
             }
@@ -202,7 +203,7 @@ struct N2VerifiedIndicatorExportView:View {
         status="Comprobando los 30 campos, entregas y cierre del período…"
         defer{working=false}
         do {
-            let result=try await N2SyntheticTrialIOSVault.shared
+            let result=try await vault
                 .exportVerifiedIndicatorWorkbook(
                     start:local(startDate),end:local(endDate),
                     subdivision:site,ids:selected,allowPending:provisional)
