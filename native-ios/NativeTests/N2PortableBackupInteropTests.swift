@@ -68,6 +68,65 @@ final class N2PortableBackupInteropTests:XCTestCase {
         let actualRealSource=try await N2ProtectedClinicalIOSVault.shared.inspect()
         XCTAssertNil(actualRealSource)
     }
+    func testBuild222EncryptedSourceReviewCannotBeChangedBeforeRestore() throws {
+        // An entirely invented identity, only in an ephemeral XCTest archive.
+        let source:[String:Any]=[
+            "workers":[["dni":"87654321","name":"Mariana Torres Salazar",
+                        "area":"Prueba","labor":"Operaria","sex":"F","age":"27",
+                        "ubigeo":"","site":"PLVENTUROSA"]],
+            "attentions":[],"allergies":[String:Any](),
+            "notifications":false,
+            "stockLots":[],"stockMovements":[],"catalogMappings":[],
+            "deliveryIncidents":[],"ambulatoryReconciliation":[]
+        ]
+        let snapshot=try JSONSerialization.data(withJSONObject:source)
+        let pass="N2-interop-synthetic-backup-2026"
+        let first=try N2NativePortableBackupMaker.createVerified(
+            snapshot:snapshot,password:pass)
+        let file=FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString+".danperbackup")
+        try first.write(to:file,options:.atomic)
+        defer{try? FileManager.default.removeItem(at:file)}
+        let review=try PortableBackupInspector.review(url:file,password:pass)
+        XCTAssertTrue(review.canRestore)
+        XCTAssertEqual(review.audit.manifest.workers,1)
+        XCTAssertEqual(review.audit.manifest.attentions,0)
+        XCTAssertEqual(review.audit.manifest.movements,0)
+        XCTAssertEqual(review.audit.manifest.lots,0)
+        XCTAssertEqual(review.encryptedSHA256.count,64)
+        XCTAssertThrowsError(try PortableBackupInspector.review(
+            url:file,password:"completely-different-passphrase"))
+        let second=try N2NativePortableBackupMaker.createVerified(
+            snapshot:snapshot,password:pass)
+        try second.write(to:file,options:.atomic)
+        let changed=try PortableBackupInspector.review(url:file,password:pass)
+        XCTAssertNotEqual(changed.encryptedSHA256,review.encryptedSHA256,
+                          "A differently encrypted archive must force a new review")
+    }
+    func testFullSyntheticClinicalBackupPreservesPhysicalHistoryAcrossReview()throws {
+        guard let fixture=Bundle.main.url(forResource:"n1e-clinical-stock",
+                   withExtension:"json",subdirectory:"N1sDemoResources") else{
+            throw XCTSkip("Clinical demo resource not bundled in this host")
+        }
+        let raw=try Data(contentsOf:fixture)
+        let original=try N1eLegacyClinicalAudit.inspect(raw)
+        let pass="N2-interop-full-clinical-backup-2026"
+        let file=FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString+".danperbackup")
+        let sealed=try N2NativePortableBackupMaker.createVerified(
+            snapshot:raw,password:pass)
+        try sealed.write(to:file,options:.atomic)
+        defer {try? FileManager.default.removeItem(at:file)}
+        let review=try PortableBackupInspector.review(url:file,password:pass)
+        XCTAssertEqual(review.audit.manifest.workers,original.workers)
+        XCTAssertEqual(review.audit.manifest.attentions,original.attentions)
+        XCTAssertEqual(review.audit.manifest.movements,original.physicalMovements)
+        XCTAssertEqual(review.audit.manifest.lots,original.stockLots)
+        XCTAssertEqual(review.audit.unresolvedClinicalConsumptions,
+                       original.pendingClinicalItems)
+        // The source fixture includes provisional clinical consumptions. They
+        // must stay pending; no physical movement is invented by reviewing.
+    }
     func testUnsafePasswordAndPlaintextAreRejected() throws {
         XCTAssertThrowsError(try N2NativePortableBackupMaker.createVerified(
             snapshot:try sample(),password:"short"))
