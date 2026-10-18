@@ -75,7 +75,7 @@ public enum N2AreaAutocomplete {
             let rhs=needle.isEmpty ? 0:rank(b.name,needle:needle)
             if lhs != rhs{return lhs<rhs}
             if a.sourceRank != b.sourceRank{return a.sourceRank<b.sourceRank}
-            return a.name.localizedStandardCompare(b.name)==.orderedAscending
+            return a.name.localizedStandardCompare(b.name) == ComparisonResult.orderedAscending
         }.prefix(limit).map(\.name)
     }
 }
