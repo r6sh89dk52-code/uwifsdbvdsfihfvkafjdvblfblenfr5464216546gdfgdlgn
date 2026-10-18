@@ -144,9 +144,9 @@ struct N2VerifiedNursingExportView:View {
                 withIntermediateDirectories:true,
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
-            let output=dir.appendingPathComponent(
-                "DANPER_KARDEX_N2_"+selectedPeriod.start+
-                (reportMode=="daily" ? "" : "_al_"+selectedPeriod.end)+".xlsx")
+            let suffix=reportMode=="daily" ? "" : "_al_" + selectedPeriod.end
+            let name="DANPER_KARDEX_N2_" + selectedPeriod.start + suffix + ".xlsx"
+            let output=dir.appendingPathComponent(name)
             try result.xlsx.write(to:output,
                 options:[.atomic,.completeFileProtection])
             status="Generado: \(result.stockKnownRows) productos con historial; " +
