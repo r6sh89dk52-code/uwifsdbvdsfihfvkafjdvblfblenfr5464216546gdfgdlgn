@@ -17,6 +17,7 @@ private struct N2NursingActivity:UIViewControllerRepresentable {
 
 /// Uses the encrypted N2 source, not the bundled synthetic test report.
 struct N2VerifiedNursingExportView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     @State private var day=Date()
     @State private var reportMode="daily"
     @State private var rangeStart=Date()
@@ -126,12 +127,12 @@ struct N2VerifiedNursingExportView:View {
             let result:N2VerifiedNursingWorkbook.Result
             let operatorName=responsible.trimmingCharacters(in:.whitespacesAndNewlines)
             if reportMode=="daily" {
-                result=try await N2SyntheticTrialIOSVault.shared
+                result=try await vault
                     .exportVerifiedDailyNursingWorkbook(
                         date:selectedDay,shift:shift,
                         responsible:operatorName,site:site)
             } else {
-                result=try await N2SyntheticTrialIOSVault.shared
+                result=try await vault
                     .exportVerifiedRangeNursingWorkbook(
                         start:selectedPeriod.start,end:selectedPeriod.end,
                         responsible:operatorName,site:site)
