@@ -1,7 +1,7 @@
 import Foundation
 
-/// Presentation-level admission rules for the isolated fictional iOS beta.
-/// Never infer that a failed button tap succeeded or create real personnel.
+/// Presentation-level admission rules for the native iOS registration flow.
+/// Never infer that a failed button tap succeeded or bypass duplicate-DNI checks.
 public enum N2WorkerRegistrationGate {
     public static func issues(dni:String,names:String,site:String,
                               isBirthDateKnown:Bool,birthDateValid:Bool,
@@ -12,12 +12,11 @@ public enum N2WorkerRegistrationGate {
             result.append("No se pudo abrir el registro local. Vuelve a Inicio e intenta entrar nuevamente.")
         }
         if dni.isEmpty {
-            result.append("Introduce un DNI de prueba o genera uno disponible.")
+            result.append("Introduce el DNI de ocho dígitos.")
         } else if dni.count != 8 ||
                   !dni.utf8.allSatisfy({(48...57).contains($0)}) {
             result.append("El DNI debe contener exactamente ocho dígitos.")
-        } else if !dni.hasPrefix("000000") {
-            result.append("Esta versión de evaluación solo admite DNI de prueba que empiecen por 000000. Utiliza «Generar DNI de prueba».")
+
         } else if knownDNI.contains(dni) {
             result.append("El DNI ya existe en el directorio. Búscalo en Personal para evitar duplicados.")
         }
@@ -38,11 +37,4 @@ public enum N2WorkerRegistrationGate {
         return result
     }
 
-    public static func availableDemoDNI(excluding existing:Set<String>)->String? {
-        for number in Array(6...99)+Array(0...5) {
-            let candidate=String(format:"%08d",number)
-            if !existing.contains(candidate) {return candidate}
-        }
-        return nil
-    }
 }
