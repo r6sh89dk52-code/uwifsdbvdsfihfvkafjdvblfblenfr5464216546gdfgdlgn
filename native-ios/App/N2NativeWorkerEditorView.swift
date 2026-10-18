@@ -15,6 +15,7 @@ struct N2NativeWorkerEditorView:View {
     @State private var existingAreas=[String:String]()
     @State private var officialAreas=[N2OfficialArea]()
     @State private var areaCatalogIncomplete=false
+    @State private var areaCatalogDiagnostics=""
     @State private var dni=""
     @State private var names=""
     @State private var area=""
@@ -104,9 +105,14 @@ struct N2NativeWorkerEditorView:View {
                             .accessibilityIdentifier("worker-area-search")
                     }
                     if areaCatalogIncomplete {
-                        Label("No se cargó el catálogo completo de áreas. Puedes escribir el área manualmente.",
+                        Label("No se pudo cargar el catálogo completo. Puedes escribir el área manualmente.",
                               systemImage:"exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.orange)
+                        if !areaCatalogDiagnostics.isEmpty {
+                            Text(areaCatalogDiagnostics)
+                                .font(.caption2).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("area-catalog-diagnostic")
+                        }
                     } else {
                         let total=N2AreaAutocomplete.officialCount(site:site,official:officialAreas)
                         if total>0 {
@@ -221,16 +227,45 @@ struct N2NativeWorkerEditorView:View {
     }
     @MainActor
     private func load() async {
-        if let url=Bundle.main.url(forResource:"n2-organization-areas",
-                                   withExtension:"json",subdirectory:"N1sDemoResources"),
-           let data=try? Data(contentsOf:url),
-           let list=try? JSONDecoder().decode([N2OfficialArea].self,from:data),
-           N2AreaAutocomplete.isComplete(official:list) {
-            officialAreas=list
+        // The official directory is generated twice from the same XLSX:
+        // as a root App JSON resource and inside N1sDemoResources.
+        // Try both to tolerate XcodeGen folder-resource packaging differences.
+        let locations:[URL?]=[
+            Bundle.main.url(forResource:"DANPEROfficialAreas",withExtension:"json"),
+            Bundle.main.url(forResource:"n2-organization-areas",withExtension:"json",
+                            subdirectory:"N1sDemoResources"),
+            Bundle.main.url(forResource:"n2-organization-areas",withExtension:"json")
+        ]
+        var attempts=[String]()
+        var validated:[N2OfficialArea]?
+        for location in locations {
+            guard let url=location else {
+                attempts.append("Recurso no encontrado")
+                continue
+            }
+            do {
+                let bytes=try Data(contentsOf:url)
+                let list=try JSONDecoder().decode([N2OfficialArea].self,from:bytes)
+                let fondo=N2AreaAutocomplete.officialCount(site:"LA VENTUROSA",official:list)
+                let planta=N2AreaAutocomplete.officialCount(site:"PLVENTUROSA",official:list)
+                guard N2AreaAutocomplete.isComplete(official:list) else {
+                    attempts.append("\(url.lastPathComponent): fundo \(fondo)/31, planta \(planta)/124")
+                    continue
+                }
+                validated=list
+                break
+            } catch {
+                attempts.append("\(url.lastPathComponent): formato inválido")
+            }
+        }
+        if let validated {
+            officialAreas=validated
             areaCatalogIncomplete=false
+            areaCatalogDiagnostics=""
         } else {
             officialAreas=[]
             areaCatalogIncomplete=true
+            areaCatalogDiagnostics=attempts.joined(separator:" · ")
         }
         do {
             if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
