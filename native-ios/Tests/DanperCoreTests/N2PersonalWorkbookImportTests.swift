@@ -120,6 +120,30 @@ final class N2PersonalWorkbookImportTests:XCTestCase {
             preview:imported,site:"PLVENTUROSA"))
     }
 
+    func testInlineStrPERSONALWithoutOptionalSharedStrings()throws {
+        let sheet="""
+        <row r="1">
+            <c r="A1" t="inlineStr"><is><t>DNI</t></is></c>
+            <c r="B1" t="inlineStr"><is><t>NOMBRES</t></is></c>
+            <c r="C1" t="inlineStr"><is><t>EDAD AUTOMATIZADA</t></is></c>
+            <c r="D1" t="inlineStr"><is><t>SEXO</t></is></c>
+        </row>
+        <row r="2">
+            <c r="A2"><v>78654321</v></c>
+            <c r="B2" t="inlineStr"><is><t>Luis Paredes Rojas</t></is></c>
+            <c r="C2"><v>33</v></c>
+            <c r="D2" t="inlineStr"><is><t>M</t></is></c>
+        </row>
+        """
+        let url=try makeWorkbook(rows:[sheet],useSharedStrings:false)
+        defer{try? FileManager.default.removeItem(at:url)}
+        let result=try N2PersonalWorkbookReader.read(url:url)
+        XCTAssertEqual(result.stats.valid,1)
+        XCTAssertEqual(result.workers.first?.age,"33")
+        XCTAssertEqual(result.workers.first?.sex,"M")
+        XCTAssertTrue(result.stats.canConfirm)
+    }
+
     func testMissingPERSONALRejected()throws {
         let workbook=try makeWorkbook(rows:["<row r=\"1\"></row>"],
                                       includePersonal:false)
