@@ -49,7 +49,7 @@ assert(view.includes('evaluatePolicy('));
 assert(view.includes('previewPersonalMerge('));
 assert(view.includes('mergePersonal('));
 assert(view.includes('activateInitialPersonal('));
-assert(view.includes('scenePhase == .background'));
+assert(view.includes('if phase == .background'));
 assert(gate.includes('N2NativePersonalImportView()'));
 assert(tests.includes('testCompressedPERSONALWithSharedStringsAndInlineWorkers'));
 assert(tests.includes('testInlineStrPERSONALWithoutOptionalSharedStrings'));
