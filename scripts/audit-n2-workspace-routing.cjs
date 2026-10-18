@@ -48,5 +48,22 @@ assert(gate.includes('if phase != .active {onClose()}'));
 const rootUI=fs.readFileSync(path.join(app,'NativeRootView.swift'),'utf8');
 assert(rootUI.includes('N2ClinicalWorkspaceGateView()'));
 assert(rootUI.includes('N2SyntheticTrialIOSVault.shared.startSyntheticDemo()'));
+const resetView=fs.readFileSync(path.join(app,'N2DemoResetView.swift'),'utf8');
+const resetActor=fs.readFileSync(path.join(app,'N2SyntheticTrialIOSVault.swift'),'utf8');
+const scope=fs.readFileSync(path.join(root,'native-ios','Sources','DanperCore',
+                                    'N2SyntheticResetScope.swift'),'utf8');
+assert(rootUI.includes('N2DemoResetView(onDeleted:'));
+assert(resetView.includes('N2SyntheticTrialIOSVault.shared.eraseEntireDemo('));
+assert(resetView.includes('N2SyntheticResetScope.confirmation'));
+assert(resetView.includes('evaluatePolicy('));
+assert(!resetView.includes('N2ProtectedClinicalIOSVault.shared'));
+assert(scope.includes('"DANPER-N2-SYNTHETIC-VAULT"'));
+assert(scope.includes('"DANPER-N2-CLINICAL-VAULT"'));
+assert(resetActor.includes('SecItemDelete(query() as CFDictionary)'));
+assert(resetActor.includes('N2SyntheticResetScope.canErase('));
+assert(!resetActor.includes('removeAllPendingNotificationRequests('));
+const reminder=fs.readFileSync(path.join(app,'N2DraftReminder.swift'),'utf8');
+assert(reminder.includes('mode.rawValue'));
+assert(reminder.includes('if mode == .demo'));
 console.log('PASS: '+views.length+' views route via immutable workspace; '+calls.length+
- ' clinical/demo vault methods, separate authenticated clinical gate, no automatic migration.');
+ ' clinical/demo vault methods, separate authenticated clinical gate, safe DEMO reset path and reminders.');
