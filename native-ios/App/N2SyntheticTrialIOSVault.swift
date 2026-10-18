@@ -118,7 +118,8 @@ actor N2SyntheticTrialIOSVault {
         guard let obj=try? JSONSerialization.jsonObject(with:worker) as? [String:Any],
               let dni=obj["dni"] as? String,
               let name=obj["name"] as? String,
-              dni.count==8,dni.hasPrefix("000000"),
+              dni.utf8.count==8,
+              dni.utf8.allSatisfy({(48...57).contains($0)}),
               name.trimmingCharacters(in:.whitespacesAndNewlines).count>=5 else {
             throw Failure.blockedMigration
         }
