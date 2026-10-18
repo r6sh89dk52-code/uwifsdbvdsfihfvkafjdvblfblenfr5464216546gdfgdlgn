@@ -118,6 +118,16 @@ struct NativeRootView:View {
                     .padding(.horizontal,12)
                     .padding(.vertical,8)
                     .background(danperAccent.opacity(0.09),in:Capsule())
+                DanperPanel {
+                    Label("MODO DE PRUEBA · DATOS FICTICIOS",
+                          systemImage:"exclamationmark.shield.fill")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.orange)
+                    Text("Esta versión utiliza una bóveda de ensayo. No introduzcas datos de pacientes reales: la bóveda clínica independiente aún no está habilitada en las pantallas de trabajo.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .fixedSize(horizontal:false,vertical:true)
+                }
+                .accessibilityIdentifier("clinical-demo-mode-warning")
                 if isReady {
                     Button {tab=2} label: {
                         HStack {
