@@ -136,7 +136,7 @@ struct N2NativeClinicalFormView:View {
             return
         }
         form.dni=""
-        if digits.isEmpty {workerNameInput=""}
+        workerNameInput=""
         notFoundDNI=""
         guard digits.count==8,!layoutOnly else{return}
         dniLookupTask=Task { @MainActor in
