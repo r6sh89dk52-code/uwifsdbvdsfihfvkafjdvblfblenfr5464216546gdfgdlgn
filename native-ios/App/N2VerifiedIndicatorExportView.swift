@@ -209,7 +209,8 @@ struct N2VerifiedIndicatorExportView:View {
                     subdivision:site,ids:selected,allowPending:provisional)
             cleanup()
             let dir=FileManager.default.temporaryDirectory
-                .appendingPathComponent("danper-n2-indicator-"+UUID().uuidString,
+                .appendingPathComponent((vault.isClinical ? "danper-n2-clinical-indicator-" :
+                                            "danper-n2-demo-indicator-")+UUID().uuidString,
                                         isDirectory:true)
             try FileManager.default.createDirectory(at:dir,
                 withIntermediateDirectories:true,
