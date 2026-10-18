@@ -28,7 +28,9 @@ struct N2NativeWorkerEditorView:View {
     @State private var site="LA VENTUROSA"
     @State private var sex=""
     @State private var hasBirthDate=false
-    @State private var birthDate=Date()
+    @State private var birthDateText=""
+    @State private var manualAgeText=""
+    @FocusState private var birthDateFocused:Bool
     @State private var ubigeo=""
     @State private var revision:Int?
     @State private var busy=false
@@ -44,11 +46,21 @@ struct N2NativeWorkerEditorView:View {
         return f.string(from:date)
     }
     private var today:String{iso(Date())}
-    private var birthISO:String{hasBirthDate ? iso(birthDate) : ""}
+    private var birthISO:String {
+        guard hasBirthDate else{return ""}
+        return N2WorkerBirthDateEntry.validatedISO(birthDateText,on:today) ?? ""
+    }
     private var ageLabel:String {
-        guard hasBirthDate,
+        guard !birthISO.isEmpty,
               let years=N2WorkerAge.years(birthDate:birthISO,on:today) else{return ""}
         return "Edad actual: \(years) años. Se actualizará automáticamente."
+    }
+    private var birthDateComplete:Bool {
+        N2WorkerBirthDateEntry.digits(birthDateText).count==8
+    }
+    private var ageEntryIsValid:Bool {
+        manualAgeText.isEmpty ||
+        N2WorkerBirthDateEntry.manualAge(manualAgeText) != nil
     }
     private var ready:Bool {
         revision != nil && !busy && savedDNI.isEmpty &&
@@ -56,7 +68,7 @@ struct N2NativeWorkerEditorView:View {
         dni.utf8.allSatisfy{(48...57).contains($0)} &&
         names.trimmingCharacters(in:.whitespacesAndNewlines).count>=5 &&
         (sex.isEmpty || ["M","F"].contains(sex)) &&
-        (!hasBirthDate || N2WorkerAge.years(birthDate:birthISO,on:today) != nil)
+        (hasBirthDate ? !birthISO.isEmpty : ageEntryIsValid)
     }
     private var areaSuggestions:[String] {
         guard areaSuggestionsVisible else{return []}
@@ -168,14 +180,58 @@ struct N2NativeWorkerEditorView:View {
                         labels:["":"No consignado","M":"Masculino","F":"Femenino"])
                     Toggle("Conozco la fecha de nacimiento",isOn:$hasBirthDate)
                         .tint(DanperStyle.red)
+                        .onChange(of:hasBirthDate) {_,known in
+                            // Switching modes clears the other entry so it
+                            // cannot be accidentally saved as a stale value.
+                            if known {
+                                manualAgeText=""
+                            } else {
+                                birthDateText=""
+                                birthDateFocused=false
+                            }
+                        }
                     if hasBirthDate {
-                        DatePicker("Fecha de nacimiento",selection:$birthDate,
-                                   in:...Date(),displayedComponents:.date)
-                            .datePickerStyle(.compact)
-                            .environment(\.locale,Locale(identifier:"es_PE"))
-                        if !ageLabel.isEmpty {
+                        DanperField(title:"Fecha de nacimiento") {
+                            TextField("DD/MM/AAAA",text:$birthDateText)
+                                .keyboardType(.numberPad)
+                                .focused($birthDateFocused)
+                                .accessibilityLabel("Fecha de nacimiento, día mes y año")
+                                .accessibilityIdentifier("worker-birth-date-text")
+                                .onChange(of:birthDateText) {_,input in
+                                    let formatted=N2WorkerBirthDateEntry.format(input)
+                                    if input != formatted {birthDateText=formatted}
+                                }
+                        }
+                        if !birthDateComplete {
+                            Text("Escribe ocho dígitos, por ejemplo 18101999. Los separadores se agregan automáticamente.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        } else if birthISO.isEmpty {
+                            Label("La fecha no es válida o es posterior a hoy.",
+                                  systemImage:"exclamationmark.circle")
+                                .font(.caption).foregroundStyle(.orange)
+                        } else if !ageLabel.isEmpty {
                             Label(ageLabel,systemImage:"calendar")
                                 .font(.footnote).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        DanperField(title:"Edad (opcional)") {
+                            TextField("Edad en años",text:$manualAgeText)
+                                .keyboardType(.numberPad)
+                                .accessibilityIdentifier("worker-manual-age")
+                                .onChange(of:manualAgeText) {_,input in
+                                    let cleaned=String(decoding:input.utf8
+                                        .filter{(48...57).contains($0)}.prefix(3),
+                                        as:UTF8.self)
+                                    if input != cleaned {manualAgeText=cleaned}
+                                }
+                        }
+                        if !ageEntryIsValid {
+                            Label("Introduce una edad válida entre 0 y 120 años.",
+                                  systemImage:"exclamationmark.circle")
+                                .font(.caption).foregroundStyle(.orange)
+                        } else {
+                            Text("Si no conoces la fecha de nacimiento, la edad quedará registrada como dato declarado; no se actualizará automáticamente.")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     DanperField(title:"Ubigeo (opcional)") {
@@ -310,8 +366,11 @@ struct N2NativeWorkerEditorView:View {
             "area":area.trimmingCharacters(in:.whitespacesAndNewlines),
             "labor":labor.trimmingCharacters(in:.whitespacesAndNewlines),
             "site":site,"sex":sex,
-            "age":N2WorkerAge.years(birthDate:birthISO,on:today)
-                .map(String.init) ?? "",
+            "age":hasBirthDate
+                ? (N2WorkerAge.years(birthDate:birthISO,on:today)
+                   .map(String.init) ?? "")
+                : (N2WorkerBirthDateEntry.manualAge(manualAgeText)
+                   .map(String.init) ?? ""),
             "birthDate":birthISO,
             "ubigeo":ubigeo.trimmingCharacters(in:.whitespacesAndNewlines)
         ]
