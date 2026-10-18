@@ -196,7 +196,9 @@ public enum N2VerifiedIndicatorWorkbook {
             }
             let count=frequencyByID[aid] ?? 1
             let ageString=String(describing:worker["age"] ?? "")
-            let age=(Int(ageString).flatMap{(0...120).contains($0) ? $0 : nil})
+            let birthday=string(worker["birthDate"])
+            let age=N2WorkerAge.years(birthDate:birthday,on:iso) ??
+                Int(ageString).flatMap{(0...120).contains($0) ? $0 : nil}
             let procedures=visit["standaloneProcedures"] as? [String] ?? []
             for row in items.isEmpty ? [[:]] : items {
                 let itemID=string(row["id"]),hasItem = !items.isEmpty
