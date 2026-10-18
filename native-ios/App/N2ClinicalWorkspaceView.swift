@@ -41,26 +41,29 @@ struct N2ClinicalWorkspaceGateView:View {
                         LabeledContent("Pendientes",value:String(summary.pendingClinicalLines))
                         Label("Bóveda clínica cifrada identificada",
                               systemImage:"checkmark.shield.fill")
+                        Text("Ya existe una fuente clínica. No podrás restaurar otra build 222 encima ni borrarla desde el importador PERSONAL; los respaldos originales se conservan intactos.")
+                            .font(.caption).foregroundStyle(.secondary)
                             .foregroundStyle(.green)
                     } else {
-                        NavigationLink {
-                            N2NativePersonalImportView()
-                        } label: {
-                            Label("Crear base clínica desde Excel PERSONAL",systemImage:"tablecells")
-                        }
-                        .buttonStyle(DanperPrimaryButton())
-                        Text("Puedes importar PERSONAL y comenzar con un directorio clínico vacío. No se añadirán registros ficticios ni existencias inventadas.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        Text("También puedes importar una fuente clínica completa previamente verificada.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                            .font(.subheadline).foregroundStyle(.secondary)
+                        Text("¿Ya utilizaste la build 222? Restaura PRIMERO su respaldo completo, antes de importar PERSONAL. Así conservarás trabajadores, atenciones, lotes, dispensaciones y pendientes.")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal:false,vertical:true)
                         NavigationLink {
                             N2NativeActivationView()
                         } label: {
-                            Label("Importación protegida · fuente única",
-                                  systemImage:"doc.badge.arrow.up")
+                            Label("Restaurar respaldo completo de build 222",
+                                  systemImage:"lock.doc")
+                        }
+                        .buttonStyle(DanperPrimaryButton())
+                        NavigationLink {
+                            N2NativePersonalImportView()
+                        } label: {
+                            Label("Empezar solo con Excel PERSONAL",systemImage:"tablecells")
                         }
                         .buttonStyle(DanperSecondaryButton())
+                        Text("Usa PERSONAL únicamente si deseas comenzar con un padrón nuevo y SIN las atenciones ni el inventario antiguos. Una vez creada la bóveda clínica, no se sobrescribe con otro respaldo.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                     Button {
                         Task {await refresh()}
