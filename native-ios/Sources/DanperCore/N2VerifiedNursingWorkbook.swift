@@ -29,5 +29,25 @@ public enum N2VerifiedNursingWorkbook {
         return Result(xlsx:book.xlsx,stockKnownRows:known,
                       stockUnknownRows:98-known,day:date)
     }
+    /// Verified multi-day report, explicitly labeled CONSOLIDADO with start/end.
+    public static func exportRange(snapshot:Data,catalog:Data,template:Data,
+                                   start:String,end:String,responsible:String,
+                                   site:String="")throws->Result {
+        let report=try N2NursingReportBuilder.range(
+            snapshot:snapshot,catalog:catalog,start:start,end:end,site:site)
+        guard report.rows.count==98,report.exportable else{
+            throw Failure.incompleteOrUnreconciled
+        }
+        let known=report.rows.filter(\.stockKnown).count
+        guard known>0 else{throw Failure.noPhysicalHistory}
+        let manifest=try report.manifest(shift:"CONSOLIDADO",responsible:responsible)
+        let book=try N1sNursingExcelWriter.export(base:template,manifest:manifest)
+        guard book.sheetCount==1,book.writtenRows==98,book.xlsx.count>20_000,
+              book.xlsx.starts(with:[0x50,0x4B,0x03,0x04]) else{
+            throw Failure.incompleteOrUnreconciled
+        }
+        return Result(xlsx:book.xlsx,stockKnownRows:known,
+                      stockUnknownRows:98-known,day:start)
+    }
 }
 
