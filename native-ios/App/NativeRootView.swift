@@ -69,6 +69,8 @@ struct NativeRootView:View {
                 .tabItem{Label("Más",systemImage:"square.grid.2x2.fill")}.tag(4)
         }
         .tint(DanperStyle.red)
+        // Regular tabs always belong to the isolated fictitious workspace.
+        .environment(\.n2WorkspaceVault,.demo)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
         .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
