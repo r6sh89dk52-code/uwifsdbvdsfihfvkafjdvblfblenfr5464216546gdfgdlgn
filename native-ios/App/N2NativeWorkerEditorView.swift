@@ -5,6 +5,7 @@ import DanperCore
 /// Manual worker registration into the isolated clinical store.
 /// If entered from an attention, the completed person returns to that encounter.
 struct N2NativeWorkerEditorView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     private let onSaved:((String)->Void)?
     private let editingDNI:String?
     @Environment(\.dismiss) private var dismiss
@@ -402,9 +403,9 @@ struct N2NativeWorkerEditorView:View {
         }
         }
         do {
-            if let vault=try await N2SyntheticTrialIOSVault.shared.inspect() {
-                revision=vault.revision
-                let context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            if let currentSummary=try await vault.inspect() {
+                revision=currentSummary.revision
+                let context=try await vault.clinicalFormContext()
                 existingDNI=Set(context.workers.map(\.dni))
                 workers=context.workers
                 if !initialProfileLoaded,let editingDNI,
@@ -412,7 +413,7 @@ struct N2NativeWorkerEditorView:View {
                     initialProfileLoaded=true
                     dni=record.dni
                     names=record.name
-                    officialIdentity=(try await N2SyntheticTrialIOSVault.shared.readHistory())?
+                    officialIdentity=(try await vault.readHistory())?
                         .roster.first(where:{$0.dni==editingDNI})?.rosterStatus == "official"
                     site=record.site.isEmpty ? "LA VENTUROSA" : record.site
                     area=record.area
@@ -534,12 +535,12 @@ struct N2NativeWorkerEditorView:View {
                 var stored:N2ProtectedStoreSummary?
                 do {
                     if let editingDNI {
-                        stored=try await N2SyntheticTrialIOSVault.shared.correctWorker(
+                        stored=try await vault.correctWorker(
                             dni:editingDNI,worker:bytes,
                             at:Int64(Date().timeIntervalSince1970*1000),
                             expectedRevision:expected)
                     } else {
-                        stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
+                        stored=try await vault.registerWorker(
                             bytes,at:Int64(Date().timeIntervalSince1970*1000),
                             expectedRevision:expected)
                     }
@@ -547,25 +548,25 @@ struct N2NativeWorkerEditorView:View {
                     // Another tab may have saved a draft in the meantime.
                     // Retry one time with the latest revision, without
                     // resetting or replacing the existing encrypted data.
-                    let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                    let fresh=try await vault.clinicalFormContext()
                     if editingDNI == nil && fresh.workers.contains(where:{$0.dni==candidate}) {
                         throw N2SnapshotEditError.duplicateWorker
                     }
                     expected=fresh.revision
                     if let editingDNI {
-                        stored=try await N2SyntheticTrialIOSVault.shared.correctWorker(
+                        stored=try await vault.correctWorker(
                             dni:editingDNI,worker:bytes,
                             at:Int64(Date().timeIntervalSince1970*1000),
                             expectedRevision:expected)
                     } else {
-                        stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
+                        stored=try await vault.registerWorker(
                             bytes,at:Int64(Date().timeIntervalSince1970*1000),
                             expectedRevision:expected)
                     }
                 }
                 guard let result=stored else {throw N2SnapshotEditError.validationFailed}
                 // Read back the persisted record before claiming success.
-                let confirmed=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                let confirmed=try await vault.clinicalFormContext()
                 guard let verified=confirmed.workers.first(where:{$0.dni==candidate}),
                       verified.name==(fields["name"] as? String),
                       verified.area==(fields["area"] as? String),
