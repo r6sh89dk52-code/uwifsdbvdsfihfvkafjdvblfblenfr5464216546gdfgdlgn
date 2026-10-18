@@ -400,6 +400,7 @@ struct N2NativeWorkerEditorView:View {
                 existingDNI=Set(context.workers.map(\.dni))
                 workers=context.workers
                 updateAreas()
+                if validationAttempted {revalidateAfterEdit()}
             }
         } catch {
             failed=true
