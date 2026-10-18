@@ -112,6 +112,29 @@ actor N2SyntheticTrialIOSVault {
         } catch {
             throw Failure.resetIncomplete
         }
+        // Remove ONLY temporary exports with the new explicit DEMO prefix.
+        // Old unscoped filenames cannot safely be classified as clinical vs
+        // demo, so they are not deleted; exported files in Files are external.
+        do {
+            let temp=fm.temporaryDirectory.standardizedFileURL
+            let items=try fm.contentsOfDirectory(
+                at:temp,includingPropertiesForKeys:[.isDirectoryKey,.isSymbolicLinkKey])
+            for folder in items where
+                    N2SyntheticResetScope.canEraseDemoTempFolder(
+                        named:folder.lastPathComponent) {
+                guard folder.standardizedFileURL.deletingLastPathComponent()==temp else {
+                    throw Failure.resetIncomplete
+                }
+                let info=try folder.resourceValues(
+                    forKeys:[.isDirectoryKey,.isSymbolicLinkKey])
+                guard info.isDirectory==true,info.isSymbolicLink != true else {
+                    throw Failure.resetIncomplete
+                }
+                try fm.removeItem(at:folder)
+            }
+        } catch {
+            throw Failure.resetIncomplete
+        }
         guard !fm.fileExists(atPath:target.path),
               try readKey()==nil else {
             throw Failure.resetIncomplete
