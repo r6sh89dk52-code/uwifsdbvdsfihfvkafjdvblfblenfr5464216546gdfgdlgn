@@ -104,30 +104,19 @@ struct N2NativeWorkerEditorView:View {
                 }
                 DanperPanel("Identificación") {
                     DanperField(title:"DNI") {
-                        TextField("Ej. 00000006",text:$dni)
+                        TextField("DNI de 8 dígitos",text:$dni)
                             .keyboardType(.numberPad)
+                            .accessibilityIdentifier("worker-registration-dni")
+                            .onChange(of:dni) {_,value in
+                                let numbers=String(decoding:value.utf8
+                                    .filter{(48...57).contains($0)}.prefix(8),
+                                    as:UTF8.self)
+                                if value != numbers {dni=numbers}
+                            }
                             .disabled(!savedDNI.isEmpty)
                     }
-                    HStack(alignment:.center,spacing:8) {
-                        Text("Para esta evaluación se utilizan identificadores de prueba.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer(minLength:0)
-                        Button("Generar DNI") {
-                            if let sample=N2WorkerRegistrationGate.availableDemoDNI(excluding:existingDNI) {
-                                dni=sample
-                                saveIssues=[]
-                                failed=false
-                            } else {
-                                status="No quedan identificadores disponibles para esta evaluación."
-                                failed=true
-                                showSaveError=true
-                            }
-                        }
-                        .font(.caption.weight(.semibold))
-                        .buttonStyle(.bordered)
-                        .tint(DanperStyle.red)
-                        .accessibilityIdentifier("generate-demo-worker-dni")
-                    }
+                    Text("Introduce los ocho dígitos del DNI. Si ya existe en Personal, no se duplicará.")
+                        .font(.caption).foregroundStyle(.secondary)
                     if existingDNI.contains(dni) {
                         Label("Este DNI ya está registrado.",systemImage:"person.crop.circle.badge.exclamationmark")
                             .font(.footnote).foregroundStyle(.orange)
