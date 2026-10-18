@@ -47,7 +47,7 @@ struct N2NativeClinicalFormView:View {
     @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var saved=false
     @State private var fault=false
-    @State private var status="Abriendo bóveda cifrada N2…"
+    @State private var status="Preparando el registro…"
     @State private var expandedMedication:String?
     @State private var chooseWorker=false
     @State private var showMissingWorker=false
@@ -103,7 +103,7 @@ struct N2NativeClinicalFormView:View {
                     if fault {
                         DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
                     } else if !saved && !layoutDetailOnly {
-                        Label("Prueba · datos ficticios",systemImage:"lock.shield")
+                        Label("Registro ambulatorio",systemImage:"cross.case.fill")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if !saved && !drafts.isEmpty {
@@ -325,7 +325,7 @@ struct N2NativeClinicalFormView:View {
                 }
             } else {
                 ContentUnavailableView(
-                    fault ? "Bóveda no disponible" : "Verificando historia clínica",
+                    fault ? "Datos no disponibles" : "Preparando formulario",
                     systemImage:"lock.shield",
                     description:Text(status))
                 .task {await load()}
@@ -800,7 +800,7 @@ struct N2NativeClinicalFormView:View {
             }
         }catch{
             fault=true
-            status="No hay una fuente clínica N2 verificada o su integridad falló. No se guardó ningún dato."
+            status="No se pudieron cargar los datos. Ningún registro fue modificado."
         }
     }
 
@@ -931,10 +931,10 @@ struct N2NativeClinicalFormView:View {
                 form.time=time
                 step=0
             }
-            status="Borrador eliminado de la bóveda cifrada."
+            status="Borrador eliminado."
         }catch {
             fault=true
-            status="No se pudo eliminar el borrador. Revisa la bóveda antes de editar."
+            status="No se pudo eliminar el borrador. Inténtalo nuevamente."
         }
     }
 
