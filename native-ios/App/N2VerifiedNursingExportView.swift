@@ -139,7 +139,8 @@ struct N2VerifiedNursingExportView:View {
             }
             cleanup()
             let dir=FileManager.default.temporaryDirectory
-                .appendingPathComponent("danper-n2-kardex-"+UUID().uuidString,
+                .appendingPathComponent((vault.isClinical ? "danper-n2-clinical-kardex-" :
+                                             "danper-n2-demo-kardex-")+UUID().uuidString,
                                         isDirectory:true)
             try FileManager.default.createDirectory(at:dir,
                 withIntermediateDirectories:true,
