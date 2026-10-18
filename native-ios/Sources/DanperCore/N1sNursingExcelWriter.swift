@@ -215,6 +215,11 @@ internal enum N1sNursingExcelWriter {
               let responsible=object["responsible"] as? String,
               !responsible.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
         else {throw N1sExcelError.invalidManifest}
+        let periodEnd=(object["periodEnd"] as? String) ?? ""
+        guard periodEnd.isEmpty || (periodEnd>=date &&
+              ["CONSOLIDADO"].contains(shift)) else{
+            throw N1sExcelError.invalidManifest
+        }
         var entries=try N1rStoredZip.unpack(base)
         guard entries.contains(where:{$0.name=="xl/worksheets/sheet2.xml"}),
               entries.contains(where:{$0.name=="xl/workbook.xml"}),
@@ -248,7 +253,9 @@ internal enum N1sNursingExcelWriter {
         }
         sheet=try patch(sheet,address:"A3",value:"TURNO: "+shift)
         sheet=try patch(sheet,address:"A4",value:"RESPONSABLE: "+responsible)
-        sheet=try patch(sheet,address:"I3",value:"FECHA: "+dateName)
+        let rangeLabel=periodEnd.isEmpty ? "FECHA: "+dateName :
+            "PERÍODO CONSOLIDADO: "+dateName+" AL "+(try dateLabel(periodEnd))
+        sheet=try patch(sheet,address:"I3",value:rangeLabel)
         guard let styleEntry=entries.firstIndex(where:{$0.name=="xl/styles.xml"}),
               let styles=String(data:entries[styleEntry].data,encoding:.utf8)
         else{throw N1sExcelError.invalidTemplate}
