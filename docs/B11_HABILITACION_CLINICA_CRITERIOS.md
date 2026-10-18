@@ -78,3 +78,62 @@ El importador se desarrolló **en código**, pero está **pendiente de XCTest, X
 - No se contacta con servidores ni se incorporan registros reales en el repositorio, recursos de demostración o logs.
 - Pruebas nuevas: `N2PersonalWorkbookImportTests.swift` con Excel ZIP sintético y rutas negativas; el script de compilación ejecuta `swift test --filter N2PersonalWorkbookImportTests` y la prueba de seguridad DEMO.
 - Después de importar PERSONAL, las atenciones e inventario están vacíos por diseño. Configurar inventario inicial clínico y completar restauración/Excel comparativo sigue siendo obligatorio antes de poner la app en funcionamiento.
+
+## Restauración completa de un respaldo original de build 222 (18-10-2026)
+
+**PR #4 — implementado en código, pendiente de aprobar en Xcode y sobre el respaldo original del operador**.
+
+### Compatibilidad
+
+La fuente oficial `src/portableBackup.ts` (build 222) genera `.danperbackup` con:
+- JSON exterior: `format = DANPER-SALUD-PORTABLE-BACKUP`, `version = 1`,
+  `kdf = PBKDF2-SHA256`, `iterations = 310000`, `cipher = AES-256-GCM`;
+  `salt` de 16 bytes, `nonce` de 12 bytes y `data` base64 que contiene ciphertext + tag.
+- PBKDF2 UTF-8 contraseña de 14 a 200 caracteres → clave AES 256 bits.
+- JSON interior `{schema:1, exportedAt, snapshot}`; el `snapshot` contiene el
+  árbol completo de trabajadores, atenciones, alergias, lotes, movimientos,
+  asociaciones, incidencias, conciliaciones y campos desconocidos preservados.
+- B11 `PortableBackupInspector` reconoce ese contrato. Lee el archivo en iPhone
+  sin modificarlo, verifica GCM e integridad de la estructura y el Kardex.
+  No adivina un dato clínico faltante ni convierte pendientes en dispensado.
+
+### UX de restauración 2 fases
+
+1. `Acceso clínico independiente → Restaurar respaldo completo de build 222`.
+   **Elegir esta ruta ANTES de "Empezar solo con Excel PERSONAL"**.
+2. Introducir la contraseña ORIGINAL, confirmar la procedencia y seleccionar el
+   archivo desde Archivos. Autenticarse por Face ID/código.
+3. Vista previa de recuentos de trabajadores, atenciones guardadas, borradores,
+   rectificaciones, alergias, lotes, movimientos físicos, asociaciones,
+   incidencias, conciliaciones y pendientes. **Fase 1 no escribe registros**.
+4. Verificar respaldo en código por `SHA256` de la COPIA CIFRADA. Confirmar
+   explícitamente. Volver a autenticar y descifrar el mismo archivo.
+5. La activación solo admite la bóveda clínica **vacía** y rechaza si se alteró
+   el archivo, es ilegible, tiene contraseña errónea, registros ficticios
+   detectables, referencias huérfanas, movimiento Kardex inválido o fuente
+   ya presente. `N2ProtectedClinicalVaultCore` guarda un snapshot completo en
+   un solo journal cifrado; lee de nuevo y compara bytes y revisión.
+6. Comparar recuentos previos y posteriores. La build 222, su Keychain y la copia
+   de Archivos NO se borran ni se modifican.
+
+### Advertencias y condiciones de aceptación
+
+- La restauración desde backup completo y la importación inicial solo-PERSONAL
+  crean **alternativas** a la primera fuente: **no se fusionan**. Si ya importaste
+  PERSONAL en la bóveda clínica, no borres la base para restaurar otro archivo.
+  Primero evaluar una migración específica con respaldo recuperable.
+- Si el backup contenía consumos históricos sin entrega físicamente confirmada,
+  deben seguir constando como pendientes (R no verificado) y requieren
+  conciliación; no volver a descontarlos sin evidencia.
+- `scripts/audit-n2-build222-backup-restore.cjs` comprueba los contratos
+  de cifrado del TS original contra el lector Swift y las protecciones de la UI.
+- `N2PortableBackupInteropTests` incorpora:
+  contraseña errónea, hash distinto tras sustituir el archivo cifrado,
+  recuentos de la fuente sintética completa (trabajadores, atenciones, lotes,
+  movimientos y pendientes).
+- **SIGUE PENDIENTE:** ejecutar estas pruebas nativas desde Xcode 16.2 y, en
+  ambiente aislado y sin exponer el backup por chat/GitHub, revisar y restaurar
+  el `.danperbackup` concreto que creó la build 222 del operador, comparar
+  DNI, atenciones, consumos y movimientos de forma manual/automática. El
+  cumplimiento criptográfico teórico NO demuestra aún que su archivo histórico
+  pase todas las reglas clínicas del importador.
