@@ -81,13 +81,17 @@ try{
  fs.writeFileSync(path.join(output,'n2-ambulatory-products.json'),JSON.stringify(products));
  fs.writeFileSync(path.join(output,'n2-nursing-catalog.json'),JSON.stringify(nurseCatalog));
  fs.writeFileSync(path.join(output,'n2-approved-mappings.json'),JSON.stringify(approved));
+ const organization=require('./n2-official-area-catalog.cjs').result;
+ assert(organization.length>0);
+ fs.writeFileSync(path.join(output,'n2-organization-areas.json'),JSON.stringify(organization));
  assert.deepEqual(fs.readdirSync(output).sort(),[
   'n1s-indicator-plan.json','n1s-indicator-template-store.zip',
   'n1s-nursing-plan.json','n1s-nursing-template-store.zip',
   'n2-synthetic-clinical.json','n2-ambulatory-products.json',
-  'n2-nursing-catalog.json','n2-approved-mappings.json'
+  'n2-nursing-catalog.json','n2-approved-mappings.json',
+  'n2-organization-areas.json'
  ].sort());
- console.log('PASS: eight sanitized preview resources; no real worker or patient data.');
+ console.log('PASS: nine sanitized preview resources; no real worker or patient data.');
 } finally {
  fs.rmSync(temporary,{recursive:true,force:true});
 }
