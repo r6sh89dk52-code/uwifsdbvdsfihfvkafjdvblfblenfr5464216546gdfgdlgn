@@ -65,8 +65,14 @@ struct N2NativeWorkerEditorView:View {
             .filter{$0.localizedStandardContains(term) &&
                     $0.localizedCaseInsensitiveCompare(area) != .orderedSame}
             .sorted {left,right in
-                let a=left.localizedStandardHasPrefix(term)
-                let b=right.localizedStandardHasPrefix(term)
+                let a=left.folding(options:[.diacriticInsensitive,.caseInsensitive],
+                                   locale:Locale(identifier:"es_PE"))
+                          .hasPrefix(term.folding(options:[.diacriticInsensitive,.caseInsensitive],
+                                                  locale:Locale(identifier:"es_PE")))
+                let b=right.folding(options:[.diacriticInsensitive,.caseInsensitive],
+                                    locale:Locale(identifier:"es_PE"))
+                           .hasPrefix(term.folding(options:[.diacriticInsensitive,.caseInsensitive],
+                                                   locale:Locale(identifier:"es_PE")))
                 return a == b ? left.localizedStandardCompare(right)==.orderedAscending : a
             }
             .prefix(5).map{$0}
