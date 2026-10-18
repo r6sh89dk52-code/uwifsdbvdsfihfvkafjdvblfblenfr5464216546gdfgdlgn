@@ -993,7 +993,7 @@ struct N2NativeClinicalFormView:View {
                     id:version.id,changes:patch,at:timestamp,
                     expectedRevision:latest.revision)
                 lastAutosaveTimestamp=timestamp
-                await N2DraftReminder.schedule(id:version.id)
+                await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
                 status="Borrador cifrado · revisión \(result.revision)."
             }catch{
                 if !Task.isCancelled && !saved {
@@ -1016,7 +1016,7 @@ struct N2NativeClinicalFormView:View {
                 raw,at:now,expectedRevision:fresh.revision)
             savedLines=try await vault.dispensingStatus(visitID:form.id)
             saved=true
-            N2DraftReminder.cancel(id:form.id)
+            N2DraftReminder.cancel(id:form.id,mode:vault.mode)
             self.context=try await vault.clinicalFormContext()
             drafts=try await vault.readDrafts()
             status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."
@@ -1044,7 +1044,7 @@ struct N2NativeClinicalFormView:View {
             let fresh=try await vault.clinicalFormContext()
             _=try await vault.deleteDraft(
                 id:id,expectedRevision:fresh.revision)
-            N2DraftReminder.cancel(id:id)
+            N2DraftReminder.cancel(id:id,mode:vault.mode)
             drafts=try await vault.readDrafts()
             context=try await vault.clinicalFormContext()
             if form.id==id {
