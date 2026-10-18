@@ -6,7 +6,11 @@ import DanperCore
 /// vault. Nothing reads the build222 installation or N1g demo drafts.
 struct N2NativeClinicalFormView:View {
     let requestedDraftID:String?
-    init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
+    private var initialWorkerDNI:String?
+    init(requestedDraftID:String?=nil,initialWorkerDNI:String?=nil) {
+        self.requestedDraftID=requestedDraftID
+        self.initialWorkerDNI=initialWorkerDNI
+    }
     #if DEBUG
     init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="",saved:Bool=false,showCatalog:Bool=false,detailOnly:Bool=false,layoutOutcomes:[String:String]=[:]) {
         requestedDraftID=nil
@@ -796,7 +800,15 @@ struct N2NativeClinicalFormView:View {
                 form.date=date
                 form.time=time
                 status="Formulario preparado."
-                chooseWorker=true
+                if let initialWorkerDNI,
+                   context?.workers.contains(where:{$0.dni==initialWorkerDNI})==true {
+                    form.dni=initialWorkerDNI
+                    allergyStatus=context?.allergies[initialWorkerDNI]?.status ?? "unknown"
+                    allergySubstances=context?.allergies[initialWorkerDNI]?.substances ?? ""
+                    chooseWorker=false
+                } else {
+                    chooseWorker=true
+                }
             }
         }catch{
             fault=true
