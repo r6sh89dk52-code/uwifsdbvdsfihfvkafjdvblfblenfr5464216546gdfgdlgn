@@ -5,6 +5,7 @@ import DanperCore
 /// The preview route always uses a bundled synthetic JSON sample. A future
 /// real vault must authenticate before handing a snapshot to this view.
 struct N2NativeHistoryView: View {
+    @Environment(\.n2WorkspaceVault) private var vault
     var useProtectedVault = false
     @State private var projection:N2NativeReadModel?
     @State private var query=""
@@ -110,7 +111,7 @@ struct N2NativeHistoryView: View {
         guard force || projection==nil else {return}
         do {
             if useProtectedVault {
-                guard let records=try await N2SyntheticTrialIOSVault.shared.readHistory() else {
+                guard let records=try await vault.readHistory() else {
                     hasError=true;return
                 }
                 projection=records
@@ -196,6 +197,7 @@ private struct N2WorkerHistoryDetail:View {
 
 
 struct N2VisitDispensingView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     let visitID:String
     @State private var lines=[N2DispensingLine]()
     @State private var failed=false
@@ -216,7 +218,7 @@ struct N2VisitDispensingView:View {
         }
         .navigationTitle("Consumos de la atención").danperFormChrome()
         .task {
-            do {lines=try await N2SyntheticTrialIOSVault.shared.dispensingLines(visitID:visitID)}
+            do {lines=try await vault.dispensingLines(visitID:visitID)}
             catch {failed=true}
         }
     }
