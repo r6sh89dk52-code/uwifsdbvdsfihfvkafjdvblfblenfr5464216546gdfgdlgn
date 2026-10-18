@@ -65,7 +65,6 @@ struct N2NativeClinicalFormView:View {
     @State private var chooseDraft=false
     @State private var draftToDelete:String?
     @State private var drafts=[N2RecoverableDraft]()
-    @State private var search=""
     @State private var allergyStatus="unknown"
     @State private var allergySubstances=""
     @State private var editingAllergy=false
@@ -106,10 +105,8 @@ struct N2NativeClinicalFormView:View {
     private var nameSuggestions:[N2FormWorker] {
         let query=workerNameInput.trimmingCharacters(in:.whitespacesAndNewlines)
         guard query.count>=2,form.dni.isEmpty else{return []}
-        return Array((context?.workers ?? []).filter {
-            $0.name.localizedStandardContains(query) ||
-            $0.dni.localizedStandardContains(query)
-        }.prefix(5))
+        return N2NativeWorkerLookup.nameMatches(query,
+            in:context?.workers ?? [],limit:5)
     }
     private func selectWorker(_ worker:N2FormWorker) {
         dniLookupTask?.cancel()
@@ -131,10 +128,10 @@ struct N2NativeClinicalFormView:View {
     }
     private func enteredWorkerDNI(_ value:String) {
         dniLookupTask?.cancel()
-        let digits=String(decoding:value.utf8.filter{(48...57).contains($0)}.prefix(8),
-                          as:UTF8.self)
+        let digits=N2NativeWorkerLookup.numericDNI(value)
         if workerDNIInput != digits {workerDNIInput=digits}
-        if let worker=context?.workers.first(where:{$0.dni==digits}) {
+        if let worker=N2NativeWorkerLookup.exactDNI(digits,
+            in:context?.workers ?? []) {
             selectWorker(worker)
             return
         }
@@ -145,7 +142,8 @@ struct N2NativeClinicalFormView:View {
         dniLookupTask=Task { @MainActor in
             do {try await Task.sleep(for:.milliseconds(400))}catch{return}
             guard workerDNIInput==digits,!Task.isCancelled else{return}
-            if let worker=context?.workers.first(where:{$0.dni==digits}) {
+            if let worker=N2NativeWorkerLookup.exactDNI(digits,
+                in:context?.workers ?? []) {
                 selectWorker(worker)
             } else {
                 notFoundDNI=digits
