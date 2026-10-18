@@ -137,3 +137,19 @@ La fuente oficial `src/portableBackup.ts` (build 222) genera `.danperbackup` con
   DNI, atenciones, consumos y movimientos de forma manual/automática. El
   cumplimiento criptográfico teórico NO demuestra aún que su archivo histórico
   pase todas las reglas clínicas del importador.
+
+## P1 — libro conjunto Fundo + Planta (implementado en código, aún sin PASS)
+
+- `N2VerifiedIndicatorWorkbook.export(subdivision:"AMBAS")` valida que CADA fila de CONSUMOS conserve su sede explícita (LA VENTUROSA o PLVENTUROSA). No clasifica sedes a partir del nombre ni incluye atenciones sin sede verificada.
+- El cierre oficial exige un evento de revisión separado **para ambas sedes** y para el mismo período 9–8; un cierre de Fundo no certifica a Planta.
+- El consumo físico se contabiliza por sede y por código, y recién después se consolidan las cantidades en el reporte único. No se transfieren saldos ni se inventa stock en el otro centro.
+- Para las columnas de existencias agregadas, solo se informa el saldo cuando ambas sedes tienen evidencia para el producto. La plantilla contiene cuatro grupos de ingresos: si el conjunto supera ese límite para un material, se bloquea en vez de truncar.
+- `N1sFullExcelWriter` mantiene las diez hojas oficiales y solo acepta `AMBAS` cuando las filas contienen un valor válido de sede; `N2VerifiedIndicatorExportView` muestra esa elección inicialmente.
+- `N2RealIndicatorWorkbookTests.testJointFundoAndPlantaIndicatorRequiresBothReconciledPeriods` prueba rechazo de una sola revisión y salida combinada sintética con dos revisiones. Los casos se agregaron al script P0 de Mac (`scripts/check-b11-clinical-p0-macos.sh`).
+- **Pendiente**: XCTest real y abrir el Excel en Microsoft Excel comparándolo con la plantilla institucional de build 222; validar fórmulas A–AD y CÓDIGOS organizativos por fila. Ningún PASS está acreditado para esta implementación todavía.
+
+### Orden de pruebas local con datos ficticios
+1. `bash scripts/check-b11-priority-parity-macos.sh` — comprobaciones estáticas, compilación Xcode y suites básicas.
+2. `bash scripts/check-b11-clinical-p0-macos.sh` — genera fixtures clínicos sintéticos, ejecuta Swift XCTest completo y test cifrado en simulador temporal aislado.
+3. Comparar el archivo cifrado real `.danperbackup` **solo en dispositivo del usuario**; no compartir contraseña ni archivos de pacientes con GitHub/chat. Restauración en bóveda CLÍNICA vacía; verificar recuentos antes/después.
+4. Comparar libro Excel real; prueba en iPhone físico; mantener build222 como copia original hasta aceptación.
