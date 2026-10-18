@@ -120,7 +120,7 @@ try{
  ].join('\n');
  const swiftPath=path.join(root,'native-ios','App','N2GeneratedOfficialAreas.swift');
  fs.writeFileSync(swiftPath,swiftSource);
- assert.equal((swiftSource.match(/N2OfficialArea\\(site:/g)||[]).length,155,
+ assert.equal((swiftSource.match(/N2OfficialArea\(site:/g)||[]).length,155,
               'El catálogo Swift debe contener exactamente las 155 áreas verificadas');
  assert(swiftSource.includes('N2OfficialArea(site:"PLVENTUROSA"'));
  assert(swiftSource.includes('N2OfficialArea(site:"LA VENTUROSA"'));
