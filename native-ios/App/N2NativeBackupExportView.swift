@@ -140,10 +140,10 @@ struct N2NativeBackupExportView:View {
             let fmt=DateFormatter()
             fmt.dateFormat="yyyyMMdd-HHmmss"
             fmt.timeZone=TimeZone(identifier:"America/Lima")
-            let destination=folder.appendingPathComponent(
-                (vault.isClinical ? "DANPER_N2_CLINICA_CIFRADO_" :
-                                   "DANPER_N2_DEMO_CIFRADO_")+
-                fmt.string(from:Date())+".danperbackup")
+            let prefix=vault.isClinical ? "DANPER_N2_CLINICA_CIFRADO_" :
+                                          "DANPER_N2_DEMO_CIFRADO_"
+            let backupFilename="\(prefix)\(fmt.string(from:Date())).danperbackup"
+            let destination=folder.appendingPathComponent(backupFilename)
             try bytes.write(to:destination,options:[.atomic,.completeFileProtection])
             status="Respaldo cifrado verificado. Abriendo Compartir…"
             share=N2SecureBackupShare(url:destination)
