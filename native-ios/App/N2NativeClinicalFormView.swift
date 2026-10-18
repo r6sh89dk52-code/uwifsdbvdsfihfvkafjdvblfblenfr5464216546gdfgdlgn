@@ -668,10 +668,11 @@ struct N2NativeClinicalFormView:View {
                             Text(medicationName(med.code,context)).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
                             Text("Cantidad \(med.quantity) · \(med.procedure.isEmpty ? "Procedimiento pendiente" : med.procedure.capitalized)")
                                 .font(.caption).foregroundStyle(.secondary)
-                            if allergyStatus=="known",
-                               !N2MedicationAllergyTextMatch.matches(
+                            if !N2MedicationAllergyTextMatch.matches(
                                   productName:medicationName(med.code,context),
-                                  substances:allergySubstances).isEmpty {
+                                  substances:(allergyStatus=="known" ? allergySubstances : "")+
+                                     ";"+(context.allergies[form.dni]?.status=="known" ?
+                                          context.allergies[form.dni]?.substances ?? "" : "")).isEmpty {
                                 Label("Revisar posible coincidencia de alergia",systemImage:"exclamationmark.triangle.fill")
                                     .font(.caption).foregroundStyle(.orange)
                             }
