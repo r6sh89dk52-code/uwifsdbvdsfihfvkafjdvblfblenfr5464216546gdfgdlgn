@@ -10,11 +10,14 @@ actor N2SyntheticTrialIOSVault {
     private let service="pe.danper.saludmovil.native.preview.n2.synthetic"
     private let account="n2-synthetic-trial-key-v1"
     enum Failure:LocalizedError {
-        case missingKey, unavailableKeychain, keyInvalid, blockedMigration
+        case missingKey, unavailableKeychain, keyInvalid, blockedMigration, resetIncomplete
         case keychainStatus(Int32)
         var errorDescription:String? {
             if case let .keychainStatus(code)=self {
                 return "Keychain no disponible (OSStatus \(code)). No se han modificado datos."
+            }
+            if case .resetIncomplete=self {
+                return "La clave de pruebas fue invalidada, pero quedaron archivos cifrados. Pulsa borrar nuevamente para terminar la limpieza. La bóveda clínica y build 222 no se modificaron."
             }
             return "No fue posible verificar la bóveda nativa. No se han modificado los datos de la build 222."
         }
@@ -70,6 +73,51 @@ actor N2SyntheticTrialIOSVault {
         }
         return secret
     }
+    /// Explicit, irreversible cryptographic erasure of the N2 DEMO domain.
+    /// Deletes the demo-only Keychain key FIRST, then its allowlisted encrypted
+    /// journal directory. If file removal fails, retrying is safe because the
+    /// lost key cannot be recreated while encrypted files remain.
+    /// NEVER reads, deletes, or resets the independent clinical namespace.
+    func eraseEntireDemo(confirmation:String)throws {
+        guard confirmation==N2SyntheticResetScope.confirmation else {
+            throw Failure.blockedMigration
+        }
+        let fm=FileManager.default
+        guard let support=fm.urls(for:.applicationSupportDirectory,
+                                 in:.userDomainMask).first?.standardizedFileURL else {
+            throw Failure.blockedMigration
+        }
+        let target=support.appendingPathComponent(
+            N2SyntheticResetScope.directoryName,isDirectory:true)
+        guard N2SyntheticResetScope.canErase(support:support,target:target) else {
+            throw Failure.blockedMigration
+        }
+        if fm.fileExists(atPath:target.path) {
+            let info=try target.resourceValues(
+                forKeys:[.isDirectoryKey,.isSymbolicLinkKey])
+            guard info.isDirectory==true,info.isSymbolicLink != true else {
+                throw Failure.blockedMigration
+            }
+        }
+        let result=SecItemDelete(query() as CFDictionary)
+        guard result==errSecSuccess || result==errSecItemNotFound else {
+            throw Failure.keychainStatus(result)
+        }
+        // The encryption key is now gone. A crash here leaves only unreadable
+        // ciphertext; calling this method again completes the cleanup.
+        do {
+            if fm.fileExists(atPath:target.path) {
+                try fm.removeItem(at:target)
+            }
+        } catch {
+            throw Failure.resetIncomplete
+        }
+        guard !fm.fileExists(atPath:target.path),
+              try readKey()==nil else {
+            throw Failure.resetIncomplete
+        }
+    }
+
     /// Counts only. Requires no key creation, no decryption unless encrypted
     /// vault is already present, and no access to the old application.
     func inspect()throws->N2ProtectedStoreSummary? {
