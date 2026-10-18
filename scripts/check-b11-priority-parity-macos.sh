@@ -12,6 +12,7 @@ for cmd in node xcodegen xcodebuild; do
   fi
 done
 node scripts/audit-n2-workspace-routing.cjs
+node scripts/audit-n2-personal-import.cjs
 node scripts/prepare-n1s-ios-demo-resources.cjs
 COUNT="$(grep -c 'N2OfficialArea(site:' native-ios/App/N2GeneratedOfficialAreas.swift || true)"
 if [ "$COUNT" != "155" ]; then
@@ -40,4 +41,15 @@ if [ "$CODE" -ne 0 ]; then
   exit "$CODE"
 fi
 echo "PASS: compilación Debug de B11 para iOS Simulator."
+echo "Ejecutando XCTest nativo del importador PERSONAL (solo datos sintéticos)…"
+cd "$ROOT/native-ios"
+if ! swift test --filter N2PersonalWorkbookImportTests; then
+  echo "ERROR: fallaron las pruebas de lectura PERSONAL o conciliación." >&2
+  exit 1
+fi
+if ! swift test --filter N2SyntheticResetScopeTests; then
+  echo "ERROR: fallaron las pruebas de aislamiento del borrado ficticio." >&2
+  exit 1
+fi
+echo "PASS: pruebas específicas de importación PERSONAL y borrado DEMO."
 echo "Aviso: este PASS no certifica los Excel, Face ID ni pruebas en iPhone físico."
