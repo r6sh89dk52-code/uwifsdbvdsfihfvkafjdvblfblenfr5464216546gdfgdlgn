@@ -6,6 +6,7 @@ import DanperCore
 /// Clinical diagnosis and procedure metadata can be corrected without
 /// changing the original item ID, dispensed quantity or FEFO stock ledger.
 struct N2ClinicalCorrectionView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     let visitID:String
     @State private var detail:N2CorrectionDetail?
     @State private var revision:Int?
@@ -266,11 +267,11 @@ struct N2ClinicalCorrectionView:View {
             }
             guard !Task.isCancelled else{return}
             do {
-                let ctx=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                let ctx=try await vault.clinicalFormContext()
                 let millis=max(Int64(Date().timeIntervalSince1970*1000),
                                lastDraftAt+1)
                 let raw=try JSONSerialization.data(withJSONObject:changes)
-                _=try await N2SyntheticTrialIOSVault.shared
+                _=try await vault
                     .savePendingClinicalCorrection(
                         visitID:visitID,changes:raw,reason:why,
                         operatorName:op,medicationDiscrepancy:note,
@@ -291,10 +292,10 @@ struct N2ClinicalCorrectionView:View {
         recovering=true
         defer{recovering=false}
         do {
-            let ctx=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-            let d=try await N2SyntheticTrialIOSVault.shared
+            let ctx=try await vault.clinicalFormContext()
+            let d=try await vault
                 .readCorrectionDetail(visitID:visitID)
-            history=try await N2SyntheticTrialIOSVault.shared
+            history=try await vault
                 .readCorrectionHistory(visitID:visitID)
             revision=ctx.revision
             detail=d
@@ -313,7 +314,7 @@ struct N2ClinicalCorrectionView:View {
             procedures=d.procedures.joined(separator:"\n")
             itemProcedures=Dictionary(uniqueKeysWithValues:
                 d.medications.map{($0.id,$0.procedure)})
-            if let pending=try await N2SyntheticTrialIOSVault.shared
+            if let pending=try await vault
                    .readPendingClinicalCorrection(visitID:visitID),
                let changes=try? JSONSerialization.jsonObject(
                    with:pending.changes) as? [String:Any] {
@@ -355,10 +356,10 @@ struct N2ClinicalCorrectionView:View {
         saving=true
         defer{saving=false}
         do {
-            if try await N2SyntheticTrialIOSVault.shared
+            if try await vault
                   .readPendingClinicalCorrection(visitID:visitID) != nil {
-                let ctx=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-                _=try await N2SyntheticTrialIOSVault.shared
+                let ctx=try await vault.clinicalFormContext()
+                _=try await vault
                     .deletePendingClinicalCorrection(
                         visitID:visitID,expectedRevision:ctx.revision)
             }
@@ -379,9 +380,9 @@ struct N2ClinicalCorrectionView:View {
         do {
             let input=editPacket()
             let patch=try JSONSerialization.data(withJSONObject:input)
-            let latest=try await N2SyntheticTrialIOSVault.shared
+            let latest=try await vault
                 .clinicalFormContext()
-            let result=try await N2SyntheticTrialIOSVault.shared
+            let result=try await vault
                 .saveClinicalCorrection(
                     visitID:visitID,eventID:eventID,changes:patch,
                     reason:reason,operatorName:operatorName,
