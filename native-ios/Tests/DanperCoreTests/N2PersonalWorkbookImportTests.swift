@@ -177,14 +177,12 @@ final class N2PersonalWorkbookImportTests:XCTestCase {
             snapshot:initial,preview:update,site:"PLVENTUROSA")
         XCTAssertEqual(report.added,1)
         XCTAssertEqual(report.after,2)
+        var conflictStats=N2PersonalImportStats()
+        conflictStats.total=1;conflictStats.valid=1
         let conflict=N2PersonalImportPreview(workers:[
             N2PersonalWorker(dni:"41728463",name:"Nombre Distinto",
                              area:"Empaque",sex:"F")
-        ],stats:{
-            var value=N2PersonalImportStats()
-            value.total=1;value.valid=1
-            return value
-        }())
+        ],stats:conflictStats)
         XCTAssertThrowsError(try N2PersonalRosterImport.merge(
             snapshot:merged,preview:conflict,site:"PLVENTUROSA")) {
             XCTAssertEqual($0 as? N2PersonalImportError,.needsReview)
