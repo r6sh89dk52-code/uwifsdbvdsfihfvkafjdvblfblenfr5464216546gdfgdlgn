@@ -15,7 +15,7 @@ struct N2DemoResetView:View {
     @State private var busy=false
     @State private var deleted=false
     @State private var status="Comprobando el entorno de prueba…"
-    @State private var error=false
+    @State private var hasError=false
 
     private var canErase:Bool {
         !busy && !deleted && scenePhase == .active &&
@@ -86,7 +86,7 @@ struct N2DemoResetView:View {
                 }
                 Text(status)
                     .font(.footnote)
-                    .foregroundStyle(error ? Color.orange : Color.secondary)
+                    .foregroundStyle(hasError ? Color.orange : Color.secondary)
                     .fixedSize(horizontal:false,vertical:true)
             }.padding(16)
         }
@@ -110,11 +110,11 @@ struct N2DemoResetView:View {
             summary=try await N2SyntheticTrialIOSVault.shared.inspect()
             status=summary == nil ? "Sin registros de prueba activos." :
                 "Se eliminarán TODOS los registros cifrados de la demostración."
-            error=false
+            hasError=false
         } catch {
             summary=nil
             status="No se pudo leer la base de pruebas. Puedes eliminar también una bóveda cifrada deteriorada."
-            error=true
+            hasError=true
         }
     }
 
@@ -131,7 +131,7 @@ struct N2DemoResetView:View {
                 localizedReason:"Eliminar definitivamente la bóveda ficticia de DANPER Salud Móvil")
             guard authorized,scenePhase == .active else {
                 status="Eliminación cancelada: no se autorizó el dispositivo."
-                error=true
+                hasError=true
                 return
             }
             // Collect only DEMO draft IDs. Never clear all app notifications,
@@ -150,7 +150,7 @@ struct N2DemoResetView:View {
             deleted=true
             status="Limpieza confirmada. La bóveda clínica se mantuvo separada."
         } catch {
-            error=true
+            hasError=true
             status="No se pudo confirmar el borrado completo: "+error.localizedDescription+
                 " Si había archivos residuales, puedes reintentar la operación."
         }
