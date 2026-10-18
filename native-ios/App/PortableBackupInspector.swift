@@ -55,7 +55,8 @@ enum PortableBackupInspector {
     /// First phase: read-only cryptographic validation and aggregate preview.
     /// Original encrypted file remains unchanged; no clinical vault is opened.
     static func review(url:URL,password:String)throws->N2Build222BackupReview {
-        let (_,audit,sha)=try auditedSnapshot(url:url,password:password)
+        let (raw,_,sha)=try auditedSnapshot(url:url,password:password)
+        let audit=try N1lRealSnapshotGate.audit(raw,destination:.verifiedEmpty)
         return N2Build222BackupReview(audit:audit,encryptedSHA256:sha)
     }
 
@@ -87,9 +88,10 @@ enum PortableBackupInspector {
               (try await N2ProtectedClinicalIOSVault.shared.inspect())==nil else {
             throw BackupInspectionError.invalidSnapshot
         }
-        let (plaintext,audit,sha)=try auditedSnapshot(url:url,password:password)
+        let (plaintext,_,sha)=try auditedSnapshot(url:url,password:password)
         var raw=plaintext
         defer {raw.resetBytes(in:0..<raw.count)}
+        let audit=try N1lRealSnapshotGate.audit(raw,destination:.verifiedEmpty)
         guard sha==expectedEncryptedSHA256,
               audit.isStructurallyEligibleForReview,
               audit.obviousDemoWorkerMarkers==0,
