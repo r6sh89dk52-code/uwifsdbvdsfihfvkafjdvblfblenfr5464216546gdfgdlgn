@@ -91,6 +91,10 @@ struct N2ClinicalWorkspaceGateView:View {
         .navigationTitle("Acceso clínico")
         .danperFormChrome()
         .task {await refresh()}
+        // Returning from PERSONAL import must refresh the gate's source count.
+        .onAppear {
+            if scenePhase == .active {Task {await refresh()}}
+        }
         .onChange(of:scenePhase) {_,phase in
             if phase != .active {
                 showWorkspace=false
