@@ -25,6 +25,18 @@ enum N2DraftReminder {
         try? await center.add(request)
     }
 
+    /// Cancels every demo reminder even if the deleted encrypted draft index
+    /// was unreadable. Clinical identifiers are never included in this filter.
+    static func cancelAllDemo() async {
+        let center=UNUserNotificationCenter.current()
+        let requests=await center.pendingNotificationRequests()
+        let ids=requests.map(\.identifier).filter {
+            $0.hasPrefix("danper.n2.demo.pending.") ||
+            $0.hasPrefix("danper.n2.pending.")
+        }
+        if !ids.isEmpty {center.removePendingNotificationRequests(withIdentifiers:ids)}
+    }
+
     static func cancel(id:String,mode:N2WorkspaceVault.Mode = .demo) {
         guard UUID(uuidString:id) != nil else{return}
         var ids=[identifier(id:id,mode:mode)]
