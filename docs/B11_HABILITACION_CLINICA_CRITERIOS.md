@@ -63,3 +63,18 @@ Operación de `N2SyntheticTrialIOSVault.eraseEntireDemo()`:
 **Muy importante:** limpiar DEMO **no es un requisito técnico para activar CLÍNICA**, porque las bóvedas son independientes. Limpiar DEMO no importa un Excel real por sí mismo. La importación nativa del Excel PERSONAL y el inicio de una base clínica vacía siguen pendientes y no se consideran acabados.
 
 Pruebas: `N2SyntheticResetScopeTests`, script `scripts/audit-n2-workspace-routing.cjs`, futura prueba manual con datos ficticios y Xcode 16.2. Este desarrollo **no autoriza usar datos reales todavía**.
+
+## Actualización: importador nativo Excel PERSONAL (18-10-2026)
+
+El importador se desarrolló **en código**, pero está **pendiente de XCTest, Xcode 16.2 y comparación con el archivo institucional**; no habilita uso clínico real hasta que todas las pruebas P0 estén aprobadas.
+
+- Entrada: `Acceso clínico independiente → Crear base clínica desde Excel PERSONAL` cuando no hay fuente real, o `Importar/conciliar PERSONAL` cuando ya existe; también desde la pestaña Más del espacio clínico.
+- `N2PersonalWorkbookReader`: utiliza `ZIPFoundation 0.9.20` (paquete fijado), XMLParser, y lee exclusivamente `PERSONAL` mediante las relaciones OOXML. Acepta `inlineStr` o `sharedStrings` opcional y Excel comprimido. Limita el archivo a 20 MB y cada parte XML a límites explícitos, bloqueando rutas ZIP anómalas y entidades XML externas. No importa otras hojas ni historial.
+- Identidad: encabezados `DNI` y `NOMBRES` obligatorios, alternativos `APELLIDOS Y NOMBRES` y `NOMBRE COMPLETO`, `ÁREA`, `CARGO/LABOR/PUESTO`, `EDAD/EDAD MANUAL/EDAD AUTOMATIZADA`, `SEXO`, `UBIGEO`; DNI con ocho dígitos y sin inferir sexo por nombre. Cuenta duplicados y bloquea conflictos de nombres y sexo.
+- La hoja PERSONAL de build 222 no contiene una sede por persona: la interfaz exige seleccionar explícitamente Fundo o Planta para **ese archivo**. Importar por separado los padrones correspondientes si hay sedes distintas, sin mezclar ni suponer ubicaciones.
+- Vista previa: cuenta únicos, inválidos, sin nombre, repetidos, sexos ausentes/incorrectos y conflictos, más altas/actualizaciones frente a la bóveda existente. Face ID/código antes de abrir archivos; datos importados permanecen solo en memoria hasta confirmar.
+- Primera importación: `N2PersonalRosterImport.initialSnapshot` crea una fuente nueva con trabajadores oficiales y **cero** atenciones, alergias, lotes, movimientos, conciliaciones o consumos; `N2ProtectedClinicalVaultCore.activateInitialPersonal` admite solo una bóveda clínica **vacía** y pasa las auditorías N1e/N1f/N1l.
+- Reimportación: `mergePersonal` compara el DNI, mantiene nombres/sexos si coinciden (bloquea contradicciones), conserva correcciones manuales y todas las colecciones de historia, aplica **una única transacción cifrada** condicionada por revisión; no elimina automáticamente ausentes ni crea duplicados. Repetir sin cambios es idempotente.
+- No se contacta con servidores ni se incorporan registros reales en el repositorio, recursos de demostración o logs.
+- Pruebas nuevas: `N2PersonalWorkbookImportTests.swift` con Excel ZIP sintético y rutas negativas; el script de compilación ejecuta `swift test --filter N2PersonalWorkbookImportTests` y la prueba de seguridad DEMO.
+- Después de importar PERSONAL, las atenciones e inventario están vacíos por diseño. Configurar inventario inicial clínico y completar restauración/Excel comparativo sigue siendo obligatorio antes de poner la app en funcionamiento.
