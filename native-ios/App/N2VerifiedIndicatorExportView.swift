@@ -78,7 +78,8 @@ struct N2VerifiedIndicatorExportView:View {
                                   labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
                 DanperDateField(title:"Desde",selection:$startDate)
                 DanperDateField(title:"Hasta",selection:$endDate)
-                Text("La selección inicial es esta semana (lunes a domingo). Para el corte mensual, elige día 9 a día 8.")
+                Text("Corte mensual sugerido: día 9 al día 8 del siguiente mes. Puedes ajustar las fechas para una revisión puntual.")
+                    .font(.footnote).foregroundStyle(.secondary)
                     .font(.footnote).foregroundStyle(.secondary)
             }
             }
@@ -165,9 +166,16 @@ struct N2VerifiedIndicatorExportView:View {
             var cal=Calendar(identifier:.gregorian)
             cal.timeZone=TimeZone(identifier:"America/Lima")!
             cal.firstWeekday=2
-            if let week=cal.dateInterval(of:.weekOfYear,for:Date()) {
-                startDate=week.start
-                endDate=cal.date(byAdding:.day,value:6,to:week.start) ?? week.start
+            let now=Date()
+            let parts=cal.dateComponents([.year,.month,.day],from:now)
+            if let year=parts.year,let month=parts.month,let day=parts.day,
+               let thisMonthNinth=cal.date(from:DateComponents(year:year,month:month,day:9)) {
+                let start=day>=9 ? thisMonthNinth :
+                    (cal.date(byAdding:.month,value:-1,to:thisMonthNinth) ?? thisMonthNinth)
+                startDate=start
+                if let next=cal.date(byAdding:.month,value:1,to:start) {
+                    endDate=cal.date(byAdding:.day,value:-1,to:next) ?? start
+                } else {endDate=start}
             }
             guard let history=try await N2SyntheticTrialIOSVault.shared
                     .readHistory() else {
