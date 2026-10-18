@@ -16,6 +16,7 @@ struct NativeRootView:View {
     #endif
     private var layoutOnly=false
     @State private var tab=0
+    @State private var newlyRegisteredWorkerDNI:String?
     @State private var summary:N2ProtectedStoreSummary?
     @State private var loading=true
     @State private var preparing=false
@@ -38,7 +39,10 @@ struct NativeRootView:View {
                         .toolbar {
                             ToolbarItem(placement:.topBarTrailing) {
                                 NavigationLink {
-                                    N2NativeWorkerEditorView()
+                                    N2NativeWorkerEditorView(onSaved:{dni in
+                                        newlyRegisteredWorkerDNI=dni
+                                        tab=2
+                                    })
                                 }label:{
                                     Label("Nuevo trabajador",
                                           systemImage:"person.badge.plus")
@@ -49,8 +53,11 @@ struct NativeRootView:View {
             }
             .tabItem{Label("Personal",systemImage:"person.2.fill")}.tag(1)
             NavigationStack {
-                if isReady {N2NativeClinicalFormView()}
-                else {lockedTab(title:"Atención",symbol:"cross.case")}
+                if isReady {
+                    N2NativeClinicalFormView(
+                        initialWorkerDNI:newlyRegisteredWorkerDNI)
+                    .id(newlyRegisteredWorkerDNI ?? "new-attention")
+                } else {lockedTab(title:"Atención",symbol:"cross.case")}
             }
             .tabItem{Label("Atención",systemImage:"cross.case.fill")}.tag(2)
             NavigationStack {
