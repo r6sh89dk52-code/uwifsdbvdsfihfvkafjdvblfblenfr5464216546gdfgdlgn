@@ -18,10 +18,10 @@ struct N2NativeHistoryView: View {
                 ScrollView {
                   VStack(alignment:.leading,spacing:16) {
                     DanperPanel {
-                        Label(useProtectedVault ? "BÓVEDA CLÍNICA N2 · SOLO LECTURA" : "SOLO PRUEBA · TRABAJADORES FICTICIOS",
+                        Label(useProtectedVault ? "Historial de atenciones" : "Historial de ejemplo",
                               systemImage:"lock.shield.fill")
                             .foregroundStyle(.secondary)
-                        Text(useProtectedVault ? "Datos locales desde la bóveda cifrada N2. No se modifica la build 222." : "Se muestran registros sintéticos. No se leen ni guardan datos clínicos de tu iPhone.")
+                        Text(useProtectedVault ? "Consulta los registros y sus consumos guardados." : "Consulta las atenciones disponibles.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
@@ -132,7 +132,7 @@ private struct N2WorkerHistoryDetail:View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
             if let worker=model.roster.first(where:{$0.dni==dni}) {
-                DanperPanel(realSource ? "Trabajador" : "Trabajador ficticio") {
+                DanperPanel("Trabajador") {
                     LabeledContent("Nombre",value:worker.name)
                     LabeledContent("DNI",value:worker.dni)
                     LabeledContent("Área",value:worker.area)
@@ -178,7 +178,7 @@ private struct N2WorkerHistoryDetail:View {
             }
           }.padding(16)
         }
-        .navigationTitle(realSource ? "Historia clínica" : "Historia de prueba")
+        .navigationTitle("Historia clínica")
         .danperFormChrome()
     }
 }
