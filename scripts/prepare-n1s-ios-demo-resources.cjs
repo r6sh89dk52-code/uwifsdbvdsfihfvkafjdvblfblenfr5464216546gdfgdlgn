@@ -82,8 +82,21 @@ try{
  fs.writeFileSync(path.join(output,'n2-nursing-catalog.json'),JSON.stringify(nurseCatalog));
  fs.writeFileSync(path.join(output,'n2-approved-mappings.json'),JSON.stringify(approved));
  const organization=require('./n2-official-area-catalog.cjs').result;
- assert(organization.length>0);
- fs.writeFileSync(path.join(output,'n2-organization-areas.json'),JSON.stringify(organization));
+ const countFor=site=>organization.filter(area=>area.site===site).length;
+ assert.equal(countFor('LA VENTUROSA'),31,'Faltan áreas oficiales del fundo');
+ assert.equal(countFor('PLVENTUROSA'),124,'Faltan áreas oficiales de PL Venturosa');
+ const organizationJSON=JSON.stringify(organization);
+ // Two packaging paths: legacy folder resource and a root-level XcodeGen
+ // JSON resource included by the App source group. Both contain the same
+ // canonical codes sourced from the official ten-sheet workbook.
+ const organizationFolderFile=path.join(output,'n2-organization-areas.json');
+ const organizationRootFile=path.join(root,'native-ios','App','DANPEROfficialAreas.json');
+ fs.writeFileSync(organizationFolderFile,organizationJSON);
+ fs.writeFileSync(organizationRootFile,organizationJSON);
+ assert.equal(fs.readFileSync(organizationFolderFile,'utf8'),
+              fs.readFileSync(organizationRootFile,'utf8'),
+              'Las dos copias del catálogo organizativo deben coincidir');
+ console.log('PASS áreas oficiales: Fundo La Venturosa 31; PL Venturosa 124; iOS raíz y carpeta.');
  assert.deepEqual(fs.readdirSync(output).sort(),[
   'n1s-indicator-plan.json','n1s-indicator-template-store.zip',
   'n1s-nursing-plan.json','n1s-nursing-template-store.zip',
