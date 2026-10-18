@@ -147,6 +147,34 @@ final class N2PersonalWorkbookImportTests:XCTestCase {
         XCTAssertTrue(result.stats.canConfirm)
     }
 
+    func testFormulaAgeCacheCanBeReadWithoutTrustingFormulaIdentity()throws {
+        let sheet="""
+        <row r="1">
+            <c r="A1" t="inlineStr"><is><t>DNI</t></is></c>
+            <c r="B1" t="inlineStr"><is><t>NOMBRES</t></is></c>
+            <c r="C1" t="inlineStr"><is><t>EDAD AUTOMATIZADA</t></is></c>
+        </row>
+        <row r="2">
+            <c r="A2"><v>78654321</v></c>
+            <c r="B2" t="inlineStr"><is><t>Luis Paredes Rojas</t></is></c>
+            <c r="C2"><f>YEAR(TODAY())-1992</f><v>34</v></c>
+        </row>
+        """
+        let url=try makeWorkbook(rows:[sheet],useSharedStrings:false)
+        defer {try? FileManager.default.removeItem(at:url)}
+        let decoded=try N2PersonalWorkbookReader.read(url:url)
+        XCTAssertEqual(decoded.workers.first?.age,"34")
+        XCTAssertEqual(decoded.workers.first?.dni,"78654321")
+        let unsafe=sheet.replacingOccurrences(
+            of:"<c r=\"A2\"><v>78654321</v></c>",
+            with:"<c r=\"A2\"><f>11111111+1</f><v>78654321</v></c>")
+        let bad=try makeWorkbook(rows:[unsafe],useSharedStrings:false)
+        defer{try? FileManager.default.removeItem(at:bad)}
+        XCTAssertThrowsError(try N2PersonalWorkbookReader.read(url:bad)) {
+            XCTAssertEqual($0 as? N2PersonalImportError,.noValidWorkers)
+        }
+    }
+
     func testMissingPERSONALRejected()throws {
         let workbook=try makeWorkbook(rows:["<row r=\"1\"></row>"],
                                       includePersonal:false)
