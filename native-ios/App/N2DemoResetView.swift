@@ -121,7 +121,7 @@ struct N2DemoResetView:View {
     @MainActor private func erase() async {
         guard canErase else{return}
         busy=true
-        error=false
+        hasError=false
         status="Autorizando eliminación…"
         defer {busy=false}
         do {
