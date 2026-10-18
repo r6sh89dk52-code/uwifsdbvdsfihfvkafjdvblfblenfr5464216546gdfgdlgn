@@ -166,16 +166,8 @@ public final class N2ProtectedClinicalVaultCore {
               let root=try? JSONSerialization.jsonObject(with:source)
                  as? [String:Any],
               let workers=root["workers"] as? [[String:Any]],
-              workers.count==5,Set(workers.compactMap{$0["dni"] as? String})
-                 == Set(["00000001","00000002","00000003","00000004","00000005"]),
-              workers.allSatisfy({ worker in
-                (worker["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
-              }),
               let visits=root["attentions"] as? [[String:Any]],
-              visits.allSatisfy({ visit in
-                let worker=visit["worker"] as? [String:Any] ?? [:]
-                return (worker["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
-              }) else {
+              N2SyntheticFixtureIdentity.matches(workers:workers,visits:visits) else {
             throw N2ProtectedStoreError.unsafeSource
         }
         _=try N1eLegacyClinicalAudit.inspect(source)
