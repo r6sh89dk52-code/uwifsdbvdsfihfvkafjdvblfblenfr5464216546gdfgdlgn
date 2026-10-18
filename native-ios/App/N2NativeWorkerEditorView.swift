@@ -6,12 +6,18 @@ import DanperCore
 /// If entered from an attention, the completed person returns to that encounter.
 struct N2NativeWorkerEditorView:View {
     private let onSaved:((String)->Void)?
-    init(initialDNI:String="",onSaved:((String)->Void)?=nil) {
+    private let editingDNI:String?
+    @Environment(\.dismiss) private var dismiss
+    init(initialDNI:String="",editingDNI:String?=nil,
+         onSaved:((String)->Void)?=nil) {
         self.onSaved=onSaved
-        _dni=State(initialValue:initialDNI)
+        self.editingDNI=editingDNI
+        _dni=State(initialValue:editingDNI ?? initialDNI)
     }
     @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var existingDNI=Set<String>()
+    @State private var officialIdentity=false
+    @State private var initialProfileLoaded=false
     @State private var existingAreas=[String:String]()
     @State private var officialAreas=[N2OfficialArea]()
     @State private var areaCatalogIncomplete=false
@@ -70,7 +76,8 @@ struct N2NativeWorkerEditorView:View {
             dni:dni.trimmingCharacters(in:.whitespacesAndNewlines),
             names:names,site:site, isBirthDateKnown:hasBirthDate,
             birthDateValid:!birthISO.isEmpty,
-            manuallyEnteredAge:manualAgeText,knownDNI:existingDNI,
+            manuallyEnteredAge:manualAgeText,
+            knownDNI:existingDNI.subtracting(editingDNI.map{Set([$0])} ?? []),
             storeAvailable:revision != nil)
     }
     private var ready:Bool {
@@ -113,11 +120,12 @@ struct N2NativeWorkerEditorView:View {
                                     as:UTF8.self)
                                 if value != numbers {dni=numbers}
                             }
-                            .disabled(!savedDNI.isEmpty)
+                            .disabled(!savedDNI.isEmpty || editingDNI != nil)
                     }
-                    Text("Introduce los ocho dígitos del DNI. Si ya existe en Personal, no se duplicará.")
+                    Text(editingDNI != nil ? "El DNI no puede modificarse al corregir una ficha." :
+                         "Introduce los ocho dígitos del DNI. Si ya existe en Personal, no se duplicará.")
                         .font(.caption).foregroundStyle(.secondary)
-                    if existingDNI.contains(dni) {
+                    if editingDNI == nil && existingDNI.contains(dni) {
                         Label("Este DNI ya está registrado.",systemImage:"person.crop.circle.badge.exclamationmark")
                             .font(.footnote).foregroundStyle(.orange)
                     }
@@ -125,7 +133,11 @@ struct N2NativeWorkerEditorView:View {
                         TextField("Ej. Mariana Torres Salazar",text:$names)
                             .textInputAutocapitalization(.words)
                             .textContentType(.name)
-                            .disabled(!savedDNI.isEmpty)
+                            .disabled(!savedDNI.isEmpty || officialIdentity)
+                    }
+                    if officialIdentity {
+                        Text("La identidad del padrón oficial no se cambia desde una corrección local. Sí puedes actualizar área, sede y labor.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 DanperPanel("Datos laborales") {
@@ -278,16 +290,23 @@ struct N2NativeWorkerEditorView:View {
                         Label("Puedes consultar este trabajador desde Personal o iniciar una atención.",
                               systemImage:"checkmark.seal.fill")
                             .font(.footnote).foregroundStyle(.green)
-                        Button {prepareNextWorker()} label: {
-                            Label("Registrar otro trabajador",systemImage:"person.badge.plus")
+                        if editingDNI != nil {
+                            Button {dismiss()} label: {
+                                Label("Volver al directorio",systemImage:"chevron.left")
+                            }
+                            .buttonStyle(DanperSecondaryButton())
+                        } else {
+                            Button {prepareNextWorker()} label: {
+                                Label("Registrar otro trabajador",systemImage:"person.badge.plus")
+                            }
+                            .buttonStyle(DanperSecondaryButton())
                         }
-                        .buttonStyle(DanperSecondaryButton())
                     }
                 } else {
                     Button {save()} label: {
                         HStack {
                             if busy {ProgressView().tint(.white)}
-                            Label(busy ? "Guardando trabajador…" : "Guardar trabajador",
+                            Label(busy ? "Guardando…" : editingDNI != nil ? "Guardar cambios" : "Guardar trabajador",
                                   systemImage:busy ? "hourglass" : "person.badge.plus")
                         }
                     }
@@ -297,7 +316,7 @@ struct N2NativeWorkerEditorView:View {
                 }
             }.padding(16).background(.regularMaterial)
         }
-        .navigationTitle("Nuevo trabajador")
+        .navigationTitle(editingDNI != nil ? "Editar trabajador" : "Nuevo trabajador")
         .danperFormChrome()
         .sensoryFeedback(.success,trigger:savedDNI) {_,_ in haptics}
         .alert("No se pudo guardar",isPresented:$showSaveError) {
@@ -388,6 +407,30 @@ struct N2NativeWorkerEditorView:View {
                 let context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
                 existingDNI=Set(context.workers.map(\.dni))
                 workers=context.workers
+                if !initialProfileLoaded,let editingDNI,
+                   let record=context.workers.first(where:{$0.dni==editingDNI}) {
+                    initialProfileLoaded=true
+                    dni=record.dni
+                    names=record.name
+                    officialIdentity=(try await N2SyntheticTrialIOSVault.shared.readHistory())?
+                        .roster.first(where:{$0.dni==editingDNI})?.rosterStatus == "official"
+                    site=record.site.isEmpty ? "LA VENTUROSA" : record.site
+                    area=record.area
+                    labor=record.labor
+                    sex=record.sex
+                    ubigeo=record.ubigeo
+                    if !record.birthDate.isEmpty {
+                        let components=record.birthDate.split(separator:"-")
+                        if components.count==3 {
+                            birthDateText=String(components[2]+components[1]+components[0])
+                            birthDateText=N2WorkerBirthDateEntry.format(birthDateText)
+                            hasBirthDate=true
+                        }
+                    } else {
+                        hasBirthDate=false
+                        manualAgeText=record.age
+                    }
+                }
                 updateAreas()
                 if validationAttempted {revalidateAfterEdit()}
             }
@@ -490,21 +533,35 @@ struct N2NativeWorkerEditorView:View {
                 var expected=current
                 var stored:N2ProtectedStoreSummary?
                 do {
-                    stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
-                        bytes,at:Int64(Date().timeIntervalSince1970*1000),
-                        expectedRevision:expected)
+                    if let editingDNI {
+                        stored=try await N2SyntheticTrialIOSVault.shared.correctWorker(
+                            dni:editingDNI,worker:bytes,
+                            at:Int64(Date().timeIntervalSince1970*1000),
+                            expectedRevision:expected)
+                    } else {
+                        stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
+                            bytes,at:Int64(Date().timeIntervalSince1970*1000),
+                            expectedRevision:expected)
+                    }
                 } catch N2ProtectedStoreError.staleRevision {
                     // Another tab may have saved a draft in the meantime.
                     // Retry one time with the latest revision, without
                     // resetting or replacing the existing encrypted data.
                     let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-                    if fresh.workers.contains(where:{$0.dni==candidate}) {
+                    if editingDNI == nil && fresh.workers.contains(where:{$0.dni==candidate}) {
                         throw N2SnapshotEditError.duplicateWorker
                     }
                     expected=fresh.revision
-                    stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
-                        bytes,at:Int64(Date().timeIntervalSince1970*1000),
-                        expectedRevision:expected)
+                    if let editingDNI {
+                        stored=try await N2SyntheticTrialIOSVault.shared.correctWorker(
+                            dni:editingDNI,worker:bytes,
+                            at:Int64(Date().timeIntervalSince1970*1000),
+                            expectedRevision:expected)
+                    } else {
+                        stored=try await N2SyntheticTrialIOSVault.shared.registerWorker(
+                            bytes,at:Int64(Date().timeIntervalSince1970*1000),
+                            expectedRevision:expected)
+                    }
                 }
                 guard let result=stored else {throw N2SnapshotEditError.validationFailed}
                 // Read back the persisted record before claiming success.
@@ -519,7 +576,8 @@ struct N2NativeWorkerEditorView:View {
                 savedDNI=candidate
                 failed=false
                 saveIssues=[]
-                status="Trabajador guardado correctamente. DNI \(candidate)."
+                status=editingDNI != nil ? "Ficha actualizada y verificada. DNI \(candidate)." :
+                                               "Trabajador guardado correctamente. DNI \(candidate)."
             } catch {
                 failed=true
                 if let failure=error as? N2SnapshotEditError {
