@@ -11,15 +11,10 @@ struct N2NativeDraftsDashboard:View {
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
-            DanperPanel {
-                Label("Datos protegidos",systemImage:"lock.shield")
-                Text("Los borradores están guardados dentro de la misma bóveda cifrada. Reabrir no crea otra atención ni descuenta inventario.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                if failed {
+            if failed {
+                DanperPanel {
                     Label(message,systemImage:"exclamationmark.triangle")
                         .foregroundStyle(.orange)
-                }else{
-                    Text(message).font(.footnote).foregroundStyle(.secondary)
                 }
             }
             DanperPanel("Registros pendientes") {
@@ -71,7 +66,7 @@ struct N2NativeDraftsDashboard:View {
         }catch{
             records=[]
             failed=true
-            message="No se pudo verificar la bóveda N2. No se ha borrado ningún registro."
+            message="No se pudieron abrir los borradores. No se eliminó ningún registro."
         }
     }
 }
