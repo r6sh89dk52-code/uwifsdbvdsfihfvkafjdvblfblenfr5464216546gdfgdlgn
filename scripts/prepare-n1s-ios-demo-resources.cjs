@@ -96,7 +96,34 @@ try{
  assert.equal(fs.readFileSync(organizationFolderFile,'utf8'),
               fs.readFileSync(organizationRootFile,'utf8'),
               'Las dos copias del catálogo organizativo deben coincidir');
- console.log('PASS áreas oficiales: Fundo La Venturosa 31; PL Venturosa 124; iOS raíz y carpeta.');
+ // Compile-time catalog: XcodeGen will include this Swift source in the app
+ // target. The app no longer depends on how folder-reference JSON is copied.
+ const swiftQuote=value=>{
+  const quoted=JSON.stringify(String(value));
+  assert(!quoted.includes('\\u0000'),'Organizational labels cannot contain NUL');
+  return quoted;
+ };
+ const swiftData=organization.map(entry=>
+  '        N2OfficialArea(site:'+swiftQuote(entry.site)+
+  ',area:'+swiftQuote(entry.area)+
+  ',code:'+swiftQuote(entry.code)+')').join(',\\n');
+ const swiftSource=[
+  '// GENERATED — DO NOT EDIT. Official areas only, no staff or patient data.',
+  '// Source: verified 10-sheet DANPER workbook @subuo + @uo.',
+  'import DanperCore',
+  'enum N2GeneratedOfficialAreas {',
+  '    static let entries:[N2OfficialArea]=[',
+  swiftData,
+  '    ]',
+  '}',
+  ''
+ ].join('\\n');
+ const swiftPath=path.join(root,'native-ios','App','N2GeneratedOfficialAreas.swift');
+ fs.writeFileSync(swiftPath,swiftSource);
+ assert(swiftSource.includes('N2OfficialArea(site:"PLVENTUROSA"'));
+ assert(swiftSource.includes('N2OfficialArea(site:"LA VENTUROSA"'));
+ console.log('PASS Swift compilado: '+organization.length+' áreas verificadas.');
+ console.log('PASS áreas oficiales: Fundo La Venturosa 31; PL Venturosa 124.');
  assert.deepEqual(fs.readdirSync(output).sort(),[
   'n1s-indicator-plan.json','n1s-indicator-template-store.zip',
   'n1s-nursing-plan.json','n1s-nursing-template-store.zip',
