@@ -39,7 +39,7 @@ targets:
             echo "error: No se pudo generar el catálogo oficial de áreas."
             exit 1
           fi
-          echo "Catálogo organizativo listo para el simulador."
+          node -e 'const x=require(process.argv[1]); const f=x.filter(y=>y.site==="LA VENTUROSA").length; const p=x.filter(y=>y.site==="PLVENTUROSA").length; if (f!==31||p!==124) {console.error("error: Catálogo incompleto: fundo",f,"/31, planta",p,"/124. Ejecuta node scripts/prepare-n1s-ios-demo-resources.cjs");process.exit(1)} console.log("Áreas oficiales comprobadas: Fundo 31, PL Venturosa 124")' "$ASSET"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview
