@@ -86,6 +86,9 @@ final class N2PersonalWorkbookImportTests:XCTestCase {
         XCTAssertEqual(person.age,"27")
         let created=try N2PersonalRosterImport.initialSnapshot(
             preview:preview,site:"PLVENTUROSA")
+        let firstSourceAudit=try N1lRealSnapshotGate.audit(
+            created,destination:.verifiedEmpty)
+        XCTAssertTrue(firstSourceAudit.isStructurallyEligibleForReview)
         let obj=try XCTUnwrap(JSONSerialization.jsonObject(with:created) as? [String:Any])
         for name in ["attentions","stockLots","stockMovements","catalogMappings",
                      "deliveryIncidents","ambulatoryReconciliation"] {
@@ -174,6 +177,18 @@ final class N2PersonalWorkbookImportTests:XCTestCase {
             snapshot:initial,preview:update,site:"PLVENTUROSA")
         XCTAssertEqual(report.added,1)
         XCTAssertEqual(report.after,2)
+        let conflict=N2PersonalImportPreview(workers:[
+            N2PersonalWorker(dni:"41728463",name:"Nombre Distinto",
+                             area:"Empaque",sex:"F")
+        ],stats:{
+            var value=N2PersonalImportStats()
+            value.total=1;value.valid=1
+            return value
+        }())
+        XCTAssertThrowsError(try N2PersonalRosterImport.merge(
+            snapshot:merged,preview:conflict,site:"PLVENTUROSA")) {
+            XCTAssertEqual($0 as? N2PersonalImportError,.needsReview)
+        }
         let before=try XCTUnwrap(JSONSerialization.jsonObject(with:initial) as? [String:Any])
         let after=try XCTUnwrap(JSONSerialization.jsonObject(with:merged) as? [String:Any])
         for key in ["attentions","allergies","stockLots","stockMovements",
