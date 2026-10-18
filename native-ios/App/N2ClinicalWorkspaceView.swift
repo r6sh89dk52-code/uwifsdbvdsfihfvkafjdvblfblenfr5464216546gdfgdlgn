@@ -43,7 +43,16 @@ struct N2ClinicalWorkspaceGateView:View {
                               systemImage:"checkmark.shield.fill")
                             .foregroundStyle(.green)
                     } else {
-                        Text("Primero debe existir una copia original verificada. La demostración ficticia nunca se convierte automáticamente en esta fuente.")
+                        NavigationLink {
+                            N2NativePersonalImportView()
+                        } label: {
+                            Label("Crear base clínica desde Excel PERSONAL",systemImage:"tablecells")
+                        }
+                        .buttonStyle(DanperPrimaryButton())
+                        Text("Puedes importar PERSONAL y comenzar con un directorio clínico vacío. No se añadirán registros ficticios ni existencias inventadas.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Text("También puedes importar una fuente clínica completa previamente verificada.")
+                            .font(.footnote).foregroundStyle(.secondary)
                             .font(.subheadline).foregroundStyle(.secondary)
                         NavigationLink {
                             N2NativeActivationView()
