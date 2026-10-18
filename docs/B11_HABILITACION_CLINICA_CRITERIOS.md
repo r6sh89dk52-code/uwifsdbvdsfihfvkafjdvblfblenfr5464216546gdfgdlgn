@@ -46,3 +46,20 @@
 - Registro de aceptación: commit exacto, Xcode/iOS/dispositivo, suite XCTest, recuentos antes/después de restauración, comparación Excel, validación clínica y responsable que autoriza.
 
 Seguimiento técnico: [Issue #5](https://github.com/r6sh89dk52-code/danper-salud-movil-pruebas/issues/5).
+
+## Borrado completo de los datos ficticios — implementado en código, pendiente de validar
+
+El botón `Más → Restablecer entorno de prueba → Borrar TODOS los datos ficticios` abre un asistente con recuentos previos. La persona debe escribir exactamente `BORRAR PRUEBAS`, confirmar una segunda vez y aprobar Face ID o código de dispositivo. **No se ejecuta al importar PERSONAL y no se ejecuta automáticamente**.
+
+Operación de `N2SyntheticTrialIOSVault.eraseEntireDemo()`:
+1. Comprueba nombre exacto del dominio sintético, ruta de Application Support permitida y que no sea un enlace simbólico.
+2. Invalida únicamente la clave Keychain `n2-synthetic-trial-key-v1` del servicio `pe.danper.saludmovil.native.preview.n2.synthetic`; no utiliza la clave clínica.
+3. Elimina el directorio `DANPER-N2-SYNTHETIC-VAULT` completo (personas, atenciones, borradores, alergias, stock/lotes, Kardex, auditorías, consumos y correcciones).
+4. Elimina SOLO temporales con prefijos `danper-n2-demo-<tipo>-<UUID>`, nunca los `danper-n2-clinical-*` ni archivos de origen incierto, y cancela las notificaciones `danper.n2.demo.pending.*` y las históricas `danper.n2.pending.*`.
+5. Comprueba que no existen ni la clave ni el directorio sintético, y vuelve a Inicio sin resembrar los cinco empleados ficticios. Si el proceso se interrumpe tras eliminar la clave, puede repetirse para terminar de retirar el directorio cifrado residual.
+
+**Límites:** una copia que el operador haya guardado fuera del sandbox (Archivos, correo, etc.) NO se borra ni revoca. Los temporales antiguos sin separación clínica/demo no se purgan automáticamente. Los catálogos y plantillas distribuidos con la app, ajustes visuales y la build 222 tampoco se eliminan.
+
+**Muy importante:** limpiar DEMO **no es un requisito técnico para activar CLÍNICA**, porque las bóvedas son independientes. Limpiar DEMO no importa un Excel real por sí mismo. La importación nativa del Excel PERSONAL y el inicio de una base clínica vacía siguen pendientes y no se consideran acabados.
+
+Pruebas: `N2SyntheticResetScopeTests`, script `scripts/audit-n2-workspace-routing.cjs`, futura prueba manual con datos ficticios y Xcode 16.2. Este desarrollo **no autoriza usar datos reales todavía**.
