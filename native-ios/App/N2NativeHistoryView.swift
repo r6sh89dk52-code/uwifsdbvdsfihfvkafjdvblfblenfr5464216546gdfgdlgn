@@ -140,6 +140,14 @@ private struct N2WorkerHistoryDetail:View {
                     LabeledContent("DNI",value:worker.dni)
                     LabeledContent("Área",value:worker.area)
                     LabeledContent("Ubicación",value:worker.site)
+                    if realSource {
+                        NavigationLink {
+                            N2NativeWorkerEditorView(editingDNI:dni)
+                        } label: {
+                            Label("Editar ficha del trabajador",systemImage:"square.and.pencil")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                    }
                 }
             }
             DanperPanel("Atenciones y borradores") {
