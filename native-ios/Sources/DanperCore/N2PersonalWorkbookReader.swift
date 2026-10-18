@@ -178,7 +178,7 @@ public enum N2PersonalWorkbookReader {
             if optional {return Data()}
             throw N2PersonalImportError.invalidFile
         }
-        guard entry.type == .file,entry.uncompressedSize<=UInt64(max) else {
+        guard entry.type == .file,entry.uncompressedSize<=numericCast(max) else {
             throw N2PersonalImportError.tooLarge
         }
         var result=Data()
