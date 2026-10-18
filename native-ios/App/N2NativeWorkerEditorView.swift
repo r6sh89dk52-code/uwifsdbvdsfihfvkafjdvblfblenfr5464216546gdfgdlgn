@@ -2,12 +2,6 @@ import Foundation
 import SwiftUI
 import DanperCore
 
-private struct N2OfficialAreaOption:Decodable {
-    let site:String
-    let area:String
-    let code:String
-}
-
 /// Manual worker registration into the isolated clinical store.
 /// If entered from an attention, the completed person returns to that encounter.
 struct N2NativeWorkerEditorView:View {
@@ -19,7 +13,7 @@ struct N2NativeWorkerEditorView:View {
     @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var existingDNI=Set<String>()
     @State private var existingAreas=[String:String]()
-    @State private var officialAreas=[N2OfficialAreaOption]()
+    @State private var officialAreas=[N2OfficialArea]()
     @State private var dni=""
     @State private var names=""
     @State private var area=""
@@ -62,56 +56,11 @@ struct N2NativeWorkerEditorView:View {
         (sex.isEmpty || ["M","F"].contains(sex)) &&
         (!hasBirthDate || N2WorkerAge.years(birthDate:birthISO,on:today) != nil)
     }
-    // Extra search terms suggested by the operator, not verified official UO codes.
-    // They are never sent to Excel as organization codes.
-    private let commonAreaLabels=[
-        "Fitosanidad",
-        "Servicio de Salud",
-        "Departamento de Operaciones",
-        "Mantenimiento de Sistema de Riego",
-        "Producción Agrícola Palto"
-    ]
-    private func normalizeArea(_ text:String)->String {
-        text.folding(options:[.diacriticInsensitive,.caseInsensitive],
-                     locale:Locale(identifier:"es_PE"))
-            .trimmingCharacters(in:.whitespacesAndNewlines)
-            .split(whereSeparator:{$0.isWhitespace})
-            .joined(separator:" ")
-    }
-    private func areaMatches(_ candidate:String,_ needle:String)->Bool {
-        let normalized=normalizeArea(candidate)
-        return normalized.contains(needle)
-    }
-    private func areaRanking(_ candidate:String,_ needle:String)->Int {
-        let normalized=normalizeArea(candidate)
-        if normalized==needle {return 0}
-        if normalized.hasPrefix(needle) {return 1}
-        if normalized.split(separator:" ").contains(where:{$0.hasPrefix(needle)}) {return 2}
-        return 3
-    }
     private var areaSuggestions:[String] {
-        let needle=normalizeArea(area)
-        guard !needle.isEmpty && areaSuggestionsVisible else{return []}
-        // All official areas are searchable, regardless of the selected site.
-        // Export resolves a code only if area + selected site really match.
-        let preferred=officialAreas.filter{$0.site==site}.map(\.area)
-        let remaining=officialAreas.filter{$0.site != site}.map(\.area)
-        let combined=preferred+Array(existingAreas.keys)+remaining+commonAreaLabels
-        var unique=[String]()
-        var seen=Set<String>()
-        for candidate in combined {
-            let key=normalizeArea(candidate)
-            if !key.isEmpty && seen.insert(key).inserted {
-                unique.append(candidate)
-            }
-        }
-        let matching=unique.filter{areaMatches($0,needle)}
-        return matching.sorted {first,second in
-            let rankA=areaRanking(first,needle)
-            let rankB=areaRanking(second,needle)
-            if rankA != rankB {return rankA<rankB}
-            return first.localizedStandardCompare(second)==.orderedAscending
-        }.prefix(8).map{$0}
+        guard areaSuggestionsVisible else{return []}
+        return N2AreaAutocomplete.suggestions(
+            query:area,site:site,official:officialAreas,
+            known:Array(existingAreas.keys))
     }
     var body:some View {
         DanperScrollView {
@@ -177,7 +126,7 @@ struct N2NativeWorkerEditorView:View {
                                                         in:RoundedRectangle(cornerRadius:12))
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityIdentifier("area-option-"+normalizeArea(suggestion))
+                                    .accessibilityIdentifier("area-option-"+N2AreaAutocomplete.normalize(suggestion))
                                 }
                             }.padding(6)
                         }
@@ -258,7 +207,7 @@ struct N2NativeWorkerEditorView:View {
         if let url=Bundle.main.url(forResource:"n2-organization-areas",
                                    withExtension:"json",subdirectory:"N1sDemoResources"),
            let data=try? Data(contentsOf:url),
-           let list=try? JSONDecoder().decode([N2OfficialAreaOption].self,from:data) {
+           let list=try? JSONDecoder().decode([N2OfficialArea].self,from:data) {
             officialAreas=list
         }
         do {
