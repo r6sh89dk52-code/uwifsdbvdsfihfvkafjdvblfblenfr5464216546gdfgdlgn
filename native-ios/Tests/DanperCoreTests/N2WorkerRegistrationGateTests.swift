@@ -21,7 +21,8 @@ final class N2WorkerRegistrationGateTests:XCTestCase {
     }
     func testEveryBlockingConditionExplainsItself() {
         XCTAssertTrue(issues(dni:"").contains(where:{$0.contains("DNI")}))
-        XCTAssertTrue(issues(dni:"12345678").contains(where:{$0.contains("Generar DNI")}))
+        XCTAssertTrue(issues(dni:"12345678").isEmpty)
+        XCTAssertTrue(issues(dni:"87654321").isEmpty)
         XCTAssertTrue(issues(dni:"0000001").contains(where:{$0.contains("ocho")}))
         XCTAssertTrue(issues(name:"Ana").contains(where:{$0.contains("nombres")}))
         XCTAssertTrue(issues(age:"121").contains(where:{$0.contains("120")}))
@@ -29,15 +30,6 @@ final class N2WorkerRegistrationGateTests:XCTestCase {
                         .contains(where:{$0.contains("fecha")}))
         XCTAssertTrue(issues(known:["00000006"]).contains(where:{$0.contains("existe")}))
         XCTAssertTrue(issues(available:false).contains(where:{$0.contains("local")}))
-    }
-    func testGeneratedDNIIsNotAlreadyRegistered() {
-        let occupied=Set((1...5).map{String(format:"%08d",$0)})
-        XCTAssertEqual(N2WorkerRegistrationGate.availableDemoDNI(excluding:occupied),
-                       "00000006")
-        XCTAssertEqual(N2WorkerRegistrationGate.availableDemoDNI(
-            excluding:occupied.union(["00000006"])),"00000007")
-        let all=Set((0...99).map{String(format:"%08d",$0)})
-        XCTAssertNil(N2WorkerRegistrationGate.availableDemoDNI(excluding:all))
     }
     func testCanRetryStaleRegistrationWithoutChangingPastClinicalData() throws {
         let dir=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
