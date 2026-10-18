@@ -258,12 +258,21 @@ internal enum N1sFullExcelWriter {
               let reviewed=bool(root["reviewed"]),
               let provisional=bool(root["provisional"]),
               let start=string(root["start"]),let end=string(root["end"]),start<=end,
-              ["LA VENTUROSA","PLVENTUROSA"].contains(string(root["subdivision"]) ?? ""),
+              ["LA VENTUROSA","PLVENTUROSA","AMBAS"].contains(
+                  string(root["subdivision"]) ?? ""),
               let rowsExpected=root["rows"] as? Int else {
             throw N1sExcelError.invalidManifest
         }
         let selected=try rows(root)
-        guard selected.count==rowsExpected,Set(catalog.compactMap{string($0["code"])}).count==432,
+        let site=string(root["subdivision"]) ?? ""
+        guard selected.count==rowsExpected,
+              selected.allSatisfy({line in
+                  guard let rowSite=line.first as? String else{return false}
+                  return site=="AMBAS"
+                     ? ["LA VENTUROSA","PLVENTUROSA"].contains(rowSite)
+                     : rowSite==site
+              }),
+              Set(catalog.compactMap{string($0["code"])}).count==432,
               Set(reconciliation.keys)==Set(catalog.compactMap{string($0["code"])}),
               !(provisional && reviewed) else {throw N1sExcelError.invalidManifest}
         let pending=selected.contains{line in line[15] as? String != "" && !(line[17] is NSNumber)}
