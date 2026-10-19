@@ -375,6 +375,8 @@ struct NativeRootView:View {
                 return "La clave de prueba tiene un formato inesperado. Se conservaron los archivos."
             case .blockedMigration:
                 return "El ejemplo ficticio no superó la validación. No se importaron ni modificaron datos."
+            case .resetIncomplete:
+                return "La eliminación de los datos ficticios quedó incompleta. La clave de prueba se invalidó, pero quedan archivos cifrados por retirar. Repite el borrado desde Más → Restablecer entorno de prueba; la bóveda clínica y la build 222 permanecen intactas."
             case .keychainStatus(let code):
                 return "No se pudo acceder al Keychain de pruebas (código iOS: \(code)). Conservamos los archivos; comparte este código para corregir la activación."
             }
