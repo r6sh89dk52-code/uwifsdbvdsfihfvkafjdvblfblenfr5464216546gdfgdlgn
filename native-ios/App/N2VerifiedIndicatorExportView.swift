@@ -18,6 +18,7 @@ private struct N2IndicatorShareSheet:UIViewControllerRepresentable {
 /// Entirely native N2 selection screen. The builder refuses pending stock,
 /// missing review events, mixed sites, or invented official balances.
 struct N2VerifiedIndicatorExportView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     private var layoutOnly=false
     private var layoutSelectionOnly=false
     init() {}
@@ -32,7 +33,7 @@ struct N2VerifiedIndicatorExportView:View {
         _endDate=State(initialValue:f.date(from:"2026-10-31")!)
     }
     #endif
-    @State private var site="LA VENTUROSA"
+    @State private var site="AMBAS"
     @State private var startDate=Date()
     @State private var endDate=Date()
     @State private var visits=[N2VisitIndexRow]()
@@ -40,7 +41,7 @@ struct N2VerifiedIndicatorExportView:View {
     @State private var ready=false
     @State private var working=false
     @State private var failed=false
-    @State private var status="Abriendo la bóveda clínica N2…"
+    @State private var status="Selecciona período, sede y atenciones."
     @State private var provisional=false
     @State private var confirmProvisional=false
     @State private var share:N2IndicatorShare?
@@ -55,7 +56,8 @@ struct N2VerifiedIndicatorExportView:View {
     private var inRange:[N2VisitIndexRow] {
         let a=local(startDate),b=local(endDate)
         return visits.filter {
-            $0.status=="saved" && $0.date>=a && $0.date<=b
+            $0.status=="saved" && $0.date>=a && $0.date<=b &&
+            (site=="AMBAS" || $0.workerSite.isEmpty || $0.workerSite==site)
         }
     }
     private var enabled:Bool {
@@ -67,25 +69,35 @@ struct N2VerifiedIndicatorExportView:View {
           VStack(alignment:.leading,spacing:16) {
             if !layoutSelectionOnly {
             DanperPanel("Indicador ambulatorio · 10 hojas") {
-                Label("Modo de prueba — datos ficticios",
-                      systemImage:"lock.shield.fill")
-                Text("Solo atenciones elegidas y consumos enlazados al Kardex. No se rellena stock inicial, ingreso o recuento sin evento revisado.")
+                Label("Exportar libro de 10 hojas",systemImage:"doc.richtext")
+                    .font(.subheadline.weight(.semibold))
+                Text("Puedes exportar Ambas sedes en un libro único. Cada atención conserva su sede; ambos cierres físicos deben estar verificados.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             DanperPanel("Seleccionar período y sede") {
-                DanperChoiceField(title:"Sede",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
-                                  labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                DanperChoiceField(title:"Ámbito del informe",selection:$site,
+                                  options:["AMBAS","LA VENTUROSA","PLVENTUROSA"],
+                                  labels:["AMBAS":"Ambas sedes (libro conjunto)",
+                                          "LA VENTUROSA":"Fundo La Venturosa",
+                                          "PLVENTUROSA":"Planta La Venturosa"])
                 DanperDateField(title:"Desde",selection:$startDate)
                 DanperDateField(title:"Hasta",selection:$endDate)
-                Text("La selección inicial es esta semana (lunes a domingo). Para el corte mensual, elige día 9 a día 8.")
+                Text("Corte mensual sugerido: día 9 al día 8 del siguiente mes. Puedes ajustar las fechas para una revisión puntual.")
+                    .font(.footnote).foregroundStyle(.secondary)
                     .font(.footnote).foregroundStyle(.secondary)
             }
             }
             DanperPanel("Atenciones seleccionadas") {
                 HStack {
-                    Text("\(selected.count) elegidas de \(inRange.count)")
+                    Text("\(selected.count) elegidas de \(inRange.count) en \(site == "AMBAS" ? "ambas sedes" : "esta sede")")
                     Spacer()
                     Button("Solo confirmadas") {selectConfirmed()}
+                }
+                if site=="AMBAS" &&
+                   inRange.contains(where:{!["LA VENTUROSA","PLVENTUROSA"].contains($0.workerSite)}) {
+                    Label("Hay atenciones sin sede verificada. No se incluirán en el libro oficial hasta corregir su ubicación.",
+                          systemImage:"exclamationmark.triangle.fill")
+                        .font(.footnote).foregroundStyle(.orange)
                 }
                 if inRange.isEmpty {
                     Text("Sin atenciones en estas fechas.")
@@ -101,6 +113,9 @@ struct N2VerifiedIndicatorExportView:View {
                     )){
                         VStack(alignment:.leading,spacing:3) {
                             Text(v.workerName).font(.subheadline)
+                            Text(v.workerSite.isEmpty ? "Sede sin verificar" : v.workerSite)
+                                .font(.caption2)
+                                .foregroundStyle(v.workerSite.isEmpty ? Color.orange : Color.secondary)
                             Text(DanperDatePresentation.displayDateTime(v.date,v.time)+" · "+v.diagnosis)
                                 .font(.caption).foregroundStyle(.secondary)
                             if v.pendingPhysicalLines>0 {
@@ -132,7 +147,9 @@ struct N2VerifiedIndicatorExportView:View {
                 }.buttonStyle(DanperPrimaryButton()).disabled(!enabled)
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
-                Text("Necesita cierres de inventario registrados en el período. Si faltan existencias, se dejan celdas vacías; revisa el resultado en Excel antes de enviarlo.")
+                Text(provisional
+                     ? "Libro provisional: conserva consumos declarados y no acredita movimientos físicos pendientes."
+                     : "Libro oficial: requiere revisión de cierre, stock inicial y recuento final del período.")
                     .font(.caption).foregroundStyle(.secondary)
             }
           }.padding(16)
@@ -149,6 +166,11 @@ struct N2VerifiedIndicatorExportView:View {
         .task {if !layoutOnly {await load()}}
         .onChange(of:startDate) {_,_ in selectConfirmed()}
         .onChange(of:endDate) {_,_ in selectConfirmed()}
+        .onChange(of:site) {_,_ in selectConfirmed()}
+        .onChange(of:provisional) {_,allowed in
+            if allowed {selected=Set(inRange.map(\.id))}
+            else {selectConfirmed()}
+        }
         .onDisappear {if share == nil {cleanup()}}
     }
     @MainActor
@@ -157,22 +179,29 @@ struct N2VerifiedIndicatorExportView:View {
             var cal=Calendar(identifier:.gregorian)
             cal.timeZone=TimeZone(identifier:"America/Lima")!
             cal.firstWeekday=2
-            if let week=cal.dateInterval(of:.weekOfYear,for:Date()) {
-                startDate=week.start
-                endDate=cal.date(byAdding:.day,value:6,to:week.start) ?? week.start
+            let now=Date()
+            let parts=cal.dateComponents([.year,.month,.day],from:now)
+            if let year=parts.year,let month=parts.month,let day=parts.day,
+               let thisMonthNinth=cal.date(from:DateComponents(year:year,month:month,day:9)) {
+                let start=day>=9 ? thisMonthNinth :
+                    (cal.date(byAdding:.month,value:-1,to:thisMonthNinth) ?? thisMonthNinth)
+                startDate=start
+                if let next=cal.date(byAdding:.month,value:1,to:start) {
+                    endDate=cal.date(byAdding:.day,value:-1,to:next) ?? start
+                } else {endDate=start}
             }
-            guard let history=try await N2SyntheticTrialIOSVault.shared
+            guard let history=try await vault
                     .readHistory() else {
                 throw N2VerifiedIndicatorWorkbook.Failure.invalidSnapshot
             }
             visits=history.visits
             ready=true
             selectConfirmed()
-            status="Datos verificados. Revisa las atenciones y el cierre contable antes de exportar."
+            status="Selecciona las atenciones y genera el libro."
         }catch{
             failed=true
             ready=false
-            status="Bóveda N2 ausente o no verificable. No se genera ningún libro."
+            status="No se pudo cargar el historial. No se modificaron datos."
         }
     }
     private func selectConfirmed() {
@@ -186,30 +215,63 @@ struct N2VerifiedIndicatorExportView:View {
         status="Comprobando los 30 campos, entregas y cierre del período…"
         defer{working=false}
         do {
-            let result=try await N2SyntheticTrialIOSVault.shared
+            let result=try await vault
                 .exportVerifiedIndicatorWorkbook(
                     start:local(startDate),end:local(endDate),
                     subdivision:site,ids:selected,allowPending:provisional)
             cleanup()
             let dir=FileManager.default.temporaryDirectory
-                .appendingPathComponent("danper-n2-indicator-"+UUID().uuidString,
+                .appendingPathComponent((vault.isClinical ? "danper-n2-clinical-indicator-" :
+                                            "danper-n2-demo-indicator-")+UUID().uuidString,
                                         isDirectory:true)
             try FileManager.default.createDirectory(at:dir,
                 withIntermediateDirectories:true,
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
-            let url=dir.appendingPathComponent(
-                (result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_")+local(startDate)+"_"+local(endDate)+".xlsx")
+            let exportPrefix=result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_"
+            let siteSuffix=site=="AMBAS" ? "AMBAS_" : ""
+            let outputName="\(exportPrefix)\(siteSuffix)\(local(startDate))_\(local(endDate)).xlsx"
+            let url=dir.appendingPathComponent(outputName)
             try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
-            status=(result.provisional ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. " : "")+"Generado: \(result.visits) atenciones / \(result.rows) filas. " +
-                "Materiales sin stock inicial: \(result.missingOpening); " +
-                "sin recuento final: \(result.missingClosingCount). " +
-                "Las celdas no conciliadas siguen vacías."
+            let warning=result.provisional
+                ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. "
+                : ""
+            status="\(warning)Generado: \(result.visits) atenciones / \(result.rows) filas. Materiales sin stock inicial: \(result.missingOpening); sin recuento final: \(result.missingClosingCount). Las celdas no conciliadas siguen vacías."
             share=N2IndicatorShare(file:url)
         }catch{
             failed=true
             cleanup()
-            status="Exportación rechazada: revisa sede, consumos físicos, fecha y eventos de cierre. No se modificó ningún registro."
+            status=exportFailureMessage(error)
+            #if DEBUG
+            print("DANPER Indicador: "+String(reflecting:error))
+            #endif
+        }
+    }
+    private func exportFailureMessage(_ error:Error)->String {
+        guard let failure=error as? N2VerifiedIndicatorWorkbook.Failure else {
+            return "No se pudo generar el Excel. Revisa los datos del período. No se modificaron registros."
+        }
+        switch failure {
+        case .unreviewedPeriod:
+            return "Falta revisión de cierre del período. En el libro conjunto se requiere tanto Fundo como Planta. Revísalos por separado desde Conciliación."
+        case .invalidReconciliation:
+            return "Falta stock inicial o recuento final verificable, o hay un movimiento de conciliación inconsistente. Revisa Conciliación de inventario."
+        case .unverifiedDelivery:
+            return "Una atención seleccionada tiene un consumo sin entrega confirmada o una corrección pendiente. Desmárcala o usa un libro provisional cuando corresponda."
+        case .invalidVisit:
+            return "Una atención tiene sede no verificada o datos obligatorios incompletos. Confirma la ubicación en Personal antes de exportar ambas sedes."
+        case .invalidPeriod:
+            return "El período de fechas no es válido. Comprueba Desde y Hasta."
+        case .missingSelection:
+            return "No hay atenciones válidas para la sede y las fechas seleccionadas."
+        case .ambiguousSite:
+            return "Selecciona una sede válida antes de exportar."
+        case .invalidCatalog:
+            return "No se pudo validar el catálogo oficial. No se generó ningún Excel."
+        case .invalidSnapshot:
+            return "No se pudo verificar el historial antes de exportar."
+        case .invalidWorkbook:
+            return "No se pudo preparar el libro Excel de diez hojas. No se cambió ningún registro."
         }
     }
     @MainActor

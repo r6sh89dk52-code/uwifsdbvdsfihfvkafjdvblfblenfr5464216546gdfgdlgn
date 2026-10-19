@@ -41,6 +41,23 @@ try{
  assert.equal(synthetic.workers.length,5);
  assert(synthetic.workers.every(w=>w.name.startsWith('PERSONA FICTICIA ')&&/^0000000[1-5]$/.test(w.dni)));
  assert(synthetic.attentions.every(a=>a.worker.name.startsWith('PERSONA FICTICIA ')));
+ // Replace unnatural display placeholders only in the packaged synthetic iOS fixture.
+ // This does not mutate existing installed vaults or production/legacy backups.
+ const fictionalNames={
+  '00000001':'Mariana Torres Salazar',
+  '00000002':'Luis Paredes Rojas',
+  '00000003':'Daniela Campos Vega',
+  '00000004':'Carlos Mendoza Ruiz',
+  '00000005':'Valeria Ríos Medina'
+ };
+ for(const worker of synthetic.workers) {
+  assert(fictionalNames[worker.dni]);
+  worker.name=fictionalNames[worker.dni];
+ }
+ for(const visit of synthetic.attentions) {
+  assert(visit.worker && fictionalNames[visit.worker.dni]);
+  visit.worker.name=fictionalNames[visit.worker.dni];
+ }
  assert.equal(synthetic.stockLots.length,5);
  assert.equal(synthetic.stockMovements.length,synthetic.stockMovements.filter(m=>m.dispenseRef).length);
  // Two explicitly fictional site-scoped supplies for evaluating new visits.
@@ -64,13 +81,59 @@ try{
  fs.writeFileSync(path.join(output,'n2-ambulatory-products.json'),JSON.stringify(products));
  fs.writeFileSync(path.join(output,'n2-nursing-catalog.json'),JSON.stringify(nurseCatalog));
  fs.writeFileSync(path.join(output,'n2-approved-mappings.json'),JSON.stringify(approved));
+ const organization=require('./n2-official-area-catalog.cjs').result;
+ const countFor=site=>organization.filter(area=>area.site===site).length;
+ assert.equal(countFor('LA VENTUROSA'),31,'Faltan áreas oficiales del fundo');
+ assert.equal(countFor('PLVENTUROSA'),124,'Faltan áreas oficiales de PL Venturosa');
+ const organizationJSON=JSON.stringify(organization);
+ // Two packaging paths: legacy folder resource and a root-level XcodeGen
+ // JSON resource included by the App source group. Both contain the same
+ // canonical codes sourced from the official ten-sheet workbook.
+ const organizationFolderFile=path.join(output,'n2-organization-areas.json');
+ const organizationRootFile=path.join(root,'native-ios','App','DANPEROfficialAreas.json');
+ fs.writeFileSync(organizationFolderFile,organizationJSON);
+ fs.writeFileSync(organizationRootFile,organizationJSON);
+ assert.equal(fs.readFileSync(organizationFolderFile,'utf8'),
+              fs.readFileSync(organizationRootFile,'utf8'),
+              'Las dos copias del catálogo organizativo deben coincidir');
+ // Compile-time catalog: XcodeGen will include this Swift source in the app
+ // target. The app no longer depends on how folder-reference JSON is copied.
+ const swiftQuote=value=>{
+  const quoted=JSON.stringify(String(value));
+  assert(!quoted.includes('\\u0000'),'Organizational labels cannot contain NUL');
+  return quoted;
+ };
+ const swiftData=organization.map(entry=>
+  '        N2OfficialArea(site:'+swiftQuote(entry.site)+
+  ',area:'+swiftQuote(entry.area)+
+  ',code:'+swiftQuote(entry.code)+')').join(',\n');
+ const swiftSource=[
+  '// GENERATED — DO NOT EDIT. Official areas only, no staff or patient data.',
+  '// Source: verified 10-sheet DANPER workbook @subuo + @uo.',
+  'import DanperCore',
+  'enum N2GeneratedOfficialAreas {',
+  '    static let entries:[N2OfficialArea]=[',
+  swiftData,
+  '    ]',
+  '}',
+  ''
+ ].join('\n');
+ const swiftPath=path.join(root,'native-ios','App','N2GeneratedOfficialAreas.swift');
+ fs.writeFileSync(swiftPath,swiftSource);
+ assert.equal((swiftSource.match(/N2OfficialArea\(site:/g)||[]).length,155,
+              'El catálogo Swift debe contener exactamente las 155 áreas verificadas');
+ assert(swiftSource.includes('N2OfficialArea(site:"PLVENTUROSA"'));
+ assert(swiftSource.includes('N2OfficialArea(site:"LA VENTUROSA"'));
+ console.log('PASS Swift compilado: '+organization.length+' áreas verificadas.');
+ console.log('PASS áreas oficiales: Fundo La Venturosa 31; PL Venturosa 124.');
  assert.deepEqual(fs.readdirSync(output).sort(),[
   'n1s-indicator-plan.json','n1s-indicator-template-store.zip',
   'n1s-nursing-plan.json','n1s-nursing-template-store.zip',
   'n2-synthetic-clinical.json','n2-ambulatory-products.json',
-  'n2-nursing-catalog.json','n2-approved-mappings.json'
+  'n2-nursing-catalog.json','n2-approved-mappings.json',
+  'n2-organization-areas.json'
  ].sort());
- console.log('PASS: eight sanitized preview resources; no real worker or patient data.');
+ console.log('PASS: nine sanitized preview resources; no real worker or patient data.');
 } finally {
  fs.rmSync(temporary,{recursive:true,force:true});
 }

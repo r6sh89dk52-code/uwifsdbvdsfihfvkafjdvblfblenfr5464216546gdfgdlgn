@@ -19,6 +19,7 @@ private struct N2SecureBackupActivity: UIViewControllerRepresentable {
 }
 
 struct N2NativeBackupExportView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     @State private var password=""
     @State private var confirmation=""
     @State private var summary:N2ProtectedStoreSummary?
@@ -38,7 +39,8 @@ struct N2NativeBackupExportView:View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
             DanperPanel("Respaldo cifrado") {
-                Label("Datos protegidos del modo de prueba",
+                Label(vault.isClinical ? "Datos protegidos de la bóveda CLÍNICA" :
+                      "Datos protegidos del modo de prueba",
                       systemImage:"lock.shield.fill")
                     .font(.headline)
                 if let summary {
@@ -87,9 +89,9 @@ struct N2NativeBackupExportView:View {
         }
         .task {
             do {
-                summary=try await N2SyntheticTrialIOSVault.shared.inspect()
+                summary=try await vault.inspect()
                 status=summary == nil
-                    ? "Sin bóveda clínica activa. No se ha creado ningún respaldo."
+                    ? "No existe una bóveda activa para esta fuente. No se ha creado ningún respaldo."
                     : "Bóveda verificada. Puedes generar una copia cifrada."
             }catch {
                 summary=nil
@@ -125,11 +127,12 @@ struct N2NativeBackupExportView:View {
                 failed=true
                 return
             }
-            let bytes=try await N2SyntheticTrialIOSVault.shared
+            let bytes=try await vault
                 .exportPortableEncryptedBackup(password:password)
             clearTemporary()
             let folder=FileManager.default.temporaryDirectory
-                .appendingPathComponent("danper-n2-encrypted-share-"+UUID().uuidString,
+                .appendingPathComponent((vault.isClinical ? "danper-n2-clinical-encrypted-share-" :
+                                           "danper-n2-demo-encrypted-share-")+UUID().uuidString,
                                         isDirectory:true)
             try FileManager.default.createDirectory(at:folder,
                 withIntermediateDirectories:true,
@@ -138,8 +141,10 @@ struct N2NativeBackupExportView:View {
             let fmt=DateFormatter()
             fmt.dateFormat="yyyyMMdd-HHmmss"
             fmt.timeZone=TimeZone(identifier:"America/Lima")
-            let destination=folder.appendingPathComponent(
-                "DANPER_N2_CIFRADO_"+fmt.string(from:Date())+".danperbackup")
+            let prefix=vault.isClinical ? "DANPER_N2_CLINICA_CIFRADO_" :
+                                          "DANPER_N2_DEMO_CIFRADO_"
+            let backupFilename="\(prefix)\(fmt.string(from:Date())).danperbackup"
+            let destination=folder.appendingPathComponent(backupFilename)
             try bytes.write(to:destination,options:[.atomic,.completeFileProtection])
             status="Respaldo cifrado verificado. Abriendo Compartir…"
             share=N2SecureBackupShare(url:destination)

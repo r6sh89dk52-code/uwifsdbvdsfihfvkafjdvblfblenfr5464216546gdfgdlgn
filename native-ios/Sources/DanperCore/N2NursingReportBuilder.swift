@@ -38,13 +38,17 @@ public struct N2NursingReport:Sendable {
 
     /// N1s official 98-product writer consumes this exact manifest.
     public func manifest(shift:String,responsible:String)throws->Data {
-        // An interval cannot be represented as an official single-day XLSX.
-        guard periodEnd == nil else {throw N2NursingReportError.unsupportedRange}
+        // A period is explicitly labeled as a consolidated range in the
+        // worksheet. Never silently pass a multi-day report as a daily shift.
+        guard periodEnd == nil || shift=="CONSOLIDADO" else {
+            throw N2NursingReportError.unsupportedRange
+        }
         guard exportable,["MAÑANA","TARDE","NOCHE","CONSOLIDADO"].contains(shift),
               !responsible.trimmingCharacters(in:.whitespaces).isEmpty else {
             throw N2NursingReportError.incompleteHistory
         }
-        let record:[String:Any]=["date":date,"rows":rows.map{$0.value()},
+        let record:[String:Any]=["date":date,"periodEnd":periodEnd ?? "",
+                                  "rows":rows.map{$0.value()},
                                   "shift":shift,"responsible":responsible]
         return try JSONSerialization.data(withJSONObject:record)
     }

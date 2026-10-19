@@ -5,8 +5,13 @@ import DanperCore
 /// Native N2 editor uses only an explicitly activated, isolated clinical
 /// vault. Nothing reads the build222 installation or N1g demo drafts.
 struct N2NativeClinicalFormView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     let requestedDraftID:String?
-    init(requestedDraftID:String?=nil) {self.requestedDraftID=requestedDraftID}
+    private var initialWorkerDNI:String?
+    init(requestedDraftID:String?=nil,initialWorkerDNI:String?=nil) {
+        self.requestedDraftID=requestedDraftID
+        self.initialWorkerDNI=initialWorkerDNI
+    }
     #if DEBUG
     init(layoutContext:N2FormContext,draft:N2NativeFormDraft,step:Int,validationMessage:String="",saved:Bool=false,showCatalog:Bool=false,detailOnly:Bool=false,layoutOutcomes:[String:String]=[:]) {
         requestedDraftID=nil
@@ -47,17 +52,25 @@ struct N2NativeClinicalFormView:View {
     @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var saved=false
     @State private var fault=false
-    @State private var status="Abriendo bóveda cifrada N2…"
+    @State private var status="Preparando el registro…"
     @State private var expandedMedication:String?
-    @State private var chooseWorker=false
+    @State private var showMissingWorker=false
+    @State private var showNewWorker=false
+    @State private var workerDNIInput=""
+    @State private var workerNameInput=""
+    @State private var notFoundDNI=""
+    @State private var dniLookupTask:Task<Void,Never>?
+    @FocusState private var workerDNIFocused:Bool
+    @State private var allergyFeedback=""
     @State private var chooseProduct=false
     @State private var chooseDraft=false
     @State private var draftToDelete:String?
     @State private var drafts=[N2RecoverableDraft]()
-    @State private var search=""
     @State private var allergyStatus="unknown"
     @State private var allergySubstances=""
     @State private var editingAllergy=false
+    @State private var allergyConfirmationProduct:String?
+    @State private var allergyMatches=[String]()
     @State private var autosaveTask:Task<Void,Never>?
     @State private var lastAutosaveTimestamp:Int64=0
     @Environment(\.scenePhase) private var scenePhase
@@ -92,6 +105,56 @@ struct N2NativeClinicalFormView:View {
     private var currentWorker:N2FormWorker? {
         context?.workers.first(where:{$0.dni==form.dni})
     }
+    private var nameSuggestions:[N2FormWorker] {
+        let query=workerNameInput.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard query.count>=2,form.dni.isEmpty else{return []}
+        return N2NativeWorkerLookup.nameMatches(query,
+            in:context?.workers ?? [],limit:5)
+    }
+    private func selectWorker(_ worker:N2FormWorker) {
+        dniLookupTask?.cancel()
+        form.dni=worker.dni
+        workerDNIInput=worker.dni
+        workerNameInput=worker.name
+        workerDNIFocused=false
+        notFoundDNI=""
+        showMissingWorker=false
+    }
+    private func workerAgeDescription(_ worker:N2FormWorker)->String {
+        if let age=N2WorkerAge.years(birthDate:worker.birthDate,on:form.date) {
+            return "\(age) años"
+        }
+        if let age=Int(worker.age),(0...120).contains(age) {
+            return "\(age) años (declarada)"
+        }
+        return "No consignada"
+    }
+    private func enteredWorkerDNI(_ value:String) {
+        dniLookupTask?.cancel()
+        let digits=N2NativeWorkerLookup.numericDNI(value)
+        if workerDNIInput != digits {workerDNIInput=digits}
+        if let worker=N2NativeWorkerLookup.exactDNI(digits,
+            in:context?.workers ?? []) {
+            selectWorker(worker)
+            return
+        }
+        form.dni=""
+        workerNameInput=""
+        notFoundDNI=""
+        guard digits.count==8,!layoutOnly else{return}
+        dniLookupTask=Task { @MainActor in
+            do {try await Task.sleep(for:.milliseconds(400))}catch{return}
+            guard workerDNIInput==digits,!Task.isCancelled else{return}
+            if let worker=N2NativeWorkerLookup.exactDNI(digits,
+                in:context?.workers ?? []) {
+                selectWorker(worker)
+            } else {
+                notFoundDNI=digits
+                workerDNIFocused=false
+                showMissingWorker=true
+            }
+        }
+    }
     var body:some View {
         Group {
             if let context {
@@ -100,7 +163,7 @@ struct N2NativeClinicalFormView:View {
                     if fault {
                         DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
                     } else if !saved && !layoutDetailOnly {
-                        Label("Prueba · datos ficticios",systemImage:"lock.shield")
+                        Label("Registro ambulatorio",systemImage:"cross.case.fill")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if !saved && !drafts.isEmpty {
@@ -178,31 +241,48 @@ struct N2NativeClinicalFormView:View {
                 .sensoryFeedback(.selection,trigger:step) {_,_ in haptics}
                 .sensoryFeedback(.selection,trigger:form.procedures.count) {_,_ in haptics}
                 .sensoryFeedback(.success,trigger:saved) {_,_ in haptics}
-                .sheet(isPresented:$chooseWorker) {
-                    NavigationStack {
-                        List {
-                            ForEach(context.workers.filter{w in
-                                search.isEmpty || w.dni.localizedStandardContains(search) ||
-                                w.name.localizedStandardContains(search)
-                            }) {w in
-                                Button {
-                                    form.dni=w.dni
-                                    search=""
-                                    chooseWorker=false
-                                } label:{
-                                    VStack(alignment:.leading) {
-                                        Text(w.name).foregroundStyle(.primary)
-                                        Text(w.dni+" · "+w.area)
-                                            .font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
+                .confirmationDialog("Revisar coincidencia textual de alergia",
+                    isPresented:Binding(
+                        get:{allergyConfirmationProduct != nil},
+                        set:{if !$0 {allergyConfirmationProduct=nil}}
+                    ),titleVisibility:.visible) {
+                    Button("Agregar y conservar advertencia") {
+                        if let code=allergyConfirmationProduct {
+                            appendClinicalMedication(code)
                         }
-                        .searchable(text:$search,prompt:"DNI o nombres")
-                        .navigationTitle("Seleccionar trabajador")
-                        .toolbar{
-                            ToolbarItem(placement:.topBarTrailing) {
-                                Button("Cerrar"){chooseWorker=false}
+                        allergyConfirmationProduct=nil
+                    }
+                    Button("Cancelar",role:.cancel) {
+                        allergyConfirmationProduct=nil
+                    }
+                } message: {
+                    Text("Posible coincidencia con alergia declarada: \(allergyMatches.joined(separator: ", ")). Esta alerta usa solo texto; no verifica principios activos ni reacciones cruzadas. Comprueba la indicación antes de cualquier administración.")
+                }
+                .alert("Trabajador no registrado",isPresented:$showMissingWorker) {
+                    Button("Registrar trabajador") {
+                        showNewWorker=true
+                    }
+                    Button("Cerrar",role:.cancel) {
+                        workerDNIInput=""
+                        workerNameInput=""
+                        notFoundDNI=""
+                        form.dni=""
+                    }
+                } message: {
+                    Text("No encontramos el DNI \(notFoundDNI) en Personal. Puedes registrarlo ahora y continuar esta misma atención.")
+                }
+                .sheet(isPresented:$showNewWorker) {
+                    NavigationStack {
+                        N2NativeWorkerEditorView(
+                            initialDNI:notFoundDNI,
+                            onSaved:{dni in
+                                Task {await didRegisterWorker(dni)}
+                            })
+                        .toolbar {
+                            ToolbarItem(placement:.topBarLeading) {
+                                Button("Cerrar") {
+                                    showNewWorker=false
+                                }
                             }
                         }
                     }
@@ -255,8 +335,14 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
                 .onChange(of:form.dni) {_,dni in
+                    if let worker=context.workers.first(where:{$0.dni==dni}) {
+                        workerDNIInput=dni
+                        workerNameInput=worker.name
+                    }
                     allergyStatus=context.allergies[dni]?.status ?? "unknown"
                     allergySubstances=context.allergies[dni]?.substances ?? ""
+                    allergyFeedback=context.allergies[dni]?.reviewed == true
+                        ? "Alergias revisadas" : ""
                 }
                 .task(id:form) {
                     if step==3 && !saved && !layoutOnly {
@@ -281,7 +367,7 @@ struct N2NativeClinicalFormView:View {
                 }
             } else {
                 ContentUnavailableView(
-                    fault ? "Bóveda no disponible" : "Verificando historia clínica",
+                    fault ? "Datos no disponibles" : "Preparando formulario",
                     systemImage:"lock.shield",
                     description:Text(status))
                 .task {await load()}
@@ -341,20 +427,71 @@ struct N2NativeClinicalFormView:View {
         }
     }
     private func workerSection(_ context:N2FormContext)->some View {
-        DanperPanel("Identificación") {
-            Button {
-                chooseWorker=true
-            } label: {
-                HStack {
-                    Label(currentWorker?.name ?? "Buscar trabajador",systemImage:"person.crop.rectangle").foregroundStyle(.primary)
-                    Spacer()
-                    Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
-                }.padding(12).background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-            }.buttonStyle(.plain)
+        DanperPanel("Identificación del trabajador") {
+            DanperField(title:"DNI") {
+                TextField("Introduce los 8 números del DNI",text:$workerDNIInput)
+                    .keyboardType(.numberPad)
+                    .focused($workerDNIFocused)
+                    .accessibilityIdentifier("attention-worker-dni")
+                    .onChange(of:workerDNIInput) {_,value in
+                        enteredWorkerDNI(value)
+                    }
+            }
+            Text("El DNI carga automáticamente la ficha. Si no está registrado, podrás crearlo sin salir de la atención.")
+                .font(.caption).foregroundStyle(.secondary)
+            DanperField(title:"Nombres y apellidos") {
+                if let worker=currentWorker {
+                    Text(worker.name).foregroundStyle(.primary)
+                        .frame(maxWidth:.infinity,alignment:.leading)
+                        .accessibilityIdentifier("attention-worker-name")
+                } else {
+                    TextField("También puedes buscar por nombre",text:$workerNameInput)
+                        .textInputAutocapitalization(.words)
+                        .accessibilityIdentifier("attention-worker-name-query")
+                }
+            }
+            if !nameSuggestions.isEmpty {
+                VStack(spacing:5) {
+                    ForEach(nameSuggestions) { person in
+                        Button {selectWorker(person)} label: {
+                            HStack(spacing:10) {
+                                Image(systemName:"person.crop.circle").foregroundStyle(.secondary)
+                                VStack(alignment:.leading,spacing:3) {
+                                    Text(person.name).font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    Text("DNI "+person.dni).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName:"arrow.up.left").foregroundStyle(.secondary)
+                            }.padding(12)
+                        }.buttonStyle(.plain)
+                    }
+                }.background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+            }
+            if workerDNIInput.count==8 && currentWorker==nil && !showMissingWorker {
+                Button("Registrar DNI "+workerDNIInput) {
+                    notFoundDNI=workerDNIInput
+                    showMissingWorker=true
+                }
+                .buttonStyle(DanperSecondaryButton())
+            }
             if let worker=currentWorker {
-                LabeledContent("DNI",value:worker.dni)
-                LabeledContent("Área",value:worker.area)
-                LabeledContent("Sede",value:worker.site)
+                VStack(alignment:.leading,spacing:9) {
+                    Label("Trabajador identificado",systemImage:"checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.green)
+                    LabeledContent("DNI",value:worker.dni)
+                    LabeledContent("Área",value:worker.area.isEmpty ? "No consignada" : worker.area)
+                    LabeledContent("Labor / cargo",value:worker.labor.isEmpty ? "No consignada" : worker.labor)
+                    LabeledContent("Edad",value:workerAgeDescription(worker))
+                    LabeledContent("Sede",value:worker.site=="PLVENTUROSA" ?
+                                   "Planta La Venturosa" : "Fundo La Venturosa")
+                    LabeledContent("Ubicación / ubigeo",
+                                   value:worker.ubigeo.isEmpty ? "No consignada" : worker.ubigeo)
+                    LabeledContent("Sexo registrado",value:worker.sex=="M" ? "Masculino" :
+                                   worker.sex=="F" ? "Femenino" : "No consignado")
+                }
+                .padding(13)
+                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
                 Text("Alergias revisadas antes de registrar medicamentos.")
                     .font(.footnote).foregroundStyle(.secondary)
                 DanperChoiceField(title:"Revisión de alergias",selection:$allergyStatus,
@@ -364,7 +501,13 @@ struct N2NativeClinicalFormView:View {
                     TextField("Indica las sustancias",text:$allergySubstances,axis:.vertical).lineLimit(2...5)
                 }
                 }
-                Button(editingAllergy ? "Verificando..." : "Confirmar revisión de alergias") {
+                if !allergyFeedback.isEmpty {
+                    Label(allergyFeedback,systemImage:"checkmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .accessibilityAddTraits(.updatesFrequently)
+                }
+                Button(editingAllergy ? "Guardando…" : "Guardar revisión de alergias") {
                     Task {await recordAllergy(worker.dni)}
                 }
                 .buttonStyle(DanperSecondaryButton())
@@ -420,9 +563,13 @@ struct N2NativeClinicalFormView:View {
                 DanperInlineSearch(title:"Buscar medicamento o insumo",placeholder:"Ej. Paracetamol",
                     options:context.products.clinical.map{DanperSearchOption(id:$0.code,title:$0.name,detail:$0.unit+" · Código "+$0.code)},
                     onSelect:{code in
-                        let med=N2FormMedication(code:code)
-                        form.items.append(med);expandedMedication=med.id
-                        form.refreshProcedureSuggestions(catalog:context.products)
+                        let matches=allergyTextMatches(code,context:context)
+                        if matches.isEmpty {
+                            appendClinicalMedication(code)
+                        } else {
+                            allergyMatches=Array(Set(matches)).sorted()
+                            allergyConfirmationProduct=code
+                        }
                     },onClose:{chooseProduct=false})
             }
 
@@ -493,8 +640,22 @@ struct N2NativeClinicalFormView:View {
         }
     }
         }
+    private func appendClinicalMedication(_ code:String) {
+        let med=N2FormMedication(code:code)
+        form.items.append(med)
+        expandedMedication=med.id
+        if let context {form.refreshProcedureSuggestions(catalog:context.products)}
+    }
     private func medicationName(_ code:String,_ context:N2FormContext)->String {
         context.products.clinical.first(where:{$0.code==code})?.name ?? code
+    }
+    private func allergyTextMatches(_ code:String,context:N2FormContext)->[String] {
+        let current=allergyStatus=="known" ? allergySubstances : ""
+        let record=context.allergies[form.dni]
+        let documented=record?.status=="known" ? (record?.substances ?? "") : ""
+        return N2MedicationAllergyTextMatch.matches(
+            productName:medicationName(code,context),
+            substances:current + ";" + documented)
     }
     @ViewBuilder
     private func medicationFields(_ context:N2FormContext)->some View {
@@ -510,6 +671,10 @@ struct N2NativeClinicalFormView:View {
                             Text(medicationName(med.code,context)).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
                             Text("Cantidad \(med.quantity) · \(med.procedure.isEmpty ? "Procedimiento pendiente" : med.procedure.capitalized)")
                                 .font(.caption).foregroundStyle(.secondary)
+                            if !allergyTextMatches(med.code,context:context).isEmpty {
+                                Label("Revisar posible coincidencia de alergia",systemImage:"exclamationmark.triangle.fill")
+                                    .font(.caption).foregroundStyle(.orange)
+                            }
                         }.frame(maxWidth:.infinity,alignment:.leading)
                         Image(systemName:expandedMedication==med.id ? "chevron.up" : "chevron.down")
                             .font(.caption.weight(.bold)).foregroundStyle(.secondary)
@@ -575,7 +740,7 @@ struct N2NativeClinicalFormView:View {
         }
     }
     private func focusFirstMissing(_ context:N2FormContext) {
-        if currentWorker==nil {step=0;chooseWorker=true;return}
+        if currentWorker==nil {step=0;workerDNIFocused=true;return}
         if !form.clinicalIssues(step:1,context:context).filter({$0.hasPrefix("allergy-")}).isEmpty {step=0;return}
         if !form.clinicalIssues(step:1,context:context).isEmpty {step=1}
         else if !form.clinicalIssues(step:2,context:context).isEmpty || !extraTreatmentRequirements.isEmpty {step=2}
@@ -611,9 +776,9 @@ struct N2NativeClinicalFormView:View {
         previewBusy=true;previewReady=false;previewError=""
         defer{previewBusy=false}
         do {
-            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            let fresh=try await vault.clinicalFormContext()
             let raw=try form.makeSavedVisit(context:fresh)
-            let results=try await N2SyntheticTrialIOSVault.shared.previewAttention(raw,visitID:form.id,at:now,expectedRevision:fresh.revision)
+            let results=try await vault.previewAttention(raw,visitID:form.id,at:now,expectedRevision:fresh.revision)
             guard !Task.isCancelled else{return}
             previewLines=results;previewReady=results.count==form.items.count
         } catch {
@@ -729,9 +894,9 @@ struct N2NativeClinicalFormView:View {
     @MainActor
     private func load() async {
         do {
-            let source=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            let source=try await vault.clinicalFormContext()
             context=source
-            drafts=try await N2SyntheticTrialIOSVault.shared.readDrafts()
+            drafts=try await vault.readDrafts()
             if let requestedDraftID {
                 guard let recovered=drafts.first(where:{$0.id==requestedDraftID}) else {
                     fault=true
@@ -740,16 +905,25 @@ struct N2NativeClinicalFormView:View {
                 }
                 form=recovered.form
                 step=0
-                status="Borrador cifrado recuperado · revisión \(source.revision)"
+                status="Borrador recuperado."
             } else {
                 let (date,time)=limaClock()
                 form.date=date
                 form.time=time
-                status="Bóveda cifrada disponible · revisión \(source.revision)"
+                status="Formulario preparado."
+                if let initialWorkerDNI,
+                   let worker=context?.workers.first(where:{$0.dni==initialWorkerDNI}) {
+                    selectWorker(worker)
+                    allergyStatus=context?.allergies[initialWorkerDNI]?.status ?? "unknown"
+                    allergySubstances=context?.allergies[initialWorkerDNI]?.substances ?? ""
+                } else {
+                    workerDNIInput=""
+                    workerNameInput=""
+                }
             }
         }catch{
             fault=true
-            status="No hay una fuente clínica N2 verificada o su integridad falló. No se guardó ningún dato."
+            status="No se pudieron cargar los datos. Ningún registro fue modificado."
         }
     }
 
@@ -759,19 +933,42 @@ struct N2NativeClinicalFormView:View {
         defer{editingAllergy=false}
         do{
             let normalized=allergyStatus=="known" ? allergySubstances : ""
-            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-            let updated=try await N2SyntheticTrialIOSVault.shared
+            let fresh=try await vault.clinicalFormContext()
+            let updated=try await vault
                 .reviewAllergies(dni:dni,status:allergyStatus,
                     substances:normalized,at:now,
                     expectedRevision:fresh.revision)
-            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-            status="Alergias revisadas en revisión \(updated.revision)."
+            context=try await vault.clinicalFormContext()
+            status="Revisión de alergias guardada."
+            allergyFeedback="Alergias revisadas y guardadas"
             fault=false
         }catch{
-            status="No se confirmó el registro de alergias. Verifica el estado de la bóveda."
+            status="No se pudo guardar la revisión de alergias."
+            allergyFeedback="No se guardaron los cambios. Intenta nuevamente."
             fault=true
         }
     }
+    @MainActor
+    private func didRegisterWorker(_ dni:String) async {
+        do {
+            let fresh=try await vault.clinicalFormContext()
+            guard fresh.workers.contains(where:{$0.dni==dni}) else{return}
+            context=fresh
+            form.dni=dni
+            allergyStatus=fresh.allergies[dni]?.status ?? "unknown"
+            allergySubstances=fresh.allergies[dni]?.substances ?? ""
+            allergyFeedback=""
+            workerDNIInput=dni
+            workerNameInput=fresh.workers.first(where:{$0.dni==dni})?.name ?? ""
+            notFoundDNI=""
+            showNewWorker=false
+            step=0
+        } catch {
+            validationMessage="Se registró el trabajador, pero no se pudo actualizar su ficha. Vuelve a buscarlo en Personal."
+            showValidation=true
+        }
+    }
+
     private var meaningfulDraft:Bool {
         !form.dni.isEmpty || !form.category.isEmpty || !form.system.isEmpty ||
         !form.diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ||
@@ -788,15 +985,15 @@ struct N2NativeClinicalFormView:View {
             }
             guard !Task.isCancelled else{return}
             do{
-                let latest=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+                let latest=try await vault.clinicalFormContext()
                 let patch=try version.makeDraftPatch(context:context)
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
-                let result=try await N2SyntheticTrialIOSVault.shared.saveDraft(
+                let result=try await vault.saveDraft(
                     id:version.id,changes:patch,at:timestamp,
                     expectedRevision:latest.revision)
                 lastAutosaveTimestamp=timestamp
-                await N2DraftReminder.schedule(id:version.id)
+                await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
                 status="Borrador cifrado · revisión \(result.revision)."
             }catch{
                 if !Task.isCancelled && !saved {
@@ -813,15 +1010,15 @@ struct N2NativeClinicalFormView:View {
         busy=true
         defer{busy=false}
         do {
-            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            let fresh=try await vault.clinicalFormContext()
             let raw=try form.makeSavedVisit(context:fresh)
-            let outcome=try await N2SyntheticTrialIOSVault.shared.saveAttention(
+            let outcome=try await vault.saveAttention(
                 raw,at:now,expectedRevision:fresh.revision)
-            savedLines=try await N2SyntheticTrialIOSVault.shared.dispensingStatus(visitID:form.id)
+            savedLines=try await vault.dispensingStatus(visitID:form.id)
             saved=true
-            N2DraftReminder.cancel(id:form.id)
-            self.context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-            drafts=try await N2SyntheticTrialIOSVault.shared.readDrafts()
+            N2DraftReminder.cancel(id:form.id,mode:vault.mode)
+            self.context=try await vault.clinicalFormContext()
+            drafts=try await vault.readDrafts()
             status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."
         }catch {
             status="No se pudo confirmar la atención. La operación fue rechazada y el stock no se debe descontar parcialmente."
@@ -844,12 +1041,12 @@ struct N2NativeClinicalFormView:View {
         busy=true
         defer {busy=false}
         do {
-            let fresh=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-            _=try await N2SyntheticTrialIOSVault.shared.deleteDraft(
+            let fresh=try await vault.clinicalFormContext()
+            _=try await vault.deleteDraft(
                 id:id,expectedRevision:fresh.revision)
-            N2DraftReminder.cancel(id:id)
-            drafts=try await N2SyntheticTrialIOSVault.shared.readDrafts()
-            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            N2DraftReminder.cancel(id:id,mode:vault.mode)
+            drafts=try await vault.readDrafts()
+            context=try await vault.clinicalFormContext()
             if form.id==id {
                 autosaveTask?.cancel()
                 form=N2NativeFormDraft()
@@ -858,14 +1055,18 @@ struct N2NativeClinicalFormView:View {
                 form.time=time
                 step=0
             }
-            status="Borrador eliminado de la bóveda cifrada."
+            status="Borrador eliminado."
         }catch {
             fault=true
-            status="No se pudo eliminar el borrador. Revisa la bóveda antes de editar."
+            status="No se pudo eliminar el borrador. Inténtalo nuevamente."
         }
     }
 
     private func startAnother() {
+        dniLookupTask?.cancel()
+        workerDNIInput=""
+        workerNameInput=""
+        notFoundDNI=""
         saved=false
         fault=false
         form=N2NativeFormDraft()

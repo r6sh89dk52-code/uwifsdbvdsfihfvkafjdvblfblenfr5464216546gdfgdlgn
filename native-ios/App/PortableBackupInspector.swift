@@ -32,10 +32,34 @@ private struct Envelope: Decodable {
     let data: String
 }
 
+/// Read-only report for one encrypted build 222 archive.
+/// SHA256 is of the encrypted file bytes; no PII or password is exposed.
+struct N2Build222BackupReview:Sendable {
+    let audit:N1lSourceAudit
+    let encryptedSHA256:String
+    var canRestore:Bool {
+        audit.isStructurallyEligibleForReview &&
+        audit.obviousDemoWorkerMarkers==0 &&
+        audit.obviousDemoClinicalMarkers==0 &&
+        audit.missingRosterReferences==0 &&
+        audit.danglingCorrections==0
+    }
+}
+
 /// Read-only cross-platform backup verifier. No writes to Keychain or Files.
 enum PortableBackupInspector {
     static func inspect(url: URL, password: String) throws -> N1BackupManifest {
         try audit(url:url,password:password).manifest
+    }
+
+    /// First phase: read-only cryptographic validation and aggregate preview.
+    /// Original encrypted file remains unchanged; no clinical vault is opened.
+    static func review(url:URL,password:String)throws->N2Build222BackupReview {
+        let (plaintext,_,sha)=try auditedSnapshot(url:url,password:password)
+        var raw=plaintext
+        defer {raw.resetBytes(in:0..<raw.count)}
+        let audit=try N1lRealSnapshotGate.audit(raw,destination:.verifiedEmpty)
+        return N2Build222BackupReview(audit:audit,encryptedSHA256:sha)
     }
 
     /// Decrypts and audits exactly ONE user-selected backup in memory.
@@ -58,26 +82,47 @@ enum PortableBackupInspector {
     /// decrypt, audit before any Keychain creation, and copy into a DIFFERENT
     /// encrypted vault. Does not read or alter the installed build222 app.
     static func activateProtectedSource(url:URL,password:String,
-                                        explicitConsent:Bool) async throws
+                                        explicitConsent:Bool,
+                                        expectedEncryptedSHA256:String) async throws
         -> N2ProtectedStoreSummary {
-        guard explicitConsent else{throw BackupInspectionError.invalidSnapshot}
-        var raw=try auditedSnapshot(url:url,password:password).0
-        defer {raw.resetBytes(in:0..<raw.count)}
-        let check=try N1lRealSnapshotGate.audit(raw,destination:.verifiedEmpty)
-        guard check.isStructurallyEligibleForReview,
-              check.obviousDemoWorkerMarkers==0,
-              check.obviousDemoClinicalMarkers==0,
-              check.missingRosterReferences==0,
-              check.danglingCorrections==0 else {
+        guard explicitConsent,
+              expectedEncryptedSHA256.count==64,
+              (try await N2ProtectedClinicalIOSVault.shared.inspect())==nil else {
             throw BackupInspectionError.invalidSnapshot
         }
-        _=try N1eLegacyClinicalAudit.inspect(raw)
-        return try await N2ProtectedClinicalIOSVault.shared
+        let (plaintext,_,sha)=try auditedSnapshot(url:url,password:password)
+        var raw=plaintext
+        defer {raw.resetBytes(in:0..<raw.count)}
+        let audit=try N1lRealSnapshotGate.audit(raw,destination:.verifiedEmpty)
+        guard sha==expectedEncryptedSHA256,
+              audit.isStructurallyEligibleForReview,
+              audit.obviousDemoWorkerMarkers==0,
+              audit.obviousDemoClinicalMarkers==0,
+              audit.missingRosterReferences==0,
+              audit.danglingCorrections==0 else {
+            throw BackupInspectionError.invalidSnapshot
+        }
+        let checked=try N1eLegacyClinicalAudit.inspect(raw)
+        guard checked.workers==audit.manifest.workers,
+              checked.attentions==audit.manifest.attentions,
+              checked.physicalMovements==audit.manifest.movements,
+              checked.stockLots==audit.manifest.lots else {
+            throw BackupInspectionError.invalidSnapshot
+        }
+        let saved=try await N2ProtectedClinicalIOSVault.shared
             .activateOnlyWithConsent(raw,approvedByUser:explicitConsent)
+        guard saved.workers==audit.manifest.workers,
+              saved.attentions==audit.manifest.attentions,
+              saved.saved==audit.saved,
+              saved.drafts==audit.drafts,
+              saved.physicalMovements==audit.manifest.movements,
+              saved.pendingClinicalLines==audit.unresolvedClinicalConsumptions
+        else {throw BackupInspectionError.invalidSnapshot}
+        return saved
     }
 
     private static func auditedSnapshot(url:URL,password:String)
-        throws -> (Data,N1lSourceAudit) {
+        throws -> (Data,N1lSourceAudit,String) {
         guard password.count >= 14 && password.count <= 200 else {
             throw BackupInspectionError.invalidPasswordLength
         }
@@ -92,6 +137,8 @@ enum PortableBackupInspector {
             throw BackupInspectionError.invalidFile
         }
         let source = try Data(contentsOf: url)
+        let encryptedSHA256=SHA256.hash(data:source)
+            .map{String(format:"%02x",$0)}.joined()
         let record = try JSONDecoder().decode(Envelope.self, from: source)
         guard record.format == "DANPER-SALUD-PORTABLE-BACKUP",
               record.version == 1, record.kdf == "PBKDF2-SHA256",
@@ -132,7 +179,7 @@ enum PortableBackupInspector {
         do {
             let raw=try JSONSerialization.data(withJSONObject:snapshot,options:[.sortedKeys])
             let result=try N1lRealSnapshotGate.audit(raw,destination:.uncertain)
-            return (raw,result)
+            return (raw,result,encryptedSHA256)
         } catch {
             throw BackupInspectionError.invalidSnapshot
         }

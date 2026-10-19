@@ -78,8 +78,37 @@ actor N2ProtectedClinicalIOSVault {
         return try N2ProtectedClinicalVaultCore(keyData:secret)
             .activateSingleVerifiedSource(source,explicitConsent:approvedByUser)
     }
+    /// Only the encrypted CLINICAL namespace can create or merge PERSONAL.
+    /// Never uses or clears N2SyntheticTrialIOSVault, N1m or build222.
+    func activateInitialPersonal(_ preview:N2PersonalImportPreview,
+                                 site:String,approvedByUser:Bool)throws
+        ->N2ProtectedStoreSummary {
+        guard approvedByUser else{throw Failure.blockedMigration}
+        guard let secret=try deviceKey(create:true) else {
+            throw Failure.unavailableKeychain
+        }
+        return try N2ProtectedClinicalVaultCore(keyData:secret)
+            .activateInitialPersonal(preview:preview,site:site,
+                                     explicitConsent:approvedByUser)
+    }
+    func previewPersonalMerge(_ preview:N2PersonalImportPreview,
+                              site:String)throws->N2PersonalImportResult {
+        try protectedStore().previewPersonalMerge(preview:preview,site:site)
+    }
+    func mergePersonal(_ preview:N2PersonalImportPreview,
+                       site:String,expectedRevision:Int)throws->N2PersonalImportResult {
+        try protectedStore().mergePersonal(preview:preview,site:site,
+                                           expectedRevision:expectedRevision)
+    }
+
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
+    }
+    func dispensingLines(visitID:String)throws->[N2DispensingLine] {
+        try protectedStore().dispensingLines(visitID:visitID)
+    }
+    func dispensingStatus(visitID:String)throws->[String:String] {
+        try protectedStore().dispensingStatus(visitID:visitID)
     }
     func readHistory()throws->N2NativeReadModel? {
         guard let secret=try deviceKey(create:false) else{return nil}
@@ -101,6 +130,11 @@ actor N2ProtectedClinicalIOSVault {
     func registerWorker(_ worker:Data,at:Int64,expectedRevision:Int)
         throws->N2ProtectedStoreSummary {
         try protectedStore().registerWorker(worker,at:at,expectedRevision:expectedRevision)
+    }
+    func correctWorker(dni:String,worker:Data,at:Int64,
+                       expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().correctWorker(dni:dni,worker:worker,
+                                           at:at,expectedRevision:expectedRevision)
     }
     func reviewAllergies(dni:String,status:String,substances:String,
                         at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
@@ -165,6 +199,24 @@ actor N2ProtectedClinicalIOSVault {
             approvedCatalog:resource("n2-approved-mappings"),
             at:at,expectedRevision:expectedRevision)
     }
+    func previewAttention(_ attention:Data,visitID:String,at:Int64,
+                          expectedRevision:Int)throws->[String:String] {
+        let result=try protectedStore().previewAttention(attention,
+            approvedCatalog:resource("n2-approved-mappings"),
+            at:at,expectedRevision:expectedRevision)
+        let root=try JSONSerialization.jsonObject(with:result.snapshot) as? [String:Any]
+        let visits=root?["attentions"] as? [[String:Any]]
+        return visits?.first{$0["id"] as? String==visitID}?["nativeDispensing"]
+            as? [String:String] ?? [:]
+    }
+    func verifyOriginalStockSite(eventID:String,lotID:String,site:String,
+                                 reason:String,operatorName:String,
+                                 at:Int64,expectedRevision:Int)
+        throws->N2ProtectedStoreSummary {
+        try protectedStore().verifyOriginalStockSite(
+            eventID:eventID,lotID:lotID,site:site,reason:reason,
+            operatorName:operatorName,at:at,expectedRevision:expectedRevision)
+    }
     func addLot(_ lot:Data,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().registerStockLot(lot,
             nursingCatalog:resource("n2-nursing-catalog"),expectedRevision:expectedRevision)
@@ -195,7 +247,8 @@ actor N2ProtectedClinicalIOSVault {
             expectedRevision:expectedRevision)
     }
     func exportVerifiedIndicatorWorkbook(
-        start:String,end:String,subdivision:String,ids:Set<String>)throws
+        start:String,end:String,subdivision:String,ids:Set<String>,
+        allowPending:Bool=false)throws
         -> N2VerifiedIndicatorWorkbook.Result {
         guard let url=Bundle.main.url(
             forResource:"n1s-indicator-template-store",
@@ -206,11 +259,12 @@ actor N2ProtectedClinicalIOSVault {
             products:resource("n2-ambulatory-products"),
             mappings:resource("n2-approved-mappings"),
             template:Data(contentsOf:url),
-            start:start,end:end,subdivision:subdivision,ids:ids)
+            start:start,end:end,subdivision:subdivision,ids:ids,
+            allowPending:allowPending)
     }
 
     func exportVerifiedDailyNursingWorkbook(date:String,shift:String,
-        responsible:String)throws->N2VerifiedNursingWorkbook.Result {
+        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
         guard let source=Bundle.main.url(
             forResource:"n1s-nursing-template-store",
             withExtension:"zip",subdirectory:"N1sDemoResources") else {
@@ -219,7 +273,19 @@ actor N2ProtectedClinicalIOSVault {
         return try protectedStore().exportVerifiedDailyNursingWorkbook(
             catalog:resource("n2-nursing-catalog"),
             template:Data(contentsOf:source),
-            date:date,shift:shift,responsible:responsible)
+            date:date,shift:shift,responsible:responsible,site:site)
+    }
+    func exportVerifiedRangeNursingWorkbook(start:String,end:String,
+        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
+        guard let source=Bundle.main.url(
+            forResource:"n1s-nursing-template-store",
+            withExtension:"zip",subdirectory:"N1sDemoResources") else {
+            throw Failure.blockedMigration
+        }
+        return try protectedStore().exportVerifiedRangeNursingWorkbook(
+            catalog:resource("n2-nursing-catalog"),
+            template:Data(contentsOf:source),
+            start:start,end:end,responsible:responsible,site:site)
     }
     func exportPortableEncryptedBackup(password:String)throws->Data {
         guard let secret=try deviceKey(create:false) else{

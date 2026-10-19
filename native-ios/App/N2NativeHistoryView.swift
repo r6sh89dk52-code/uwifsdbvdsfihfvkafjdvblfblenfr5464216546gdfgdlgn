@@ -5,6 +5,7 @@ import DanperCore
 /// The preview route always uses a bundled synthetic JSON sample. A future
 /// real vault must authenticate before handing a snapshot to this view.
 struct N2NativeHistoryView: View {
+    @Environment(\.n2WorkspaceVault) private var vault
     var useProtectedVault = false
     @State private var projection:N2NativeReadModel?
     @State private var query=""
@@ -18,10 +19,10 @@ struct N2NativeHistoryView: View {
                 ScrollView {
                   VStack(alignment:.leading,spacing:16) {
                     DanperPanel {
-                        Label(useProtectedVault ? "BÓVEDA CLÍNICA N2 · SOLO LECTURA" : "SOLO PRUEBA · TRABAJADORES FICTICIOS",
+                        Label(useProtectedVault ? "Historial de atenciones" : "Historial de ejemplo",
                               systemImage:"lock.shield.fill")
                             .foregroundStyle(.secondary)
-                        Text(useProtectedVault ? "Datos locales desde la bóveda cifrada N2. No se modifica la build 222." : "Se muestran registros sintéticos. No se leen ni guardan datos clínicos de tu iPhone.")
+                        Text(useProtectedVault ? "Consulta los registros y sus consumos guardados." : "Consulta las atenciones disponibles.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
@@ -70,14 +71,17 @@ struct N2NativeHistoryView: View {
                                "Abriendo historial nativo",
                     systemImage:"lock.doc",
                     description:Text(useProtectedVault ?
-                        "Activa el modo de prueba desde Inicio para consultar el historial." :
+                        "No hay un historial verificado disponible para esta bóveda." :
                         "Verificación de registros ficticios."))
             }
         }
         .navigationTitle("Personal e historial")
         .danperFormChrome()
         .task {await load()}
-        .tint(accent)
+        .onAppear {
+            if projection != nil {Task {await load(force:true)}}
+        }
+        .tint(.primary)
     }
 
     @ViewBuilder
@@ -103,11 +107,11 @@ struct N2NativeHistoryView: View {
         .padding(.vertical,3)
     }
 
-    private func load() async {
-        guard projection==nil else {return}
+    private func load(force:Bool=false) async {
+        guard force || projection==nil else {return}
         do {
             if useProtectedVault {
-                guard let records=try await N2SyntheticTrialIOSVault.shared.readHistory() else {
+                guard let records=try await vault.readHistory() else {
                     hasError=true;return
                 }
                 projection=records
@@ -132,11 +136,19 @@ private struct N2WorkerHistoryDetail:View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
             if let worker=model.roster.first(where:{$0.dni==dni}) {
-                DanperPanel(realSource ? "Trabajador" : "Trabajador ficticio") {
+                DanperPanel("Trabajador") {
                     LabeledContent("Nombre",value:worker.name)
                     LabeledContent("DNI",value:worker.dni)
                     LabeledContent("Área",value:worker.area)
                     LabeledContent("Ubicación",value:worker.site)
+                    if realSource {
+                        NavigationLink {
+                            N2NativeWorkerEditorView(editingDNI:dni)
+                        } label: {
+                            Label("Editar ficha del trabajador",systemImage:"square.and.pencil")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                    }
                 }
             }
             DanperPanel("Atenciones y borradores") {
@@ -178,13 +190,14 @@ private struct N2WorkerHistoryDetail:View {
             }
           }.padding(16)
         }
-        .navigationTitle(realSource ? "Historia clínica" : "Historia de prueba")
+        .navigationTitle("Historia clínica")
         .danperFormChrome()
     }
 }
 
 
 struct N2VisitDispensingView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     let visitID:String
     @State private var lines=[N2DispensingLine]()
     @State private var failed=false
@@ -205,7 +218,7 @@ struct N2VisitDispensingView:View {
         }
         .navigationTitle("Consumos de la atención").danperFormChrome()
         .task {
-            do {lines=try await N2SyntheticTrialIOSVault.shared.dispensingLines(visitID:visitID)}
+            do {lines=try await vault.dispensingLines(visitID:visitID)}
             catch {failed=true}
         }
     }

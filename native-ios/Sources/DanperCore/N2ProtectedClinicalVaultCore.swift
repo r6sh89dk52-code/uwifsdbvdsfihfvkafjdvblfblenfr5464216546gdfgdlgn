@@ -148,6 +148,16 @@ public final class N2ProtectedClinicalVaultCore {
             snapshot:active.snapshot,catalog:catalog,template:template,
             date:date,shift:shift,responsible:responsible,site:site)
     }
+    public func exportVerifiedRangeNursingWorkbook(
+        catalog:Data,template:Data,start:String,end:String,
+        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2VerifiedNursingWorkbook.exportRange(
+            snapshot:active.snapshot,catalog:catalog,template:template,
+            start:start,end:end,responsible:responsible,site:site)
+    }
     public func sourceForEncryptedBackup()throws->Data {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
@@ -166,16 +176,8 @@ public final class N2ProtectedClinicalVaultCore {
               let root=try? JSONSerialization.jsonObject(with:source)
                  as? [String:Any],
               let workers=root["workers"] as? [[String:Any]],
-              workers.count==5,Set(workers.compactMap{$0["dni"] as? String})
-                 == Set(["00000001","00000002","00000003","00000004","00000005"]),
-              workers.allSatisfy({ worker in
-                (worker["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
-              }),
               let visits=root["attentions"] as? [[String:Any]],
-              visits.allSatisfy({ visit in
-                let worker=visit["worker"] as? [String:Any] ?? [:]
-                return (worker["name"] as? String ?? "").hasPrefix("PERSONA FICTICIA ")
-              }) else {
+              N2SyntheticFixtureIdentity.matches(workers:workers,visits:visits) else {
             throw N2ProtectedStoreError.unsafeSource
         }
         _=try N1eLegacyClinicalAudit.inspect(source)
@@ -220,6 +222,49 @@ public final class N2ProtectedClinicalVaultCore {
         return try summary(active)
     }
 
+    /// Initial PERSONAL import requires a genuinely empty CLINICAL domain.
+    /// Synthetic employees, histories and stock NEVER accompany these rows.
+    public func activateInitialPersonal(preview:N2PersonalImportPreview,
+                                        site:String,explicitConsent:Bool)throws
+        ->N2ProtectedStoreSummary {
+        guard directory.lastPathComponent=="DANPER-N2-CLINICAL-VAULT",
+              explicitConsent else{throw N2ProtectedStoreError.unsafeSource}
+        let source=try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:site)
+        return try activateSingleVerifiedSource(source,
+                                               explicitConsent:explicitConsent)
+    }
+    /// A read-only conflict check; no clinical source is ever returned to UI.
+    public func previewPersonalMerge(preview:N2PersonalImportPreview,
+                                     site:String)throws->N2PersonalImportResult {
+        guard let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2PersonalRosterImport.merge(
+            snapshot:active.snapshot,preview:preview,site:site).1
+    }
+    /// Single atomic generation; concurrent visits, stock or roster changes
+    /// cause staleRevision and must be re-reviewed rather than retried blindly.
+    public func mergePersonal(preview:N2PersonalImportPreview,site:String,
+                              expectedRevision:Int)throws->N2PersonalImportResult {
+        guard directory.lastPathComponent=="DANPER-N2-CLINICAL-VAULT",
+              let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        guard active.revision==expectedRevision else {
+            throw N2ProtectedStoreError.staleRevision
+        }
+        let (next,result)=try N2PersonalRosterImport.merge(
+            snapshot:active.snapshot,preview:preview,site:site)
+        guard next != active.snapshot else{return result}
+        let revision=try journal.commit(next,expectedRevision:expectedRevision)
+        guard let checked=try journal.recover(),checked.revision==revision,
+              checked.snapshot==next else {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        return result
+    }
+
     /// Every edit is validated and promoted with a single atomic generation;
     /// no independent asynchronous workers/stock saves may be interleaved.
     private func modify(expectedRevision:Int,
@@ -238,6 +283,13 @@ public final class N2ProtectedClinicalVaultCore {
             throw N2ProtectedStoreError.unsafeSource
         }
         return try summary(verified)
+    }
+    @discardableResult
+    public func correctWorker(dni:String,worker:Data,at:Int64,
+                              expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2SnapshotEditor.correctWorker(snapshot:$0,dni:dni,worker:worker,at:at)
+        }
     }
     @discardableResult
     public func registerWorker(_ worker:Data,at:Int64,

@@ -5,6 +5,7 @@ import DanperCore
 /// Independent N2 stock operations: register a lot, receive more supplies,
 /// and reconcile an explicitly counted lot. No guessed package sizes.
 struct N2NativeInventoryView:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     private var layoutOnly=false
     init() {}
     #if DEBUG
@@ -225,7 +226,7 @@ struct N2NativeInventoryView:View {
     @MainActor
     private func load() async {
         do{
-            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            context=try await vault.clinicalFormContext()
             message="Inventario verificado; lotes: \(context?.lots.count ?? 0)."
             failed=false
         }catch{
@@ -248,7 +249,7 @@ struct N2NativeInventoryView:View {
             let result:N2ProtectedStoreSummary
             switch mode {
             case "site":
-                result=try await N2SyntheticTrialIOSVault.shared.verifyOriginalStockSite(
+                result=try await vault.verifyOriginalStockSite(
                     eventID:movementID,lotID:selectedLotID,site:site,reason:reason,
                     at:movementAt,expectedRevision:current.revision)
             case "lot":
@@ -263,21 +264,21 @@ struct N2NativeInventoryView:View {
                     "openedRemaining":values.2,"updatedAt":movementAt
                 ]
                 let data=try JSONSerialization.data(withJSONObject:record)
-                result=try await N2SyntheticTrialIOSVault.shared.addLot(
+                result=try await vault.addLot(
                     data,expectedRevision:current.revision)
             case "receipt":
-                result=try await N2SyntheticTrialIOSVault.shared.receiveStock(
+                result=try await vault.receiveStock(
                     movementID:movementID,lotID:selectedLotID,at:movementAt,
                     sealedAdded:values.0,looseAdded:values.1,
                     reason:reason,expectedRevision:current.revision)
             default:
-                result=try await N2SyntheticTrialIOSVault.shared.reconcileCount(
+                result=try await vault.reconcileCount(
                     movementID:movementID,lotID:selectedLotID,at:movementAt,
                     sealed:values.0,loose:values.1,opened:values.2,
                     reason:reason,expectedRevision:current.revision)
             }
             _ = result
-            context=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
+            context=try await vault.clinicalFormContext()
             // Disable a second tap with stale quantities after a successful
             // receipt or lot creation. Failed writes retain the same ID/clock
             // so an uncertain network/UI retry cannot silently double-count.

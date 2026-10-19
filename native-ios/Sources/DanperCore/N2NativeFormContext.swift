@@ -1,5 +1,26 @@
 import Foundation
 
+/// Stored birthday is the source of truth; exported age is computed on the clinical date.
+public enum N2WorkerAge {
+    public static func years(birthDate:String,on clinicalDate:String)->Int? {
+        func parts(_ iso:String)->(Int,Int,Int)? {
+            guard iso.range(of:#"^\d{4}-\d{2}-\d{2}$"#,options:.regularExpression) != nil else{return nil}
+            let a=iso.split(separator:"-").compactMap{Int($0)}
+            guard a.count==3 else{return nil}
+            var cal=Calendar(identifier:.gregorian)
+            cal.timeZone=TimeZone(secondsFromGMT:0)!
+            guard let date=cal.date(from:DateComponents(year:a[0],month:a[1],day:a[2])),
+                  cal.component(.year,from:date)==a[0],
+                  cal.component(.month,from:date)==a[1],
+                  cal.component(.day,from:date)==a[2] else{return nil}
+            return (a[0],a[1],a[2])
+        }
+        guard let b=parts(birthDate),let d=parts(clinicalDate) else{return nil}
+        let age=d.0-b.0-((d.1,d.2)<(b.1,b.2) ? 1:0)
+        return (0...120).contains(age) ? age : nil
+    }
+}
+
 public struct N2FormWorker:Equatable,Sendable,Identifiable {
     public var id:String{dni}
     public let dni:String
@@ -10,6 +31,7 @@ public struct N2FormWorker:Equatable,Sendable,Identifiable {
     public let age:String
     public let ubigeo:String
     public let site:String
+    public var birthDate:String=""
 }
 public struct N2FormAllergy:Equatable,Sendable {
     public let status:String
@@ -71,13 +93,15 @@ public enum N2NativeFormContextReader {
                   let name=row["name"] as? String,allowed.contains(dni) else {
                 return nil
             }
-            return N2FormWorker(dni:dni,name:name,
+            var worker=N2FormWorker(dni:dni,name:name,
                 area:row["area"] as? String ?? "",
                 labor:row["labor"] as? String ?? "",
                 sex:row["sex"] as? String ?? "",
                 age:String(describing:row["age"] ?? ""),
                 ubigeo:row["ubigeo"] as? String ?? "",
                 site:row["site"] as? String ?? "")
+            worker.birthDate=row["birthDate"] as? String ?? ""
+            return worker
         }.sorted{$0.name.localizedStandardCompare($1.name) == .orderedAscending}
         var records:[String:N2FormAllergy]=[:]
         for (dni,value) in allergy {
@@ -222,7 +246,10 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         }
         let workerRaw:[String:Any]=[
             "dni":worker.dni,"name":worker.name,"area":worker.area,
-            "labor":worker.labor,"sex":worker.sex,"age":worker.age,
+            "labor":worker.labor,"sex":worker.sex,
+            "age":N2WorkerAge.years(birthDate:worker.birthDate,on:date)
+                .map(String.init) ?? worker.age,
+            "birthDate":worker.birthDate,
             "ubigeo":worker.ubigeo,"site":worker.site
         ]
         let hasWound=(procedures + items.map(\.procedure)).contains{
@@ -247,7 +274,10 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         let worker=context.workers.first(where:{$0.dni==dni})
         let workerRaw:[String:Any]=worker.map {
             ["dni":$0.dni,"name":$0.name,"area":$0.area,
-             "labor":$0.labor,"sex":$0.sex,"age":$0.age,
+             "labor":$0.labor,"sex":$0.sex,
+             "age":N2WorkerAge.years(birthDate:$0.birthDate,on:date)
+                 .map(String.init) ?? $0.age,
+             "birthDate":$0.birthDate,
              "ubigeo":$0.ubigeo,"site":$0.site]
         } ?? [:]
         let itemRows:[[String:Any]]=items.map { med in

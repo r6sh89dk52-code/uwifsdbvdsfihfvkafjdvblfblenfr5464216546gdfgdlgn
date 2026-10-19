@@ -41,6 +41,61 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
         XCTAssertEqual(x.missingOpening,431)
         XCTAssertEqual(x.missingClosingCount,431)
     }
+    func testJointFundoAndPlantaIndicatorRequiresBothReconciledPeriods()throws {
+        var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        let proof=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
+        let base=try XCTUnwrap(proof["events"] as? [[String:Any]])
+        let planta:[[String:Any]]=[
+            ["id":"joint-pl-open","kind":"opening","subdivision":"PLVENTUROSA",
+             "code":"16000182","date":"2026-10-09","at":1791504000000,
+             "quantity":22,"reason":"Inventario inicial de prueba","document":"",
+             "expires":"","periodEnd":"","voidOf":""],
+            ["id":"joint-pl-close","kind":"count","subdivision":"PLVENTUROSA",
+             "code":"16000182","date":"2026-11-08","at":1794182400000,
+             "quantity":10,"reason":"Recuento final de prueba","document":"",
+             "expires":"","periodEnd":"","voidOf":""],
+            ["id":"joint-pl-reviewed","kind":"review","subdivision":"PLVENTUROSA",
+             "code":"","date":"2026-10-09","at":1794182400200,
+             "quantity":0,"reason":"Cierre físico verificado","document":"",
+             "expires":"","periodEnd":"2026-11-08","voidOf":""]
+        ]
+        let ids:Set<String>=["fundo-unit","fundo-reuse",
+                              "planta-open","planta-tablet-carton"]
+        let products=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
+        let mappings=try fixture("n2-reviewed-approved.json")
+        let template=try fixture("n1s-indicator-template-store.zip")
+        // The old one-site evidence cannot be relabeled as "BOTH".
+        snapshot["ambulatoryReconciliation"]=base
+        let partial=try JSONSerialization.data(withJSONObject:snapshot)
+        XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
+            snapshot:partial,products:products,mappings:mappings,
+            template:template,start:"2026-10-09",end:"2026-11-08",
+            subdivision:"AMBAS",selectedVisitIDs:ids)) {
+            XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,
+                           .unreviewedPeriod)
+        }
+        snapshot["ambulatoryReconciliation"]=base+planta
+        let verified=try JSONSerialization.data(withJSONObject:snapshot)
+        let result=try N2VerifiedIndicatorWorkbook.export(
+            snapshot:verified,products:products,mappings:mappings,
+            template:template,start:"2026-10-09",end:"2026-11-08",
+            subdivision:"AMBAS",selectedVisitIDs:ids)
+        XCTAssertEqual(result.visits,4)
+        XCTAssertEqual(result.rows,4)
+        XCTAssertFalse(result.provisional)
+        XCTAssertEqual(result.missingOpening,431)
+        XCTAssertEqual(result.missingClosingCount,431)
+        let entries=try N1rStoredZip.unpack(result.xlsx)
+        let sheet=try XCTUnwrap(entries.first(where:{$0.name=="xl/worksheets/sheet5.xml"}))
+        let xml=try XCTUnwrap(String(data:sheet.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("LA VENTUROSA"))
+        XCTAssertTrue(xml.contains("PLVENTUROSA"))
+        XCTAssertEqual(entries.filter{$0.name.hasPrefix("xl/worksheets/sheet") &&
+                                      $0.name.hasSuffix(".xml")}.count,10)
+    }
+
     func testReviewedPeriodVoidedRequiresNewClosingReview()throws {
         let proof=try XCTUnwrap(JSONSerialization.jsonObject(
             with:fixture("n1q-voided-expected.json")) as? [String:Any])

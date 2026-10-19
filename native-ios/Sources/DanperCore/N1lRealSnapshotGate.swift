@@ -90,10 +90,14 @@ public enum N1lRealSnapshotGate {
         }
 
         let roster = Set(workers.compactMap { anyText($0["dni"]) })
-        let savedByID = Dictionary(uniqueKeysWithValues: visits.compactMap { v -> (String, Bool)? in
-            guard let id=anyText(v["id"]) else { return nil }
-            return (id, anyText(v["status"]) == "saved")
-        })
+        // Never trap on duplicated encounter IDs in an untrusted encrypted
+        // archive. An invalid source is rejected instead of crashing the app.
+        var savedByID=[String:Bool]()
+        for visit in visits {
+            guard let id=anyText(visit["id"]),!id.isEmpty,
+                  savedByID[id] == nil else {throw N1lAuditError.invalidSnapshot}
+            savedByID[id]=anyText(visit["status"]) == "saved"
+        }
         let markedWorkers = workers.filter { marked(anyText($0["name"]) ?? "") }.count
         let markedClinical = visits.filter { visit in
             guard let worker = visit["worker"] as? [String:Any] else { return false }

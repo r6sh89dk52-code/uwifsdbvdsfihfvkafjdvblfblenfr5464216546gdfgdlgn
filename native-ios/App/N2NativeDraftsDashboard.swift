@@ -3,6 +3,7 @@ import DanperCore
 
 /// First-class encrypted N2 draft tab, never uses N1g demo drafts.
 struct N2NativeDraftsDashboard:View {
+    @Environment(\.n2WorkspaceVault) private var vault
     @State private var records=[N2RecoverableDraft]()
     @State private var loading=true
     @State private var failed=false
@@ -11,15 +12,10 @@ struct N2NativeDraftsDashboard:View {
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
-            DanperPanel {
-                Label("Datos protegidos",systemImage:"lock.shield")
-                Text("Los borradores están guardados dentro de la misma bóveda cifrada. Reabrir no crea otra atención ni descuenta inventario.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                if failed {
+            if failed {
+                DanperPanel {
                     Label(message,systemImage:"exclamationmark.triangle")
                         .foregroundStyle(.orange)
-                }else{
-                    Text(message).font(.footnote).foregroundStyle(.secondary)
                 }
             }
             DanperPanel("Registros pendientes") {
@@ -65,13 +61,13 @@ struct N2NativeDraftsDashboard:View {
         loading=true
         defer {loading=false}
         do {
-            records=try await N2SyntheticTrialIOSVault.shared.readDrafts()
+            records=try await vault.readDrafts()
             failed=false
             message="Borradores recuperables: \(records.count). Desliza para actualizar."
         }catch{
             records=[]
             failed=true
-            message="No se pudo verificar la bóveda N2. No se ha borrado ningún registro."
+            message="No se pudieron abrir los borradores. No se eliminó ningún registro."
         }
     }
 }
