@@ -228,14 +228,15 @@ struct N2VerifiedIndicatorExportView:View {
                 withIntermediateDirectories:true,
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
-            let url=dir.appendingPathComponent(
-                (result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_")+
-                (site=="AMBAS" ? "AMBAS_" : "")+local(startDate)+"_"+local(endDate)+".xlsx")
+            let exportPrefix=result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_"
+            let siteSuffix=site=="AMBAS" ? "AMBAS_" : ""
+            let outputName="\(exportPrefix)\(siteSuffix)\(local(startDate))_\(local(endDate)).xlsx"
+            let url=dir.appendingPathComponent(outputName)
             try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
-            status=(result.provisional ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. " : "")+"Generado: \(result.visits) atenciones / \(result.rows) filas. " +
-                "Materiales sin stock inicial: \(result.missingOpening); " +
-                "sin recuento final: \(result.missingClosingCount). " +
-                "Las celdas no conciliadas siguen vacías."
+            let warning=result.provisional
+                ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. "
+                : ""
+            status="\(warning)Generado: \(result.visits) atenciones / \(result.rows) filas. Materiales sin stock inicial: \(result.missingOpening); sin recuento final: \(result.missingClosingCount). Las celdas no conciliadas siguen vacías."
             share=N2IndicatorShare(file:url)
         }catch{
             failed=true
