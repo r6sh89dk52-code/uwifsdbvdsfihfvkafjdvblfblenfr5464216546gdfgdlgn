@@ -149,8 +149,7 @@ struct N2DemoResetView:View {
             status="Limpieza confirmada. La bóveda clínica se mantuvo separada."
         } catch {
             hasError=true
-            status="No se pudo confirmar el borrado completo: "+error.localizedDescription+
-                " Si había archivos residuales, puedes reintentar la operación."
+            status="No se pudo confirmar el borrado completo: \(error.localizedDescription). Si había archivos residuales, puedes reintentar la operación."
         }
     }
 }
