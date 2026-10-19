@@ -11,6 +11,7 @@ for cmd in node xcodegen xcodebuild; do
     exit 1
   fi
 done
+node scripts/audit-n2-swift-string-concatenations.cjs
 node scripts/audit-n2-workspace-routing.cjs
 node scripts/audit-n2-personal-import.cjs
 node scripts/audit-n2-build222-backup-restore.cjs
