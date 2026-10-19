@@ -151,8 +151,7 @@ struct N2VerifiedNursingExportView:View {
             let output=dir.appendingPathComponent(name)
             try result.xlsx.write(to:output,
                 options:[.atomic,.completeFileProtection])
-            status="Generado: \(result.stockKnownRows) productos con historial; " +
-                "\(result.stockUnknownRows) sin existencias acreditadas (en blanco)."
+            status="Generado: \(result.stockKnownRows) productos con historial; \(result.stockUnknownRows) sin existencias acreditadas (en blanco)."
             share=N2NursingShare(file:output)
         }catch {
             cleanup()
