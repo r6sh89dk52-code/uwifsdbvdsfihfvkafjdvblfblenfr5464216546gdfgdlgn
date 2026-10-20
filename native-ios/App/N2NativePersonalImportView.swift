@@ -12,7 +12,7 @@ struct N2NativePersonalImportView:View {
     @State private var busy=false
     @State private var choosing=false
     @State private var confirm=false
-    @State private var site="LA VENTUROSA"
+    @State private var site=""
     @State private var preview:N2PersonalImportPreview?
     @State private var current:N2ProtectedStoreSummary?
     @State private var comparison:N2PersonalImportResult?
@@ -21,8 +21,18 @@ struct N2NativePersonalImportView:View {
     @State private var failed=false
     @State private var fileName=""
 
+    private var siteIsVerified:Bool {
+        guard let preview else{return false}
+        if site=="DESDE_EXCEL" {
+            return preview.stats.sourceSiteColumn &&
+                preview.workers.allSatisfy{["LA VENTUROSA","PLVENTUROSA"].contains($0.site)}
+        }
+        return ["LA VENTUROSA","PLVENTUROSA"].contains(site) &&
+            preview.workers.allSatisfy{$0.site.isEmpty || $0.site==site}
+    }
     private var canImport:Bool {
         authenticated && preview?.stats.canConfirm == true &&
+        siteIsVerified && (current==nil || comparison != nil) &&
         !busy && !failed && scenePhase == .active
     }
     var body:some View {
@@ -52,13 +62,22 @@ struct N2NativePersonalImportView:View {
                 }
                 if authenticated {
                     DanperPanel("2 · Seleccionar Excel PERSONAL") {
-                        Picker("Sede de este padrón",selection:$site) {
-                            Text("Fundo La Venturosa").tag("LA VENTUROSA")
-                            Text("Planta La Venturosa").tag("PLVENTUROSA")
+                        Picker("Clasificación de sedes",selection:$site) {
+                            Text("Seleccionar criterio de sede").tag("")
+                            Text("Todo el archivo: Fundo La Venturosa").tag("LA VENTUROSA")
+                            Text("Todo el archivo: Planta La Venturosa").tag("PLVENTUROSA")
+                            if preview?.stats.sourceSiteColumn == true {
+                                Text("Respetar columna SEDE del Excel").tag("DESDE_EXCEL")
+                            }
                         }
-                        .pickerStyle(.segmented)
-                        Text("Si PERSONAL no incluye sede, esta selección se asignará a todos los DNI importados. Para padrones de distintas sedes, importa cada archivo por separado.")
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("personal-site-mode")
+                        Text("Ninguna sede se asigna por defecto. Si PERSONAL contiene la columna SEDE, puedes respetar la sede de cada DNI. Si no la contiene, selecciona una sola sede únicamente para un padrón previamente verificado. Nunca importes un archivo mixto sin identificar sus sedes.")
                             .font(.caption).foregroundStyle(.secondary)
+                        if !siteIsVerified {
+                            Label("Selecciona y verifica la sede antes de importar.",systemImage:"exclamationmark.triangle.fill")
+                                .font(.footnote).foregroundStyle(.orange)
+                        }
                         Button {
                             choosing=true
                         } label: {
@@ -84,6 +103,14 @@ struct N2NativePersonalImportView:View {
                         LabeledContent("Sexo fuera de catálogo",value:String(preview.stats.sexInvalid))
                         LabeledContent("Nombres contradictorios",value:String(preview.stats.nameConflicts))
                         LabeledContent("Sexos contradictorios",value:String(preview.stats.sexConflicts))
+                        if preview.stats.sourceSiteColumn {
+                            Divider()
+                            LabeledContent("Trabajadores de Fundo",value:String(preview.workers.filter{$0.site=="LA VENTUROSA"}.count))
+                            LabeledContent("Trabajadores de Planta",value:String(preview.workers.filter{$0.site=="PLVENTUROSA"}.count))
+                            LabeledContent("Filas sin sede",value:String(preview.stats.siteMissing))
+                            LabeledContent("Sedes sin reconocer",value:String(preview.stats.siteInvalid))
+                            LabeledContent("DNI con dos sedes",value:String(preview.stats.siteConflicts))
+                        }
                         if let comparison {
                             Divider()
                             LabeledContent("Nuevos trabajadores",value:String(comparison.added))
@@ -97,7 +124,7 @@ struct N2NativePersonalImportView:View {
                                 .font(.footnote).foregroundStyle(.green)
                         }
                         if !preview.stats.canConfirm {
-                            Label("Importación bloqueada: corrige primero los DNI, nombres o conflictos del Excel. Ningún registro ha cambiado.",
+                            Label("Importación bloqueada: corrige los DNI, nombres, sexos o sedes incompletas y contradictorias. Ningún registro ha cambiado.",
                                   systemImage:"exclamationmark.triangle.fill")
                                 .font(.footnote).foregroundStyle(.orange)
                         } else if failed {
@@ -162,7 +189,7 @@ struct N2NativePersonalImportView:View {
         .onChange(of:site) {_,_ in
             comparison=nil
             failed=false
-            if preview != nil {Task {await review()}}
+            if siteIsVerified {Task {await review()}}
         }
         .opacity(scenePhase == .active ? 1 : 0)
         .accessibilityHidden(scenePhase != .active)
@@ -211,12 +238,13 @@ struct N2NativePersonalImportView:View {
             }.value
             guard authenticated,scenePhase == .active else{return}
             fileName=url.lastPathComponent
+            site="" // Each new PERSONAL workbook requires a fresh explicit site choice.
             preview=result
             message=result.stats.canConfirm ?
                 "Lectura completa. Comprueba los recuentos y confirma." :
                 "Se encontraron filas inválidas o diferencias dentro del Excel. No se realizó la importación."
             if result.stats.canConfirm {
-                await review()
+                message="Lectura completa. Elige cómo clasificar las sedes y revisa el padrón antes de importar."
             } else {
                 failed=true
             }
@@ -227,7 +255,8 @@ struct N2NativePersonalImportView:View {
     }
 
     @MainActor private func review() async {
-        guard authenticated,let preview,preview.stats.canConfirm else{return}
+        guard authenticated,let preview,preview.stats.canConfirm,
+              siteIsVerified else{return}
         do {
             let live=try await N2ProtectedClinicalIOSVault.shared.inspect()
             current=live
