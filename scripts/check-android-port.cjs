@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const read=p=>fs.readFileSync(p,'utf8');
+const secure=read('src/secureDemoStore.ts');
+assert.match(secure,/export function isNativeSecureStore\(\).*Capacitor\.getPlatform\(\)==='android'/);
+assert.match(secure,/await writeWorkerVault\(safe\.workers\)/);
+assert.match(secure,/await writeClinicalVault\(\{\.\.\.safe,workers:\[\]\}\)/);
+assert.match(read('src/BackupSettingsPanel.tsx'),/const native=.*Capacitor\.getPlatform\(\)==='android'/);
+assert.match(read('src/shareKardexFile.ts'),/Capacitor\.getPlatform\(\)==='android'/);
+assert.match(read('src/nativeReminders.ts'),/isNativeMobile\(\)/);
+assert.match(read('src/main.tsx'),/isNativeMobile\(\)\?/);
+assert(fs.existsSync('scripts/harden-android-manifest.mjs'));
+console.log('PASS comprobación estática Android. NO sustituye pruebas del APK en dispositivo.');
