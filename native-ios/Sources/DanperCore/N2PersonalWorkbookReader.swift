@@ -16,10 +16,12 @@ public struct N2PersonalWorker:Equatable,Sendable {
     public let sex:String
     public let age:String
     public let ubigeo:String
+    /// Explicit source-site evidence; empty if PERSONAL does not supply a site.
+    public let site:String
     public init(dni:String,name:String,area:String="",labor:String="",
-                sex:String="",age:String="",ubigeo:String="") {
+                sex:String="",age:String="",ubigeo:String="",site:String="") {
         self.dni=dni;self.name=name;self.area=area;self.labor=labor
-        self.sex=sex;self.age=age;self.ubigeo=ubigeo
+        self.sex=sex;self.age=age;self.ubigeo=ubigeo;self.site=site
     }
 }
 public struct N2PersonalImportStats:Equatable,Sendable {
@@ -32,9 +34,14 @@ public struct N2PersonalImportStats:Equatable,Sendable {
     public var sexInvalid=0
     public var sexConflicts=0
     public var nameConflicts=0
+    public var sourceSiteColumn=false
+    public var siteMissing=0
+    public var siteInvalid=0
+    public var siteConflicts=0
     public var canConfirm:Bool {
         valid>0 && invalidDni==0 && withoutName==0 &&
-        sexInvalid==0 && sexConflicts==0 && nameConflicts==0
+        sexInvalid==0 && sexConflicts==0 && nameConflicts==0 &&
+        siteMissing==0 && siteInvalid==0 && siteConflicts==0
     }
 }
 public struct N2PersonalImportPreview:Sendable {
@@ -215,6 +222,14 @@ public enum N2PersonalWorkbookReader {
         }
         return cleaned(raw)
     }
+    /// Do not guess worker site from occupation, name or area.
+    private static func recognizedSite(_ raw:String)->String {
+        switch normalized(raw) {
+        case "LA VENTUROSA","FUNDO LA VENTUROSA":return "LA VENTUROSA"
+        case "PLVENTUROSA","PLANTA LA VENTUROSA":return "PLVENTUROSA"
+        default:return ""
+        }
+    }
     private static func compile(_ rows:[[String]])throws->N2PersonalImportPreview {
         guard let headings=rows.first else {throw N2PersonalImportError.invalidHeaders}
         let header=headings.map(normalized)
@@ -227,10 +242,13 @@ public enum N2PersonalWorkbookReader {
         let manual=index("EDAD MANUAL","EDAD"), auto=index("EDAD AUTOMATIZADA")
         let sex=index("SEXO"),ubi=index("UBIGEO"),area=index("AREA")
         let labor=index("CARGO","LABOR","PUESTO")
+        let siteIndex=index("SEDE","SUBDIVISION","SUBDIVISION OPERATIVA")
         var byDNI=[String:N2PersonalWorker]()
         var order=[String]()
         var sexConflicting=Set<String>()
+        var siteConflicting=Set<String>()
         var stats=N2PersonalImportStats()
+        stats.sourceSiteColumn=siteIndex>=0
         for row in rows.dropFirst() {
             if row.allSatisfy({cleaned($0).isEmpty}) {continue}
             stats.total+=1
@@ -253,9 +271,16 @@ public enum N2PersonalWorkbookReader {
             let validAge=Int(candidateAge).map{(0...120).contains($0)} ?? false
             let age=validAge && candidateAge.utf8.allSatisfy({(48...57).contains($0)})
                 ? candidateAge : ""
+            let originalSite=cell(row,siteIndex)
+            let mappedSite=recognizedSite(originalSite)
+            if siteIndex>=0 {
+                if originalSite.isEmpty {stats.siteMissing+=1}
+                else if mappedSite.isEmpty {stats.siteInvalid+=1}
+            }
             let candidate=N2PersonalWorker(
                 dni:key,name:fullName,area:cell(row,area),labor:cell(row,labor),
-                sex:normalizedSex,age:age,ubigeo:cell(row,ubi))
+                sex:normalizedSex,age:age,ubigeo:cell(row,ubi),
+                site:mappedSite)
             if let previous=byDNI[key] {
                 stats.duplicates+=1
                 if normalized(previous.name) != normalized(candidate.name) {
@@ -266,13 +291,19 @@ public enum N2PersonalWorkbookReader {
                     stats.sexConflicts+=1
                     sexConflicting.insert(key)
                 }
+                if !previous.site.isEmpty && !candidate.site.isEmpty &&
+                    previous.site != candidate.site && !siteConflicting.contains(key) {
+                    stats.siteConflicts+=1
+                    siteConflicting.insert(key)
+                }
                 func pick(_ a:String,_ b:String)->String {a.isEmpty ? b : a}
                 byDNI[key]=N2PersonalWorker(
                     dni:key,name:previous.name,area:pick(previous.area,candidate.area),
                     labor:pick(previous.labor,candidate.labor),
                     sex:sexConflicting.contains(key) ? "" : pick(previous.sex,candidate.sex),
                     age:pick(previous.age,candidate.age),
-                    ubigeo:pick(previous.ubigeo,candidate.ubigeo))
+                    ubigeo:pick(previous.ubigeo,candidate.ubigeo),
+                    site:pick(previous.site,candidate.site))
             } else {
                 order.append(key)
                 byDNI[key]=candidate
