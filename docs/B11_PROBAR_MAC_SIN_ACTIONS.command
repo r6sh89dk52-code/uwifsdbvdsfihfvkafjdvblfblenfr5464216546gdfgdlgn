@@ -10,7 +10,8 @@ DERIVED="${HOME}/Downloads/DANPER_B11_SEDES_DERIVED"
 mkdir -p "${HOME}/Downloads"
 
 exec > >(tee -a "${LOG}") 2>&1
-trap 'rc=$?; echo ""; if [ "$rc" -ne 0 ]; then echo "ERROR de comprobación local (salida $rc)."; else echo "PRUEBA LOCAL TERMINADA: compilación Simulator OK."; fi; echo "DIAGNÓSTICO: ${LOG}"; exit "$rc"' EXIT
+FIXTURES=""
+trap 'rc=$?; if [ -n "${FIXTURES:-}" ] && [ -d "$FIXTURES" ]; then rm -rf "$FIXTURES"; fi; echo ""; if [ "$rc" -ne 0 ]; then echo "ERROR de comprobación local (salida $rc)."; else echo "PRUEBA LOCAL TERMINADA: compilación Simulator OK."; fi; echo "DIAGNÓSTICO: ${LOG}"; exit "$rc"' EXIT
 
 echo "=== DANPER B11: validación aislada sin GitHub Actions ==="
 echo "Proyecto: $ROOT"
@@ -57,7 +58,6 @@ node scripts/audit-n2-joint-indicator.cjs
 
 echo "=== 4. Generar SOLO fixtures ficticios, sin información clínica real ==="
 FIXTURES="$(mktemp -d "${TMPDIR:-/tmp}/danper-b11-fixtures.XXXXXX")"
-trap 'rm -rf "$FIXTURES"' RETURN
 export DANPER_N1_FIXTURE_DIR="$FIXTURES"
 for generator in \
   generate-native-compat-fixtures.cjs \
