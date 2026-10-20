@@ -8,3 +8,12 @@ outputs/
 .env.*
 .DS_Store
 *.tsbuildinfo
+
+# Generated Android builds, credentials and SDK machine paths
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.jks
+*.keystore

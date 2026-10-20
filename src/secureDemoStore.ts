@@ -1,4 +1,4 @@
-/** iPhone-only local clinical data with AES-GCM encrypted snapshots. */
+/** Native iOS/Android clinical data with AES-GCM encrypted snapshots; no plaintext native fallback. */
 import {SecureStorage,KeychainAccess} from '@aparajita/capacitor-secure-storage';
 import {Capacitor} from '@capacitor/core';
 import {decryptPortableBackup} from './portableBackup';
@@ -70,7 +70,7 @@ async function preserveLegacySnapshot(raw:string):Promise<void>{
 let configured:Promise<void>|undefined;
 let writeQueue:Promise<void>=Promise.resolve();
 
-export function isNativeSecureStore(){return Capacitor.isNativePlatform()&&Capacitor.getPlatform()==='ios'}
+export function isNativeSecureStore(){return Capacitor.isNativePlatform()&&(Capacitor.getPlatform()==='ios'||Capacitor.getPlatform()==='android')}
 export function emptyDemoSnapshot():DemoSnapshot{return{attentions:[],workers:[],allergies:{},notifications:false,stockLots:[],stockMovements:[],catalogMappings:[],deliveryIncidents:[],ambulatoryReconciliation:[]}}
 function object(value:unknown):value is Record<string,unknown>{return value!==null&&typeof value==='object'&&!Array.isArray(value)}
 export function validateDemoSnapshot(value:unknown):DemoSnapshot{
@@ -224,7 +224,7 @@ export function writeDemoSnapshot(snapshot:DemoSnapshot):Promise<void>{
  */
 export function hasActiveRecords(snapshot:DemoSnapshot):boolean{return containsData(snapshot)}
 export async function restoreEmptyDeviceFromBackup(backup:unknown):Promise<void>{
- if(!isNativeSecureStore())throw Error('La restauración requiere la aplicación nativa de iPhone.');
+ if(!isNativeSecureStore())throw Error('La restauración requiere la aplicación nativa de iOS o Android.');
  const requested=validateDemoSnapshot(backup);
  const stable=JSON.parse(JSON.stringify(requested)) as DemoSnapshot;
  writeQueue=writeQueue.catch(()=>undefined).then(async()=>{
@@ -253,7 +253,7 @@ export async function restoreEmptyDeviceFromBackup(backup:unknown):Promise<void>
  * A failed write blocks export rather than silently archiving stale data.
  */
 export async function readStableSnapshotForBackup():Promise<DemoSnapshot>{
- if(!isNativeSecureStore())throw Error('Respaldo privado disponible solo en iPhone.');
+ if(!isNativeSecureStore())throw Error('Respaldo privado disponible solo en iOS o Android.');
  await writeQueue;
  return loadDemoSnapshot();
 }
@@ -287,7 +287,7 @@ async function readSourceBeforeMigration():Promise<DemoSnapshot>{
  * preserves the original Keychain snapshot.
  */
 export async function migrateFromVerifiedPortableBackup(archive:string,password:string):Promise<DemoSnapshot>{
- if(!isNativeSecureStore())throw Error('La migración cifrada solo está disponible en iPhone.');
+ if(!isNativeSecureStore())throw Error('La migración cifrada solo está disponible en iOS o Android.');
  if(migrationInProgress)throw Error('Ya se está comprobando una migración.');
  migrationInProgress=true;
  try{
@@ -312,7 +312,7 @@ export async function migrateFromVerifiedPortableBackup(archive:string,password:
  * A successful reset permanently blocks queued writes until the page reloads.
  */
 export async function resetDisposableLocalDatabase():Promise<void>{
- if(!isNativeSecureStore())throw Error('El reinicio completo solo está disponible en la aplicación iOS.');
+ if(!isNativeSecureStore())throw Error('El reinicio completo solo está disponible en la aplicación nativa de iOS o Android.');
  if(intentionalResetInProgress)throw Error('Ya se está reiniciando la base local.');
  intentionalResetInProgress=true;
  try{

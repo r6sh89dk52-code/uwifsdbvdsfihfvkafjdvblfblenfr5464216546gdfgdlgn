@@ -12,11 +12,11 @@ export default function FreshStartPanel(){
  const valid=confirmedNoRealRecords&&phrase==='BORRAR DATOS DE PRUEBA'&&!busy;
  async function execute(){
   if(!valid)return;
-  if(!window.confirm('BORRADO IRREVERSIBLE: se eliminarán TODOS los trabajadores importados, atenciones, alergias, existencias, movimientos y referencias cifradas de esta instalación. NO se borrarán los catálogos oficiales incluidos en la IPA ni su lógica de exportación. ¿Proceder?'))return;
+  if(!window.confirm('BORRADO IRREVERSIBLE: se eliminarán TODOS los trabajadores importados, atenciones, alergias, existencias, movimientos y referencias cifradas de esta instalación. NO se borrarán los catálogos oficiales incluidos en la aplicación ni su lógica de exportación. ¿Proceder?'))return;
   setBusy(true);setError('');setStatus('Eliminando exclusivamente datos locales de prueba…');
   try{
    await resetDisposableLocalDatabase();
-   setStatus('Base de prueba eliminada y Keychain depurado. Reiniciando…');
+   setStatus('Base de prueba eliminada y almacén seguro depurado. Reiniciando…');
    window.location.reload();
   }catch(e){
    setStatus('');
@@ -26,8 +26,8 @@ export default function FreshStartPanel(){
  }
  return <section className="panel" aria-label="Inicio limpio de base local">
   <h3>Comenzar con base local vacía</h3>
-  <p className="kardexError">Esta opción DESTRUYE los datos guardados en este iPhone. Úsala exclusivamente cuando hayas confirmado que NO existen atenciones, alergias ni inventarios reales que quieras conservar. No es un mecanismo de actualización.</p>
-  <p className="hint">Elimina los trabajadores de prueba (y los importados), lotes, cantidades, movimientos, atenciones y claves anteriores de Keychain. NO elimina el catálogo fijo de 98 productos del Kardex, los 432 códigos del Indicador Ambulatorio, las 86 correspondencias revisadas, ni las dos exportaciones Excel.</p>
+  <p className="kardexError">Esta opción DESTRUYE los datos guardados en este dispositivo. Úsala exclusivamente cuando hayas confirmado que NO existen atenciones, alergias ni inventarios reales que quieras conservar. No es un mecanismo de actualización.</p>
+  <p className="hint">Elimina los trabajadores de prueba (y los importados), lotes, cantidades, movimientos, atenciones y claves anteriores del almacenamiento seguro. NO elimina el catálogo fijo de 98 productos del Kardex, los 432 códigos del Indicador Ambulatorio, las 86 correspondencias revisadas, ni las dos exportaciones Excel.</p>
   <p className="hint">Antes de confirmar, guarda en un lugar autorizado el Excel PERSONAL real. Una vez reiniciada, impórtalo nuevamente como el único padrón inicial.</p>
   <label className="toggle"><input type="checkbox" checked={confirmedNoRealRecords} disabled={busy} onChange={e=>setConfirmedNoRealRecords(e.target.checked)}/>Confirmo que todos los datos registrados actualmente son descartables y que no necesito recuperar los registros anteriores.</label>
   <label>Escribe BORRAR DATOS DE PRUEBA

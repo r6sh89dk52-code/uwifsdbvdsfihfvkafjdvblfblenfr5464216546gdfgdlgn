@@ -13,7 +13,7 @@ function base64Utf8(value:string):string{
  return btoa(text);
 }
 export default function BackupSettingsPanel(){
- const native=Capacitor.isNativePlatform()&&Capacitor.getPlatform()==='ios';
+ const native=Capacitor.isNativePlatform()&&(Capacitor.getPlatform()==='ios'||Capacitor.getPlatform()==='android');
  const [password,setPassword]=useState('');
  const [confirmation,setConfirmation]=useState('');
  const [restorePassword,setRestorePassword]=useState('');
@@ -32,7 +32,7 @@ export default function BackupSettingsPanel(){
    const encrypted=await encryptPortableBackup(snapshot,password);
    const name='DANPER-Respaldo-'+new Date().toISOString().slice(0,10)+'.danperbackup';
    const result=await Filesystem.writeFile({path:name,directory:Directory.Cache,data:base64Utf8(encrypted)});
-   await Share.share({title:'Respaldo cifrado DANPER Salud Móvil',url:result.uri,dialogTitle:'Guardar respaldo cifrado fuera del iPhone'});
+   await Share.share({title:'Respaldo cifrado DANPER Salud Móvil',url:result.uri,dialogTitle:'Guardar respaldo cifrado fuera del dispositivo'});
    setPassword('');setConfirmation('');
    setStatus('Respaldo cifrado preparado. Comprueba en Archivos que realmente quedó guardado en una ubicación recuperable.');
    feedback('success');
@@ -44,7 +44,7 @@ export default function BackupSettingsPanel(){
  async function inspectBackup(file:File|undefined){
   setPreview(null);setSourceName('');setError('');setStatus('');
   if(!file||busy)return;
-  if(!native){setError('La restauración privada está disponible únicamente en iPhone.');return}
+  if(!native){setError('La restauración privada está disponible únicamente en iOS y Android.');return}
   if(file.size>42*1024*1024||!file.name.toLowerCase().endsWith('.danperbackup')){
    setError('Selecciona un respaldo .danperbackup válido de hasta 42 MB.');return;
   }
@@ -82,11 +82,11 @@ export default function BackupSettingsPanel(){
  return <section className="panel backupPanel">
   <h3>Respaldo y recuperación</h3>
   <p className="hint">Copia cifrada con contraseña independiente de Keychain: incluye trabajadores, atenciones, alergias, inventario, entregas y conciliaciones. No se envía a GitHub ni a un servidor.</p>
-  {!native&&<p className="hint" role="status">Solo disponible en la aplicación nativa de iPhone. El navegador continúa siendo un entorno de pruebas.</p>}
+  {!native&&<p className="hint" role="status">Disponible en las aplicaciones nativas de iOS y Android. El navegador continúa siendo un entorno de pruebas.</p>}
   <label className="backupLabel">Nueva contraseña para crear respaldo
    <input type="password" autoComplete="off" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mínimo 14 caracteres" disabled={busy||!native}/>
   </label>
-  <p className="hint">Guárdala fuera del iPhone: si la olvidas, ningún técnico podrá descifrar el respaldo.</p>
+  <p className="hint">Guárdala fuera del teléfono: si la olvidas, ningún técnico podrá descifrar el respaldo.</p>
   <label className="backupLabel">Confirmar contraseña (para crear copia)
    <input type="password" autoComplete="off" value={confirmation} onChange={e=>setConfirmation(e.target.value)} placeholder="Repetir contraseña" disabled={busy||!native}/>
   </label>
@@ -95,7 +95,7 @@ export default function BackupSettingsPanel(){
   </button>
   <hr/>
   <h4>Restaurar desde un respaldo</h4>
-  <p className="hint">Por seguridad no se mezclan ni sobrescriben bases existentes. Solo se permite recuperar en un iPhone con la base vacía y después de comprobar la contraseña del archivo.</p>
+  <p className="hint">Por seguridad no se mezclan ni sobrescriben bases existentes. Solo se permite recuperar en un dispositivo con la base vacía y después de comprobar la contraseña del archivo.</p>
   <label className="backupLabel">Contraseña del archivo que vas a restaurar
    <input type="password" autoComplete="off" value={restorePassword} onChange={e=>{setRestorePassword(e.target.value);setPreview(null);setSourceName('');setError('');setStatus('')}} placeholder="Contraseña original del respaldo" disabled={busy||!native}/>
   </label>

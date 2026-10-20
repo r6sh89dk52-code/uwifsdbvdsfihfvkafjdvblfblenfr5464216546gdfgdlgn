@@ -4,16 +4,17 @@ import {notificationId,reminderDueAt} from './draftRules';
 
 export type DraftReminder={id:string;updatedAt:number};
 export function isNativeIOS():boolean{return Capacitor.getPlatform()==='ios'&&Capacitor.isNativePlatform()}
+export function isNativeMobile():boolean{return Capacitor.isNativePlatform()&&(Capacitor.getPlatform()==='ios'||Capacitor.getPlatform()==='android')}
 export async function enableNativeNotifications():Promise<'granted'|'denied'|'not-native'>{
- if(!isNativeIOS())return 'not-native';
+ if(!isNativeMobile())return 'not-native';
  const result=await LocalNotifications.requestPermissions();return result.display==='granted'?'granted':'denied';
 }
 
-// Native iOS only; browser view provides in-app alerts but never promises background push.
+// Native iOS and Android schedule local alerts; browser view is in-app only.
 // Serialized scheduling reduces races while the user is typing.
 let queue:Promise<void>=Promise.resolve();
 export function syncNativeDraftNotifications(drafts:DraftReminder[],enabled:boolean):Promise<void>{
- if(!isNativeIOS())return Promise.resolve();
+ if(!isNativeMobile())return Promise.resolve();
  queue=queue.catch(()=>undefined).then(async()=>{
   const pending=await LocalNotifications.getPending();
   const ours=pending.notifications.filter(n=>n.id>=800000000&&n.id<1700000000).map(n=>({id:n.id}));

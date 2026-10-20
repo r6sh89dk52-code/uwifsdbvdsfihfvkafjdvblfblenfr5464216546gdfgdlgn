@@ -35,7 +35,7 @@ export default function ClinicalMigrationGate(){
   <p role="status">Detectamos tu padrón y tus registros del formato anterior. La nueva versión no los migrará sin comprobar antes tu respaldo externo cifrado.</p>
   <section className="panel">
    <h3>1. Selecciona tu respaldo verificado</h3>
-   <p className="hint">El mismo archivo .danperbackup que ya guardaste en Archivos y comprobaste con su contraseña en la versión anterior. El archivo se procesa únicamente en el iPhone.</p>
+   <p className="hint">El mismo archivo .danperbackup que ya guardaste en Archivos y comprobaste con su contraseña en la versión anterior. El archivo se procesa únicamente en el dispositivo.</p>
    <label>Archivo cifrado
     <input type="file" accept=".danperbackup" disabled={busy} onChange={e=>{
      const file=e.currentTarget.files?.[0]??null;
