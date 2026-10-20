@@ -225,4 +225,102 @@ final class N2PersonalWorkbookImportTests:XCTestCase {
                                                         options:[.sortedKeys]))
         }
     }
+    func testMixedSitePERSONALUsesExplicitPerWorkerSiteWithoutGuessing()throws {
+        let sheet="""
+        <row r="1">
+            <c r="A1" t="inlineStr"><is><t>DNI</t></is></c>
+            <c r="B1" t="inlineStr"><is><t>NOMBRES</t></is></c>
+            <c r="C1" t="inlineStr"><is><t>SEDE</t></is></c>
+        </row>
+        <row r="2">
+            <c r="A2"><v>41728463</v></c>
+            <c r="B2" t="inlineStr"><is><t>Trabajadora de Prueba Uno</t></is></c>
+            <c r="C2" t="inlineStr"><is><t>Fundo La Venturosa</t></is></c>
+        </row>
+        <row r="3">
+            <c r="A3"><v>78654321</v></c>
+            <c r="B3" t="inlineStr"><is><t>Trabajador de Prueba Dos</t></is></c>
+            <c r="C3" t="inlineStr"><is><t>Planta La Venturosa</t></is></c>
+        </row>
+        """
+        let file=try makeWorkbook(rows:[sheet],useSharedStrings:false)
+        defer{try? FileManager.default.removeItem(at:file)}
+        let preview=try N2PersonalWorkbookReader.read(url:file)
+        XCTAssertTrue(preview.stats.sourceSiteColumn)
+        XCTAssertTrue(preview.stats.canConfirm)
+        XCTAssertEqual(Set(preview.workers.map(\.site)),Set(["LA VENTUROSA","PLVENTUROSA"]))
+        XCTAssertThrowsError(try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:"LA VENTUROSA"))
+        XCTAssertThrowsError(try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:""))
+        let snapshot=try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:"DESDE_EXCEL")
+        let root=try XCTUnwrap(JSONSerialization.jsonObject(with:snapshot) as? [String:Any])
+        let workers=try XCTUnwrap(root["workers"] as? [[String:Any]])
+        XCTAssertEqual(workers.count,2)
+        XCTAssertEqual(workers[0]["site"] as? String,"LA VENTUROSA")
+        XCTAssertEqual(workers[1]["site"] as? String,"PLVENTUROSA")
+        let (same,result)=try N2PersonalRosterImport.merge(
+            snapshot:snapshot,preview:preview,site:"DESDE_EXCEL")
+        XCTAssertEqual(same,snapshot)
+        XCTAssertEqual(result.unchanged,2)
+    }
+
+    func testPERSONALWithUnknownOrMissingSiteBlocksAllImports()throws {
+        let sheet="""
+        <row r="1">
+            <c r="A1" t="inlineStr"><is><t>DNI</t></is></c>
+            <c r="B1" t="inlineStr"><is><t>NOMBRES</t></is></c>
+            <c r="C1" t="inlineStr"><is><t>SEDE</t></is></c>
+        </row>
+        <row r="2">
+            <c r="A2"><v>41728463</v></c>
+            <c r="B2" t="inlineStr"><is><t>Persona de Prueba Uno</t></is></c>
+        </row>
+        <row r="3">
+            <c r="A3"><v>78654321</v></c>
+            <c r="B3" t="inlineStr"><is><t>Persona de Prueba Dos</t></is></c>
+            <c r="C3" t="inlineStr"><is><t>Sede Desconocida</t></is></c>
+        </row>
+        """
+        let file=try makeWorkbook(rows:[sheet],useSharedStrings:false)
+        defer{try? FileManager.default.removeItem(at:file)}
+        let preview=try N2PersonalWorkbookReader.read(url:file)
+        XCTAssertEqual(preview.stats.siteMissing,1)
+        XCTAssertEqual(preview.stats.siteInvalid,1)
+        XCTAssertFalse(preview.stats.canConfirm)
+        XCTAssertThrowsError(try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:"DESDE_EXCEL"))
+        XCTAssertThrowsError(try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:"PLVENTUROSA"))
+    }
+
+    func testConflictingSiteWithinSameDNIIsNotSilentlyOverwritten()throws {
+        let sheet="""
+        <row r="1">
+            <c r="A1" t="inlineStr"><is><t>DNI</t></is></c>
+            <c r="B1" t="inlineStr"><is><t>NOMBRES</t></is></c>
+            <c r="C1" t="inlineStr"><is><t>SEDE</t></is></c>
+        </row>
+        <row r="2">
+            <c r="A2"><v>41728463</v></c>
+            <c r="B2" t="inlineStr"><is><t>Persona de Prueba Uno</t></is></c>
+            <c r="C2" t="inlineStr"><is><t>LA VENTUROSA</t></is></c>
+        </row>
+        <row r="3">
+            <c r="A3"><v>41728463</v></c>
+            <c r="B3" t="inlineStr"><is><t>Persona de Prueba Uno</t></is></c>
+            <c r="C3" t="inlineStr"><is><t>PLVENTUROSA</t></is></c>
+        </row>
+        """
+        let file=try makeWorkbook(rows:[sheet],useSharedStrings:false)
+        defer{try? FileManager.default.removeItem(at:file)}
+        let preview=try N2PersonalWorkbookReader.read(url:file)
+        XCTAssertEqual(preview.stats.duplicates,1)
+        XCTAssertEqual(preview.stats.siteConflicts,1)
+        XCTAssertFalse(preview.stats.canConfirm)
+        XCTAssertThrowsError(try N2PersonalRosterImport.initialSnapshot(
+            preview:preview,site:"DESDE_EXCEL"))
+    }
+
 }

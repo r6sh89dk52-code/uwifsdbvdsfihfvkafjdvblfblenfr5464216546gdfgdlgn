@@ -11,7 +11,7 @@ public struct N2PersonalImportResult:Equatable,Sendable {
 
 public enum N2PersonalRosterImport {
     private static func validate(_ preview:N2PersonalImportPreview,_ site:String)throws {
-        guard ["LA VENTUROSA","PLVENTUROSA"].contains(site),
+        guard ["LA VENTUROSA","PLVENTUROSA","DESDE_EXCEL"].contains(site),
               preview.stats.canConfirm,
               preview.workers.count==preview.stats.valid,
               preview.workers.count<=30_000 else {
@@ -23,6 +23,13 @@ public enum N2PersonalRosterImport {
                   $0.dni.utf8.count==8 &&
                   $0.dni.utf8.allSatisfy({(48...57).contains($0)}) &&
                   !$0.name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+              }),
+              preview.workers.allSatisfy({ row in
+                  if site=="DESDE_EXCEL" {
+                      return preview.stats.sourceSiteColumn &&
+                          ["LA VENTUROSA","PLVENTUROSA"].contains(row.site)
+                  }
+                  return row.site.isEmpty || row.site==site
               }) else{throw N2PersonalImportError.needsReview}
     }
     private static func normalized(_ value:String)->String {
@@ -33,10 +40,13 @@ public enum N2PersonalRosterImport {
             .joined(separator:" ").uppercased()
     }
     private static func worker(_ row:N2PersonalWorker,site:String)->[String:Any] {
-        [
+        // Preserve each verified source site when a mixed PERSONAL workbook
+        // explicitly identifies workers from both locations.
+        let confirmedSite=site=="DESDE_EXCEL" ? row.site : site
+        return [
             "dni":row.dni,"name":row.name,"area":row.area,
             "labor":row.labor,"sex":row.sex,"age":row.age,
-            "ubigeo":row.ubigeo,"site":site,
+            "ubigeo":row.ubigeo,"site":confirmedSite,
             "birthDate":"","source":"imported","rosterStatus":"official"
         ]
     }
@@ -99,7 +109,8 @@ public enum N2PersonalRosterImport {
             guard normalized(existingName)==normalized(source.name),
                   existingSex.isEmpty || source.sex.isEmpty ||
                     existingSex==source.sex,
-                  existingSite.isEmpty || existingSite==site else {
+                  existingSite.isEmpty ||
+                    existingSite==(incoming["site"] as? String ?? "") else {
                 // Never silently overwrite identity from a second roster.
                 throw N2PersonalImportError.needsReview
             }
