@@ -26,6 +26,7 @@ struct NativeRootView:View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("danper.appearance") private var appearance="system"
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @AppStorage("danper.haptics.enabled") private var haptics=true
 
     private var isReady:Bool { summary != nil || layoutOnly }
@@ -65,7 +66,7 @@ struct NativeRootView:View {
             NavigationStack { toolsTab }
                 .tabItem { Label("Ajustes",systemImage:"gearshape.fill") }.tag(3)
         }
-        .tint(DanperStyle.red)
+        .tint(visualPalette=="salud" ? Color(red:0.04,green:0.43,blue:0.80) : DanperStyle.red)
         .environment(\.n2WorkspaceVault,.demo)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
@@ -320,6 +321,19 @@ struct NativeRootView:View {
                         .foregroundStyle(.red)
                 }
                 Text("Solo elimina registros creados en la demostración B11. Las fuentes clínicas y la build 222 no se tocan. Se exige confirmación escrita y autenticación.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            DanperPanel("Identidad visual") {
+                Picker("Colores del aplicativo",selection:$visualPalette) {
+                    Text("DANPER rojo").tag("danper")
+                    Text("Salud azul").tag("salud")
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("danper-visual-palette")
+                Label(visualPalette=="salud"
+                      ? "Azul institucional, celeste y fondos suaves."
+                      : "Rojo DANPER y superficies clásicas.",
+                      systemImage:"paintpalette")
                     .font(.caption).foregroundStyle(.secondary)
             }
             DanperPanel("Preferencias") {
