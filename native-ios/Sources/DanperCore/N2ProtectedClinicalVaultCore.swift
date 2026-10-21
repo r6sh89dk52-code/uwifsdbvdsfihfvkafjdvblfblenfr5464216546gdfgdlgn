@@ -165,6 +165,47 @@ public final class N2ProtectedClinicalVaultCore {
         _=try N1eLegacyClinicalAudit.inspect(active.snapshot)
         return active.snapshot
     }
+    /// Starts a genuinely EMPTY encrypted practice vault. Unlike the bundled
+    /// synthetic fixture it contains ZERO visits, workers, stock or movements.
+    /// No prior files or encrypted generations may be overwritten.
+    @discardableResult
+    public func activateEmptySynthetic(confirmed:Bool)throws
+        ->N2ProtectedStoreSummary {
+        guard confirmed,
+              directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT",
+              try journal.recover()==nil,
+              try FileManager.default.contentsOfDirectory(
+                  at:directory,includingPropertiesForKeys:nil).isEmpty else {
+            throw N2ProtectedStoreError.targetNotEmpty
+        }
+        let empty:[String:Any]=[
+            "workers":[[String:Any]](),
+            "attentions":[[String:Any]](),
+            "allergies":[String:Any](),
+            "stockLots":[[String:Any]](),
+            "stockMovements":[[String:Any]](),
+            "catalogMappings":[[String:Any]](),
+            "deliveryIncidents":[[String:Any]](),
+            "ambulatoryReconciliation":[[String:Any]](),
+            "notifications":false
+        ]
+        let source=try JSONSerialization.data(
+            withJSONObject:empty,options:[.sortedKeys])
+        _=try N1eLegacyClinicalAudit.inspect(source)
+        _=try N1fLosslessFieldGate.inspect(source)
+        let n=try journal.commit(source,expectedRevision:0)
+        guard let active=try journal.recover(),active.revision==n,
+              active.snapshot==source else {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        let result=try summary(active)
+        guard result.workers==0,result.attentions==0,result.drafts==0,
+              result.physicalMovements==0 else {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        return result
+    }
+
     /// Explicitly start an isolated sandbox containing ONLY the five documented
     /// fictional employees. This path cannot restore or mix actual patient
     /// records, and is physically separate from the clinical vault.
