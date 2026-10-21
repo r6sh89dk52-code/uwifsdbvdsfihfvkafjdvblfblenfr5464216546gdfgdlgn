@@ -23,6 +23,17 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         let result=try N1sFullExcelWriter.exportIndicator(base:first,manifest:plan)
         XCTAssertEqual(result.sheetCount,10)
         XCTAssertEqual(result.writtenRows,2)
+        let parts=try N1rStoredZip.unpack(result.xlsx)
+        let workbook=try XCTUnwrap(parts.first{$0.name=="xl/workbook.xml"})
+        let bookXML=try XCTUnwrap(String(data:workbook.data,encoding:.utf8))
+        let names=["BD MATERIALES","CONTEO","INGRESOS","RESU","CONSUMOS",
+                   "JUSTIFICACIONES","GUIA","@subuo","BASE TRU","@uo"]
+        for name in names {XCTAssertTrue(bookXML.contains("name=\""+name+"\""))}
+        XCTAssertEqual((1...10).filter{n in
+            parts.contains{$0.name=="xl/worksheets/sheet\(n).xml"}
+        }.count,10)
+        XCTAssertEqual(parts.filter{$0.name.hasPrefix("xl/tables/table") &&
+                                 $0.name.hasSuffix(".xml")}.count,19)
         XCTAssertFalse(result.canUseClinicalData)
         XCTAssertGreaterThan(result.xlsx.count,50_000)
         XCTAssertEqual(result.xlsx,try N1sFullExcelWriter.exportIndicator(base:first,manifest:plan).xlsx)
@@ -35,6 +46,13 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
             manifest:fixture("n1s-nursing-plan.json"))
         XCTAssertEqual(result.sheetCount,1)
         XCTAssertEqual(result.writtenRows,98)
+        let package=try N1rStoredZip.unpack(result.xlsx)
+        XCTAssertFalse(package.contains{$0.name=="xl/worksheets/sheet1.xml"})
+        let book=try XCTUnwrap(package.first{$0.name=="xl/workbook.xml"})
+        let xml=try XCTUnwrap(String(data:book.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("name=\"KARDEX ENFERMERAS\""))
+        XCTAssertFalse(xml.contains("name=\"Hoja1\""))
+        XCTAssertFalse(package.contains{$0.name=="docProps/app.xml"})
         XCTAssertFalse(result.canUseClinicalData)
         XCTAssertTrue(try N1rStoredZip.unpack(result.xlsx).contains{
             $0.name=="xl/printerSettings/printerSettings2.bin"
