@@ -27,6 +27,7 @@ done
 echo "Verificando exportadores Swift y diferencias de inventario..."
 ( cd native-ios && swift test --filter N1sCombinedOfficialExcelTests --jobs 2 ) 2>&1 | tee "$DEST/swift-excel.log"
 ( cd native-ios && swift test --filter N2NursingParityTests --jobs 2 ) 2>&1 | tee "$DEST/swift-kardex.log"
+( cd native-ios && swift test --filter N2IncidentExportScopeTests --jobs 2 ) 2>&1 | tee "$DEST/swift-incident-scope.log"
 for file in n1s-indicator-native.xlsx n1s-nursing-native.xlsx; do
   [ -s "$DEST/$file" ] || { echo "Falta el libro generado $file" >&2; exit 1; }
 done
