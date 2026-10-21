@@ -97,7 +97,8 @@ public enum N1eLegacyClinicalAudit {
 
     /// A successful audit never grants restore authorization; the caller must
     /// still authenticate, stage both encrypted domains, and obtain consent.
-    public static func inspect(_ data: Data) throws -> N1eClinicalParityReport {
+    public static func inspect(_ data: Data,allowEmptySynthetic:Bool=false)
+        throws -> N1eClinicalParityReport {
         guard data.count <= 30 * 1024 * 1024,
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let workers = root["workers"] as? [[String: Any]],
@@ -106,7 +107,8 @@ public enum N1eLegacyClinicalAudit {
               let rawMoves = root["stockMovements"] as? [[String: Any]]
         else { throw N1eParityError.invalidSnapshot }
         // Enforce the exact nine collections from the actual build222 format.
-        guard (try? N1BackupAdmission.preview(data: data)) != nil else {
+        guard (try? N1BackupAdmission.preview(data:data)) != nil ||
+              (allowEmptySynthetic && N2EmptyDemoSnapshot.matches(data)) else {
             throw N1eParityError.invalidSnapshot
         }
         var workerIDs = Set<String>()
