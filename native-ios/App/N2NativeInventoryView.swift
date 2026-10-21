@@ -89,8 +89,16 @@ struct N2NativeInventoryView:View {
     var body:some View {
         DanperScrollView {
           VStack(alignment:.leading,spacing:16) {
-            DanperPanel("Inventario y lotes") {
-                Label("Kardex físico de enfermería · 98 materiales",
+            VStack(alignment:.leading,spacing:4) {
+                Text("GESTIÓN DE EXISTENCIAS")
+                    .font(.caption2.weight(.bold)).tracking(1.1)
+                    .foregroundStyle(DanperStyle.red)
+                Text("Inventario de enfermería")
+                    .font(.system(.title2,design:.rounded,weight:.bold))
+            }
+            .frame(maxWidth:.infinity,alignment:.leading)
+            DanperPanel("Inventario registrado · 98 productos") {
+                Label("Kardex físico protegido",
                       systemImage:"lock.shield.fill")
                 Text("Registra existencias y revisa los lotes de cada sede. La capacidad de cajas y frascos se indica al registrar el lote.")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -98,7 +106,7 @@ struct N2NativeInventoryView:View {
                     .foregroundStyle(failed ? Color.red : Color.secondary)
             }
             if workspace=="overview" {
-                DanperPanel("Gestionar existencias") {
+                DanperPanel("¿Qué necesitas hacer?") {
                     ForEach(["lot","receipt","count"],id:\.self) {action in
                         Button {
                             mode=action;workspace="edit"
