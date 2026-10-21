@@ -368,6 +368,12 @@ struct NativeRootView:View {
                 }
             }
             DanperPanel("Datos reales · no se mezclan con las pruebas") {
+                 DanperToolLink(title:"Importar trabajadores desde Excel PERSONAL",
+                                symbol:"doc.badge.plus") {
+                     N2NativePersonalImportView()
+                 }
+                 Text("Importación local de la hoja PERSONAL a la bóveda clínica independiente. Antes de usar datos de empleados reales, valida el importador y la seguridad en el iPhone.")
+                     .font(.caption).foregroundStyle(.secondary)
                 DanperToolLink(title:"Acceso al espacio clínico independiente",symbol:"cross.case.fill") {
                     N2ClinicalWorkspaceGateView()
                 }
