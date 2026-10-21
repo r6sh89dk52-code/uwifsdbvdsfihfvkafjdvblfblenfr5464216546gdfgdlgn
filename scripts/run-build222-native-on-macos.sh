@@ -30,6 +30,7 @@ mkdir -p "$WORK"
 
 step "1/7 Dependencias y recursos de demostración"
 npm ci
+node scripts/test-n2-build222-ui-parity.cjs
 node scripts/prepare-n1s-ios-demo-resources.cjs
 bash native-ios/scripts/make-app-icon.sh
 [ -s native-ios/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png ] || fail "No se generó el icono."
