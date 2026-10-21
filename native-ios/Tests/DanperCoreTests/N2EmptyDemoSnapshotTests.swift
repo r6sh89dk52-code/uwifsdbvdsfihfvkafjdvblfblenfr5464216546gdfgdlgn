@@ -33,6 +33,23 @@ final class N2EmptyDemoSnapshotTests:XCTestCase {
         let extra=try JSONSerialization.data(withJSONObject:root)
         XCTAssertFalse(N2EmptyDemoSnapshot.matches(extra))
     }
+    func testBlankRosterCanReceiveItsFirstManualWorker()throws {
+        let blank=try N2EmptyDemoSnapshot.make()
+        let emptyIndex=try N2NativeSnapshotReader.read(blank)
+        XCTAssertTrue(emptyIndex.roster.isEmpty)
+        XCTAssertTrue(emptyIndex.visits.isEmpty)
+        let employee=try JSONSerialization.data(withJSONObject:[
+            "dni":"00000006",
+            "name":"Trabajador De Ejemplo"
+        ])
+        let next=try N2SnapshotEditor.addWorker(
+            snapshot:blank,worker:employee,at:1_791_000_000_000)
+        let after=try N2NativeSnapshotReader.read(next)
+        XCTAssertEqual(after.roster.count,1)
+        XCTAssertEqual(after.roster.first?.dni,"00000006")
+        XCTAssertTrue(after.visits.isEmpty)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(next).workers,1)
+    }
     func testEmptyDemoDeterministicButDoesNotContainOldSample()throws {
         let first=try N2EmptyDemoSnapshot.make()
         let second=try N2EmptyDemoSnapshot.make()
