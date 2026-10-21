@@ -7,7 +7,13 @@ import DanperCore
 struct N2NativeInventoryView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     private var layoutOnly=false
-    init() {}
+    init(initialOperation:String?=nil) {
+        if let initialOperation,
+           ["lot","receipt","count"].contains(initialOperation) {
+            _workspace=State(initialValue:"edit")
+            _mode=State(initialValue:initialOperation)
+        }
+    }
     #if DEBUG
     init(layoutContext:N2FormContext,operation:String?=nil) {
         layoutOnly=true
