@@ -180,7 +180,7 @@ private struct N2ClinicalWorkspaceRootView:View {
                                 .font(.footnote).foregroundStyle(.orange)
                         }
                         Button {
-                            tab=2
+                            tab=1
                         } label: {
                             Label("Registrar nueva atención",systemImage:"plus.circle.fill")
                         }
@@ -197,6 +197,18 @@ private struct N2ClinicalWorkspaceRootView:View {
                             Label("Indicador ambulatorio · Excel",systemImage:"tablecells")
                         }
                         .buttonStyle(DanperSecondaryButton())
+                        DanperToolLink(title:"Personal e historial",
+                                       symbol:"person.2.fill") {
+                            N2NativeHistoryView(useProtectedVault:true)
+                        }
+                        DanperToolLink(title:"Borradores pendientes",
+                                       symbol:"doc.text.fill") {
+                            N2NativeDraftsDashboard()
+                        }
+                        DanperToolLink(title:"Kardex y reportes",
+                                       symbol:"shippingbox.fill") {
+                            N2Build222KardexHub()
+                        }
                         Button("Cerrar espacio clínico",role:.cancel) {onClose()}
                             .buttonStyle(DanperSecondaryButton())
                     }.padding(16)
@@ -205,13 +217,18 @@ private struct N2ClinicalWorkspaceRootView:View {
             }
             .tabItem {Label("Inicio",systemImage:"house.fill")}.tag(0)
             NavigationStack {
+                N2NativeClinicalFormView(initialWorkerDNI:registeredDNI)
+                    .id(registeredDNI ?? "clinical-attention")
+            }
+            .tabItem {Label("Registrar",systemImage:"plus.circle.fill")}.tag(1)
+            NavigationStack {
                 N2NativeHistoryView(useProtectedVault:true)
                     .toolbar {
                         ToolbarItem(placement:.topBarTrailing) {
                             NavigationLink {
                                 N2NativeWorkerEditorView(onSaved:{dni in
                                     registeredDNI=dni
-                                    tab=2
+                                    tab=1
                                 })
                             } label: {
                                 Label("Nuevo trabajador",systemImage:"person.badge.plus")
@@ -219,16 +236,7 @@ private struct N2ClinicalWorkspaceRootView:View {
                         }
                     }
             }
-            .tabItem {Label("Personal",systemImage:"person.2.fill")}.tag(1)
-            NavigationStack {
-                N2NativeClinicalFormView(initialWorkerDNI:registeredDNI)
-                    .id(registeredDNI ?? "clinical-attention")
-            }
-            .tabItem {Label("Atención",systemImage:"cross.case.fill")}.tag(2)
-            NavigationStack {
-                N2NativeDraftsDashboard()
-            }
-            .tabItem {Label("Borradores",systemImage:"doc.text.fill")}.tag(3)
+            .tabItem {Label("Historial",systemImage:"list.clipboard.fill")}.tag(2)
             NavigationStack {
                 ScrollView {
                     VStack(alignment:.leading,spacing:14) {
@@ -255,9 +263,9 @@ private struct N2ClinicalWorkspaceRootView:View {
                             .buttonStyle(DanperSecondaryButton())
                     }.padding(16)
                 }
-                .navigationTitle("Más · Clínica")
+                .navigationTitle("Ajustes · Clínica")
             }
-            .tabItem {Label("Más",systemImage:"square.grid.2x2.fill")}.tag(4)
+            .tabItem {Label("Ajustes",systemImage:"gearshape.fill")}.tag(3)
         }
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
@@ -265,7 +273,7 @@ private struct N2ClinicalWorkspaceRootView:View {
         .accessibilityHidden(scenePhase != .active)
         .allowsHitTesting(scenePhase == .active)
         .onChange(of:tab) {old,current in
-            if old==2 && current != 2 {registeredDNI=nil}
+            if old==1 && current != 1 {registeredDNI=nil}
         }
         .onChange(of:scenePhase) {_,phase in
             if phase != .active {onClose()}
