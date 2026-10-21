@@ -53,6 +53,19 @@ struct N2VerifiedIndicatorExportView:View {
         f.timeZone=TimeZone(identifier:"America/Lima")
         return f.string(from:date)
     }
+    private func metricValue(_ value:String,_ label:String)->some View {
+        VStack(spacing:5) {
+            Text(value)
+                .font(.title3.weight(.bold)).monospacedDigit()
+                .foregroundStyle(.primary)
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth:.infinity,minHeight:64)
+        .padding(8)
+        .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:12))
+    }
+
     private func useOfficialCut() {
         var calendar=Calendar(identifier:.gregorian)
         calendar.timeZone=TimeZone(identifier:"America/Lima")!
@@ -122,6 +135,14 @@ struct N2VerifiedIndicatorExportView:View {
                 Label("Las cantidades pendientes no se convierten en movimientos físicos ni en saldos cero.",
                       systemImage:"checkmark.shield")
                     .font(.caption).foregroundStyle(.secondary)
+                HStack(spacing:9) {
+                    metricValue("\(selected.count)","Seleccionadas")
+                    metricValue("\(inRange.count)","En el período")
+                    metricValue("\(inRange.filter{$0.pendingPhysicalLines>0}.count)","Pendientes")
+                }
+                Text("Verifica que las atenciones tengan sede, stock y conteos respaldados. El modo provisional separa las cantidades declaradas de los movimientos físicos.")
+                    .font(.caption).foregroundStyle(.secondary)
+
                 HStack {
                     Text("\(selected.count) elegidas de \(inRange.count) en \(site == "AMBAS" ? "ambas sedes" : "esta sede")")
                     Spacer()
