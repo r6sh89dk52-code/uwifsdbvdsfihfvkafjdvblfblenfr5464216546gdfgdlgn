@@ -19,7 +19,7 @@ struct N2ClinicalWorkspaceGateView:View {
                 DanperPanel("Espacio clínico independiente") {
                     Label("Fuente clínica separada",systemImage:"lock.shield.fill")
                         .font(.headline)
-                    Text("No contiene ni fusiona datos de la demostración. Los registros que se creen aquí permanecerán exclusivamente en la bóveda CLÍNICA.")
+                    Text("Importa el padrón PERSONAL desde Excel o restaura una copia cifrada de la Build 222. Ninguna fuente se cargará automáticamente.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Label("EN VALIDACIÓN: todavía no está aprobada para atención de pacientes reales.",
                           systemImage:"exclamationmark.triangle.fill")
@@ -41,27 +41,29 @@ struct N2ClinicalWorkspaceGateView:View {
                         LabeledContent("Pendientes",value:String(summary.pendingClinicalLines))
                         Label("Bóveda clínica cifrada identificada",
                               systemImage:"checkmark.shield.fill")
-                        Text("Ya existe una fuente clínica. No podrás restaurar otra build 222 encima ni borrarla desde el importador PERSONAL; los respaldos originales se conservan intactos.")
+                        Text("Ya existe una fuente cifrada. Importar de nuevo PERSONAL conciliará el padrón sin borrar atenciones, consumos ni lotes. Para restaurar otro respaldo se necesita una base independiente.")
                             .font(.caption).foregroundStyle(.secondary)
                             .foregroundStyle(.green)
                     } else {
-                        Text("¿Ya utilizaste la build 222? Restaura PRIMERO su respaldo completo, antes de importar PERSONAL. Así conservarás trabajadores, atenciones, lotes, dispensaciones y pendientes.")
+                        Text("Elige una sola fuente inicial. Si vas a conservar atenciones y Kardex anteriores, restaura primero el respaldo cifrado de la Build 222. Si quieres un padrón nuevo, importa directamente PERSONAL.")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal:false,vertical:true)
-                        NavigationLink {
-                            N2NativeActivationView()
-                        } label: {
-                            Label("Restaurar respaldo completo de build 222",
-                                  systemImage:"lock.doc")
-                        }
-                        .buttonStyle(DanperPrimaryButton())
+                            .foregroundStyle(.secondary)
                         NavigationLink {
                             N2NativePersonalImportView()
                         } label: {
-                            Label("Empezar solo con Excel PERSONAL",systemImage:"tablecells")
+                            Label("Importar trabajadores desde Excel PERSONAL",
+                                  systemImage:"tablecells")
+                        }
+                        .buttonStyle(DanperPrimaryButton())
+                        .accessibilityIdentifier("clinical-first-run-import-personal")
+                        NavigationLink {
+                            N2NativeActivationView()
+                        } label: {
+                            Label("Restaurar copia cifrada Build 222",
+                                  systemImage:"lock.doc")
                         }
                         .buttonStyle(DanperSecondaryButton())
+                        .accessibilityIdentifier("clinical-first-run-restore-222")
                         Text("Usa PERSONAL únicamente si deseas comenzar con un padrón nuevo y SIN las atenciones ni el inventario antiguos. Una vez creada la bóveda clínica, no se sobrescribe con otro respaldo.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
@@ -167,6 +169,8 @@ private struct N2ClinicalWorkspaceRootView:View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab=0
     @State private var registeredDNI:String?
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
+    @AppStorage("danper.appearance") private var appearance="system"
     var body:some View {
         TabView(selection:$tab) {
             NavigationStack {
@@ -244,8 +248,20 @@ private struct N2ClinicalWorkspaceRootView:View {
                             Label("Fuente clínica cifrada",
                                   systemImage:"lock.shield.fill")
                                 .font(.headline)
-                            Text("No se permite mezclar ni importar archivos de la demostración.")
+                            Text("No se mezclan padrones, inventarios o atenciones de otras fuentes sin verificación.")
                                 .font(.footnote).foregroundStyle(.secondary)
+                        }
+                        DanperPanel("Apariencia") {
+                            Picker("Colores",selection:$visualPalette) {
+                                Text("DANPER rojo").tag("danper")
+                                Text("Salud azul").tag("salud")
+                            }
+                            .pickerStyle(.segmented)
+                            Picker("Modo",selection:$appearance) {
+                                Text("Sistema").tag("system")
+                                Text("Claro").tag("light")
+                                Text("Oscuro").tag("dark")
+                            }.pickerStyle(.segmented)
                         }
                         DanperToolLink(title:"Importar / conciliar PERSONAL",
                                        symbol:"person.crop.rectangle.stack") {N2NativePersonalImportView()}
