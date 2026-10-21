@@ -17,6 +17,7 @@ is_jdk21() {
 jdk_candidates=(
   "${DANPER_JDK21_HOME:-}"
   "${JAVA_HOME:-}"
+  "$HOME/Library/Application Support/DANPER/jdk-21/Contents/Home"
   "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
   "/Applications/Android Studio Preview.app/Contents/jbr/Contents/Home"
   "$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home"
@@ -32,7 +33,8 @@ for candidate in "${jdk_candidates[@]}"; do
 done
 if [ -z "$selected_java" ]; then
   echo "ERROR: no se encontró JDK 21. Gradle 8.11.1 NO puede ejecutarse con Java 25."
-  echo "Instala Android Studio con JDK 21 o instala: brew install openjdk@21"
+  echo "Sin Homebrew: ejecuta bash scripts/install-jdk21-macos.command"
+  echo "También puedes instalar manualmente JDK 21 desde Eclipse Temurin."
   echo "Después repite este mismo script. NO necesitas cambiar Java globalmente."
   if [ -x /usr/libexec/java_home ]; then /usr/libexec/java_home -V 2>&1 || true; fi
   exit 1
