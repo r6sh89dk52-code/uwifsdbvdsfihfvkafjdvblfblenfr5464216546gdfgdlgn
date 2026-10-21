@@ -197,16 +197,65 @@ struct NativeRootView:View {
                     }
                 }
                 if !isReady {
-                    VStack(alignment:.leading,spacing:14) {
-                        Text("Comienza tu prueba").font(.title3.bold())
-                        Text("Registra atenciones, administra el personal y consulta los reportes.")
+                    DanperPanel("¿Cómo deseas comenzar?") {
+                        Text("Elige el origen de los datos. No se importará ni restaurará nada automáticamente.")
                             .font(.subheadline).foregroundStyle(.secondary)
-                        if loading || preparing {ProgressView("Preparando datos protegidos…")}
-                        if !problem.isEmpty {Text(problem).font(.footnote).foregroundStyle(.orange)}
-                        Button {Task {await startPractice()}} label: {
-                            Label("Comenzar",systemImage:"play.fill")
-                        }.buttonStyle(DanperPrimaryButton()).disabled(loading || preparing)
-                    }.padding(18).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
+                        if loading || preparing {
+                            ProgressView("Preparando almacenamiento cifrado…")
+                        }
+                        if !problem.isEmpty {
+                            Label(problem,systemImage:"exclamationmark.triangle")
+                                .font(.footnote).foregroundStyle(.orange)
+                                .fixedSize(horizontal:false,vertical:true)
+                        }
+                        Button {
+                            Task {await startPractice(withSample:false)}
+                        } label: {
+                            Label("Empezar con una base vacía",
+                                  systemImage:"tray")
+                        }
+                        .buttonStyle(DanperPrimaryButton())
+                        .disabled(loading || preparing || !problem.isEmpty)
+                        .accessibilityIdentifier("start-empty-demo")
+                        Text("0 trabajadores, 0 atenciones, 0 consumos y 0 lotes. Podrás registrar datos de prueba desde cero.")
+                            .font(.caption).foregroundStyle(.secondary)
+
+                        Button {
+                            Task {await startPractice(withSample:true)}
+                        } label: {
+                            Label("Cargar ejemplo ficticio",
+                                  systemImage:"person.3.sequence")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                        .disabled(loading || preparing || !problem.isEmpty)
+                        .accessibilityIdentifier("start-sample-demo")
+                        Text("Este ejemplo siempre incluye los mismos cinco trabajadores y atenciones sintéticas. Nunca es una base nueva vacía.")
+                            .font(.caption).foregroundStyle(.secondary)
+
+                        Divider()
+                        NavigationLink {
+                            N2NativePersonalImportView()
+                        } label: {
+                            Label("Importar trabajadores desde Excel",
+                                  systemImage:"doc.badge.plus")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth:.infinity,minHeight:48)
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                        .accessibilityIdentifier("start-import-personal-xlsx")
+                        Text("Lee la hoja PERSONAL del .xlsx y permite verificar DNIs, nombres, sexo, área y sede. Se guarda en una bóveda clínica independiente, nunca mezclada con la demostración. Requiere autenticación.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        NavigationLink {
+                            N2NativeActivationView()
+                        } label: {
+                            Label("Restaurar respaldo cifrado Build 222",
+                                  systemImage:"lock.doc")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth:.infinity,minHeight:48)
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                        .accessibilityIdentifier("start-restore-build222")
+                    }
                 }
                 VStack(alignment:.leading,spacing:12) {
                     Text("Herramientas").font(.title3.weight(.bold))
@@ -391,6 +440,8 @@ struct NativeRootView:View {
             summary=try await N2SyntheticTrialIOSVault.shared.inspect()
             if let model=try await N2SyntheticTrialIOSVault.shared.readHistory() {
                 metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())
+            } else {
+                metrics=nil
             }
             problem=""
         }catch {
@@ -399,17 +450,31 @@ struct NativeRootView:View {
         }
     }
     @MainActor
-    private func startPractice() async {
-        guard !preparing else{return}
+    private func startPractice(withSample:Bool) async {
+        guard !preparing,summary==nil,problem.isEmpty else{return}
         preparing=true
         defer{preparing=false}
         do {
-            summary=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+            let result:N2ProtectedStoreSummary
+            if withSample {
+                result=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+            } else {
+                result=try await N2SyntheticTrialIOSVault.shared.startEmptyDemo()
+                guard result.workers==0,result.attentions==0,
+                      result.drafts==0,result.physicalMovements==0 else {
+                    throw N2SyntheticTrialIOSVault.Failure.blockedMigration
+                }
+            }
+            summary=result
             if let model=try await N2SyntheticTrialIOSVault.shared.readHistory() {
                 metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())
+            } else {
+                metrics=nil
             }
             problem=""
-        }catch {
+        } catch {
+            summary=nil
+            metrics=nil
             problem=trialFailureMessage(error)
         }
     }
