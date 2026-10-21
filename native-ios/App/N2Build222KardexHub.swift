@@ -6,7 +6,7 @@ import DanperCore
 struct N2Build222KardexHub:View {
     private let options:[(number:String,title:String,detail:String,symbol:String)]=[
         ("1","Inventario físico","Consultar los 98 productos, existencias y lotes","shippingbox.fill"),
-        ("2","Entradas y salidas","Registrar lotes, ingresos y conteos comprobados","arrow.left.arrow.right"),
+        ("2","Entradas y salidas","Ingresos físicos; salidas de atención en el historial","arrow.left.arrow.right"),
         ("3","Revisar pendientes anteriores","Examinar conciliaciones y movimientos sin confirmar","checkmark.shield"),
         ("4","Exportar Kardex","Generar el Excel de enfermería","doc.richtext")
     ]
@@ -35,7 +35,7 @@ struct N2Build222KardexHub:View {
                         .font(.footnote).foregroundStyle(.secondary)
                     VStack(spacing:10) {
                         route(0){N2NativeInventoryView()}
-                        route(1){N2NativeInventoryView()}
+                        route(1){N2NativeInventoryView(initialOperation:"receipt")}
                         route(2){N2ReconciliationView()}
                         route(3){N2VerifiedNursingExportView()}
                     }
