@@ -78,7 +78,7 @@ public enum N2FormError:Error,Equatable {
 public enum N2NativeFormContextReader {
     public static func read(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)
         throws->N2FormContext {
-        guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
+        guard (try? N1eLegacyClinicalAudit.inspect(snapshot,allowEmptySynthetic:true)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
               let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let w=root["workers"] as? [[String:Any]],
