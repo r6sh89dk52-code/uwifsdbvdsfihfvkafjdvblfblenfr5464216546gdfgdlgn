@@ -13,10 +13,25 @@ final class N2EmptyDemoSnapshotTests:XCTestCase {
         }
         XCTAssertTrue((root["allergies"] as? [String:Any])?.isEmpty==true)
         XCTAssertEqual(root["notifications"] as? Bool,false)
-        let audit=try N1eLegacyClinicalAudit.inspect(data)
+        // A genuinely empty demo must NOT become an admissible Build 222 backup.
+        XCTAssertThrowsError(try N1BackupAdmission.preview(data:data))
+        XCTAssertThrowsError(try N1eLegacyClinicalAudit.inspect(data))
+        XCTAssertTrue(N2EmptyDemoSnapshot.matches(data))
+        let audit=try N1eLegacyClinicalAudit.inspect(data,allowEmptySynthetic:true)
         XCTAssertEqual(audit.workers,0)
         XCTAssertEqual(audit.attentions,0)
         XCTAssertEqual(audit.physicalMovements,0)
+    }
+    func testWhitelistingRejectsAnythingOtherThanTheExactBlankSource()throws {
+        let original=try N2EmptyDemoSnapshot.make()
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        root["workers"]=[["dni":"00000001","name":"Dato agregado"]]
+        let modified=try JSONSerialization.data(withJSONObject:root)
+        XCTAssertFalse(N2EmptyDemoSnapshot.matches(modified))
+        root["workers"]=[[String:String]]()
+        root["unrecognizedClinicalField"]="must-not-skip-audit"
+        let extra=try JSONSerialization.data(withJSONObject:root)
+        XCTAssertFalse(N2EmptyDemoSnapshot.matches(extra))
     }
     func testEmptyDemoDeterministicButDoesNotContainOldSample()throws {
         let first=try N2EmptyDemoSnapshot.make()
