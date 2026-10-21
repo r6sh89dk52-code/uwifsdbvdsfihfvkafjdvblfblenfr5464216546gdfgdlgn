@@ -28,7 +28,7 @@ CURRENT="$(git branch --show-current)"
 [ -f native-ios/project.yml ] || fail "No existe native-ios/project.yml."
 mkdir -p "$WORK"
 
-step "1/7 Dependencias y recursos de demostración"
+step "1/7 Dependencias y plantillas Excel sin padrones precargados"
 npm ci
 node scripts/test-n2-build222-ui-parity.cjs
 node scripts/prepare-n1s-ios-demo-resources.cjs
@@ -37,7 +37,7 @@ bash native-ios/scripts/make-app-icon.sh
 
 step "2/7 Generación del proyecto Xcode"
 ( cd native-ios && xcodegen generate --spec project.yml )
-echo "===== Pruebas críticas de borrado y arranque realmente vacío ====="
+echo "===== Pruebas de aislamiento histórico y estructura vacía (solo lógica de test) ====="
 ( cd native-ios && swift test --filter N2EmptyDemoSnapshotTests )
 
 
@@ -101,5 +101,5 @@ echo "LISTO: DANPER beta nativa iniciada automáticamente en el iPhone virtual."
 echo "Simulador: $SIM_ID"
 echo "Log de compilación: $LOG"
 echo "Captura de pantalla: $WORK/DANPER_B222_NATIVE_INICIO.png"
-echo "Esta ejecución no valida todas las funciones ni habilita uso con datos clínicos reales."
+echo "Esta ejecución valida compilación, no equivalencia completa con Excel original ni puesta en producción."
 echo "Para crear OTRO simulador sin borrar el antiguo: bash scripts/run-build222-native-on-macos.sh --fresh"
