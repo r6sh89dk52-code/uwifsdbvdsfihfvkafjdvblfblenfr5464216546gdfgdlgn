@@ -52,6 +52,8 @@ struct N2DemoResetView:View {
                             .foregroundStyle(.green)
                         Text("La fuente ficticia ya no está en el almacenamiento de la aplicación. No se volverá a generar a menos que inicies expresamente otra demostración.")
                             .font(.footnote)
+                        Text("En Inicio podrás elegir: base vacía (0 registros) o ejemplo con los mismos cinco trabajadores ficticios. La segunda opción crea nuevamente ese ejemplo, no recupera atenciones borradas.")
+                            .font(.footnote).foregroundStyle(.secondary)
                         Button("Volver a Inicio") {
                             dismiss()
                         }
