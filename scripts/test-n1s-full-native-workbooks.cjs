@@ -67,6 +67,23 @@ assert.match(Buffer.from(actual['xl/worksheets/sheet5.xml']).toString('utf8'),
 console.log('PASS N1s complete native indicator: 10 sheets, 19 tables, 432 material rows, original cell formulas and exact all verified materials/consumptions');
 // Nursing compare main daily 98 products with TS reference, styles/print.
 const nn=open('n1s-nursing-native.xlsx'),tn=open('n1s-nursing-reference.xlsx');
+const nurseNames=all(parse(Buffer.from(nn['xl/workbook.xml']).toString('utf8')),'sheet')
+  .map(x=>x.getAttribute('name'));
+assert.deepEqual(nurseNames,['KARDEX ENFERMERAS'],
+  'Swift export must match Build 222 single visible Kardex worksheet');
+for(const removed of ['xl/worksheets/sheet1.xml',
+                      'xl/worksheets/_rels/sheet1.xml.rels',
+                      'xl/printerSettings/printerSettings1.bin',
+                      'docProps/app.xml']) {
+  assert.ok(!nn[removed],'donor-only ZIP part leaked: '+removed);
+}
+assert.ok(!Buffer.from(nn['[Content_Types].xml']).toString('utf8')
+  .includes('/xl/worksheets/sheet1.xml'));
+assert.ok(!Buffer.from(nn['xl/_rels/workbook.xml.rels']).toString('utf8')
+  .includes('Id="rId1"'));
+assert.ok(!Buffer.from(nn['xl/workbook.xml']).toString('utf8')
+  .includes('name="Hoja1"'));
+
 assert.ok(nn['xl/printerSettings/printerSettings2.bin']);
 const nm=cells(document(nn,2)),tm=cells(document(tn,2));
 console.log('N1s nursing diagnostic nonpatient XML row7:',Buffer.from(nn['xl/worksheets/sheet2.xml']).toString('utf8').match(/<row[^>]*r="7"[^>]*>[\s\S]*?<\/row>/)?.[0]?.slice(0,2200));
