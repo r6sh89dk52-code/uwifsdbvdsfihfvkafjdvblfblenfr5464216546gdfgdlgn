@@ -46,7 +46,9 @@ public final class N2ProtectedClinicalVaultCore {
     }
     private func summary(_ record:N2EncryptedClinicalJournal.Recovered) throws
         -> N2ProtectedStoreSummary {
-        let a=try N1eLegacyClinicalAudit.inspect(record.snapshot)
+        let a=try N1eLegacyClinicalAudit.inspect(
+            record.snapshot,
+            allowEmptySynthetic:directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT")
         let b=try N1fLosslessFieldGate.inspect(record.snapshot)
         return N2ProtectedStoreSummary(revision:record.revision,
             workers:a.workers,attentions:a.attentions,
