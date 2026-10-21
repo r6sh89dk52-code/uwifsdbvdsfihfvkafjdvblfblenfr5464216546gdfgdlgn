@@ -144,10 +144,9 @@ public enum N2VerifiedIndicatorWorkbook {
             return (code,p)
         })
         guard productMap.count==432 else{throw Failure.invalidCatalog}
-        guard try !hasIncidentInSelectedVisits(incidents,movements:movement,
-                                                 selectedVisitIDs:selectedVisitIDs) else {
-            throw Failure.unverifiedDelivery
-        }
+        let disputed=try hasIncidentInSelectedVisits(
+            incidents,movements:movement,selectedVisitIDs:selectedVisitIDs)
+        guard !disputed else{throw Failure.unverifiedDelivery}
         var approved=Set<String>()
         for link in mapped {
             guard let a=link["clinicalCode"] as? String,
