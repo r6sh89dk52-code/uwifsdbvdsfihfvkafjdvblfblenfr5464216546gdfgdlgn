@@ -4,16 +4,51 @@ import UIKit
 /// Reusable visual language for the entire native preview. Respect Dynamic Type,
 /// Dark/Light Mode, Reduce Motion and the iPhone's safe areas.
 enum DanperStyle {
-    static let red=Color(red:0.89,green:0.094,blue:0.176)
-    static let deepRed=Color(red:0.57,green:0.035,blue:0.12)
-    static let canvas=Color(uiColor:UIColor { $0.userInterfaceStyle == .dark ? UIColor(red:0.09,green:0.09,blue:0.105,alpha:1) : UIColor(red:0.965,green:0.965,blue:0.974,alpha:1) })
-    static let surface=Color(uiColor:UIColor { $0.userInterfaceStyle == .dark ? UIColor(red:0.145,green:0.145,blue:0.16,alpha:1) : .white })
+    /// User-facing alternative: the blue / cyan health campaign identity.
+    /// Legacy symbol name "red" stays for existing SwiftUI callers.
+    static var healthPalette:Bool {
+        UserDefaults.standard.string(forKey:"danper.visual.palette") == "salud"
+    }
+    static var red:Color {
+        healthPalette ? Color(red:0.04,green:0.43,blue:0.80) :
+                        Color(red:0.89,green:0.094,blue:0.176)
+    }
+    static var deepRed:Color {
+        healthPalette ? Color(red:0.01,green:0.73,blue:0.93) :
+                        Color(red:0.57,green:0.035,blue:0.12)
+    }
+    static var canvas:Color {
+        Color(uiColor:UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return healthPalette
+                    ? UIColor(red:0.055,green:0.095,blue:0.155,alpha:1)
+                    : UIColor(red:0.09,green:0.09,blue:0.105,alpha:1)
+            }
+            return healthPalette
+                ? UIColor(red:0.942,green:0.979,blue:0.995,alpha:1)
+                : UIColor(red:0.965,green:0.965,blue:0.974,alpha:1)
+        })
+    }
+    static var surface:Color {
+        Color(uiColor:UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return healthPalette
+                    ? UIColor(red:0.095,green:0.15,blue:0.21,alpha:1)
+                    : UIColor(red:0.145,green:0.145,blue:0.16,alpha:1)
+            }
+            return .white
+        })
+    }
     static let animation=Animation.easeInOut(duration:0.22)
-    static let gradient=LinearGradient(colors:[red,deepRed],
-                                      startPoint:.topLeading,endPoint:.bottomTrailing)
+    static var gradient:LinearGradient {
+        LinearGradient(colors:[red,deepRed],
+                       startPoint:.topLeading,endPoint:.bottomTrailing)
+    }
 }
 
+
 struct DanperPrimaryButton:ButtonStyle {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration:Configuration)->some View {
         configuration.label
@@ -31,6 +66,7 @@ struct DanperPrimaryButton:ButtonStyle {
     }
 }
 struct DanperSecondaryButton:ButtonStyle {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration:Configuration)->some View {
         configuration.label
@@ -46,6 +82,7 @@ struct DanperSecondaryButton:ButtonStyle {
     }
 }
 struct DanperFormChrome:ViewModifier {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     func body(content:Content)->some View {
         content
             .scrollContentBackground(.hidden)
@@ -132,6 +169,7 @@ struct DanperStatusBanner:View {
 /// Build 222 panels: separate content surfaces, outlined fields and neutral text.
 /// Action color belongs to the primary CTA and selected marks, not entire rows.
 struct DanperPanel<Content:View>:View {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     private let title:String?
     private let content:Content
     init(_ title:String?=nil,@ViewBuilder content:()->Content) {
