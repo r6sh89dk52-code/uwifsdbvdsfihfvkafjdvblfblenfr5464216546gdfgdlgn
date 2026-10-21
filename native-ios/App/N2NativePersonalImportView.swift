@@ -103,6 +103,15 @@ struct N2NativePersonalImportView:View {
                         LabeledContent("Sexo fuera de catálogo",value:String(preview.stats.sexInvalid))
                         LabeledContent("Nombres contradictorios",value:String(preview.stats.nameConflicts))
                         LabeledContent("Sexos contradictorios",value:String(preview.stats.sexConflicts))
+                        VStack(alignment:.leading,spacing:5) {
+                            Text("Muestra de registros reconocidos")
+                                .font(.subheadline.weight(.semibold))
+                            ForEach(Array(preview.workers.prefix(3)),id:\.dni) {person in
+                                Text(person.dni+" · "+person.name)
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityIdentifier("personal-xlsx-import-preview")
                         if preview.stats.sourceSiteColumn {
                             Divider()
                             LabeledContent("Trabajadores de Fundo",value:String(preview.workers.filter{$0.site=="LA VENTUROSA"}.count))
@@ -155,6 +164,16 @@ struct N2NativePersonalImportView:View {
                             .foregroundStyle(.green)
                         Text("Los trabajadores están disponibles en el espacio clínico. El inventario y las atenciones se gestionan de forma independiente.")
                             .font(.footnote)
+                        NavigationLink {
+                            N2ClinicalWorkspaceGateView()
+                        } label: {
+                            Label("Abrir espacio clínico con el padrón importado",
+                                  systemImage:"person.crop.rectangle.stack")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth:.infinity,minHeight:48)
+                        }
+                        .buttonStyle(DanperPrimaryButton())
+                        .accessibilityIdentifier("open-imported-clinical-workspace")
                     }
                 }
                 Text(message).font(.footnote)
