@@ -23,6 +23,33 @@ APK DEBUG de salida: outputs/android/DANPER-Build222-Android-DEBUG.apk
 
 Puedes transferirlo al Android e instalarlo manualmente o utilizar adb install -r outputs/android/DANPER-Build222-Android-DEBUG.apk con el dispositivo autorizado para depuración.
 
+## Error Gradle en Mac con Java 25 (major version 69)
+
+Síntoma de la primera compilación local (20 de octubre de 2026):
+
+    BUG! exception in phase 'semantic analysis' in source unit '_BuildScript_'
+    Unsupported class file major version 69
+
+Causa: se utilizó Java 25 para ejecutar Gradle 8.11.1. Capacitor 7 requiere JDK 21; no actualices Gradle/Capacitor para ocultar este conflicto.
+
+**Corrección aplicada al script de esta rama**: ahora verifica JDK 21 y lo selecciona solo para esta ejecución, incluso cuando JAVA_HOME apunta a Java 25. Busca JDK 21 en Android Studio, java_home y Homebrew. Si falta, muestra instrucciones y sale antes de Gradle.
+
+Como el repositorio YA está clonado en el Mac, se debe actualizar la rama sin borrar ni clonar de nuevo:
+
+    cd ~/danper-salud-movil-pruebas
+    git status --short
+    git pull --ff-only origin feat/android-build222-local-apk-20261020
+    bash scripts/build-android-apk-macos.command
+
+Si el script responde 'no se encontró JDK 21', instala esa versión sin quitar Java 25; con Homebrew:
+
+    brew install openjdk@21
+    bash scripts/build-android-apk-macos.command
+
+Alternativa: instalar el JDK 21 compatible con Android Studio y proporcionar su ruta mediante DANPER_JDK21_HOME. Comprobar la versión con $JAVA_HOME/bin/java -version dentro del shell de compilación, o verificar el mensaje 'JDK 21 seleccionado...' en el log.
+
+El aviso npm de fsevents, el mensaje xmldom de un caso de prueba negativo y la advertencia de chunk JS >500kB NO causaron el fallo Java. Este último sí merece mediciones de rendimiento en el HONOR X5 Plus. El paso de pruebas lógicas no acredita todavía la fluidez física de Android.
+
 ## Protección de datos
 Android reutiliza la bóveda AES-256-GCM y claves guardadas con el plugin de almacenamiento seguro que se apoya en Android Keystore. Se deshabilita backup automático y se excluyen datos en reglas de extracción del sistema (en algunos fabricantes la migración puede diferir). Sin backend ni sincronización automática.
 El archivo cifrado .danperbackup es un respaldo MANUAL entre iOS y Android; restaurar solo en base vacía, con contraseña y confirmación. Esta función tampoco está validada en Android físico.
