@@ -20,7 +20,7 @@ Fecha: 2026-10-21. Fuente: código histórico `release/v0.21.12-build222-provisi
 | Kardex enfermería | hoja única `KARDEX ENFERMERAS`, 98 filas (omite hoja auxiliar) | Antes informaba 1 hoja sin retirar la hoja auxiliar; se añadió `stripDonorWorksheet` | **Corregido en fuente, pendiente XCTest en Mac** |
 | Kardex fórmulas | F=D+E, H=F-G; otras D/E/G/I/J | mismas F y H | Comparación sintética por D7:J104 |
 | Stock desconocido | celda vacía, no cero | Antes impedía exportar si todos los productos tenían stock desconocido | **Corregido** |
-| Incidencias históricas de entrega | TS valida incidentes y bloquea únicamente movimientos en conflicto | `N2VerifiedIndicatorWorkbook` todavía exige `deliveryIncidents.isEmpty` | **Brecha pendiente**: no equiparable en este caso |
+| Incidencias históricas de entrega | TS valida incidentes y bloquea únicamente movimientos en conflicto | `N2VerifiedIndicatorWorkbook` todavía exige `deliveryIncidents.isEmpty` | **Corregido en fuente**, falta ejecutar prueba de incidencias y escenario real |
 | Datos de origen | Build 222 usa padrones de PERSONAL y respaldos cifrados | Vista de importación `N2NativePersonalImportView` y bóveda independiente | Flujo de importación existente, pendiente prueba con padrón autorizado |
 | Primera ejecución | trabajador desde padrón | Inicio estándar ahora abre fuente clínica verificada/importación; no crea demo | Cambio de fuente integrado |
 | Exportación real | Archivo XLSX listo para Excel | `N2VerifiedIndicatorWorkbook` / `N2VerifiedNursingWorkbook` | Validación visual y de Excel real pendiente |
@@ -29,6 +29,7 @@ Fecha: 2026-10-21. Fuente: código histórico `release/v0.21.12-build222-provisi
 1. `DANPERNativeApp` dirige la ruta normal a `N2ClinicalWorkspaceGateView`; importación de `PERSONAL` como primera opción; se conserva restauración 222 independiente. No se borran ni trasladan automáticamente archivos existentes.
 2. `N1sNursingExcelWriter` ahora elimina `Hoja1`, `sheet1.xml` y sus referencias de workbook, relaciones, tipos de contenido, metadatos y configuraciones de impresión asociadas. Reindexa sharedStrings de la hoja preservada y confirma una hoja en el ZIP resultante.
 3. `N2VerifiedNursingWorkbook` permite exportar 98 filas cuando no existen lotes conocidos. Todos los saldos permanecen en blanco, sin inventar cantidades cero.
+4. `N2VerifiedIndicatorWorkbook` permite historial de incidencias de otros movimientos, pero bloquea las atenciones seleccionadas cuyos movimientos tengan devolución o discrepancia. Falta ejecutar el nuevo XCTest de alcance de incidencias.
 4. Prueba JS de comparación TS/Swift extendida para exigir una sola hoja de Kardex y ausencia de componentes donados; XCTest nativo añadido para exportar desde padrón sin stock.
 
 ## Cómo auditar sin datos personales
@@ -43,7 +44,7 @@ El script genera fixtures sintéticos aislados, ejecuta pruebas `N1sCombinedOffi
 2. Comparación XML por celda para todos los códigos y todos los registros de CONSUMOS (A–AD), fechas seriales y fórmula cache.
 3. Validar cada tabla estructurada y sus rangos, todas las referencias de hojas y cadenas compartidas, y que no haya piezas OOXML huérfanas.
 4. Probar escenarios: sin stock, stock parcial, aperturas de caja/frasco, múltiples lotes FEFO, consumos R=0 confirmados, movimientos históricos sin confirmar, múltiples sedes, ingresos superiores a cuatro (debe bloquear sin truncar), fechas de vencimiento y cortes consecutivos.
-5. Abordar la discrepancia de incidencias históricas antes de certificar toda la lógica.
+5. Ejecutar `N2IncidentExportScopeTests` y escenarios reales de incidencias: el código ahora valida las incidencias y bloquea solo atenciones con movimientos afectados, sin rechazar todo el historial.
 6. Abrir libros en Excel macOS/Windows; comprobar advertencias de reparación, recálculo y aspecto impreso.
 7. Probar importación `PERSONAL` autorizada y persistencia tras cerrar/reabrir, sin datos de prueba precargados.
 
