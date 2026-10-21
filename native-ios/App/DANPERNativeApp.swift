@@ -49,7 +49,9 @@ struct DANPERNativeApp: App {
                     #endif
                 } else if onboardingFinished {
                     if hasUnlockedOnce {
-                        NativeRootView()
+                        NavigationStack {
+                            N2ClinicalWorkspaceGateView()
+                        }
                             .opacity(authenticated && scenePhase == .active ? 1 : 0)
                             .accessibilityHidden(!authenticated || scenePhase != .active)
                             .allowsHitTesting(authenticated && scenePhase == .active)
