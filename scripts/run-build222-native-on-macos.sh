@@ -37,6 +37,9 @@ bash native-ios/scripts/make-app-icon.sh
 
 step "2/7 Generación del proyecto Xcode"
 ( cd native-ios && xcodegen generate --spec project.yml )
+echo "===== Pruebas críticas de borrado y arranque realmente vacío ====="
+( cd native-ios && swift test --filter N2EmptyDemoSnapshotTests )
+
 
 step "3/7 Selección de iPhone virtual independiente"
 DEVICE_TYPE="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys; a=json.load(sys.stdin)["devicetypes"]; print(next((x["identifier"] for x in a if x["name"]=="iPhone 16"),""))')"
