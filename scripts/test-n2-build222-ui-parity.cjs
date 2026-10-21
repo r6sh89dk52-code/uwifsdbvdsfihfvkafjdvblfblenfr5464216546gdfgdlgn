@@ -15,6 +15,11 @@ const nursing=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedNursingEx
 const reportStages=fs.readFileSync(path.join(root,'native-ios/App/N2Build222ExportStages.swift'),'utf8');
 const clinicalRules=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProcedureRules.swift'),'utf8');
 const palette=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
+const blank=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2EmptyDemoSnapshot.swift'),'utf8');
+const core=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'),'utf8');
+const demo=fs.readFileSync(path.join(root,'native-ios/App/N2SyntheticTrialIOSVault.swift'),'utf8');
+const reset=fs.readFileSync(path.join(root,'native-ios/App/N2DemoResetView.swift'),'utf8');
+const personal=fs.readFileSync(path.join(root,'native-ios/App/N2NativePersonalImportView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
 for(const term of ['Buscar en padrón','Nuevo trabajador','REGISTRO AMBULATORIO','registerSteps'])
   must(source,term,'referencia Build 222');
@@ -59,4 +64,18 @@ must(home,'N2HealthMascot()','mascota SwiftUI');
 must(palette,'danper.visual.palette','tema nativo');
 console.log('PASS: Kardex de 4 acciones, Excel 3 etapas, 12 procedimientos únicos y tema azul presentes.');
 console.log('PASS: estructura Build 222 (4 tabs), ingreso de trabajador, perfil, revisión de alergias y alta SwiftUI presentes.');
+for(const id of ['start-empty-demo','start-sample-demo','start-import-personal-xlsx','start-restore-build222'])
+  must(home,id,'origen de datos explícito');
+must(home,'DanperToolLink(title:"Importar trabajadores desde Excel PERSONAL"','ruta para importar durante uso');
+must(core,'activateEmptySynthetic(confirmed:Bool)','fuente de prueba vacía');
+must(core,'let source=try N2EmptyDemoSnapshot.make()','fuente validada desde cero');
+must(demo,'func startEmptyDemo()','inicio de prueba sin seed');
+must(demo,'func startSyntheticDemo()','ejemplo ficticio separado');
+for(const value of ['"workers"','"attentions"','"stockLots"','"stockMovements"'])
+  must(blank,value+':[[String:Any]]()','colección vacía '+value);
+must(reset,'try await N2SyntheticTrialIOSVault.shared.eraseEntireDemo','borrado limitado a demo');
+must(reset,'onDeleted()','propagar verificación de borrado a inicio');
+must(personal,'personal-xlsx-import-preview','vista previa de Excel');
+must(personal,'open-imported-clinical-workspace','abrir bóveda clínica tras importar');
+console.log('PASS: onboarding con origen explícito, demo realmente vacía, borrado verificado e importación protegida.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
