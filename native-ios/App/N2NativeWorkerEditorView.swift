@@ -93,6 +93,18 @@ struct N2NativeWorkerEditorView:View {
     var body:some View {
         DanperScrollView {
             VStack(alignment:.leading,spacing:16) {
+                VStack(alignment:.leading,spacing:5) {
+                    Text("PADRÓN DE TRABAJADORES")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(DanperStyle.red)
+                    Text(editingDNI == nil
+                         ? "Registrar nuevo trabajador" : "Completar ficha")
+                        .font(.system(.title2,design:.rounded,weight:.bold))
+                    Text("Identificación, sede y datos laborales · registro local protegido")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth:.infinity,alignment:.leading)
                 if failed || !savedDNI.isEmpty {
                     DanperPanel {
                         Label(status,systemImage:failed ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
@@ -110,7 +122,7 @@ struct N2NativeWorkerEditorView:View {
                     }
                     .accessibilityIdentifier("worker-registration-validation")
                 }
-                DanperPanel("Identificación") {
+                DanperPanel("Datos del trabajador") {
                     DanperField(title:"DNI") {
                         TextField("DNI de 8 dígitos",text:$dni)
                             .keyboardType(.numberPad)
@@ -130,7 +142,7 @@ struct N2NativeWorkerEditorView:View {
                         Label("Este DNI ya está registrado.",systemImage:"person.crop.circle.badge.exclamationmark")
                             .font(.footnote).foregroundStyle(.orange)
                     }
-                    DanperField(title:"Nombres y apellidos") {
+                    DanperField(title:"Nombre completo") {
                         TextField("Ej. Mariana Torres Salazar",text:$names)
                             .textInputAutocapitalization(.words)
                             .textContentType(.name)
