@@ -87,6 +87,9 @@ step "6/7 Instalación y apertura automática de DANPER"
 xcrun simctl terminate "$SIM_ID" "$APP_ID" >/dev/null 2>&1 || true
 xcrun simctl install "$SIM_ID" "$APP"
 xcrun simctl launch "$SIM_ID" "$APP_ID"
+# Optional evidence of the actual installed simulator UI, after launch.
+sleep 2
+xcrun simctl io "$SIM_ID" screenshot "$WORK/DANPER_B222_NATIVE_INICIO.png" >/dev/null 2>&1 || true
 
 step "7/7 Abrir proyecto en Xcode (sin necesitar pulsar Cmd+R)"
 open "$ROOT/native-ios/DANPERNative.xcodeproj"
@@ -94,5 +97,6 @@ echo ""
 echo "LISTO: DANPER beta nativa iniciada automáticamente en el iPhone virtual."
 echo "Simulador: $SIM_ID"
 echo "Log de compilación: $LOG"
+echo "Captura de pantalla: $WORK/DANPER_B222_NATIVE_INICIO.png"
 echo "Esta ejecución no valida todas las funciones ni habilita uso con datos clínicos reales."
 echo "Para crear OTRO simulador sin borrar el antiguo: bash scripts/run-build222-native-on-macos.sh --fresh"
