@@ -8,6 +8,13 @@ const source=fs.readFileSync(path.join(root,'src/main.tsx'),'utf8');
 const home=fs.readFileSync(path.join(root,'native-ios/App/NativeRootView.swift'),'utf8');
 const form=fs.readFileSync(path.join(root,'native-ios/App/N2NativeClinicalFormView.swift'),'utf8');
 const editor=fs.readFileSync(path.join(root,'native-ios/App/N2NativeWorkerEditorView.swift'),'utf8');
+const kardex=fs.readFileSync(path.join(root,'native-ios/App/N2Build222KardexHub.swift'),'utf8');
+const inventory=fs.readFileSync(path.join(root,'native-ios/App/N2NativeInventoryView.swift'),'utf8');
+const indicator=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedIndicatorExportView.swift'),'utf8');
+const nursing=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedNursingExportView.swift'),'utf8');
+const reportStages=fs.readFileSync(path.join(root,'native-ios/App/N2Build222ExportStages.swift'),'utf8');
+const clinicalRules=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProcedureRules.swift'),'utf8');
+const palette=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
 for(const term of ['Buscar en padrón','Nuevo trabajador','REGISTRO AMBULATORIO','registerSteps'])
   must(source,term,'referencia Build 222');
@@ -24,5 +31,32 @@ for(const term of ['worker-registration-dni','worker-save','worker-continue-atte
  'DanperPanel("Datos laborales")','DanperPanel("Datos personales")'])
   must(editor,term,'editor SwiftUI');
 assert.equal((form.match(/private func workerSection\(/g)||[]).length,1);
+for(const term of ['kardex-route-','Inventario físico','Entradas y salidas',
+ 'Revisar pendientes anteriores','Exportar Kardex'])
+  must(kardex,term,'hub Kardex original');
+must(inventory,'init(initialOperation:String?=nil)','acción física de inventario');
+for(const view of [indicator,nursing])
+  for(const term of ['N2Build222ExportProgress','N2Build222StageHeading(step:1',
+                     'N2Build222StageHeading(step:2','N2Build222StageHeading(step:3'])
+    must(view,term,'exportación Excel de tres etapas');
+for(const term of ['Crear archivo y compartir','useOfficialCut()','Libro conjunto'])
+  if(term!=='Libro conjunto')must(indicator,term,'indicador');
+for(const term of ['Período','Vista previa','Compartir'])
+  must(nursing,term,'Kardex Excel');
+must(reportStages,'struct N2Build222ExportProgress','componentes de Excel');
+const official=clinicalRules.match(/public static let procedures=\[([\s\S]*?)\]/);
+assert(official,'No se pudo leer el catálogo de procedimientos aprobado');
+const codes=[...official[1].matchAll(/"([^"]+)"/g)].map(x=>x[1]);
+const grouping=form.slice(form.indexOf('private var procedureGroups:'),
+                          form.indexOf('private func procedureOption(',form.indexOf('private var procedureGroups:')));
+for(const code of codes) {
+  const matches=grouping.match(new RegExp('"'+code+'"','g'))||[];
+  assert.equal(matches.length,1,'Procedimiento extraviado o duplicado: '+code);
+}
+assert.equal(codes.length,12,'Catálogo inesperadamente distinto: revisar manualmente');
+must(home,'danper-visual-palette','selector de paleta de salud');
+must(home,'N2HealthMascot()','mascota SwiftUI');
+must(palette,'danper.visual.palette','tema nativo');
+console.log('PASS: Kardex de 4 acciones, Excel 3 etapas, 12 procedimientos únicos y tema azul presentes.');
 console.log('PASS: estructura Build 222 (4 tabs), ingreso de trabajador, perfil, revisión de alergias y alta SwiftUI presentes.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
