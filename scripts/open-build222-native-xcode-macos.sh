@@ -14,11 +14,18 @@ if [ ! -d "native-ios/App" ] || [ ! -f "native-ios/project.yml" ]; then
   echo "No se encontró el proyecto SwiftUI." >&2
   exit 1
 fi
-echo "1/3 — Instalando dependencias para recursos locales"
+echo "1/4 — Instalando dependencias para recursos locales"
 npm ci
-echo "2/3 — Generando plantillas y catálogo; solo datos ficticios"
+echo "2/4 — Generando plantillas y catálogo; solo datos ficticios"
 node scripts/prepare-n1s-ios-demo-resources.cjs
-echo "3/3 — Regenerando proyecto XcodeGen"
+echo "3/4 — Generando AppIcon de 1024x1024 desde el logotipo DANPER"
+bash native-ios/scripts/make-app-icon.sh
+ICON="native-ios/App/Assets.xcassets/AppIcon.appiconset"
+if [ ! -s "$ICON/AppIcon.png" ] || [ ! -s "$ICON/Contents.json" ]; then
+  echo "ERROR: No se creó el AppIcon. Comprueba el logotipo original." >&2
+  exit 1
+fi
+echo "4/4 — Regenerando proyecto XcodeGen"
 (
   cd native-ios
   xcodegen generate --spec project.yml
