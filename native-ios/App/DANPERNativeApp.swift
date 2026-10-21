@@ -1,5 +1,6 @@
 import SwiftUI
 import LocalAuthentication
+import DanperCore
 
 private enum Brand {
     static let red = Color(red: 0.88, green: 0.09, blue: 0.16)
@@ -26,12 +27,25 @@ struct DANPERNativeApp: App {
         return false
         #endif
     }
+    /// Safe DEBUG-only visual inspection without Face ID or clinical vault access.
+    private var shellProbe:Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--danper-shell-probe")
+        #else
+        return false
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {
                 if interactionProbe {
                     #if DEBUG
                     N2InteractionProbe()
+                    #endif
+                } else if shellProbe {
+                    #if DEBUG
+                    NativeRootView(layoutMetrics:N2DashboardMetrics.calculate(visits:[],now:Date()))
                     #endif
                 } else if onboardingFinished {
                     if hasUnlockedOnce {
