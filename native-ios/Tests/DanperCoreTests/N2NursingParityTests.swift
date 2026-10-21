@@ -91,6 +91,34 @@ final class N2NursingParityTests:XCTestCase {
             date:"2026-02-30",shift:"CONSOLIDADO",
             responsible:"OPERADOR FICTICIO"))
     }
+    func testRosterOnlySourceExportsBlankUnknownStockWithoutInventingZeros()throws {
+        let original=try bytes("n1e-clinical-stock.json")
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        let people=try XCTUnwrap(root["workers"] as? [[String:Any]])
+        root["workers"]=Array(people.prefix(1))
+        root["attentions"]=[[String:Any]]()
+        root["allergies"]=[String:Any]()
+        for key in ["stockLots","stockMovements","catalogMappings",
+                    "deliveryIncidents","ambulatoryReconciliation"] {
+            root[key]=[[String:Any]]()
+        }
+        let fresh=try JSONSerialization.data(withJSONObject:root,options:[.sortedKeys])
+        let (_,catalog)=try fixture()
+        let book=try N2VerifiedNursingWorkbook.export(
+            snapshot:fresh,catalog:catalog,
+            template:bytes("n1s-nursing-template-store.zip"),
+            date:"2026-10-14",shift:"CONSOLIDADO",
+            responsible:"OPERADOR DE PRUEBA")
+        XCTAssertEqual(book.stockKnownRows,0)
+        XCTAssertEqual(book.stockUnknownRows,98)
+        let archive=try N1rStoredZip.unpack(book.xlsx)
+        XCTAssertFalse(archive.contains{$0.name=="xl/worksheets/sheet1.xml"})
+        let excel=try XCTUnwrap(archive.first{$0.name=="xl/worksheets/sheet2.xml"})
+        let xml=try XCTUnwrap(String(data:excel.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("D7"))
+        XCTAssertFalse(xml.contains("<c r=\"D7\"><v>0</v></c>"))
+    }
+
     func testRangeIsAlwaysLabeledAsConsolidatedPeriod() throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (_,catalog)=try fixture()
