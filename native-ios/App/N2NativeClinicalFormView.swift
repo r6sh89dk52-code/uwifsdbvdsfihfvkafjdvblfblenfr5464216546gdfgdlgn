@@ -685,10 +685,45 @@ struct N2NativeClinicalFormView:View {
             }
         }
     }
+    private var procedureGroups:[(title:String,symbol:String,values:[String])] {
+        let candidates:[(String,String,[String])]=[["Observación y controles","stethoscope",["OBSERVACION","CONTROL","TOMA DE PETAR"]],["Tratamientos y aplicaciones","cross.vial.fill",["TRATAMIENTO ORAL","INYECTABLE","APLICACION DE CREMA","APLICACION DE GOTAS OFTALMICAS"]],["Curaciones y procedimientos","bandage.fill",["CURACION DE HERIDA","LAVADO OCULAR","RETIRO DE PUNTOS DE SUTURA","SUTURAS","EXTRACCION DE CUERPO EXTRAÑO"]]]
+        let listed=Set(candidates.flatMap{$0.2})
+        var result=candidates.map{($0.0,$0.1,$0.2.filter{procedures.contains($0)})}
+        let remaining=procedures.filter{!listed.contains($0)}
+        if !remaining.isEmpty {result.append(("Otros procedimientos","list.bullet",remaining))}
+        return result.filter{!$0.2.isEmpty}
+    }
+
+    private func procedureOption(_ value:String)->some View {
+        let chosen=form.procedures.contains(value)
+        return Button {
+            if chosen {form.procedures.removeAll{$0==value}}
+            else {form.procedures.append(value)}
+        } label:{
+            HStack(spacing:8) {
+                Image(systemName:chosen ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(chosen ? DanperStyle.red : Color.secondary)
+                Text(value.capitalized(with:Locale(identifier:"es_PE")))
+                    .font(.subheadline.weight(chosen ? .semibold : .regular))
+                    .foregroundStyle(.primary).multilineTextAlignment(.leading)
+                Spacer(minLength:0)
+            }
+            .padding(11).frame(maxWidth:.infinity,minHeight:54,alignment:.leading)
+            .background(chosen ? DanperStyle.red.opacity(0.1) : DanperStyle.canvas,
+                        in:RoundedRectangle(cornerRadius:13))
+            .overlay(RoundedRectangle(cornerRadius:13)
+                .strokeBorder(chosen ? DanperStyle.red.opacity(0.38) : Color.secondary.opacity(0.12)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(chosen ? .isSelected : [])
+    }
+
     private func treatmentSection(_ context:N2FormContext)->some View {
         Group {
         if !layoutDetailOnly {
-        DanperPanel {
+        DanperPanel("Medicamentos e insumos") {
+            Text("Busca productos; valida procedimiento, cantidad y lote FEFO antes de guardar.")
+                .font(.caption).foregroundStyle(.secondary)
             Button {withAnimation(reduceMotion ? nil : DanperStyle.animation){chooseProduct.toggle()}} label: {
                 Label("Agregar medicamento o insumo",systemImage:"plus.circle.fill")
             }
@@ -724,44 +759,28 @@ struct N2NativeClinicalFormView:View {
         }
         medicationFields(context)
         DanperPanel("Procedimientos") {
-            LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ?
-                      [GridItem(.flexible())] :
-                      [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],
-                      spacing:10) {
-                ForEach(procedures,id:\.self){option in
-                    let selected=form.procedures.contains(option)
-                    Button {
-                        if selected {
-                            form.procedures.removeAll{$0==option}
-                        }else {
-                            form.procedures.append(option)
-                        }
-                    } label: {
-                        HStack(spacing:8) {
-                            Image(systemName:selected ? "checkmark.circle.fill" : "circle")
-                                .font(.headline)
-                                .foregroundStyle(selected ? DanperStyle.red : Color.secondary)
-                            Text(option.capitalized(with:Locale(identifier:"es_PE")))
-                                .font(.subheadline.weight(selected ? .semibold : .regular))
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.leading)
-                            Spacer(minLength:0)
-                        }
-                        .padding(11)
-                        .frame(maxWidth:.infinity,minHeight:56,alignment:.leading)
-                        .background(selected ? DanperStyle.red.opacity(0.10) :
-                                    DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-                        .overlay(RoundedRectangle(cornerRadius:13)
-                            .strokeBorder(selected ? DanperStyle.red.opacity(0.38) :
-                                          Color.secondary.opacity(0.12),lineWidth:1))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                }
-            }
-            .padding(.vertical,5)
-            Text("Selecciona uno o varios procedimientos. Los medicamentos y sus consumos se registran arriba, en esta misma atención.")
+            Text("Acciones realizadas durante la atención")
+                .font(.subheadline.weight(.semibold))
+            Text("Marca únicamente lo realizado. Los medicamentos, sus lotes y consumos se registran arriba.")
                 .font(.caption).foregroundStyle(.secondary)
+            ForEach(procedureGroups.indices,id:\.self) { index in
+                let group=procedureGroups[index]
+                VStack(alignment:.leading,spacing:10) {
+                    Label(group.title,systemImage:group.symbol)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(DanperStyle.red)
+                    LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize
+                        ? [GridItem(.flexible())]
+                        : [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],
+                        spacing:10) {
+                        ForEach(group.values,id:\.self) {item in procedureOption(item)}
+                    }
+                }.padding(12)
+                    .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:16))
+            }
+            if !form.procedures.isEmpty {
+                Text("\(form.procedures.count) procedimiento(s) seleccionado(s)")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
             if form.hasWound {
                 DanperChoiceField(title:"¿Se envió la foto?",selection:Binding(
                     get:{form.photoReviewed ? (form.photoSent ? "SI" : "NO") : ""},
