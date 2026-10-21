@@ -61,6 +61,8 @@ struct N2NativeClinicalFormView:View {
     @State private var notFoundDNI=""
     @State private var dniLookupTask:Task<Void,Never>?
     @FocusState private var workerDNIFocused:Bool
+    @FocusState private var workerNameFocused:Bool
+    @State private var editingWorkerDNI:String?
     @State private var allergyFeedback=""
     @State private var chooseProduct=false
     @State private var chooseDraft=false
@@ -117,8 +119,12 @@ struct N2NativeClinicalFormView:View {
         workerDNIInput=worker.dni
         workerNameInput=worker.name
         workerDNIFocused=false
+        workerNameFocused=false
         notFoundDNI=""
         showMissingWorker=false
+        allergyStatus=context?.allergies[worker.dni]?.status ?? "unknown"
+        allergySubstances=context?.allergies[worker.dni]?.substances ?? ""
+        allergyFeedback=""
     }
     private func workerAgeDescription(_ worker:N2FormWorker)->String {
         if let age=N2WorkerAge.years(birthDate:worker.birthDate,on:form.date) {
@@ -163,8 +169,20 @@ struct N2NativeClinicalFormView:View {
                     if fault {
                         DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
                     } else if !saved && !layoutDetailOnly {
-                        Label("Registro ambulatorio",systemImage:"cross.case.fill")
-                            .font(.caption).foregroundStyle(.secondary)
+                        VStack(alignment:.leading,spacing:4) {
+                            Text("REGISTRO AMBULATORIO")
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.25)
+                                .foregroundStyle(DanperStyle.red)
+                            Text("Nueva atención")
+                                .font(.system(.title2,design:.rounded,weight:.bold))
+                            Label(lastAutosaveTimestamp>0
+                                  ? "Borrador protegido · autoguardado activo"
+                                  : "Autoguardado activo · aviso de borradores",
+                                  systemImage:"checkmark.shield")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth:.infinity,alignment:.leading)
                     }
                     if !saved && !drafts.isEmpty {
                         DanperPanel("Registros pendientes") {
@@ -271,10 +289,14 @@ struct N2NativeClinicalFormView:View {
                 } message: {
                     Text("No encontramos el DNI \(notFoundDNI) en Personal. Puedes registrarlo ahora y continuar esta misma atención.")
                 }
-                .sheet(isPresented:$showNewWorker) {
+                .sheet(isPresented:$showNewWorker,onDismiss:{
+                    editingWorkerDNI=nil
+                    notFoundDNI=""
+                }) {
                     NavigationStack {
                         N2NativeWorkerEditorView(
                             initialDNI:notFoundDNI,
+                            editingDNI:editingWorkerDNI,
                             onSaved:{dni in
                                 Task {await didRegisterWorker(dni)}
                             })
@@ -426,93 +448,206 @@ struct N2NativeClinicalFormView:View {
             }
         }
     }
+    /// Build 222's worker-first workflow, entirely native and backed by the
+    /// authenticated worker directory. Worker edits occur ONLY in the
+    /// validated worker editor; a visit never silently modifies the roster.
     private func workerSection(_ context:N2FormContext)->some View {
-        DanperPanel("Identificación del trabajador") {
-            DanperField(title:"DNI") {
-                TextField("Introduce los 8 números del DNI",text:$workerDNIInput)
-                    .keyboardType(.numberPad)
-                    .focused($workerDNIFocused)
-                    .accessibilityIdentifier("attention-worker-dni")
-                    .onChange(of:workerDNIInput) {_,value in
-                        enteredWorkerDNI(value)
+        VStack(alignment:.leading,spacing:14) {
+            DanperPanel("Trabajador") {
+                HStack(spacing:10) {
+                    Button {
+                        // Activates inline search in the same encounter rather
+                        // than navigating to a disconnected read-only roster.
+                        if currentWorker != nil {
+                            form.dni=""
+                            workerDNIInput=""
+                            workerNameInput=""
+                            allergyStatus="unknown"
+                            allergySubstances=""
+                            allergyFeedback=""
+                        }
+                        workerDNIFocused=false
+                        workerNameFocused=true
+                    } label: {
+                        Label("Buscar en padrón",systemImage:"person.2")
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(2).minimumScaleFactor(0.8)
+                            .frame(maxWidth:.infinity,minHeight:48)
                     }
-            }
-            Text("El DNI carga automáticamente la ficha. Si no está registrado, podrás crearlo sin salir de la atención.")
-                .font(.caption).foregroundStyle(.secondary)
-            DanperField(title:"Nombres y apellidos") {
-                if let worker=currentWorker {
-                    Text(worker.name).foregroundStyle(.primary)
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                        .accessibilityIdentifier("attention-worker-name")
-                } else {
-                    TextField("También puedes buscar por nombre",text:$workerNameInput)
-                        .textInputAutocapitalization(.words)
-                        .accessibilityIdentifier("attention-worker-name-query")
+                    .buttonStyle(DanperSecondaryButton())
+                    .accessibilityIdentifier("attention-browse-workers")
+                    Button {
+                        editingWorkerDNI=nil
+                        notFoundDNI=workerDNIInput.count==8 ? workerDNIInput : ""
+                        workerNameFocused=false
+                        workerDNIFocused=false
+                        showNewWorker=true
+                    } label: {
+                        Label("Nuevo trabajador",systemImage:"person.badge.plus")
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(2).minimumScaleFactor(0.8)
+                            .frame(maxWidth:.infinity,minHeight:48)
+                    }
+                    .buttonStyle(DanperPrimaryButton())
+                    .accessibilityIdentifier("attention-add-worker")
                 }
-            }
-            if !nameSuggestions.isEmpty {
-                VStack(spacing:5) {
-                    ForEach(nameSuggestions) { person in
-                        Button {selectWorker(person)} label: {
-                            HStack(spacing:10) {
-                                Image(systemName:"person.crop.circle").foregroundStyle(.secondary)
-                                VStack(alignment:.leading,spacing:3) {
-                                    Text(person.name).font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.primary)
-                                    Text("DNI "+person.dni).font(.caption).foregroundStyle(.secondary)
+                DanperField(title:"DNI") {
+                    HStack(spacing:10) {
+                        TextField("8 dígitos",text:$workerDNIInput)
+                            .keyboardType(.numberPad)
+                            .focused($workerDNIFocused)
+                            .accessibilityIdentifier("attention-worker-dni")
+                            .onChange(of:workerDNIInput) {_,value in
+                                enteredWorkerDNI(value)
+                            }
+                        if !workerDNIInput.isEmpty {
+                            Image(systemName:currentWorker == nil
+                                  ? "magnifyingglass" : "checkmark.circle.fill")
+                                .foregroundStyle(currentWorker == nil
+                                                 ? Color.secondary : Color.green)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                }
+                DanperField(title:"Nombre completo") {
+                    if let worker=currentWorker {
+                        HStack {
+                            Text(worker.name)
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth:.infinity,alignment:.leading)
+                                .accessibilityIdentifier("attention-worker-name")
+                            Image(systemName:"checkmark.seal.fill")
+                                .foregroundStyle(.green)
+                        }
+                    } else {
+                        TextField("Apellidos y nombres",text:$workerNameInput)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .focused($workerNameFocused)
+                            .submitLabel(.search)
+                            .accessibilityIdentifier("attention-worker-name-query")
+                    }
+                }
+                if !nameSuggestions.isEmpty {
+                    VStack(spacing:3) {
+                        ForEach(nameSuggestions) { person in
+                            Button {
+                                selectWorker(person)
+                            } label: {
+                                HStack(spacing:10) {
+                                    Image(systemName:"person.crop.circle")
+                                        .foregroundStyle(DanperStyle.red)
+                                    VStack(alignment:.leading,spacing:3) {
+                                        Text(person.name)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                        Text("DNI "+person.dni)
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength:4)
+                                    Image(systemName:"arrow.up.left")
+                                        .foregroundStyle(.secondary)
                                 }
-                                Spacer()
-                                Image(systemName:"arrow.up.left").foregroundStyle(.secondary)
-                            }.padding(12)
-                        }.buttonStyle(.plain)
+                                .frame(maxWidth:.infinity,alignment:.leading)
+                                .padding(12)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("attention-worker-option-"+person.dni)
+                            Divider().opacity(0.35)
+                        }
                     }
-                }.background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-            }
-            if workerDNIInput.count==8 && currentWorker==nil && !showMissingWorker {
-                Button("Registrar DNI "+workerDNIInput) {
-                    notFoundDNI=workerDNIInput
-                    showMissingWorker=true
+                    .background(DanperStyle.canvas,
+                                in:RoundedRectangle(cornerRadius:13))
+                    .accessibilityIdentifier("attention-worker-suggestions")
                 }
-                .buttonStyle(DanperSecondaryButton())
-            }
-            if let worker=currentWorker {
-                VStack(alignment:.leading,spacing:9) {
-                    Label("Trabajador identificado",systemImage:"checkmark.circle.fill")
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(.green)
-                    LabeledContent("DNI",value:worker.dni)
-                    LabeledContent("Área",value:worker.area.isEmpty ? "No consignada" : worker.area)
-                    LabeledContent("Labor / cargo",value:worker.labor.isEmpty ? "No consignada" : worker.labor)
-                    LabeledContent("Edad",value:workerAgeDescription(worker))
-                    LabeledContent("Sede",value:worker.site=="PLVENTUROSA" ?
-                                   "Planta La Venturosa" : "Fundo La Venturosa")
-                    LabeledContent("Ubicación / ubigeo",
-                                   value:worker.ubigeo.isEmpty ? "No consignada" : worker.ubigeo)
-                    LabeledContent("Sexo registrado",value:worker.sex=="M" ? "Masculino" :
-                                   worker.sex=="F" ? "Femenino" : "No consignado")
+                if workerDNIInput.count==8 && currentWorker==nil && !showMissingWorker {
+                    Button {
+                        notFoundDNI=workerDNIInput
+                        editingWorkerDNI=nil
+                        showMissingWorker=true
+                    } label: {
+                        Label("Registrar DNI "+workerDNIInput,
+                              systemImage:"person.badge.plus")
+                    }
+                    .buttonStyle(DanperSecondaryButton())
                 }
-                .padding(13)
-                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
-                Text("Alergias revisadas antes de registrar medicamentos.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                DanperChoiceField(title:"Revisión de alergias",selection:$allergyStatus,
-                    options:["unknown","none","known"],labels:["unknown":"No evaluado","none":"Niega alergias conocidas","known":"Alergias reportadas"])
-                if allergyStatus=="known" {
-                    DanperField(title:"Sustancias reportadas") {
-                    TextField("Indica las sustancias",text:$allergySubstances,axis:.vertical).lineLimit(2...5)
-                }
-                }
-                if !allergyFeedback.isEmpty {
-                    Label(allergyFeedback,systemImage:"checkmark.circle.fill")
+                if let worker=currentWorker {
+                    Label("Trabajador identificado en el padrón",
+                          systemImage:"checkmark.circle.fill")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.green)
-                        .accessibilityAddTraits(.updatesFrequently)
+                    VStack(alignment:.leading,spacing:12) {
+                        LabeledContent("Sede",
+                            value:worker.site=="PLVENTUROSA"
+                                  ? "Planta La Venturosa" : "Fundo La Venturosa")
+                        LabeledContent("Área",
+                            value:worker.area.isEmpty ? "No consignada" : worker.area)
+                        LabeledContent("Labor",
+                            value:worker.labor.isEmpty ? "No consignada" : worker.labor)
+                        LabeledContent("Sexo",
+                            value:worker.sex=="M" ? "Masculino" :
+                                  worker.sex=="F" ? "Femenino" : "No consignado")
+                        LabeledContent("Edad",value:workerAgeDescription(worker))
+                        LabeledContent("Ubigeo",
+                            value:worker.ubigeo.isEmpty ? "No consignado" : worker.ubigeo)
+                    }
+                    .font(.subheadline)
+                    .padding(14)
+                    .background(DanperStyle.canvas,
+                                in:RoundedRectangle(cornerRadius:14))
+                    Button {
+                        editingWorkerDNI=worker.dni
+                        notFoundDNI=""
+                        workerNameFocused=false
+                        showNewWorker=true
+                    } label: {
+                        Label("Completar o corregir ficha laboral",
+                              systemImage:"square.and.pencil")
+                    }
+                    .buttonStyle(DanperSecondaryButton())
+                    .accessibilityIdentifier("attention-edit-worker-profile")
+                    Text("Las modificaciones de la ficha se guardan en el padrón cifrado y no reescriben atenciones anteriores.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Busca por DNI o por nombres. Si no figura en el padrón, regístralo y continúa esta misma atención.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                Button(editingAllergy ? "Guardando…" : "Guardar revisión de alergias") {
-                    Task {await recordAllergy(worker.dni)}
+            }
+
+            if let worker=currentWorker {
+                DanperPanel("Alergias del trabajador") {
+                    Label("Revisión obligatoria antes del tratamiento",
+                          systemImage:"exclamationmark.shield")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                    DanperChoiceField(title:"Revisión de alergias",
+                        selection:$allergyStatus,
+                        options:["unknown","none","known"],
+                        labels:[
+                            "unknown":"No evaluado",
+                            "none":"Niega alergias conocidas",
+                            "known":"Alergias reportadas"
+                        ])
+                    if allergyStatus=="known" {
+                        DanperField(title:"Sustancias reportadas") {
+                            TextField("Indica las sustancias",text:$allergySubstances,
+                                      axis:.vertical).lineLimit(2...5)
+                        }
+                    }
+                    if !allergyFeedback.isEmpty {
+                        Label(allergyFeedback,systemImage:"checkmark.circle.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.green)
+                    }
+                    Button(editingAllergy
+                           ? "Guardando…" : "Guardar revisión de alergias") {
+                        Task {await recordAllergy(worker.dni)}
+                    }
+                    .buttonStyle(DanperSecondaryButton())
+                    .disabled(editingAllergy ||
+                        (allergyStatus=="known" &&
+                         allergySubstances.trimmingCharacters(in:.whitespaces).isEmpty))
                 }
-                .buttonStyle(DanperSecondaryButton())
-                .disabled(editingAllergy || allergyStatus=="known" &&
-                          allergySubstances.trimmingCharacters(in:.whitespaces).isEmpty)
             }
         }
     }
