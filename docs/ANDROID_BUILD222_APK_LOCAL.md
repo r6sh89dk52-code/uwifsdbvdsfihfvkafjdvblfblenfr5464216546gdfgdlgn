@@ -23,6 +23,17 @@ APK DEBUG de salida: outputs/android/DANPER-Build222-Android-DEBUG.apk
 
 Puedes transferirlo al Android e instalarlo manualmente o utilizar adb install -r outputs/android/DANPER-Build222-Android-DEBUG.apk con el dispositivo autorizado para depuración.
 
+## Mac sin Homebrew (comando brew no encontrado)
+
+El primer intento de compilar en ese Mac encontró que `brew` no está instalado, por lo que no se instaló Java 21. Existe ahora un instalador directo en el repositorio, que obtiene **Eclipse Temurin JDK 21** de la API oficial de Adoptium y lo instala en `~/Library/Application Support/DANPER/jdk-21` sin `sudo` ni modificar el Java general del sistema:
+
+    cd ~/danper-salud-movil-pruebas
+    git pull --ff-only origin feat/android-build222-local-apk-20261020
+    bash scripts/install-jdk21-macos.command
+    bash scripts/build-android-apk-macos.command
+
+El instalador detecta la arquitectura `arm64` o `x86_64`, comprueba que se descargó un JDK 21 completo y no sobreescribe una instalación existente. El compilador Android detecta esa ruta automáticamente. Si la red bloquea Adoptium o macOS rechaza la ejecución de Java, copia el error exacto y realiza la instalación manual desde https://adoptium.net/temurin/releases/?version=21, eligiendo macOS y la arquitectura correspondiente.
+
 ## Error Gradle en Mac con Java 25 (major version 69)
 
 Síntoma de la primera compilación local (20 de octubre de 2026):
