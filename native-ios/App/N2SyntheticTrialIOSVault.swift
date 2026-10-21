@@ -147,11 +147,22 @@ actor N2SyntheticTrialIOSVault {
         guard let secret=try deviceKey(create:false) else{return nil}
         return try N2ProtectedClinicalVaultCore(keyData:secret,namespace:.synthetic).inspect()
     }
-    /// The user must explicitly opt into a completely fictional five-worker
-    /// N2 workspace. Never invoked automatically by onboarding.
+    /// Fresh encrypted demonstration with no prepopulated workers or visits.
+    /// Does not copy the fixed five-worker sample or import any clinical data.
+    func startEmptyDemo()throws->N2ProtectedStoreSummary {
+        guard try inspect()==nil else {throw Failure.blockedMigration}
+        guard let secret=try deviceKey(create:true) else {
+            throw Failure.unavailableKeychain
+        }
+        return try N2ProtectedClinicalVaultCore(keyData:secret,namespace:.synthetic)
+            .activateEmptySynthetic(confirmed:true)
+    }
+
+    /// Opt-in sample fixture. Never implied by "start empty".
+    /// A pre-existing demonstration is never silently reused on activation.
     func startSyntheticDemo()throws->N2ProtectedStoreSummary {
+        guard try inspect()==nil else {throw Failure.blockedMigration}
         let fixture=try resource("n2-synthetic-clinical")
-        if let previous=try inspect(){return previous}
         guard let secret=try deviceKey(create:true) else{
             throw Failure.unavailableKeychain
         }
