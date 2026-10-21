@@ -59,12 +59,23 @@ struct N2VerifiedNursingExportView:View {
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
-            DanperPanel("Kardex de enfermería") {
+            VStack(alignment:.leading,spacing:5) {
+                Text("REPORTES DE ENFERMERÍA")
+                    .font(.caption2.weight(.bold)).tracking(1.1)
+                    .foregroundStyle(DanperStyle.red)
+                Text("Kardex · Excel oficial")
+                    .font(.system(.title2,design:.rounded,weight:.bold))
+            }
+            N2Build222ExportProgress(titles:["Período","Vista previa","Compartir"])
+            DanperPanel("Formato oficial de 98 productos") {
                 Label("98 productos de enfermería",systemImage:"lock.shield")
                 Text("Los saldos no acreditados se dejan en blanco. No se generan ceros ni se modifican existencias.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            DanperPanel("Datos del corte diario") {
+            DanperPanel {
+                N2Build222StageHeading(step:1,title:"Elegir fechas y modalidad")
+                Text("Reporte diario, semanal o por rango. Los saldos se calculan por períodos sin duplicar aperturas.")
+                    .font(.caption).foregroundStyle(.secondary)
                 DanperChoiceField(title:"Modalidad",selection:$reportMode,
                     options:["daily","weekly","custom"],
                     labels:["daily":"Diario","weekly":"Semanal","custom":"Rango personalizado"])
@@ -90,7 +101,22 @@ struct N2VerifiedNursingExportView:View {
                     "Consolidado verificado de 98 productos; el Excel indicará claramente el intervalo y no se presentará como un solo día.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            DanperPanel("Generar") {
+            DanperPanel {
+                N2Build222StageHeading(step:2,title:"Revisar el Kardex y recuentos")
+                Label("98 productos del catálogo oficial de Enfermería",
+                      systemImage:"checkmark.shield")
+                    .font(.subheadline.weight(.semibold))
+                Text("Comprueba los lotes y recuentos físicos desde Inventario y Conciliación antes de exportar. Los saldos sin acreditar permanecen sin informar.")
+                    .font(.caption).foregroundStyle(.secondary)
+                NavigationLink {
+                    N2NativeInventoryView()
+                } label: {
+                    Label("Revisar inventario y lotes",systemImage:"shippingbox")
+                }
+                .buttonStyle(DanperSecondaryButton())
+            }
+            DanperPanel {
+                N2Build222StageHeading(step:3,title:"Exportar Excel oficial")
                 Button {
                     Task {await export()}
                 } label: {
