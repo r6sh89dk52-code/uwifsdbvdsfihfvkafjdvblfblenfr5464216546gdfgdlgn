@@ -67,7 +67,7 @@ public enum N2ClinicalCorrections {
     private static func json(_ data:Data)throws->[String:Any] {
         guard let obj=try? JSONSerialization.jsonObject(with:data) as? [String:Any],
               obj["attentions"] is [[String:Any]],obj["stockMovements"] is [[String:Any]],
-              (try? N1eLegacyClinicalAudit.inspect(data)) != nil,
+              (try? N1eLegacyClinicalAudit.inspect(data,allowEmptySynthetic:true)) != nil,
               (try? N1fLosslessFieldGate.inspect(data)) != nil else {
             throw N2CorrectionError.invalidSnapshot
         }
