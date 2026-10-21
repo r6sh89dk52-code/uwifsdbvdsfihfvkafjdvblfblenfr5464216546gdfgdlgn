@@ -20,7 +20,16 @@ const core=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2Prote
 const demo=fs.readFileSync(path.join(root,'native-ios/App/N2SyntheticTrialIOSVault.swift'),'utf8');
 const reset=fs.readFileSync(path.join(root,'native-ios/App/N2DemoResetView.swift'),'utf8');
 const personal=fs.readFileSync(path.join(root,'native-ios/App/N2NativePersonalImportView.swift'),'utf8');
+const app=fs.readFileSync(path.join(root,'native-ios/App/DANPERNativeApp.swift'),'utf8');
+const clinicalHome=fs.readFileSync(path.join(root,'native-ios/App/N2ClinicalWorkspaceView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
+must(app,'N2ClinicalWorkspaceGateView()','inicio cifrado con importación PERSONAL');
+assert(!app.includes('NativeRootView()'),'No puede abrirse el modo ficticio en inicio normal');
+must(clinicalHome,'clinical-first-run-import-personal','importar PERSONAL como acción principal');
+must(clinicalHome,'clinical-first-run-restore-222','restauración opcional Build222');
+assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
+       clinicalHome.indexOf('clinical-first-run-restore-222'));
+
 for(const term of ['Buscar en padrón','Nuevo trabajador','REGISTRO AMBULATORIO','registerSteps'])
   must(source,term,'referencia Build 222');
 for(const name of ['Inicio','Registrar','Historial','Ajustes'])
