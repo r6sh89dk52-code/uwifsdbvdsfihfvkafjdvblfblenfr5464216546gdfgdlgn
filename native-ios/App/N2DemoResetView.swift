@@ -53,7 +53,6 @@ struct N2DemoResetView:View {
                         Text("La fuente ficticia ya no está en el almacenamiento de la aplicación. No se volverá a generar a menos que inicies expresamente otra demostración.")
                             .font(.footnote)
                         Button("Volver a Inicio") {
-                            onDeleted()
                             dismiss()
                         }
                         .buttonStyle(DanperPrimaryButton())
@@ -147,6 +146,8 @@ struct N2DemoResetView:View {
             phrase=""
             deleted=true
             status="Limpieza confirmada. La bóveda clínica se mantuvo separada."
+            // Update dashboard even if the user returns with the back gesture.
+            onDeleted()
         } catch {
             hasError=true
             status="No se pudo confirmar el borrado completo: \(error.localizedDescription). Si había archivos residuales, puedes reintentar la operación."
