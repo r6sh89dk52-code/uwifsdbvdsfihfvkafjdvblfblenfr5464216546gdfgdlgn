@@ -53,6 +53,21 @@ struct N2VerifiedIndicatorExportView:View {
         f.timeZone=TimeZone(identifier:"America/Lima")
         return f.string(from:date)
     }
+    private func useOfficialCut() {
+        var calendar=Calendar(identifier:.gregorian)
+        calendar.timeZone=TimeZone(identifier:"America/Lima")!
+        let today=Date()
+        let parts=calendar.dateComponents([.year,.month,.day],from:today)
+        guard let year=parts.year,let month=parts.month,let day=parts.day,
+              let current=calendar.date(from:DateComponents(
+                  year:year,month:month,day:9)) else{return}
+        let start=day>=9 ? current :
+            (calendar.date(byAdding:.month,value:-1,to:current) ?? current)
+        guard let next=calendar.date(byAdding:.month,value:1,to:start),
+              let end=calendar.date(byAdding:.day,value:-1,to:next) else{return}
+        startDate=start
+        endDate=end
+    }
     private var inRange:[N2VisitIndexRow] {
         let a=local(startDate),b=local(endDate)
         return visits.filter {
@@ -68,13 +83,28 @@ struct N2VerifiedIndicatorExportView:View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
             if !layoutSelectionOnly {
-            DanperPanel("Indicador ambulatorio · 10 hojas") {
+            VStack(alignment:.leading,spacing:5) {
+                Text("INDICADOR AMBULATORIO").font(.caption2.weight(.bold))
+                    .tracking(1.1).foregroundStyle(DanperStyle.red)
+                Text("Generar Indicador Ambulatorio")
+                    .font(.system(.title2,design:.rounded,weight:.bold))
+            }
+            N2Build222ExportProgress(titles:["Configurar","Revisar","Compartir"])
+            DanperPanel("Excel oficial · 10 hojas") {
                 Label("Exportar libro de 10 hojas",systemImage:"doc.richtext")
                     .font(.subheadline.weight(.semibold))
                 Text("Puedes exportar Ambas sedes en un libro único. Cada atención conserva su sede; ambos cierres físicos deben estar verificados.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            DanperPanel("Seleccionar período y sede") {
+            DanperPanel {
+                N2Build222StageHeading(step:1,title:"Elegir período")
+                Text("Corte oficial recomendado: del día 9 de un mes al día 8 del siguiente. Puedes ajustarlo para una consulta puntual; la conciliación por sede sigue siendo obligatoria.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Usar período oficial 9 → 8") {
+                    useOfficialCut()
+                }
+                .buttonStyle(DanperSecondaryButton())
+                .accessibilityIdentifier("indicator-official-cut")
                 DanperChoiceField(title:"Ámbito del informe",selection:$site,
                                   options:["AMBAS","LA VENTUROSA","PLVENTUROSA"],
                                   labels:["AMBAS":"Ambas sedes (libro conjunto)",
@@ -87,7 +117,11 @@ struct N2VerifiedIndicatorExportView:View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
             }
-            DanperPanel("Atenciones seleccionadas") {
+            DanperPanel {
+                N2Build222StageHeading(step:2,title:"Comprobar atenciones y existencias")
+                Label("Las cantidades pendientes no se convierten en movimientos físicos ni en saldos cero.",
+                      systemImage:"checkmark.shield")
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Text("\(selected.count) elegidas de \(inRange.count) en \(site == "AMBAS" ? "ambas sedes" : "esta sede")")
                     Spacer()
@@ -127,7 +161,10 @@ struct N2VerifiedIndicatorExportView:View {
                     }
                 }
             }
-            DanperPanel("Exportación y protección") {
+            DanperPanel {
+                N2Build222StageHeading(step:3,title:"Crear archivo y compartir")
+                Text("El libro conserva las 10 hojas y las fórmulas verificadas. La exportación no modifica lotes, atenciones ni stock.")
+                    .font(.caption).foregroundStyle(.secondary)
                 DanperCheckRow(selected:$provisional) {
                     VStack(alignment:.leading,spacing:5) {
                         Text("Incluir consumos pendientes").font(.subheadline.weight(.semibold))
