@@ -133,7 +133,7 @@ struct NativeRootView:View {
                 .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
                 .accessibilityIdentifier("clinical-demo-mode-warning")
                 if isReady {
-                    Button {tab=2} label: {
+                    Button {tab=1} label: {
                         HStack {
                             VStack(alignment:.leading,spacing:7) {
                                 Text("ACCESO RÁPIDO").font(.caption.weight(.bold))
