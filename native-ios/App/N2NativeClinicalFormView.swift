@@ -686,7 +686,11 @@ struct N2NativeClinicalFormView:View {
         }
     }
     private var procedureGroups:[(title:String,symbol:String,values:[String])] {
-        let candidates:[(String,String,[String])]=[["Observación y controles","stethoscope",["OBSERVACION","CONTROL","TOMA DE PETAR"]],["Tratamientos y aplicaciones","cross.vial.fill",["TRATAMIENTO ORAL","INYECTABLE","APLICACION DE CREMA","APLICACION DE GOTAS OFTALMICAS"]],["Curaciones y procedimientos","bandage.fill",["CURACION DE HERIDA","LAVADO OCULAR","RETIRO DE PUNTOS DE SUTURA","SUTURAS","EXTRACCION DE CUERPO EXTRAÑO"]]]
+        let candidates:[(String,String,[String])]=[
+            ("Observación y controles","stethoscope",["OBSERVACION","CONTROL","TOMA DE PETAR"]),
+            ("Tratamientos y aplicaciones","cross.vial.fill",["TRATAMIENTO ORAL","INYECTABLE","APLICACION DE CREMA","APLICACION DE GOTAS OFTALMICAS"]),
+            ("Curaciones y procedimientos","bandage.fill",["CURACION DE HERIDA","LAVADO OCULAR","RETIRO DE PUNTOS DE SUTURA","SUTURAS","EXTRACCION DE CUERPO EXTRAÑO"])
+        ]
         let listed=Set(candidates.flatMap{$0.2})
         var result=candidates.map{($0.0,$0.1,$0.2.filter{procedures.contains($0)})}
         let remaining=procedures.filter{!listed.contains($0)}
