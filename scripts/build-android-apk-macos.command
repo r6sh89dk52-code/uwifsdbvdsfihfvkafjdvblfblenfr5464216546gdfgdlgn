@@ -57,6 +57,7 @@ npm ci --no-fund --no-audit
 # No se cambia package.json ni package-lock: se preserva build iOS.
 npm install --no-save --package-lock=false --no-fund --no-audit @capacitor/android@7
 npm run test:logic
+node scripts/test-android-performance.cjs
 npm run build
 if [ ! -f android/gradlew ]; then
   npx --no-install cap add android
