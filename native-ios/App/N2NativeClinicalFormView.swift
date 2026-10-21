@@ -692,10 +692,15 @@ struct N2NativeClinicalFormView:View {
             ("Curaciones y procedimientos","bandage.fill",["CURACION DE HERIDA","LAVADO OCULAR","RETIRO DE PUNTOS DE SUTURA","SUTURAS","EXTRACCION DE CUERPO EXTRAÑO"])
         ]
         let listed=Set(candidates.flatMap{$0.2})
-        var result=candidates.map{($0.0,$0.1,$0.2.filter{procedures.contains($0)})}
+        var result:[(title:String,symbol:String,values:[String])]=candidates.map { group in
+            (title:group.0,symbol:group.1,
+             values:group.2.filter{procedures.contains($0)})
+        }
         let remaining=procedures.filter{!listed.contains($0)}
-        if !remaining.isEmpty {result.append(("Otros procedimientos","list.bullet",remaining))}
-        return result.filter{!$0.2.isEmpty}
+        if !remaining.isEmpty {
+            result.append((title:"Otros procedimientos",symbol:"list.bullet",values:remaining))
+        }
+        return result.filter{!$0.values.isEmpty}
     }
 
     private func procedureOption(_ value:String)->some View {
