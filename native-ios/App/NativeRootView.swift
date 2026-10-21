@@ -113,13 +113,16 @@ struct NativeRootView:View {
                         Image(systemName:"waveform.path.ecg")
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(DanperStyle.red)
+                            .frame(width:52,height:52)
+                            .background(DanperStyle.red.opacity(0.09),
+                                        in:RoundedRectangle(cornerRadius:17))
                     }
                     Text("Departamento de Salud · Registro ambulatorio local")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth:.infinity,alignment:.leading)
-                .padding(19)
-                .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
+                .padding(.horizontal,2)
+                .padding(.vertical,3)
                 DisclosureGroup {
                     Text("Esta versión utiliza una bóveda de ensayo independiente. No introduzcas datos clínicos reales hasta validar la migración y las pruebas en iPhone.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -130,7 +133,10 @@ struct NativeRootView:View {
                         .font(.footnote.weight(.semibold)).foregroundStyle(.orange)
                 }
                 .padding(14)
-                .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+                .background(DanperStyle.red.opacity(0.07),
+                            in:RoundedRectangle(cornerRadius:16))
+                .overlay(RoundedRectangle(cornerRadius:16)
+                    .strokeBorder(DanperStyle.red.opacity(0.17)))
                 .accessibilityIdentifier("clinical-demo-mode-warning")
                 if isReady {
                     Button {tab=1} label: {
@@ -142,9 +148,10 @@ struct NativeRootView:View {
                             }
                             Spacer()
                             Image(systemName:"plus").font(.title.weight(.semibold))
-                        }.foregroundStyle(.white).padding(22)
-                            .frame(maxWidth:.infinity,alignment:.leading)
+                        }.foregroundStyle(.white).padding(20)
+                            .frame(maxWidth:.infinity,minHeight:130,alignment:.leading)
                             .background(DanperStyle.gradient,in:RoundedRectangle(cornerRadius:23))
+                            .shadow(color:DanperStyle.red.opacity(0.18),radius:13,y:7)
                     }.buttonStyle(.plain)
                     if let metrics {
                         ViewThatFits(in:.horizontal) {
@@ -244,7 +251,7 @@ struct NativeRootView:View {
                 Spacer(minLength:0)
             }
             .padding(14)
-            .frame(maxWidth:.infinity,minHeight:148,alignment:.topLeading)
+            .frame(maxWidth:.infinity,minHeight:124,alignment:.topLeading)
             .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:18))
             .overlay(RoundedRectangle(cornerRadius:18)
                 .strokeBorder(Color.secondary.opacity(0.10),lineWidth:1))
