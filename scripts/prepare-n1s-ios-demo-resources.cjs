@@ -37,39 +37,10 @@ try{
     path.join(output,prefix+'-template-store.zip'));
   fs.writeFileSync(path.join(output,prefix+'-plan.json'),JSON.stringify(input));
  }
- const synthetic=JSON.parse(fs.readFileSync(path.join(temporary,'n1e-clinical-stock.json'),'utf8'));
- assert.equal(synthetic.workers.length,5);
- assert(synthetic.workers.every(w=>w.name.startsWith('PERSONA FICTICIA ')&&/^0000000[1-5]$/.test(w.dni)));
- assert(synthetic.attentions.every(a=>a.worker.name.startsWith('PERSONA FICTICIA ')));
- // Replace unnatural display placeholders only in the packaged synthetic iOS fixture.
- // This does not mutate existing installed vaults or production/legacy backups.
- const fictionalNames={
-  '00000001':'Mariana Torres Salazar',
-  '00000002':'Luis Paredes Rojas',
-  '00000003':'Daniela Campos Vega',
-  '00000004':'Carlos Mendoza Ruiz',
-  '00000005':'Valeria Ríos Medina'
- };
- for(const worker of synthetic.workers) {
-  assert(fictionalNames[worker.dni]);
-  worker.name=fictionalNames[worker.dni];
- }
- for(const visit of synthetic.attentions) {
-  assert(visit.worker && fictionalNames[visit.worker.dni]);
-  visit.worker.name=fictionalNames[visit.worker.dni];
- }
- assert.equal(synthetic.stockLots.length,5);
- assert.equal(synthetic.stockMovements.length,synthetic.stockMovements.filter(m=>m.dispenseRef).length);
- // Two explicitly fictional site-scoped supplies for evaluating new visits.
- // Existing unscoped lots and historical movements are never relabelled.
- const example=synthetic.stockLots.find(l=>l.code==='E-22');
- assert(example);
- for(const [suffix,site] of [['fundo','LA VENTUROSA'],['planta','PLVENTUROSA']]) {
-  synthetic.stockLots.push({...example,id:'FICTICIO-'+suffix,lot:'FICTICIO-'+suffix,
-   site,expires:'2028-12-31',container:'unidad',catalogUnit:'UND',
-   unitsPerContainer:1,sealedContainers:0,looseUnits:20,openedRemaining:0});
- }
- fs.writeFileSync(path.join(output,'n2-synthetic-clinical.json'),JSON.stringify(synthetic));
+ // Legacy sample content is NOT packaged into the operational iOS app.
+ // This removes a stale generated fixture only from the project's bundle
+ // resources, NOT an installed user's encrypted vault or any employee record.
+ fs.rmSync(path.join(output,'n2-synthetic-clinical.json'),{force:true});
  const {load}=require('./ambulatory-test-helpers.cjs');
  const products=require('../src/products.json');
  const nurseCatalog=load('src/kardexCatalog.ts').kardexCatalog;
@@ -129,11 +100,11 @@ try{
  assert.deepEqual(fs.readdirSync(output).sort(),[
   'n1s-indicator-plan.json','n1s-indicator-template-store.zip',
   'n1s-nursing-plan.json','n1s-nursing-template-store.zip',
-  'n2-synthetic-clinical.json','n2-ambulatory-products.json',
+  'n2-ambulatory-products.json',
   'n2-nursing-catalog.json','n2-approved-mappings.json',
   'n2-organization-areas.json'
  ].sort());
- console.log('PASS: nine sanitized preview resources; no real worker or patient data.');
+ console.log('PASS: eight sanitized templates/catalog resources. No bundled worker or patient dataset.');
 } finally {
  fs.rmSync(temporary,{recursive:true,force:true});
 }
