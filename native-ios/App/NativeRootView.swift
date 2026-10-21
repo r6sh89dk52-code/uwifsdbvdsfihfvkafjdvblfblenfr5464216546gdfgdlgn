@@ -139,6 +139,33 @@ struct NativeRootView:View {
                 .overlay(RoundedRectangle(cornerRadius:16)
                     .strokeBorder(DanperStyle.red.opacity(0.17)))
                 .accessibilityIdentifier("clinical-demo-mode-warning")
+                if visualPalette=="salud" {
+                    HStack(spacing:8) {
+                        VStack(alignment:.leading,spacing:5) {
+                            Label("SALUD OCUPACIONAL",systemImage:"cross.case.fill")
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.9)
+                            Text("Prevención y cuidado en cada atención")
+                                .font(.subheadline.weight(.semibold))
+                                .fixedSize(horizontal:false,vertical:true)
+                            Text("Tu espacio de enfermería, ahora en SwiftUI.")
+                                .font(.caption)
+                                .opacity(0.85)
+                        }
+                        .foregroundStyle(.white)
+                        Spacer(minLength:0)
+                        N2HealthMascot().frame(width:112,height:112)
+                    }
+                    .padding(.leading,16)
+                    .padding(.trailing,6)
+                    .frame(maxWidth:.infinity,minHeight:124)
+                    .background(
+                        LinearGradient(colors:[
+                            Color(red:0.02,green:0.38,blue:0.78),
+                            Color(red:0.01,green:0.69,blue:0.89)],
+                            startPoint:.leading,endPoint:.trailing),
+                        in:RoundedRectangle(cornerRadius:20))
+                }
                 if isReady {
                     Button {tab=1} label: {
                         HStack {
