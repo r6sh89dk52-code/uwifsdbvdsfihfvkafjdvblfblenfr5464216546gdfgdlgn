@@ -3,7 +3,7 @@ import DanperCore
 
 private let danperAccent=Color(red:0.88,green:0.09,blue:0.16)
 
-/// A human-first beta: one explicit demo source, five clear navigation tabs.
+/// Build 222 navigation in native SwiftUI; sensitive data remain in the isolated demo vault.
 /// No clinical import occurs during launch. Real build222 data are never read.
 struct NativeRootView:View {
     init() {}
@@ -32,7 +32,16 @@ struct NativeRootView:View {
     var body:some View {
         TabView(selection:$tab) {
             NavigationStack { home }
-                .tabItem{Label("Inicio",systemImage:"house.fill")}.tag(0)
+                .tabItem { Label("Inicio",systemImage:"house.fill") }.tag(0)
+            NavigationStack {
+                if isReady {
+                    N2NativeClinicalFormView(initialWorkerDNI:newlyRegisteredWorkerDNI)
+                        .id(newlyRegisteredWorkerDNI ?? "new-attention")
+                } else {
+                    lockedTab(title:"Registrar",symbol:"cross.case")
+                }
+            }
+            .tabItem { Label("Registrar",systemImage:"plus.circle.fill") }.tag(1)
             NavigationStack {
                 if isReady {
                     N2NativeHistoryView(useProtectedVault:true)
@@ -41,94 +50,87 @@ struct NativeRootView:View {
                                 NavigationLink {
                                     N2NativeWorkerEditorView(onSaved:{dni in
                                         newlyRegisteredWorkerDNI=dni
-                                        tab=2
+                                        tab=1
                                     })
-                                }label:{
-                                    Label("Nuevo trabajador",
-                                          systemImage:"person.badge.plus")
+                                } label: {
+                                    Label("Nuevo trabajador",systemImage:"person.badge.plus")
                                 }
                             }
                         }
-                }else{lockedTab(title:"Personal",symbol:"person.2")}
+                } else {
+                    lockedTab(title:"Historial",symbol:"clipboard")
+                }
             }
-            .tabItem{Label("Personal",systemImage:"person.2.fill")}.tag(1)
-            NavigationStack {
-                if isReady {
-                    N2NativeClinicalFormView(
-                        initialWorkerDNI:newlyRegisteredWorkerDNI)
-                    .id(newlyRegisteredWorkerDNI ?? "new-attention")
-                } else {lockedTab(title:"Atención",symbol:"cross.case")}
-            }
-            .tabItem{Label("Atención",systemImage:"cross.case.fill")}.tag(2)
-            NavigationStack {
-                if isReady {N2NativeDraftsDashboard()}
-                else {lockedTab(title:"Borradores",symbol:"doc.text")}
-            }
-            .tabItem{Label("Borradores",systemImage:"doc.text.fill")}.tag(3)
+            .tabItem { Label("Historial",systemImage:"list.clipboard.fill") }.tag(2)
             NavigationStack { toolsTab }
-                .tabItem{Label("Más",systemImage:"square.grid.2x2.fill")}.tag(4)
+                .tabItem { Label("Ajustes",systemImage:"gearshape.fill") }.tag(3)
         }
         .tint(DanperStyle.red)
-        // Regular tabs always belong to the isolated fictitious workspace.
         .environment(\.n2WorkspaceVault,.demo)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
         .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
         .task(id:tab) {await refresh()}
         .onChange(of:tab) {previous,newTab in
-            if previous==2 && newTab != 2 {
+            if previous == 1 && newTab != 1 {
                 newlyRegisteredWorkerDNI=nil
             }
         }
-        .onChange(of:scenePhase) {_,phase in if phase == .active {Task {await refresh()}}}
+        .onChange(of:scenePhase) {_,phase in
+            if phase == .active {Task {await refresh()}}
+        }
     }
 
     private var home:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
-                HStack(spacing:14) {
+                HStack(spacing:12) {
                     Image("BrandLogo").resizable().scaledToFit()
-                        .frame(width:68,height:68)
-                        .clipShape(RoundedRectangle(cornerRadius:17))
-                        .overlay(RoundedRectangle(cornerRadius:17)
-                            .strokeBorder(.white.opacity(0.28),lineWidth:1))
-                    VStack(alignment:.leading,spacing:5) {
-                        Text("DANPER Salud")
-                            .font(.system(.title2,design:.rounded,weight:.bold))
-                            .foregroundStyle(.white)
-                        Text("Bienvenido, Felipe")
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.87))
-                        Label("Salud ocupacional",systemImage:"checkmark.shield.fill")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.9))
+                        .frame(width:43,height:43)
+                        .clipShape(RoundedRectangle(cornerRadius:11))
+                    VStack(alignment:.leading,spacing:1) {
+                        Text("DANPER").font(.system(.headline,design:.rounded,weight:.heavy))
+                        Text("SALUD MÓVIL").font(.caption2.weight(.bold))
+                            .tracking(1.3).foregroundStyle(.secondary)
                     }
-                    Spacer(minLength:0)
+                    Spacer()
+                    Button {tab=3} label: {
+                        Image(systemName:"gearshape")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .frame(width:44,height:44)
+                    }
+                    .accessibilityLabel("Ajustes")
                 }
-                .padding(18)
+                VStack(alignment:.leading,spacing:8) {
+                    Text("DEPARTAMENTO DE SALUD")
+                        .font(.caption2.weight(.bold)).tracking(1.5)
+                        .foregroundStyle(DanperStyle.red)
+                    HStack(alignment:.center,spacing:10) {
+                        Text("Bienvenido, Felipe")
+                            .font(.system(.title,design:.rounded,weight:.bold))
+                        Spacer()
+                        Image(systemName:"waveform.path.ecg")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(DanperStyle.red)
+                    }
+                    Text("Departamento de Salud · Registro ambulatorio local")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
                 .frame(maxWidth:.infinity,alignment:.leading)
-                .background(
-                    LinearGradient(colors:[danperAccent,Color(red:0.55,green:0.04,blue:0.14)],
-                                   startPoint:.topLeading,endPoint:.bottomTrailing),
-                    in:RoundedRectangle(cornerRadius:23)
-                )
-                .shadow(color:danperAccent.opacity(0.16),radius:14,y:6)
-                Label("DANPER SALUD MÓVIL",
-                      systemImage:"lock.shield")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(danperAccent)
-                    .padding(.horizontal,12)
-                    .padding(.vertical,8)
-                    .background(danperAccent.opacity(0.09),in:Capsule())
-                DanperPanel {
-                    Label("MODO DE PRUEBA · DATOS FICTICIOS",
-                          systemImage:"exclamationmark.shield.fill")
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(.orange)
-                    Text("Esta versión utiliza una bóveda de ensayo. No introduzcas datos de pacientes reales: la bóveda clínica independiente aún no está habilitada en las pantallas de trabajo.")
+                .padding(19)
+                .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
+                DisclosureGroup {
+                    Text("Esta versión utiliza una bóveda de ensayo independiente. No introduzcas datos clínicos reales hasta validar la migración y las pruebas en iPhone.")
                         .font(.footnote).foregroundStyle(.secondary)
-                        .fixedSize(horizontal:false,vertical:true)
+                        .padding(.top,6)
+                } label: {
+                    Label("Modo de prueba · Solo datos ficticios",
+                          systemImage:"exclamationmark.shield")
+                        .font(.footnote.weight(.semibold)).foregroundStyle(.orange)
                 }
+                .padding(14)
+                .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
                 .accessibilityIdentifier("clinical-demo-mode-warning")
                 if isReady {
                     Button {tab=2} label: {
@@ -172,14 +174,27 @@ struct NativeRootView:View {
                     }.padding(18).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
                 }
                 VStack(alignment:.leading,spacing:12) {
-                    Text("Explora DANPER Salud")
-                        .font(.title3.weight(.bold))
+                    Text("Herramientas").font(.title3.weight(.bold))
                     LazyVGrid(columns:[GridItem(.flexible(),spacing:12),
                                        GridItem(.flexible(),spacing:12)],spacing:12) {
-                        quickInfo("1",title:"Personal",desc:"Trabajadores e historial.")
-                        quickInfo("2",title:"Atención",desc:"Diagnósticos y tratamientos.")
-                        quickInfo("3",title:"Borradores",desc:"Continúa registros pendientes.")
-                        quickInfo("4",title:"Más",desc:"Inventario, Kardex y Excel.")
+                        shortcut("Historial","Consultar atenciones","list.clipboard.fill") {
+                            N2NativeHistoryView(useProtectedVault:true)
+                        }
+                        shortcut("Trabajadores","Registrar o buscar personal","person.badge.plus") {
+                            N2NativeHistoryView(useProtectedVault:true)
+                        }
+                        shortcut("Pendientes","Recuperar borradores","doc.badge.clock") {
+                            N2NativeDraftsDashboard()
+                        }
+                        shortcut("Alergias","Revisar antes del tratamiento","cross.vial.fill") {
+                            N2NativeClinicalFormView()
+                        }
+                        shortcut("Kardex","Inventario y reportes","shippingbox.fill") {
+                            N2Build222KardexHub()
+                        }
+                        shortcut("Exportar","Indicador ambulatorio · 10 hojas","tablecells.fill") {
+                            N2VerifiedIndicatorExportView()
+                        }
                     }
                 }
                 if isReady {
@@ -210,44 +225,33 @@ struct NativeRootView:View {
             .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:18))
             .accessibilityElement(children:.combine)
     }
-    private func quickInfo(_ index:String,title:String,desc:String)->some View {
-        let symbols=["1":"person.2.fill","2":"cross.case.fill",
-                     "3":"doc.text.fill","4":"square.grid.2x2.fill"]
-        return Button {
-            if isReady,let next=Int(index) {tab=next}
-        } label: {
-            VStack(alignment:.leading,spacing:10) {
-                Image(systemName:symbols[index] ?? "square.grid.2x2")
+    private func shortcut<Destination:View>(
+        _ title:String,_ description:String,_ symbol:String,
+        @ViewBuilder destination:()->Destination
+    )->some View {
+        NavigationLink(destination:destination) {
+            VStack(alignment:.leading,spacing:9) {
+                Image(systemName:symbol)
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(DanperStyle.red)
                     .frame(width:43,height:43)
-                    .background(DanperStyle.red.opacity(0.1),
-                                in:RoundedRectangle(cornerRadius:13))
-                Text(title)
-                    .font(.subheadline.weight(.bold))
+                    .background(DanperStyle.red.opacity(0.09),
+                                in:RoundedRectangle(cornerRadius:12))
+                Text(title).font(.subheadline.weight(.bold))
                     .foregroundStyle(.primary)
-                Text(desc)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(description).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal:false,vertical:true)
                 Spacer(minLength:0)
-                if isReady {
-                    Image(systemName:"arrow.up.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(DanperStyle.red)
-                        .frame(maxWidth:.infinity,alignment:.trailing)
-                }
             }
             .padding(14)
-            .frame(maxWidth:.infinity,minHeight:150,alignment:.topLeading)
-            .background(DanperStyle.surface,
-                        in:RoundedRectangle(cornerRadius:19))
-            .overlay(RoundedRectangle(cornerRadius:19)
-                .strokeBorder(Color.secondary.opacity(0.08),lineWidth:1))
+            .frame(maxWidth:.infinity,minHeight:148,alignment:.topLeading)
+            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:18))
+            .overlay(RoundedRectangle(cornerRadius:18)
+                .strokeBorder(Color.secondary.opacity(0.10),lineWidth:1))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Abrir "+title)
         .disabled(!isReady)
+        .accessibilityLabel(title+": "+description)
     }
     private func lockedTab(title:String,symbol:String)->some View {
         ContentUnavailableView {
@@ -326,7 +330,7 @@ struct NativeRootView:View {
             }
           }.padding(16)
         }
-        .navigationTitle("Más")
+        .navigationTitle("Ajustes")
         .navigationBarTitleDisplayMode(.inline)
         .danperFormChrome()
     }
@@ -376,7 +380,7 @@ struct NativeRootView:View {
             case .blockedMigration:
                 return "El ejemplo ficticio no superó la validación. No se importaron ni modificaron datos."
             case .resetIncomplete:
-                return "La eliminación de los datos ficticios quedó incompleta. La clave de prueba se invalidó, pero quedan archivos cifrados por retirar. Repite el borrado desde Más → Restablecer entorno de prueba; la bóveda clínica y la build 222 permanecen intactas."
+                return "La eliminación de los datos ficticios quedó incompleta. La clave de prueba se invalidó, pero quedan archivos cifrados por retirar. Repite el borrado desde Ajustes → Restablecer entorno de prueba; la bóveda clínica y la build 222 permanecen intactas."
             case .keychainStatus(let code):
                 return "No se pudo acceder al Keychain de pruebas (código iOS: \(code)). Conservamos los archivos; comparte este código para corregir la activación."
             }
