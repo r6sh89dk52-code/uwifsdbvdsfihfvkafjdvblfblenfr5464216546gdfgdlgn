@@ -71,6 +71,44 @@ public enum N2VerifiedIndicatorWorkbook {
         return String(decoding:bytes,as:UTF8.self)
     }
 
+    /// Mirrors Build 222: validate all historical incidents but block this
+    /// export only when an incident targets a selected physical dispensing.
+    /// A historic incident from an UNSELECTED attention stays in the ledger.
+    static func hasIncidentInSelectedVisits(_ incidents:[[String:Any]],
+        movements:[[String:Any]],selectedVisitIDs:Set<String>)throws->Bool {
+        guard incidents.count<=500 else{throw Failure.invalidReconciliation}
+        var incidentIDs=Set<String>(),linkedMovements=Set<String>()
+        for incident in incidents {
+            let id=string(incident["id"]),movementID=string(incident["movementId"]),
+                attentionID=string(incident["attentionId"]),
+                itemID=string(incident["itemId"]),
+                reason=string(incident["reason"]),
+                kind=string(incident["kind"])
+            guard !id.trimmingCharacters(in:.whitespaces).isEmpty,
+                  ["returned","discrepancy"].contains(kind),
+                  !movementID.trimmingCharacters(in:.whitespaces).isEmpty,
+                  movementID.count<=200,attentionID.count>=1,attentionID.count<=120,
+                  itemID.count>=1,itemID.count<=120,
+                  reason.trimmingCharacters(in:.whitespaces).count>=8,
+                  reason.count<=240,
+                  incident["stockRestored"] as? Bool == false,
+                  let quantity=numeric(incident["quantity"]),quantity>=0,
+                  kind=="returned" ? quantity>0 : quantity==0,
+                  let time=numeric(incident["at"]),time>0,
+                  time.rounded()==time,time<=9_007_199_254_740_991,
+                  incidentIDs.insert(id).inserted,
+                  linkedMovements.insert(movementID).inserted else{
+                throw Failure.invalidReconciliation
+            }
+        }
+        return movements.contains {m in
+            guard let id=m["id"] as? String,linkedMovements.contains(id),
+                  let ref=m["dispenseRef"] as? [String:Any],
+                  let attention=ref["attentionId"] as? String else{return false}
+            return selectedVisitIDs.contains(attention)
+        }
+    }
+
     public static func export(snapshot:Data,products:Data,mappings:Data,
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
@@ -94,7 +132,6 @@ public enum N2VerifiedIndicatorWorkbook {
               let movement=source["stockMovements"] as? [[String:Any]],
               let recon=source["ambulatoryReconciliation"] as? [[String:Any]],
               let incidents=source["deliveryIncidents"] as? [[String:Any]],
-              incidents.isEmpty,
               let mapped=try? JSONSerialization.jsonObject(with:mappings)
                     as? [[String:Any]],mapped.count==86,
               let catalogue=try? JSONSerialization.jsonObject(with:products)
@@ -107,6 +144,10 @@ public enum N2VerifiedIndicatorWorkbook {
             return (code,p)
         })
         guard productMap.count==432 else{throw Failure.invalidCatalog}
+        guard try !hasIncidentInSelectedVisits(incidents,movements:movement,
+                                                 selectedVisitIDs:selectedVisitIDs) else {
+            throw Failure.unverifiedDelivery
+        }
         var approved=Set<String>()
         for link in mapped {
             guard let a=link["clinicalCode"] as? String,
