@@ -4,9 +4,43 @@ set -eo pipefail
 cd "$(dirname "$0")/.."
 echo "DANPER Build 222 -> Android APK (local)"
 if ! command -v npm >/dev/null; then echo "Instala Node.js compatible."; exit 1; fi
-if [ -z "$JAVA_HOME" ] && [ -x "/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" ]; then
-  export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+# Capacitor 7 compiles against Java 21; Gradle 8.11.1 cannot run with Java 25.
+# Do not trust inherited JAVA_HOME (it may point to JDK 25).
+# Select JDK 21 only for this script, without changing the Mac's global Java.
+is_jdk21() {
+  local candidate="$1"
+  [ -n "$candidate" ] && [ -x "$candidate/bin/java" ] && [ -x "$candidate/bin/javac" ] || return 1
+  local major
+  major="$("$candidate/bin/java" -version 2>&1 | awk -F '"' 'NR==1 { split($2, a, "."); print a[1] }')"
+  [ "$major" = "21" ]
+}
+jdk_candidates=(
+  "${DANPER_JDK21_HOME:-}"
+  "${JAVA_HOME:-}"
+  "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+  "/Applications/Android Studio Preview.app/Contents/jbr/Contents/Home"
+  "$HOME/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+  "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+  "/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+)
+if [ -x /usr/libexec/java_home ]; then
+  jdk_candidates+=( "$(/usr/libexec/java_home -v 21 2>/dev/null || true)" )
 fi
+selected_java=""
+for candidate in "${jdk_candidates[@]}"; do
+  if is_jdk21 "$candidate"; then selected_java="$candidate"; break; fi
+done
+if [ -z "$selected_java" ]; then
+  echo "ERROR: no se encontró JDK 21. Gradle 8.11.1 NO puede ejecutarse con Java 25."
+  echo "Instala Android Studio con JDK 21 o instala: brew install openjdk@21"
+  echo "Después repite este mismo script. NO necesitas cambiar Java globalmente."
+  if [ -x /usr/libexec/java_home ]; then /usr/libexec/java_home -V 2>&1 || true; fi
+  exit 1
+fi
+export JAVA_HOME="$selected_java"
+export PATH="$JAVA_HOME/bin:$PATH"
+echo "JDK 21 seleccionado para esta compilación: $JAVA_HOME"
+"$JAVA_HOME/bin/java" -version 2>&1 | head -n 1
 if [ -z "$ANDROID_HOME" ] && [ -d "$HOME/Library/Android/sdk" ]; then
   export ANDROID_HOME="$HOME/Library/Android/sdk"
 fi
