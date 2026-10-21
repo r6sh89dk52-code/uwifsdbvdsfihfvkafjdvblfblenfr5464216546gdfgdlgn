@@ -27,3 +27,11 @@
 .officialAreaKnown{color:var(--muted,var(--text-secondary,#9ea0a5))}
 .officialAreaCustom{color:var(--muted,var(--text-secondary,#9ea0a5))}
 @media(max-width:420px){.workerClinicalFields .officialAreaField{grid-column:1/-1}}
+
+/* Worker list pagination with thumb-sized buttons and a visible page counter. */
+.workerSearchPanel{scroll-margin-top:calc(85px + env(safe-area-inset-top,0px))}
+.workerPagination{display:flex;gap:9px;align-items:center;justify-content:space-between;margin:16px 0 28px;padding:10px 0}
+.workerPagination .workerSecondary{min-height:44px;min-width:100px;white-space:nowrap}
+.workerPagination .workerSecondary:disabled{opacity:.45;cursor:not-allowed}
+.workerPaginationStatus{flex:1;text-align:center;color:var(--text);font-size:12px;font-weight:700;line-height:1.5}
+@media(max-width:370px){.workerPagination{gap:4px}.workerPagination .workerSecondary{min-width:87px;padding:10px 7px;font-size:11px}}
