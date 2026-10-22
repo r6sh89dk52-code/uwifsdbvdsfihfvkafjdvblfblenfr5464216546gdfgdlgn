@@ -149,6 +149,15 @@ actor N2ProtectedClinicalIOSVault {
     func deleteDraft(id:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().removeDraft(id:id,expectedRevision:expectedRevision)
     }
+    /// Same encrypted source as the Indicator and nursing Kardex.
+    /// Read-only: never posts movements or reconfirms a completed visit.
+    func automaticCutAccounting(through date:String)throws
+        ->N2AutomaticCutAccounting.Result {
+        let source=try protectedStore().readVerifiedSnapshot()
+        return try N2AutomaticCutAccounting.calculate(
+            snapshot:source,mappings:resource("n2-approved-mappings"),
+            through:date)
+    }
     func clinicalFormContext()throws->N2FormContext {
         let products=try resource("n2-ambulatory-products")
         let nursing=try resource("n2-nursing-catalog")
