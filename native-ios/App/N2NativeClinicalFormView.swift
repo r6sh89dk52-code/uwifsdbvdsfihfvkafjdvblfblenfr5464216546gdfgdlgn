@@ -56,6 +56,7 @@ struct N2NativeClinicalFormView:View {
     @State private var expandedMedication:String?
     @State private var collapsedMedicationGroups=Set<String>()
     @State private var showMissingWorker=false
+    @State private var showWorkerSearch=false
     @State private var showNewWorker=false
     @State private var workerDNIInput=""
     @State private var workerNameInput=""
@@ -289,6 +290,24 @@ struct N2NativeClinicalFormView:View {
                 } message: {
                     Text("No encontramos el DNI \(notFoundDNI) en Personal. Puedes registrarlo ahora y continuar esta misma atención.")
                 }
+                .sheet(isPresented:$showWorkerSearch) {
+                    NavigationStack {
+                        N2WorkerSearchSheet(workers:context.workers,
+                            onSelect:{worker in
+                                selectWorker(worker)
+                                showWorkerSearch=false
+                            },onNewWorker:{
+                                // Dismiss the search before opening the worker editor.
+                                showWorkerSearch=false
+                                editingWorkerDNI=nil
+                                notFoundDNI=""
+                                Task { @MainActor in
+                                    await Task.yield()
+                                    showNewWorker=true
+                                }
+                            })
+                    }
+                }
                 .sheet(isPresented:$showNewWorker,onDismiss:{
                     editingWorkerDNI=nil
                     notFoundDNI=""
@@ -456,18 +475,9 @@ struct N2NativeClinicalFormView:View {
             DanperPanel("Trabajador") {
                 HStack(spacing:10) {
                     Button {
-                        // Activates inline search in the same encounter rather
-                        // than navigating to a disconnected read-only roster.
-                        if currentWorker != nil {
-                            form.dni=""
-                            workerDNIInput=""
-                            workerNameInput=""
-                            allergyStatus="unknown"
-                            allergySubstances=""
-                            allergyFeedback=""
-                        }
                         workerDNIFocused=false
-                        workerNameFocused=true
+                        workerNameFocused=false
+                        showWorkerSearch=true
                     } label: {
                         Label("Buscar en padrón",systemImage:"person.2")
                             .font(.subheadline.weight(.semibold))
