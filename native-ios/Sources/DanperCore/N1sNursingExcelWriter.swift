@@ -226,12 +226,19 @@ internal enum N1sNursingExcelWriter {
             return result
         }
         var book=try get("xl/workbook.xml")
-        guard book.contains("KARDEX ENFERMERAS"),
-              book.contains("Hoja1"),
-              (try match(#"<sheet\b"#,in:book)).count==2 else {
+        // The October template may already contain only KARDEX ENFERMERAS.
+        // Build 222 treats the Hoja1 donor sheet as optional; never require it.
+        let officialSheet=#"<sheet\b(?=[^>]*\bname="KARDEX ENFERMERAS")[^>]*/>"#
+        let donorSheet=#"<sheet\b(?=[^>]*\bname="Hoja1")[^>]*/>"#
+        guard (try match(officialSheet,in:book)).count==1,
+              (try match(#"<sheet\b"#,in:book)).count <= 2 else {
             throw N1sExcelError.invalidTemplate
         }
-        book=try removeTag(book,#"<sheet\b(?=[^>]*\bname="Hoja1")[^>]*/>"#)
+        let donorCount=try match(donorSheet,in:book).count
+        guard donorCount <= 1 else {throw N1sExcelError.invalidTemplate}
+        if donorCount==1 {
+            book=try removeTag(book,donorSheet)
+        }
         guard (try match(#"<sheet\b"#,in:book)).count==1 else {
             throw N1sExcelError.invalidTemplate
         }
@@ -264,11 +271,17 @@ internal enum N1sNursingExcelWriter {
         try set("xl/workbook.xml",book)
 
         var rels=try get("xl/_rels/workbook.xml.rels")
-        rels=try removeTag(rels,#"<Relationship\b(?=[^>]*\bId="rId1")[^>]*/>"#)
-        try set("xl/_rels/workbook.xml.rels",rels)
+        let donorRelation=#"<Relationship\b(?=[^>]*\bId="rId1")[^>]*/>"#
+        if (try match(donorRelation,in:rels)).count==1 {
+            rels=try removeTag(rels,donorRelation)
+            try set("xl/_rels/workbook.xml.rels",rels)
+        }
 
         var types=try get("[Content_Types].xml")
-        types=try removeTag(types,#"<Override\b(?=[^>]*\bPartName="/xl/worksheets/sheet1.xml")[^>]*/>"#)
+        let donorType=#"<Override\b(?=[^>]*\bPartName="/xl/worksheets/sheet1.xml")[^>]*/>"#
+        if (try match(donorType,in:types)).count==1 {
+            types=try removeTag(types,donorType)
+        }
         // The old workbook's app.xml exposes the removed donor sheet in metadata.
         if types.contains("/docProps/app.xml") {
             types=try removeTag(types,#"<Override\b(?=[^>]*\bPartName="/docProps/app.xml")[^>]*/>"#)
