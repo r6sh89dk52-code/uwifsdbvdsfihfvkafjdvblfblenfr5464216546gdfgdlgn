@@ -11,6 +11,8 @@ export DANPER_N1_FIXTURE_DIR="$DEST"
 echo "Auditoría Excel con fuentes sanitizadas: $DEST"
 echo "No se abren padrones ni respaldos privados."
 npm ci
+# Catch JavaScript syntax errors before running the expensive Swift suites.
+node --check scripts/test-n1s-full-native-workbooks.cjs
 for script in \
   generate-native-compat-fixtures.cjs \
   generate-n1e-clinical-fixtures.cjs \
