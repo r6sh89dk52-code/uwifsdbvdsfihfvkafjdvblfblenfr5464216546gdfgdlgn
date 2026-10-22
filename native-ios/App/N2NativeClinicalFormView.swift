@@ -1240,6 +1240,8 @@ struct N2NativeClinicalFormView:View {
         autosaveTask?.cancel()
         form=record.form
         step=0
+        collapsedMedicationGroups.removeAll()
+        expandedMedication=nil
         chooseDraft=false
         fault=false
         status="Borrador cifrado recuperado. Revisa la información antes de guardar."
@@ -1280,6 +1282,8 @@ struct N2NativeClinicalFormView:View {
         saved=false
         fault=false
         form=N2NativeFormDraft()
+        collapsedMedicationGroups.removeAll()
+        expandedMedication=nil
         let (date,time)=limaClock()
         form.date=date
         form.time=time
