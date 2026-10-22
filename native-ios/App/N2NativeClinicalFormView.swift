@@ -43,6 +43,10 @@ struct N2NativeClinicalFormView:View {
     @FocusState private var focusedField:String?
     @State private var validationMessage=""
     @State private var showValidation=false
+    @State private var validationIssueCode:String?
+    @State private var highlightedField:String?
+    @State private var scrollIssueRequest:DanperScrollRequest?
+    @State private var choiceOpenCounter=0
     @State private var previewLines:[String:String]=[:]
     @State private var previewReady=false
     @State private var previewBusy=false
@@ -165,7 +169,7 @@ struct N2NativeClinicalFormView:View {
     var body:some View {
         Group {
             if let context {
-                DanperScrollView {
+                DanperScrollView(jumpRequest:scrollIssueRequest) {
                   VStack(alignment:.leading,spacing:16) {
                     if fault {
                         DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
@@ -397,8 +401,9 @@ struct N2NativeClinicalFormView:View {
                     form.refreshProcedureSuggestions(catalog:context.products)
                     scheduleDraft()
                 }
-                .alert("Completa este paso",isPresented:$showValidation) {
-                    Button("Revisar",role:.cancel) {focusFirstMissing(context)}
+                .alert("Faltan datos para continuar",isPresented:$showValidation) {
+                    Button("Ir al campo") {focusFirstMissing(context)}
+                    Button("Cerrar",role:.cancel){}
                 } message: {Text(validationMessage)}
                 .onChange(of:scenePhase) {_,phase in
                     if phase != .active {scheduleDraft(immediate:true)}
@@ -430,13 +435,13 @@ struct N2NativeClinicalFormView:View {
                     ForEach(0..<4) { target in
                         Button {
                             guard let context else{return}
-                            let missing=target<=step ? [] : (step..<target).flatMap { index in
-                                form.clinicalIssues(step:index,context:context).map{N2ClinicalFormOptions.messages[$0] ?? $0} + (index==2 ? extraTreatmentRequirements : [])
-                            }
-                            let allergyMissing=step==0 && target>0 ? form.clinicalIssues(step:1,context:context).filter{$0.hasPrefix("allergy-")}.map{N2ClinicalFormOptions.messages[$0] ?? $0} : []
-                            if (missing+allergyMissing).isEmpty {
+                            let violations=target<=step ? [] :
+                                (step..<target).flatMap {index in
+                                    issueCodes(for:index,context:context)
+                                }
+                            if violations.isEmpty {
                                 withAnimation(reduceMotion ? nil : DanperStyle.animation){step=target}
-                            } else {validationMessage=(missing+allergyMissing).joined(separator:"\n");showValidation=true}
+                            } else {presentValidation(violations)}
                         } label: {
                             HStack(spacing:7) {
                                 Text("\(target+1)").font(.caption.bold())
@@ -960,16 +965,88 @@ struct N2NativeClinicalFormView:View {
             }
         }
     }
+    /// Reuses the clinical validator's ordered field IDs instead of inferring
+    /// destinations from translated error strings or UI labels.
+    private func issueCodes(for stage:Int,context:N2FormContext)->[String] {
+        var issues=form.clinicalIssues(step:stage,context:context)
+        if stage==2 {
+            if form.procedures.isEmpty && form.items.isEmpty {
+                issues.append("treatment-selection")
+            }
+            if !form.items.isEmpty && form.dispensingSite.isEmpty {
+                issues.append("treatment-site")
+            }
+            if form.hasWound && !form.photoReviewed {
+                issues.append("treatment-photo")
+            }
+        }
+        return issues
+    }
+    private func issueMessage(_ code:String)->String {
+        let extra=[
+            "treatment-selection":"Selecciona al menos un procedimiento o producto.",
+            "treatment-site":"Selecciona el tópico de dispensación.",
+            "treatment-photo":"Indica si se envió la foto."
+        ]
+        return N2ClinicalFormOptions.messages[code] ?? extra[code] ?? "Revisa el campo indicado."
+    }
+    private func presentValidation(_ codes:[String]) {
+        guard let first=codes.first else{return}
+        validationIssueCode=first
+        validationMessage=codes.map(issueMessage).joined(separator:"\n")
+        showValidation=true
+    }
     private func focusFirstMissing(_ context:N2FormContext) {
-        if currentWorker==nil {step=0;workerDNIFocused=true;return}
-        if !form.clinicalIssues(step:1,context:context).filter({$0.hasPrefix("allergy-")}).isEmpty {step=0;return}
-        if !form.clinicalIssues(step:1,context:context).isEmpty {step=1}
-        else if !form.clinicalIssues(step:2,context:context).isEmpty || !extraTreatmentRequirements.isEmpty {step=2}
-        else {step=3}
-        if form.category.isEmpty {focusedField="category"}
-        else if form.system=="OSTEOMUSCULAR" && form.segment.isEmpty {focusedField="segment"}
-        else if form.diagnosis.isEmpty {focusedField="diagnosis"}
-        else {focusedField="time"}
+        let code=validationIssueCode ?? (0...3)
+            .flatMap{issueCodes(for:$0,context:context)}.first
+        guard let code else{return}
+        let field:String
+        let destination:Int
+        switch code {
+        case "worker-dni","worker-name":
+            step=0
+            showWorkerSearch=true
+            return
+        case "clinical-date": destination=1;field="clinical-date"
+        case "clinical-time": destination=1;field="clinical-time"
+        case "clinical-category": destination=1;field="clinical-category"
+        case "clinical-system": destination=1;field="clinical-system"
+        case "clinical-segment": destination=1;field="clinical-segment"
+        case "clinical-diagnosis": destination=1;field="clinical-diagnosis"
+        case "allergy-status": destination=1;field="allergy-status"
+        case "allergy-substances": destination=1;field="allergy-substances"
+        case "treatment-items": destination=2;field="treatment-medications"
+        case "treatment-selection": destination=2;field="treatment-procedures"
+        case "treatment-site": destination=2;field="treatment-site"
+        case "treatment-photo": destination=2;field="treatment-photo"
+        case "result-permission-time": destination=3;field="result-permission-time"
+        default:destination=step;field="validation-top"
+        }
+        highlightedField=field
+        withAnimation(reduceMotion ? nil : DanperStyle.animation) {
+            step=destination
+        }
+        Task { @MainActor in
+            await Task.yield()
+            scrollIssueRequest=DanperScrollRequest(fieldID:field)
+            await Task.yield()
+            switch field {
+            case "clinical-time":focusedField="time"
+            case "clinical-segment":focusedField="segment"
+            case "clinical-diagnosis":focusedField="diagnosis"
+            case "allergy-substances":focusedField="allergy-substances"
+            case "result-permission-time":focusedField="permission-time"
+            case "clinical-category","clinical-system","allergy-status",
+                 "treatment-site","treatment-photo":
+                choiceOpenCounter+=1
+            case "treatment-medications":
+                if let first=form.items.first {
+                    collapsedMedicationGroups.removeAll()
+                    expandedMedication=first.id
+                } else {chooseProduct=true}
+            default:break
+            }
+        }
     }
     private var extraTreatmentRequirements:[String] {
         var missing=[String]()
@@ -1083,12 +1160,15 @@ struct N2NativeClinicalFormView:View {
                 }
                 Button {
                     if step<3 {
-                        let missing=stepRequirements
-                        if missing.isEmpty {withAnimation(reduceMotion ? nil : DanperStyle.animation){step+=1}}
-                        else {validationMessage=missing.joined(separator:"\n");showValidation=true}
+                        let errors=issueCodes(for:step,context:context)
+                        if errors.isEmpty {
+                            highlightedField=nil
+                            withAnimation(reduceMotion ? nil : DanperStyle.animation){step+=1}
+                        } else {presentValidation(errors)}
                     } else {
-                        if pendingRequirements.isEmpty {Task {await confirm()}}
-                        else {validationMessage=pendingRequirements.joined(separator:"\n");showValidation=true}
+                        let errors=(0...3).flatMap{issueCodes(for:$0,context:context)}
+                        if errors.isEmpty {Task {await confirm()}}
+                        else {presentValidation(errors)}
                     }
                 } label: {
                     if dynamicTypeSize.isAccessibilitySize {
