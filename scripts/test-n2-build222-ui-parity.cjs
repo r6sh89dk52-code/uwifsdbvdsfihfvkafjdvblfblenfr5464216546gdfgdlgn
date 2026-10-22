@@ -26,6 +26,10 @@ const rosterSearch=fs.readFileSync(path.join(root,'native-ios/App/N2WorkerSearch
 const medicationRow=fs.readFileSync(path.join(root,'native-ios/App/N2MedicationRowView.swift'),'utf8');
 const cutCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2KardexCutPreview.swift'),'utf8');
 const cutView=fs.readFileSync(path.join(root,'native-ios/App/N2KardexCutPreviewView.swift'),'utf8');
+const autoAccounting=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2AutomaticCutAccounting.swift'),'utf8');
+const vaultSource=fs.readFileSync(path.join(root,'native-ios/App/N2ProtectedClinicalIOSVault.swift'),'utf8');
+const clinicalTx=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ClinicalTransactions.swift'),'utf8');
+
 const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView.swift'),'utf8');
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
@@ -81,11 +85,24 @@ for(const key of ['public static func period(for day:String)',
  'public static func calculate(asOf:String','verifiedUsed','laterReceipts',
  'signedAdjustments','requiresOperatorReconciliation'])
   must(cutCore,key,'reconstrucción matemática del día 9 sin mutaciones');
-for(const key of ['Previsualización · no modifica existencias',
- 'Consumos físicos verificados desde el corte',
- 'Hay consumos históricos sin conciliar',
- 'Calcular saldo inicial estimado'])
-  must(cutView,key,'cálculo mostrado al usuario sin crear movimientos');
+for(const key of ['KARDEX · UN SOLO INVENTARIO',
+ 'Consumos día por día','automaticCutAccounting(through:format(Date()))',
+ 'Stock estimado al día 9','row.usesByDay[date] ?? 0'])
+  must(cutView,key,'conciliación automática desde atenciones, sin escrituras');
+for(const key of ['visit["status"] as? String=="saved"',
+ 'line.daily[visitDay,default:0]+=n',
+ 'line.unlinked+=1',
+ 'line.unknownPackage+=1',
+ 'line.used+=debit',
+ 'let linked=Dictionary(grouping:movements'])
+  must(autoAccounting,key,'contabilización automática y única de atenciones terminadas');
+must(vaultSource,'func automaticCutAccounting(through date:String)',
+     'consulta del inventario cifrado desde la fuente única');
+for(const key of ['private static func historicalAt(',
+ 'if historical {','after["updatedAt"]=eventAt!',
+ '"unit":before["catalogUnit"]!,"at":eventAt!'])
+  must(clinicalTx,key,'FEFO de atención histórica sin alterar conteos posteriores');
+must(nursing,'Desde el 9 hasta la fecha','exportación diaria, semanal y corte mensual');
 assert(!cutView.includes('vault.addLot')&&!cutView.includes('vault.receiveStock') &&
        !cutView.includes('vault.reconcileCount'),
        'la estimación del corte no puede alterar existencias');
