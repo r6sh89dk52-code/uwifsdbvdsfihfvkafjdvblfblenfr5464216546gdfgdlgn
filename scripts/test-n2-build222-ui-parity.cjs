@@ -30,6 +30,28 @@ must(clinicalHome,'clinical-first-run-restore-222','restauración opcional Build
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
 
+for(const label of ['DEPARTAMENTO DE SALUD','Bienvenido a DANPER',
+  'clinical-home-new-attention','clinical-home-tool-','N2HealthMascot()'])
+  must(clinicalHome,label,'portada nativa 222');
+for(const label of ['@AppStorage("danper.haptics.enabled")',
+  '.sensoryFeedback(.selection,trigger:tab)',
+  '.animation(reduceMotion ? nil : DanperStyle.animation,value:tab)'])
+  must(clinicalHome,label,'hápticos y navegación de la portada');
+for(const label of ['private var medicationGroupNames',
+  'collapsedMedicationGroups','medication-procedure-group-',
+  'ForEach(medicationGroupNames,id:\\.self)'])
+  must(form,label,'medicamentos plegables por procedimiento');
+for(const label of ['private let stepTitles=["Trabajador","Evaluación","Tratamiento","Resultado"]',
+  'private func clinicalSection()->some View {',
+  'DanperPanel("Alergias del trabajador")'])
+  must(form,label,'etapas equivalentes');
+const allergyIndex=form.indexOf('DanperPanel("Alergias del trabajador")');
+assert(allergyIndex>form.indexOf('private func clinicalSection()'),
+  'La revisión de alergias debe estar en Evaluación, como Build 222');
+must(kardex,'label:"Lotes registrados"','contador real de lotes');
+must(kardex,'vault.clinicalFormContext()','lectura de lotes sin estimaciones');
+
+
 for(const term of ['Buscar en padrón','Nuevo trabajador','REGISTRO AMBULATORIO','registerSteps'])
   must(source,term,'referencia Build 222');
 for(const name of ['Inicio','Registrar','Historial','Ajustes'])
@@ -73,6 +95,7 @@ must(home,'N2HealthMascot()','mascota SwiftUI');
 must(palette,'danper.visual.palette','tema nativo');
 console.log('PASS: Kardex de 4 acciones, Excel 3 etapas, 12 procedimientos únicos y tema azul presentes.');
 console.log('PASS: estructura Build 222 (4 tabs), ingreso de trabajador, perfil, revisión de alergias y alta SwiftUI presentes.');
+console.log('PASS: inicio clínico, animaciones, grupos de tratamiento y Kardex aproximados a Build222.');
 for(const id of ['start-empty-demo','start-sample-demo','start-import-personal-xlsx','start-restore-build222'])
   must(home,id,'origen de datos explícito');
 must(home,'DanperToolLink(title:"Importar trabajadores desde Excel PERSONAL"','ruta para importar durante uso');
