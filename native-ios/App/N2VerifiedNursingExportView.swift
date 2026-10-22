@@ -40,6 +40,11 @@ struct N2VerifiedNursingExportView:View {
 
     private var selectedPeriod:(start:String,end:String) {
         if reportMode=="daily" {return (selectedDay,selectedDay)}
+        if reportMode=="cut" {
+            let start=(try? N2KardexCutPreview.period(for:selectedDay).start) ?? selectedDay
+            // "Desde el 9" means month-cut-to-date, never a future period.
+            return (start,selectedDay)
+        }
         if reportMode=="custom" {
             return (formatDay(rangeStart),formatDay(rangeEnd))
         }
@@ -48,7 +53,7 @@ struct N2VerifiedNursingExportView:View {
         cal.firstWeekday=2
         let monday=cal.dateInterval(of:.weekOfYear,for:day)?.start ?? day
         let sunday=cal.date(byAdding:.day,value:6,to:monday) ?? monday
-        return (formatDay(monday),formatDay(sunday))
+        return (formatDay(monday),formatDay(min(sunday,Date())))
     }
     private func formatDay(_ date:Date)->String {
         let formatter=DateFormatter()
@@ -74,11 +79,12 @@ struct N2VerifiedNursingExportView:View {
             }
             DanperPanel {
                 N2Build222StageHeading(step:1,title:"Elegir fechas y modalidad")
-                Text("Reporte diario, semanal o por rango. Los saldos se calculan por períodos sin duplicar aperturas.")
+                Text("Un inventario único: reporte de un día, semana, rango o acumulado desde el último corte del día 9. Los descuentos registrados se suman una sola vez por fecha.")
                     .font(.caption).foregroundStyle(.secondary)
                 DanperChoiceField(title:"Modalidad",selection:$reportMode,
-                    options:["daily","weekly","custom"],
-                    labels:["daily":"Diario","weekly":"Semanal","custom":"Rango personalizado"])
+                    options:["daily","weekly","cut","custom"],
+                    labels:["daily":"Diario","weekly":"Semanal",
+                            "cut":"Desde el 9 hasta la fecha","custom":"Rango personalizado"])
                 DanperChoiceField(title:"Sede del inventario",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
                                   labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
                 if reportMode=="daily" {
@@ -89,6 +95,12 @@ struct N2VerifiedNursingExportView:View {
                     DanperDateField(title:"Semana de referencia",selection:$day)
                     Text("Consolidado semanal: "+selectedPeriod.start+" al "+selectedPeriod.end)
                         .font(.footnote).foregroundStyle(.secondary)
+                } else if reportMode=="cut" {
+                    DanperDateField(title:"Fecha final del acumulado",selection:$day)
+                    Text("Corte mensual: "+selectedPeriod.start+" al "+selectedPeriod.end)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("El saldo inicial corresponde al día 9; se acumulan diariamente los ingresos y consumos registrados. Los días sin consumo computan cero, nunca una salida ficticia.")
+                        .font(.caption).foregroundStyle(.secondary)
                 } else {
                     DanperDateField(title:"Desde",selection:$rangeStart)
                     DanperDateField(title:"Hasta",selection:$rangeEnd)
