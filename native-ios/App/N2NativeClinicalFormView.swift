@@ -835,6 +835,9 @@ struct N2NativeClinicalFormView:View {
     @ViewBuilder
     private func medicationFields(_ context:N2FormContext)->some View {
         ForEach(medicationGroupNames,id:\.self) { group in
+            let count=form.items.filter {
+                ($0.procedure.isEmpty ? "POR CONFIRMAR" : $0.procedure)==group
+            }.count
             DanperPanel {
                 Button {
                     withAnimation(reduceMotion ? nil : DanperStyle.animation) {
@@ -849,9 +852,7 @@ struct N2NativeClinicalFormView:View {
                         Text(group.capitalized(with:Locale(identifier:"es_PE")))
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.primary)
-                        Text("\(form.items.filter{
-                            ($0.procedure.isEmpty ? "POR CONFIRMAR" : $0.procedure)==group
-                        }.count) producto(s)")
+                        Text("\(count) producto(s)")
                             .font(.caption).foregroundStyle(.secondary)
                         Spacer(minLength:0)
                         Image(systemName:collapsedMedicationGroups.contains(group)
