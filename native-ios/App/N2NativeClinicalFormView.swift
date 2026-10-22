@@ -54,6 +54,7 @@ struct N2NativeClinicalFormView:View {
     @State private var fault=false
     @State private var status="Preparando el registro…"
     @State private var expandedMedication:String?
+    @State private var collapsedMedicationGroups=Set<String>()
     @State private var showMissingWorker=false
     @State private var showNewWorker=false
     @State private var workerDNIInput=""
@@ -820,10 +821,51 @@ struct N2NativeClinicalFormView:View {
             productName:medicationName(code,context),
             substances:current + ";" + documented)
     }
+    /// The Build 222 lists medicines in collapsible procedure groups.
+    /// Grouping is presentational; editing still binds to the same medications.
+    private var medicationGroupNames:[String] {
+        var groups:[String]=[]
+        for med in form.items {
+            let name=med.procedure.isEmpty ? "POR CONFIRMAR" : med.procedure
+            if !groups.contains(name){groups.append(name)}
+        }
+        return groups
+    }
     @ViewBuilder
     private func medicationFields(_ context:N2FormContext)->some View {
-        ForEach($form.items) { $med in
+        ForEach(medicationGroupNames,id:\.self) { group in
             DanperPanel {
+                Button {
+                    withAnimation(reduceMotion ? nil : DanperStyle.animation) {
+                        if collapsedMedicationGroups.contains(group) {
+                            collapsedMedicationGroups.remove(group)
+                        }else {
+                            collapsedMedicationGroups.insert(group)
+                        }
+                    }
+                } label: {
+                    HStack(spacing:10) {
+                        Text(group.capitalized(with:Locale(identifier:"es_PE")))
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.primary)
+                        Text("\(form.items.filter{
+                            ($0.procedure.isEmpty ? "POR CONFIRMAR" : $0.procedure)==group
+                        }.count) producto(s)")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer(minLength:0)
+                        Image(systemName:collapsedMedicationGroups.contains(group)
+                              ? "chevron.down" : "chevron.up")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth:.infinity,minHeight:45,alignment:.leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("medication-procedure-group-"+group)
+                if !collapsedMedicationGroups.contains(group) {
+                    ForEach($form.items) { $med in
+                        if (med.procedure.isEmpty ? "POR CONFIRMAR" : med.procedure)==group {
+                            DanperPanel {
                 Button {withAnimation(reduceMotion ? nil : DanperStyle.animation) {
                     expandedMedication = expandedMedication==med.id ? nil : med.id
                 }} label: {
@@ -898,6 +940,10 @@ struct N2NativeClinicalFormView:View {
                     Button(role:.destructive) {form.items.removeAll{$0.id==med.id}} label: {
                         Label("Quitar producto",systemImage:"trash").font(.caption.weight(.semibold))
                     }.buttonStyle(.plain)
+                }
+                            }
+                        }
+                    }
                 }
             }
         }
