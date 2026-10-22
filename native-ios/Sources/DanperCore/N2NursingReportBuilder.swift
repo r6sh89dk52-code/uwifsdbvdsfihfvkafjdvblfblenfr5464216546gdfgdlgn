@@ -134,6 +134,11 @@ public enum N2NursingReportBuilder {
             let code=p["id"] as! String,name=p["name"] as! String
             let historic=lots.filter{$0["code"] as? String==code}
             let all=moves.filter{$0["code"] as? String==code}
+                .sorted { a,b in
+                    let ta=count(a["at"]) ?? 0,tb=count(b["at"]) ?? 0
+                    if ta != tb {return ta<tb}
+                    return (a["id"] as? String ?? "")<(b["id"] as? String ?? "")
+                }
             let relevant=historic.filter{l in
                 let lotEvents=all.filter{$0["lotId"] as? String==l["id"] as? String}
                   .sorted{(count($0["at"]) ?? 0)<(count($1["at"]) ?? 0)}
@@ -162,6 +167,8 @@ public enum N2NursingReportBuilder {
                         ? (count(m["sealedAdded"]) ?? 0)
                         : (count(m["physicalChange"]) ?? 0))
                 })
+            // A day without saved consumption movements has 0 consumption.
+            // Never infer another debit from a restored attention already linked.
             let consumed=rounded(daily.filter{$0["kind"] as? String=="use"}
                 .reduce(0.0){sum,m in
                     let before=m["before"] as? [String:Any] ?? [:]
