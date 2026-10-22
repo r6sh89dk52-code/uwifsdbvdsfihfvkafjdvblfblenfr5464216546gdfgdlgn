@@ -228,13 +228,18 @@ struct DanperPanel<Content:View>:View {
 }
 struct DanperField<Content:View>:View {
     let title:String
+    var highlighted:Bool=false
     @ViewBuilder let content:Content
     var body:some View {
         VStack(alignment:.leading,spacing:8) {
-            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text(title).font(.subheadline.weight(.semibold))
+                .foregroundStyle(highlighted ? DanperStyle.red : Color.secondary)
             content.padding(12).frame(maxWidth:.infinity,alignment:.leading)
                 .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-                .overlay(RoundedRectangle(cornerRadius:13).strokeBorder(Color.secondary.opacity(0.15)).allowsHitTesting(false))
+                .overlay(RoundedRectangle(cornerRadius:13)
+                    .strokeBorder(highlighted ? DanperStyle.red : Color.secondary.opacity(0.15),
+                                  lineWidth:highlighted ? 2 : 1)
+                    .allowsHitTesting(false))
         }
     }
 }
@@ -245,6 +250,7 @@ struct DanperChoiceField:View {
     let options:[String]
     var labels:[String:String]=[:]
     var openRequest:Int=0
+    var highlighted:Bool=false
     @State private var showRequestedOptions=false
     private func label(_ value:String)->String {labels[value] ?? value.capitalized(with:Locale(identifier:"es_PE"))}
     var body:some View {
@@ -254,7 +260,7 @@ struct DanperChoiceField:View {
                 ForEach(options,id:\.self) {value in Text(label(value)).tag(value)}
             }
         } label: {
-            DanperField(title:title) {
+            DanperField(title:title,highlighted:highlighted) {
                 HStack(spacing:12) {
                     Text(selection.isEmpty ? (labels[""] ?? "Seleccionar") : label(selection))
                         .foregroundStyle(selection.isEmpty ? .secondary : .primary)
