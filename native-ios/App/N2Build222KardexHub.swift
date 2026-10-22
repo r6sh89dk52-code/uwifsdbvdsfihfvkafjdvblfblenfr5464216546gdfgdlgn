@@ -4,6 +4,8 @@ import DanperCore
 /// Build 222 Kardex home screen, rebuilt as native navigation.
 /// Navigation never creates inventory movements or changes clinical data.
 struct N2Build222KardexHub:View {
+    @Environment(\.n2WorkspaceVault) private var vault
+    @State private var lotCount:Int?
     private let options:[(number:String,title:String,detail:String,symbol:String)]=[
         ("1","Inventario físico","Consultar los 98 productos, existencias y lotes","shippingbox.fill"),
         ("2","Entradas y salidas","Ingresos físicos; salidas de atención en el historial","arrow.left.arrow.right"),
@@ -19,13 +21,13 @@ struct N2Build222KardexHub:View {
                         .tracking(1.2).foregroundStyle(DanperStyle.red)
                     Text("Kardex")
                         .font(.system(.largeTitle,design:.rounded,weight:.bold))
-                    Text("Control físico de existencias de prueba")
+                    Text("Control físico de existencias")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }.frame(maxWidth:.infinity,alignment:.leading)
 
                 HStack(spacing:10) {
                     summary(value:"98",label:"Productos oficiales",symbol:"cross.vial")
-                    summary(value:"FEFO",label:"Selección por vencimiento",symbol:"calendar.badge.clock")
+                    summary(value:lotCount.map(String.init) ?? "—",label:"Lotes registrados",symbol:"shippingbox")
                 }
 
                 DanperPanel {
@@ -58,6 +60,16 @@ struct N2Build222KardexHub:View {
         .navigationTitle("Kardex")
         .navigationBarTitleDisplayMode(.inline)
         .danperFormChrome()
+        .task {await readLotCount()}
+    }
+
+    @MainActor private func readLotCount() async {
+        do {
+            let context=try await vault.clinicalFormContext()
+            lotCount=context.lots.count
+        }catch {
+            lotCount=nil
+        }
     }
 
     private func summary(value:String,label:String,symbol:String)->some View {
