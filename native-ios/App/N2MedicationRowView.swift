@@ -16,7 +16,7 @@ struct N2MedicationRowView:View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var expanded:Bool {
-        expandedID==medication.id || medication.procedure.isEmpty
+        expandedID==medication.id
     }
     private var productName:String {
         context.products.clinical.first(where:{$0.code==medication.code})?.name
@@ -76,6 +76,10 @@ struct N2MedicationRowView:View {
                             .foregroundStyle(.primary)
                         Text("Cantidad \(medication.quantity) · \(medication.procedure.isEmpty ? "Procedimiento pendiente" : medication.procedure.capitalized)")
                             .font(.caption).foregroundStyle(.secondary)
+                        if medication.procedure.isEmpty {
+                            Label("Revisar procedimiento",systemImage:"exclamationmark.circle.fill")
+                                .font(.caption).foregroundStyle(.orange)
+                        }
                         if allergyWarning {
                             Label("Revisar posible coincidencia de alergia",
                                   systemImage:"exclamationmark.triangle.fill")
