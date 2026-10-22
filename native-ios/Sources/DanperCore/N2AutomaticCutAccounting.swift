@@ -166,6 +166,11 @@ public enum N2AutomaticCutAccounting {
                 let loose=num(l["looseUnits"]) ?? 0
                 let opened=num(l["openedRemaining"]) ?? 0
                 let capacity=num(l["unitsPerContainer"]) ?? 1
+                let unit=(l["catalogUnit"] as? String ?? "").uppercased()
+                // Official Kardex counts sealed FCO/CJA when a new
+                // container is opened (R=1); never mistake its 100 mL
+                // capacity for 100 Kardex units.
+                if !["UND","TBL","PAR"].contains(unit) {return sum+sealed}
                 return sum+sealed*capacity+loose+opened
             }
             let correctable=count != nil && item.unknownPackage==0
