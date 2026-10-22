@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreImage
 
 /// Reusable visual language for the entire native preview. Respect Dynamic Type,
 /// Dark/Light Mode, Reduce Motion and the iPhone's safe areas.
@@ -51,12 +52,26 @@ enum DanperStyle {
 /// wordmark is a bundled asset, never recreated with a system font.
 struct DanperBrandHeader:View {
     let onSettings:()->Void
+    // The bundled 316px square includes a pure-red background. Derive alpha
+    // from the green channel: zero for that red and full for white lettering.
+    // This reuses the authentic brand lettering without exporting/editing PNGs.
+    private static let wordmark:UIImage? = {
+        guard let original=UIImage(named:"BrandLogo"),
+              let image=CIImage(image:original),
+              let filter=CIFilter(name:"CIColorMatrix") else{return UIImage(named:"BrandLogo")}
+        filter.setValue(image,forKey:kCIInputImageKey)
+        filter.setValue(CIVector(x:0,y:1,z:0,w:0),forKey:"inputAVector")
+        guard let rendered=filter.outputImage,
+              let cg=CIContext().createCGImage(rendered,from:rendered.extent) else{return original}
+        return UIImage(cgImage:cg)
+    }()
     var body:some View {
         HStack(spacing:9) {
-            Image("BrandLogo")
+            Image(uiImage:Self.wordmark ?? UIImage())
                 .resizable()
-                .scaledToFit()
-                .frame(width:145,height:53,alignment:.leading)
+                .scaledToFill()
+                .frame(width:160,height:54)
+                .clipped()
                 .accessibilityLabel("Danper")
             Text("SALUD MÓVIL")
                 .font(.system(size:10,weight:.bold,design:.rounded))
