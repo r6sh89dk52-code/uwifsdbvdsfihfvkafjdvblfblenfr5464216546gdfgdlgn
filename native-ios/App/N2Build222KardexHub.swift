@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import DanperCore
 
@@ -6,6 +7,13 @@ import DanperCore
 struct N2Build222KardexHub:View {
     @Environment(\.n2WorkspaceVault) private var vault
     @State private var lotCount:Int?
+    private var activePeriod:N2KardexCutPreview.Period? {
+        let formatter=DateFormatter()
+        formatter.locale=Locale(identifier:"en_US_POSIX")
+        formatter.timeZone=TimeZone(identifier:"America/Lima")
+        formatter.dateFormat="yyyy-MM-dd"
+        return try? N2KardexCutPreview.period(for:formatter.string(from:Date()))
+    }
     private let options:[(number:String,title:String,detail:String,symbol:String)]=[
         ("1","Inventario físico","Consultar los 98 productos, existencias y lotes","shippingbox.fill"),
         ("2","Entradas y salidas","Ingresos físicos; salidas de atención en el historial","arrow.left.arrow.right"),
@@ -21,7 +29,7 @@ struct N2Build222KardexHub:View {
                         .tracking(1.2).foregroundStyle(DanperStyle.red)
                     Text("Kardex")
                         .font(.system(.largeTitle,design:.rounded,weight:.bold))
-                    Text("Control físico de existencias")
+                    Text("Registra medicamentos, controla el stock y prepara el corte mensual.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }.frame(maxWidth:.infinity,alignment:.leading)
 
@@ -30,10 +38,55 @@ struct N2Build222KardexHub:View {
                     summary(value:lotCount.map(String.init) ?? "—",label:"Lotes registrados",symbol:"shippingbox")
                 }
 
+                NavigationLink {
+                    N2NativeInventoryView(initialOperation:"lot")
+                } label: {
+                    HStack(spacing:14) {
+                        VStack(alignment:.leading,spacing:7) {
+                            Text("REGISTRAR MEDICAMENTO")
+                                .font(.caption2.weight(.bold)).tracking(1.1)
+                            Text("Agregar medicamento y stock")
+                                .font(.headline.weight(.bold))
+                            Text("Selecciona el producto oficial, sede, lote, vencimiento y cantidades contadas.")
+                                .font(.caption)
+                                .fixedSize(horizontal:false,vertical:true)
+                        }
+                        Spacer(minLength:4)
+                        Image(systemName:"plus.circle.fill").font(.title2)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(18)
+                    .frame(maxWidth:.infinity,alignment:.leading)
+                    .background(DanperStyle.gradient,
+                                in:RoundedRectangle(cornerRadius:19))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("kardex-register-current-stock")
+
+                DanperPanel("Corte mensual · del día 9 al día 8") {
+                    if let activePeriod {
+                        LabeledContent("Inicio",value:DanperDatePresentation.display(activePeriod.start))
+                        LabeledContent("Fin",value:DanperDatePresentation.display(activePeriod.end))
+                    }
+                    Text("Si cuentas el stock ahora, reconstruir el saldo del día 9 exige sumar los consumos físicos verificados y descontar los ingresos posteriores. No se descontarán dos veces las atenciones.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    NavigationLink {
+                        N2KardexCutPreviewView()
+                    } label: {
+                        Label("Previsualizar saldo inicial del día 9",
+                              systemImage:"calendar.badge.clock")
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                    }
+                    .buttonStyle(DanperSecondaryButton())
+                    .accessibilityIdentifier("kardex-ninth-cut-preview")
+                    Text("Cálculo previo: no modifica la bóveda ni asigna lotes retrospectivamente.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+
                 DanperPanel {
-                    Text("¿Qué necesitas hacer?")
+                    Text("Consultar y gestionar")
                         .font(.title3.weight(.bold))
-                    Text("Elige una opción. Ninguna de estas pantallas registra consumos o movimientos solo por abrirla.")
+                    Text("Usa Inventario físico para consultar lo registrado; Entradas y salidas para nuevos movimientos; Pendientes para conciliaciones; Exportar Kardex para el Excel oficial.")
                         .font(.footnote).foregroundStyle(.secondary)
                     VStack(spacing:10) {
                         route(0){N2NativeInventoryView()}
@@ -52,7 +105,7 @@ struct N2Build222KardexHub:View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
-                Label("Sólo se muestran y editan datos de la bóveda activa. Las salidas físicas deben confirmarse desde su flujo correspondiente.",
+                Label("Los lotes y vencimientos se usan solo dentro de DANPER para FEFO. El Excel oficial conserva sus columnas y cantidades, sin identificadores de lote. Los movimientos físicos se registran únicamente con confirmación.",
                       systemImage:"lock.shield")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(16)
