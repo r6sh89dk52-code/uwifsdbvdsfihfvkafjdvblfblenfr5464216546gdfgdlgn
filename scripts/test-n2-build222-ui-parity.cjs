@@ -22,11 +22,23 @@ const reset=fs.readFileSync(path.join(root,'native-ios/App/N2DemoResetView.swift
 const personal=fs.readFileSync(path.join(root,'native-ios/App/N2NativePersonalImportView.swift'),'utf8');
 const app=fs.readFileSync(path.join(root,'native-ios/App/DANPERNativeApp.swift'),'utf8');
 const clinicalHome=fs.readFileSync(path.join(root,'native-ios/App/N2ClinicalWorkspaceView.swift'),'utf8');
+const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
 must(app,'N2ClinicalWorkspaceGateView()','inicio cifrado con importación PERSONAL');
 assert(!app.includes('NativeRootView()'),'No puede abrirse el modo ficticio en inicio normal');
 must(clinicalHome,'clinical-first-run-import-personal','importar PERSONAL como acción principal');
 must(clinicalHome,'clinical-first-run-restore-222','restauración opcional Build222');
+must(clinicalHome,'clinical-first-run-manual-worker','inicio manual sin Excel');
+must(clinicalHome,'N2FirstManualWorkerView()','registro inicial sin archivo');
+for(const phrase of ['N2EmptyDemoSnapshot.make()','N2SnapshotEditor.addWorker(',
+  'activateOnlyWithConsent(source,approvedByUser:true)',
+  'first-manual-worker-activate','.deviceOwnerAuthentication',
+  'N2ProtectedClinicalIOSVault.shared.inspect()==nil'])
+  must(firstWorker,phrase,'alta protegida del primer trabajador sin fuente precargada');
+assert(!firstWorker.includes('activateSyntheticFixture(') &&
+       !firstWorker.includes('startSyntheticDemo('),
+       'El alta sin Excel no puede crear registros ficticios de demostración');
+
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
 
@@ -110,4 +122,5 @@ must(reset,'onDeleted()','propagar verificación de borrado a inicio');
 must(personal,'personal-xlsx-import-preview','vista previa de Excel');
 must(personal,'open-imported-clinical-workspace','abrir bóveda clínica tras importar');
 console.log('PASS: onboarding con origen explícito, demo realmente vacía, borrado verificado e importación protegida.');
+console.log('PASS: nueva vía sin Excel crea solo el primer trabajador manual con autenticación y fuente vacía original.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
