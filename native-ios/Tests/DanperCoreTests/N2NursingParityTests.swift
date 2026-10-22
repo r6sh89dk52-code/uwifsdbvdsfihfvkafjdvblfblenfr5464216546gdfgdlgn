@@ -13,6 +13,31 @@ final class N2NursingParityTests:XCTestCase {
             with:bytes("n2-nursing-parity.json")) as? [String:Any])
         return (file,try JSONSerialization.data(withJSONObject:file["catalog"]!))
     }
+    func testKardexFromNinthAccumulatesDailyMovementsOnceAndZerosEmptyDays() throws {
+        let snapshot=try bytes("n1e-clinical-stock.json")
+        let (_,catalog)=try fixture()
+        let accumulated=try N2NursingReportBuilder.range(
+            snapshot:snapshot,catalog:catalog,
+            start:"2026-10-09",end:"2026-10-22")
+        XCTAssertEqual(accumulated.date,"2026-10-09")
+        XCTAssertEqual(accumulated.periodEnd,"2026-10-22")
+        XCTAssertEqual(accumulated.rows.count,98)
+        let days=(9...22).map{String(format:"2026-10-%02d",$0)}
+        let daily=try days.map{date in
+            try N2NursingReportBuilder.daily(
+                snapshot:snapshot,catalog:catalog,date:date)
+        }
+        for (index,row) in accumulated.rows.enumerated() {
+            let actual=daily.reduce(0.0){$0+$1.rows[index].consumed}
+            XCTAssertEqual(row.consumed,actual,accuracy:0.001,
+                           "Consumo duplicado en "+row.code)
+        }
+        let emptyDay=try N2NursingReportBuilder.daily(
+            snapshot:snapshot,catalog:catalog,date:"2026-10-19")
+        XCTAssertTrue(emptyDay.rows.allSatisfy{$0.consumed==0})
+        XCTAssertTrue(emptyDay.rows.filter{$0.stockKnown}.allSatisfy{$0.consumed==0})
+    }
+
     func testNursingDailyAndRangeMatchBuild222TypeScriptByAll98Rows()throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (reference,catalog)=try fixture()
