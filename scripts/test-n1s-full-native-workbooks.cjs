@@ -85,6 +85,12 @@ console.log('PASS INGRESOS: green >90d, yellow 0-90d, red expired, icons hide he
 console.log('PASS N1s complete native indicator: 10 sheets, 19 tables, 432 material rows, original cell formulas and exact all verified materials/consumptions');
 // Nursing compare main daily 98 products with TS reference, styles/print.
 const nn=open('n1s-nursing-native.xlsx'),tn=open('n1s-nursing-reference.xlsx');
+const nurseHeaderXML=Buffer.from(nn['xl/sharedStrings.xml']).toString('utf8')
+ +Buffer.from(nn['xl/worksheets/sheet2.xml']).toString('utf8');
+assert.ok(!/<t[^>]*>\\s*TOTAL\\s+ESTOCK\\s*<\\/t>/i.test(nurseHeaderXML),
+ 'Excel Kardex must never say TOTAL ESTOCK');
+assert.ok(/<t[^>]*>\\s*TOTAL\\s+STOCK\\s*<\\/t>/i.test(nurseHeaderXML),
+ 'Excel Kardex must display the corrected TOTAL STOCK header');
 const nurseNames=all(parse(Buffer.from(nn['xl/workbook.xml']).toString('utf8')),'sheet')
   .map(x=>x.getAttribute('name'));
 assert.deepEqual(nurseNames,['KARDEX ENFERMERAS'],
