@@ -25,7 +25,13 @@ for(let i=1;i<=10;i++){
    const found=ac.get(ref);
    assert.ok(found,'missing '+i+'!'+ref);
    const original=f(bc,ref),ours=f(ac,ref);
-   if(original) assert.equal(ours,original,'formula '+i+'!'+ref);
+   if(original && i===3 && /^[DEFG]\\d+$/.test(ref)) {
+     const row=Number(ref.match(/\\d+/)[0]);
+     const expiry={D:'J',E:'N',F:'R',G:'V'}[ref[0]]+row;
+     const semaphore='IF('+expiry+'="","",IF('+expiry+'<TODAY(),2,IF('+expiry+'-TODAY()<=90,1,0)))';
+     assert.equal(ours,semaphore,'semaforo vencimiento '+ref);
+     // Legacy 0/1 formula is superseded; Build 222 remains unchanged.
+   } else if(original) assert.equal(ours,original,'formula '+i+'!'+ref);
    else if(value(expected)!=='') {
     const a=value(found),b=value(expected);
     // XLSX stores IEEE754 numbers; Swift and JS can serialize equivalent
@@ -40,6 +46,17 @@ for(let i=1;i<=10;i++){
   }
  }
 }
+const incomeXML=Buffer.from(actual['xl/worksheets/sheet3.xml']).toString('utf8');
+const semaphoreRule=all(document(actual,3),'conditionalFormatting')
+ .find(cf=>cf.getAttribute('sqref')==='D3:G434'&&all(cf,'iconSet').length>0);
+assert.ok(semaphoreRule,'INGRESOS must have expiration icon set on D3:G434');
+const icons=all(semaphoreRule,'iconSet')[0];
+assert.equal(icons.getAttribute('iconSet'),'3TrafficLights1');
+assert.equal(icons.getAttribute('reverse'),'1');
+assert.equal(icons.getAttribute('showValue'),'0','circles must hide numeric status');
+assert.deepEqual(all(icons,'cfvo').map(x=>x.getAttribute('val')),['0','1','2']);
+assert.ok(!incomeXML.includes('<xm:sqref>D3:G439</xm:sqref>'),
+ 'old x14 icon rule must not mask the standard green/yellow/red icons');
 const count=cells(document(actual,2)),income=cells(document(actual,3)),
       resu=cells(document(actual,4)),consumos=cells(document(actual,5));
 assert.equal(get(count,'D3'),get(cells(document(ts,2)),'D3'));
@@ -64,6 +81,7 @@ const styles=Buffer.from(actual['xl/styles.xml']).toString('utf8');
 assert.match(styles,/formatCode="dd\/mm\/yyyy"/,'indicator must use Peru date display');
 assert.match(Buffer.from(actual['xl/worksheets/sheet5.xml']).toString('utf8'),
   /<c r="F2" s="\d+">/,'CONSUMOS date cells must have a numeric date style');
+console.log('PASS INGRESOS: green >90d, yellow 0-90d, red expired, icons hide helper numbers');
 console.log('PASS N1s complete native indicator: 10 sheets, 19 tables, 432 material rows, original cell formulas and exact all verified materials/consumptions');
 // Nursing compare main daily 98 products with TS reference, styles/print.
 const nn=open('n1s-nursing-native.xlsx'),tn=open('n1s-nursing-reference.xlsx');
