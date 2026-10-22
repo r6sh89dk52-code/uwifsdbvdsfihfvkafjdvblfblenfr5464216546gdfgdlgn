@@ -47,6 +47,46 @@ enum DanperStyle {
 }
 
 
+/// Shared red top banner for Build 222 native screens. The real Danper
+/// wordmark is a bundled asset, never recreated with a system font.
+struct DanperBrandHeader:View {
+    let onSettings:()->Void
+    var body:some View {
+        HStack(spacing:9) {
+            Image("BrandLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width:145,height:53,alignment:.leading)
+                .accessibilityLabel("Danper")
+            Text("SALUD MÓVIL")
+                .font(.system(size:10,weight:.bold,design:.rounded))
+                .tracking(1.5)
+                .foregroundStyle(.white)
+                .fixedSize(horizontal:true,vertical:false)
+            Spacer(minLength:3)
+            Button(action:onSettings) {
+                Image(systemName:"gearshape")
+                    .font(.system(size:22,weight:.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width:45,height:45)
+                    .background(.white.opacity(0.13),
+                                in:RoundedRectangle(cornerRadius:14))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ajustes")
+            .accessibilityIdentifier("brand-header-settings")
+        }
+        .padding(.horizontal,18)
+        .frame(maxWidth:.infinity)
+        .frame(height:65)
+        .background(
+            Color(red:0.90,green:0.07,blue:0.16)
+                .ignoresSafeArea(edges:.top))
+        .accessibilityElement(children:.contain)
+        .accessibilityIdentifier("danper-brand-header")
+    }
+}
+
 struct DanperPrimaryButton:ButtonStyle {
     @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
