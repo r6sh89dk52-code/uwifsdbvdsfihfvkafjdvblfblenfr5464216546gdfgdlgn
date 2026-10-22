@@ -166,6 +166,9 @@ struct N2ClinicalWorkspaceGateView:View {
 /// mounted demo application's tabs keep their default .demo environment.
 private struct N2ClinicalWorkspaceRootView:View {
     let onClose:()->Void
+    @Environment(\.n2WorkspaceVault) private var vault
+    @State private var homeCounts:(today:Int,week:Int,drafts:Int)?
+
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab=0
     @State private var registeredDNI:String?
@@ -252,6 +255,11 @@ private struct N2ClinicalWorkspaceRootView:View {
                         }
                         .buttonStyle(DanperPrimaryButton())
                         .accessibilityIdentifier("clinical-home-new-attention")
+                        HStack(spacing:10) {
+                            homeMetric(homeCounts.map{String($0.today)} ?? "—","Hoy")
+                            homeMetric(homeCounts.map{String($0.week)} ?? "—","Esta semana")
+                            homeMetric(homeCounts.map{String($0.drafts)} ?? "—","Borradores")
+                        }
 
                         Text("Herramientas")
                             .font(.title3.weight(.bold))
@@ -364,6 +372,7 @@ private struct N2ClinicalWorkspaceRootView:View {
                              appearance=="dark" ? .dark : .light)
         .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
         .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
+        .task(id:tab) {if tab==0 {await refreshHomeCounts()}}
         .opacity(scenePhase == .active ? 1 : 0)
         .accessibilityHidden(scenePhase != .active)
         .allowsHitTesting(scenePhase == .active)
@@ -373,6 +382,44 @@ private struct N2ClinicalWorkspaceRootView:View {
         .onChange(of:scenePhase) {_,phase in
             if phase != .active {onClose()}
         }
+    }
+    @MainActor private func refreshHomeCounts() async {
+        do {
+            guard let model=try await vault.readHistory() else {
+                homeCounts=nil
+                return
+            }
+            let drafts=try await vault.readDrafts()
+            var calendar=Calendar(identifier:.gregorian)
+            calendar.timeZone=TimeZone(identifier:"America/Lima")!
+            calendar.firstWeekday=2
+            let now=Date()
+            let formatter=DateFormatter()
+            formatter.locale=Locale(identifier:"en_US_POSIX")
+            formatter.timeZone=calendar.timeZone
+            formatter.dateFormat="yyyy-MM-dd"
+            let today=formatter.string(from:now)
+            let weekStart=formatter.string(
+                from:calendar.dateInterval(of:.weekOfYear,for:now)?.start ?? now)
+            let saved=model.visits.filter{$0.status=="saved"}
+            homeCounts=(
+                today:saved.filter{$0.date==today}.count,
+                week:saved.filter{$0.date>=weekStart && $0.date<=today}.count,
+                drafts:drafts.count
+            )
+        }catch {
+            homeCounts=nil
+        }
+    }
+    private func homeMetric(_ count:String,_ label:String)->some View {
+        VStack(spacing:5) {
+            Text(count).font(.title2.weight(.bold)).monospacedDigit()
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth:.infinity,minHeight:70)
+        .background(DanperStyle.surface,
+                    in:RoundedRectangle(cornerRadius:15))
     }
     private func homeTile<Destination:View>(
         _ title:String,_ subtitle:String,symbol:String,
