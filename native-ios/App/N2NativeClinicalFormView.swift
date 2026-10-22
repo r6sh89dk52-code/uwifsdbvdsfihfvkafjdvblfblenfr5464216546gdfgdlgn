@@ -61,6 +61,7 @@ struct N2NativeClinicalFormView:View {
     @State private var collapsedMedicationGroups=Set<String>()
     @State private var showMissingWorker=false
     @State private var showWorkerSearch=false
+    @State private var registerAfterSearch=false
     @State private var showNewWorker=false
     @State private var workerDNIInput=""
     @State private var workerNameInput=""
@@ -295,21 +296,23 @@ struct N2NativeClinicalFormView:View {
                 } message: {
                     Text("No encontramos el DNI \(notFoundDNI) en Personal. Puedes registrarlo ahora y continuar esta misma atención.")
                 }
-                .sheet(isPresented:$showWorkerSearch) {
+                .sheet(isPresented:$showWorkerSearch,onDismiss:{
+                    if registerAfterSearch {
+                        registerAfterSearch=false
+                        editingWorkerDNI=nil
+                        notFoundDNI=""
+                        showNewWorker=true
+                    }
+                }) {
                     NavigationStack {
                         N2WorkerSearchSheet(workers:context.workers,
                             onSelect:{worker in
                                 selectWorker(worker)
                                 showWorkerSearch=false
                             },onNewWorker:{
-                                // Dismiss the search before opening the worker editor.
+                                // Wait for dismissal to finish before showing another sheet.
+                                registerAfterSearch=true
                                 showWorkerSearch=false
-                                editingWorkerDNI=nil
-                                notFoundDNI=""
-                                Task { @MainActor in
-                                    await Task.yield()
-                                    showNewWorker=true
-                                }
                             })
                     }
                 }
