@@ -909,122 +909,62 @@ struct N2NativeClinicalFormView:View {
         }
         return groups
     }
+    /// Split group layout from individual editing; SwiftUI's type checker
+    /// must not infer the entire medication/FEFO editor in one expression.
     @ViewBuilder
     private func medicationFields(_ context:N2FormContext)->some View {
         ForEach(medicationGroupNames,id:\.self) { group in
-            let count=form.items.filter {
-                ($0.procedure.isEmpty ? "POR CONFIRMAR" : $0.procedure)==group
-            }.count
-            DanperPanel {
-                Button {
-                    withAnimation(reduceMotion ? nil : DanperStyle.animation) {
-                        if collapsedMedicationGroups.contains(group) {
-                            collapsedMedicationGroups.remove(group)
-                        }else {
-                            collapsedMedicationGroups.insert(group)
-                        }
-                    }
-                } label: {
-                    HStack(spacing:10) {
-                        Text(group.capitalized(with:Locale(identifier:"es_PE")))
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(.primary)
-                        Text("\(count) producto(s)")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Spacer(minLength:0)
-                        Image(systemName:collapsedMedicationGroups.contains(group)
-                              ? "chevron.down" : "chevron.up")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth:.infinity,minHeight:45,alignment:.leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("medication-procedure-group-"+group)
-                if !collapsedMedicationGroups.contains(group) {
-                    ForEach($form.items) { $med in
-                        if (med.procedure.isEmpty ? "POR CONFIRMAR" : med.procedure)==group {
-                            VStack(alignment:.leading,spacing:9) {
-                Button {withAnimation(reduceMotion ? nil : DanperStyle.animation) {
-                    expandedMedication = expandedMedication==med.id ? nil : med.id
-                }} label: {
-                    HStack(alignment:.top,spacing:9) {
-                        Image(systemName:"cross.vial.fill").foregroundStyle(DanperStyle.red)
-                            .frame(width:22)
-                        VStack(alignment:.leading,spacing:6) {
-                            Text(medicationName(med.code,context)).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
-                            Text("Cantidad \(med.quantity) · \(med.procedure.isEmpty ? "Procedimiento pendiente" : med.procedure.capitalized)")
-                                .font(.caption).foregroundStyle(.secondary)
-                            if !allergyTextMatches(med.code,context:context).isEmpty {
-                                Label("Revisar posible coincidencia de alergia",systemImage:"exclamationmark.triangle.fill")
-                                    .font(.caption).foregroundStyle(.orange)
-                            }
-                        }.frame(maxWidth:.infinity,alignment:.leading)
-                        Image(systemName:expandedMedication==med.id ? "chevron.up" : "chevron.down")
-                            .font(.caption.weight(.bold)).foregroundStyle(.secondary)
-                    }.contentShape(Rectangle())
-                }.buttonStyle(.plain)
-                if expandedMedication==med.id || med.procedure.isEmpty {
-                    Divider()
-                    Text(med.code+" · "+(context.products.clinical.first{$0.code==med.code}?.unit ?? ""))
-                        .font(.caption).foregroundStyle(.secondary)
-                    DanperField(title:"Cantidad clínica") {
-                        HStack {
-                            Button {if med.quantity>1 {med.quantity-=1}} label: {Image(systemName:"minus.circle").frame(width:44,height:44)}.disabled(med.quantity<=1)
-                            TextField("Cantidad",value:$med.quantity,format:.number)
-                                .keyboardType(.numberPad).multilineTextAlignment(.center).accessibilityLabel("Cantidad clínica")
-                            Button {med.quantity+=1} label: {Image(systemName:"plus.circle").frame(width:44,height:44)}
-                        }.buttonStyle(.plain).font(.title3).foregroundStyle(.primary)
-                    }
-                    DanperChoiceField(title:"Procedimiento",selection:Binding(
-                        get:{med.procedure},set:{med.procedure=$0;med.procedureConfirmed=true;med.procedureSource="manual"}
-                    ),options:procedures)
-                    Text(med.procedureConfirmed ? "Elección confirmada" :
-                         med.procedureSource=="presentation" ? "Sugerido por la presentación del producto" :
-                         med.procedureSource=="context" ? "Sugerido por el contexto de la atención" :
-                         "Selecciona el procedimiento utilizado")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if !med.procedureConfirmed && !med.procedure.isEmpty {
-                        Button {med.procedureConfirmed=true} label: {Label("Confirmar sugerencia",systemImage:"checkmark")}
-                            .buttonStyle(DanperSecondaryButton())
-                    }
-                    let matches=context.options(for:med.code,at:form.date,site:form.dispensingSite)
-                    DanperChoiceField(title:"Existencia física",selection:Binding(
-                        get:{med.selectedLotID},set:{value in
-                            med.selectedLotID=value;med.approveOpening=false
-                            let unit=context.products.clinical.first{$0.code==med.code}?.unit ?? ""
-                            if ["UND","TBL","PAR"].contains(unit.uppercased()) {med.physicalQuantity=Double(med.quantity)}
-                        }
-                    ),options:[""]+matches.map(\.id),labels:Dictionary(uniqueKeysWithValues:
-                        [("","Automático por FEFO / pendiente")]+matches.map{($0.id,$0.name+" · Lote "+$0.id+" · Vence "+DanperDatePresentation.display($0.expires))}))
-                    if let first=matches.first {
-                        Text("FEFO: "+first.id+" · Disponible: "+matches.reduce(0){$0+$1.total}.formatted())
-                            .font(.caption).foregroundStyle(.secondary)
+            medicationGroup(group,context:context)
+        }
+    }
+    private func procedureGroupName(_ name:String)->String {
+        name.isEmpty ? "POR CONFIRMAR" : name
+    }
+    private func medicationGroup(_ group:String,context:N2FormContext)->some View {
+        let quantity=form.items.filter{
+            procedureGroupName($0.procedure)==group
+        }.count
+        let collapsed=collapsedMedicationGroups.contains(group)
+        return DanperPanel {
+            Button {
+                withAnimation(reduceMotion ? nil : DanperStyle.animation) {
+                    if collapsed {
+                        collapsedMedicationGroups.remove(group)
                     } else {
-                        Label("Sin existencia aprobada vigente. Se registrará como consumo pendiente.",systemImage:"exclamationmark.triangle")
-                            .font(.caption).foregroundStyle(.secondary)
+                        collapsedMedicationGroups.insert(group)
                     }
-                    if !med.selectedLotID.isEmpty {
-                        if let selected=matches.first(where:{$0.id==med.selectedLotID}) {
-                            Text("Existencia: "+selected.total.formatted()+" · Capacidad por envase: "+selected.capacity.formatted())
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        DanperField(title:"Unidades físicas usadas (mL, UND…)") {
-                            TextField("Cantidad física",value:$med.physicalQuantity,format:.number).keyboardType(.decimalPad)
-                        }
-                        if matches.contains(where:{$0.sealed>0}) {
-                            DanperCheckRow(selected:$med.approveOpening) {Text("Autorizo abrir un frasco o caja nuevo").font(.subheadline)}
-                        }
-                    }
-                    Button(role:.destructive) {form.items.removeAll{$0.id==med.id}} label: {
-                        Label("Quitar producto",systemImage:"trash").font(.caption.weight(.semibold))
-                    }.buttonStyle(.plain)
                 }
-                .padding(11)
-                .background(DanperStyle.canvas,
-                            in:RoundedRectangle(cornerRadius:14))
-                            }
-                        }
+            } label: {
+                HStack(spacing:10) {
+                    Text(group.capitalized(with:Locale(identifier:"es_PE")))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                    Text("\(quantity) producto(s)")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength:0)
+                    Image(systemName:collapsed ? "chevron.down" : "chevron.up")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth:.infinity,minHeight:45,alignment:.leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("medication-procedure-group-"+group)
+            if !collapsed {
+                ForEach($form.items) { $medication in
+                    if procedureGroupName(medication.procedure)==group {
+                        N2MedicationRowView(
+                            medication:$medication,
+                            context:context,
+                            visitDate:form.date,
+                            dispensingSite:form.dispensingSite,
+                            procedures:procedures,
+                            allergyWarning:!allergyTextMatches(
+                                medication.code,context:context).isEmpty,
+                            expandedID:$expandedMedication,
+                            onRemove:{
+                                form.items.removeAll{$0.id==medication.id}
+                            })
                     }
                 }
             }
