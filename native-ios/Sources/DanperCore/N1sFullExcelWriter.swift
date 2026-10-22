@@ -120,7 +120,8 @@ internal enum N1sFullExcelWriter {
         case 3:
             let expiry=["D":"J","E":"N","F":"R","G":"V"]
             if let source=expiry[col] {
-                return "IF(\(source)\(n)=\"\",\"\",IF(\(source)\(n)-TODAY()<=90,1,0))"
+                // 0 = green, 1 = yellow (<=90 days), 2 = red (expired).
+                return "IF(\(source)\(n)=\"\",\"\",IF(\(source)\(n)<TODAY(),2,IF(\(source)\(n)-TODAY()<=90,1,0)))"
             }
             return col=="X" && reviewed ?
                 "IF(COUNTA(H\(n),L\(n),P\(n),T\(n))=0,0,SUM(H\(n),L\(n),P\(n),T\(n)))" : nil
@@ -193,6 +194,73 @@ internal enum N1sFullExcelWriter {
                                     with:"<dimension ref=\""+dim+"\"/>")
         return replaced
     }
+    /// Excel-compatible, visible traffic-light circles in INGRESOS D3:G434.
+    /// The helper cells remain numeric; icon formatting hides their values.
+    private static func expirySemaphore(_ xml:String)throws->String {
+        var sheet=xml
+        // Remove only obsolete custom icon sets for the same four columns.
+        let extended=try matches(#"<x14:conditionalFormatting\b[^>]*>.*?</x14:conditionalFormatting>"#,in:sheet)
+        for match in extended.reversed() {
+            guard let range=Range(match.range,in:sheet) else{
+                throw N1sExcelError.invalidTemplate
+            }
+            let block=String(sheet[range])
+            if (block.contains("<xm:sqref>D3:G439</xm:sqref>") ||
+                block.contains("<xm:sqref>D3:G434</xm:sqref>")) &&
+                block.contains("iconSet") {
+                sheet.removeSubrange(range)
+            }
+        }
+        // The legacy x14 wrapper can be empty after removing that rule.
+        for pattern in [
+            #"<x14:conditionalFormattings\b[^>]*>\s*</x14:conditionalFormattings>"#,
+            #"<ext\b[^>]*>\s*</ext>"#,
+            #"<extLst\b[^>]*>\s*</extLst>"#
+        ] {
+            sheet=sheet.replacingOccurrences(of:pattern,with:"",
+                        options:.regularExpression)
+        }
+        let standard=try matches(#"<conditionalFormatting\b[^>]*>.*?</conditionalFormatting>"#,in:sheet)
+        for match in standard.reversed() {
+            guard let range=Range(match.range,in:sheet) else{
+                throw N1sExcelError.invalidTemplate
+            }
+            let block=String(sheet[range])
+            if block.contains("iconSet") &&
+               (block.contains("D3:G439") || block.contains("D3:G434")) {
+                sheet.removeSubrange(range)
+            }
+        }
+        let priorities=try matches(#"\bpriority="(\d+)""#,in:sheet)
+        let largest=priorities.compactMap { result -> Int? in
+            guard let value=Range(result.range(at:1),in:sheet) else{return nil}
+            return Int(sheet[value])
+        }.max() ?? 0
+        guard largest<10000 else{throw N1sExcelError.invalidTemplate}
+        // Reversed standard 3TrafficLights1 icons map 0→green, 1→yellow, 2→red.
+        let traffic="<conditionalFormatting sqref=\"D3:G434\"><cfRule type=\"iconSet\" priority=\"\(largest+1)\"><iconSet iconSet=\"3TrafficLights1\" showValue=\"0\" reverse=\"1\"><cfvo type=\"num\" val=\"0\"/><cfvo type=\"num\" val=\"1\"/><cfvo type=\"num\" val=\"2\"/></iconSet></cfRule></conditionalFormatting>"
+        let existing=try matches(#"</conditionalFormatting>"#,in:sheet)
+        if let last=existing.last,let after=Range(last.range,in:sheet)?.upperBound {
+            sheet.insert(contentsOf:traffic,at:after)
+        }else{
+            guard let data=sheet.range(of:"</sheetData>") else{
+                throw N1sExcelError.invalidTemplate
+            }
+            let rest=sheet[data.upperBound...]
+            let later=["<dataValidations","<hyperlinks","<printOptions",
+                       "<pageMargins","<pageSetup","<headerFooter","<drawing",
+                       "<legacyDrawing","<tableParts","<extLst","</worksheet>"]
+            guard let at=later.compactMap({rest.range(of:$0)?.lowerBound}).min() else{
+                throw N1sExcelError.invalidTemplate
+            }
+            sheet.insert(contentsOf:traffic,at:at)
+        }
+        guard (try matches(#"<iconSet\b[^>]*iconSet="3TrafficLights1""#,in:sheet)).count==1 else{
+            throw N1sExcelError.invalidTemplate
+        }
+        return sheet
+    }
+
     private static func rows(_ json:[String:Any]) throws -> [[Any]] {
         guard let plan=json["plan"] as? [String:Any],
               let elements=plan["lines"] as? [[String:Any]],elements.count<=10000
@@ -375,7 +443,8 @@ internal enum N1sFullExcelWriter {
                 let rebuilt=try sheetData(xml,headerRows:header,rows:sheetRows[no] ?? [],
                                           width:width,reviewed:formulasWritten,sheet:no,
                                           dateStyle:peruDateStyle)
-                archive[i]=N1rStoredEntry(name:path,data:Data(rebuilt.utf8))
+                let completed=try no==3 ? expirySemaphore(rebuilt) : rebuilt
+                archive[i]=N1rStoredEntry(name:path,data:Data(completed.utf8))
                 continue
             }
             if path.hasPrefix("xl/tables/table"),path.hasSuffix(".xml"),
