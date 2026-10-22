@@ -23,6 +23,7 @@ const personal=fs.readFileSync(path.join(root,'native-ios/App/N2NativePersonalIm
 const app=fs.readFileSync(path.join(root,'native-ios/App/DANPERNativeApp.swift'),'utf8');
 const clinicalHome=fs.readFileSync(path.join(root,'native-ios/App/N2ClinicalWorkspaceView.swift'),'utf8');
 const rosterSearch=fs.readFileSync(path.join(root,'native-ios/App/N2WorkerSearchSheet.swift'),'utf8');
+const medicationRow=fs.readFileSync(path.join(root,'native-ios/App/N2MedicationRowView.swift'),'utf8');
 const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView.swift'),'utf8');
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
@@ -57,6 +58,17 @@ for(const phrase of ['Procedimientos independientes',
   'expand-other-procedures','treatment-medications',
   'medication-procedure-group-'])
   must(form,phrase,'tratamiento compacto y plegable');
+for(const phrase of ['N2MedicationRowView(', 'independentProceduresSection()',
+  'medicationPickerSection(context)', 'medicationGroup(group,context:context)'])
+  must(form,phrase,'segmentación del formulario SwiftUI para Xcode');
+for(const phrase of ['@Binding var medication:N2FormMedication',
+  'context.options(for:medication.code,at:visitDate,site:dispensingSite)',
+  'medication.procedureConfirmed=true',
+  'medication.physicalQuantity=Double(medication.quantity)',
+  'DanperCheckRow(selected:$medication.approveOpening)',
+  'onRemove:()->Void'])
+  must(medicationRow,phrase,'edición compacta enlazada al mismo FEFO y borrador');
+
 for(const phrase of ['rosterPage','matches.dropFirst(safePage*pageSize)',
   'Button("Siguiente")'])
   must(history,phrase,'paginación del Personal');
