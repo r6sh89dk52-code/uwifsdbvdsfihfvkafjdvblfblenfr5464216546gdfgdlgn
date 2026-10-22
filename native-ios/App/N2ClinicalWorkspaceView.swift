@@ -19,7 +19,7 @@ struct N2ClinicalWorkspaceGateView:View {
                 DanperPanel("Espacio clínico independiente") {
                     Label("Fuente clínica separada",systemImage:"lock.shield.fill")
                         .font(.headline)
-                    Text("Importa el padrón PERSONAL desde Excel o restaura una copia cifrada de la Build 222. Ninguna fuente se cargará automáticamente.")
+                    Text("Puedes importar PERSONAL, restaurar una copia cifrada de Build 222 o comenzar con un primer trabajador manual. No se precargan registros.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Label("EN VALIDACIÓN: todavía no está aprobada para atención de pacientes reales.",
                           systemImage:"exclamationmark.triangle.fill")
@@ -45,7 +45,7 @@ struct N2ClinicalWorkspaceGateView:View {
                             .font(.caption).foregroundStyle(.secondary)
                             .foregroundStyle(.green)
                     } else {
-                        Text("Elige una sola fuente inicial. Si vas a conservar atenciones y Kardex anteriores, restaura primero el respaldo cifrado de la Build 222. Si quieres un padrón nuevo, importa directamente PERSONAL.")
+                        Text("Elige una sola fuente inicial: restaurar Build 222, importar PERSONAL o registrar manualmente el primer trabajador. Ninguna opción precarga atenciones ni lotes.")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.secondary)
                         NavigationLink {
@@ -64,7 +64,15 @@ struct N2ClinicalWorkspaceGateView:View {
                         }
                         .buttonStyle(DanperSecondaryButton())
                         .accessibilityIdentifier("clinical-first-run-restore-222")
-                        Text("Usa PERSONAL únicamente si deseas comenzar con un padrón nuevo y SIN las atenciones ni el inventario antiguos. Una vez creada la bóveda clínica, no se sobrescribe con otro respaldo.")
+                        NavigationLink {
+                            N2FirstManualWorkerView()
+                        } label: {
+                            Label("Comenzar sin Excel · registrar primer trabajador",
+                                  systemImage:"person.badge.plus")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                        .accessibilityIdentifier("clinical-first-run-manual-worker")
+                        Text("Si no dispones de Excel ni respaldo, podrás comenzar registrando manualmente el primer trabajador. No se crean empleados, atenciones ni lotes de muestra. Si necesitas conservar información de Build 222, restaura su respaldo primero.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Button {
