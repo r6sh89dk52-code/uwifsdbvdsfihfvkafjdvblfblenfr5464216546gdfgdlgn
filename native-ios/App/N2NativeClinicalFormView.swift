@@ -22,7 +22,7 @@ struct N2NativeClinicalFormView:View {
         _previewReady=State(initialValue:!layoutOutcomes.isEmpty)
         _saved=State(initialValue:saved)
         _chooseProduct=State(initialValue:showCatalog)
-        _expandedMedication=State(initialValue:draft.items.first?.id)
+        _expandedMedication=State(initialValue:nil)
         _context=State(initialValue:layoutContext)
         _form=State(initialValue:draft)
         _step=State(initialValue:step)
@@ -893,7 +893,8 @@ struct N2NativeClinicalFormView:View {
     private func appendClinicalMedication(_ code:String) {
         let med=N2FormMedication(code:code)
         form.items.append(med)
-        expandedMedication=med.id
+        // Build 222: insertion shows a compact row. Expand only after a tap.
+        expandedMedication=nil
         if let context {form.refreshProcedureSuggestions(catalog:context.products)}
     }
     private func medicationName(_ code:String,_ context:N2FormContext)->String {
