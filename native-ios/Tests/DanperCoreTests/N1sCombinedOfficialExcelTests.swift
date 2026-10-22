@@ -72,6 +72,13 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         XCTAssertTrue(xml.contains("name=\"KARDEX ENFERMERAS\""))
         XCTAssertFalse(xml.contains("name=\"Hoja1\""))
         XCTAssertFalse(package.contains{$0.name=="docProps/app.xml"})
+        let stockSheet=try XCTUnwrap(package.first{
+            $0.name=="xl/worksheets/sheet2.xml"
+        })
+        let stockXML=try XCTUnwrap(String(data:stockSheet.data,encoding:.utf8))
+        let headingPattern=#"<c\b[^>]*\br="F6"[^>]*>\s*<is><t(?:\s[^>]*)?>TOTAL STOCK</t></is></c>"#
+        XCTAssertNotNil(stockXML.range(of:headingPattern,options:.regularExpression),
+                        "F6 debe presentar TOTAL STOCK sin cambiar las fórmulas")
         XCTAssertFalse(result.canUseClinicalData)
         XCTAssertTrue(try N1rStoredZip.unpack(result.xlsx).contains{
             $0.name=="xl/printerSettings/printerSettings2.bin"
