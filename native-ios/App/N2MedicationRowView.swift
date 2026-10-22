@@ -51,8 +51,7 @@ struct N2MedicationRowView:View {
     private var lotLabels:[String:String] {
         var result=["":"Automático por FEFO / pendiente"]
         for lot in lots {
-            result[lot.id]=lot.name+" · Lote "+lot.id+
-                " · Vence "+DanperDatePresentation.display(lot.expires)
+            result[lot.id]="\(lot.name) · Lote \(lot.id) · Vence \(DanperDatePresentation.display(lot.expires))"
         }
         return result
     }
@@ -72,10 +71,7 @@ struct N2MedicationRowView:View {
                         Text(productName)
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.primary)
-                        Text("Cantidad \(medication.quantity) · " +
-                             (medication.procedure.isEmpty
-                                 ? "Procedimiento pendiente"
-                                 : medication.procedure.capitalized))
+                        Text("Cantidad \(medication.quantity) · \(medication.procedure.isEmpty ? "Procedimiento pendiente" : medication.procedure.capitalized)")
                             .font(.caption).foregroundStyle(.secondary)
                         if allergyWarning {
                             Label("Revisar posible coincidencia de alergia",
@@ -171,8 +167,7 @@ struct N2MedicationRowView:View {
         DanperChoiceField(title:"Existencia física",selection:lotSelection,
                           options:[""]+lots.map(\.id),labels:lotLabels)
         if let first=lots.first {
-            Text("FEFO: "+first.id+" · Disponible: "+
-                 lots.reduce(0.0){$0+$1.total}.formatted())
+            Text("FEFO: \(first.id) · Disponible: \(lots.reduce(0.0){$0+$1.total}.formatted())"
                 .font(.caption).foregroundStyle(.secondary)
         }else {
             Label("Sin existencia aprobada vigente. Se registrará como consumo pendiente.",
@@ -181,8 +176,7 @@ struct N2MedicationRowView:View {
         }
         if !medication.selectedLotID.isEmpty {
             if let selected=lots.first(where:{$0.id==medication.selectedLotID}) {
-                Text("Existencia: "+selected.total.formatted()+
-                     " · Capacidad por envase: "+selected.capacity.formatted())
+                Text("Existencia: \(selected.total.formatted()) · Capacidad por envase: \(selected.capacity.formatted())"
                     .font(.caption).foregroundStyle(.secondary)
             }
             DanperField(title:"Unidades físicas usadas (mL, UND…)") {
