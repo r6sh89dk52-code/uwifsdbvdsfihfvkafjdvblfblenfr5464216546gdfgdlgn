@@ -198,13 +198,6 @@ internal enum N1sNursingExcelWriter {
             at:end.lowerBound)
         return(xml,count)
     }
-    /// Rewrites the misspelled stock total *label* only, never formulas or data.
-    private static func correctTotalStockLabel(_ xml:String)->String {
-        xml.replacingOccurrences(
-            of:#"(?i)(<t(?:\s[^>]*)?>)\s*TOTAL\s+ESTOCK\s*(</t>)"#,
-            with:"$1TOTAL STOCK$2",options:.regularExpression)
-    }
-
     /// Build 222 parity: the nursing export contains ONLY "KARDEX ENFERMERAS".
     /// Remove donor worksheet and all direct OOXML references (never change
     /// the original template on disk). Retain printerSettings2.bin and styles.
@@ -350,9 +343,6 @@ internal enum N1sNursingExcelWriter {
         let prefix=String(strings[..<rootOpen.lowerBound])
         let suffix=String(strings[closing.lowerBound...])
         strings=prefix + openTag + retainedStrings + suffix
-        // Correct the original typo in the header, preserving every other cell.
-        strings=correctTotalStockLabel(strings)
-        sheet=correctTotalStockLabel(sheet)
         try set("xl/sharedStrings.xml",strings)
         try set("xl/worksheets/sheet2.xml",sheet)
 
@@ -433,6 +423,10 @@ internal enum N1sNursingExcelWriter {
         let rangeLabel=periodEnd.isEmpty ? "FECHA: "+dateName :
             "PERÍODO CONSOLIDADO: "+dateName+" AL "+(try dateLabel(periodEnd))
         sheet=try patch(sheet,address:"I3",value:rangeLabel)
+        // F6 is the TOTAL STOCK column heading of the official nursing sheet.
+        // Replace this one visible cell instead of searching rich shared-string
+        // runs. patch() keeps the original cell style and merged layout.
+        sheet=try patch(sheet,address:"F6",value:"TOTAL STOCK")
         guard let styleEntry=entries.firstIndex(where:{$0.name=="xl/styles.xml"}),
               let styles=String(data:entries[styleEntry].data,encoding:.utf8)
         else{throw N1sExcelError.invalidTemplate}
