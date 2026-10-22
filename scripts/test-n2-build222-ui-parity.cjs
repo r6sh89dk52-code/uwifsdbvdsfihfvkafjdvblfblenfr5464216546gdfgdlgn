@@ -35,7 +35,8 @@ must(clinicalHome,'clinical-first-run-manual-worker','inicio manual sin Excel');
 for(const phrase of ['DanperBrandHeader {','Bienvenido',
   'ACCESO RÁPIDO','Nueva atención','homeMetric('])
   must(clinicalHome,phrase,'cabecera y estructura de Inicio Build222');
-for(const phrase of ['Image("BrandLogo")','danper-brand-header',
+for(const phrase of ['UIImage(named:"BrandLogo")',
+  'Image(uiImage:Self.wordmark ?? UIImage())','danper-brand-header',
   'ignoresSafeArea(edges:.top)','Text("SALUD MÓVIL")'])
   must(theme,phrase,'cabecera roja con logo oficial');
 for(const phrase of ['N2WorkerSearchSheet(workers:context.workers',
@@ -73,7 +74,7 @@ assert(!firstWorker.includes('activateSyntheticFixture(') &&
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
 
-for(const label of ['DEPARTAMENTO DE SALUD','Bienvenido a DANPER',
+for(const label of ['DEPARTAMENTO DE SALUD','Text("Bienvenido")',
   'clinical-home-new-attention','clinical-home-tool-','N2HealthMascot()'])
   must(clinicalHome,label,'portada nativa 222');
 for(const label of ['@AppStorage("danper.haptics.enabled")',
