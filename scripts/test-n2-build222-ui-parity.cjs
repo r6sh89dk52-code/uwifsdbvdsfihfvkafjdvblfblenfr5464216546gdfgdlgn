@@ -22,6 +22,9 @@ const reset=fs.readFileSync(path.join(root,'native-ios/App/N2DemoResetView.swift
 const personal=fs.readFileSync(path.join(root,'native-ios/App/N2NativePersonalImportView.swift'),'utf8');
 const app=fs.readFileSync(path.join(root,'native-ios/App/DANPERNativeApp.swift'),'utf8');
 const clinicalHome=fs.readFileSync(path.join(root,'native-ios/App/N2ClinicalWorkspaceView.swift'),'utf8');
+const rosterSearch=fs.readFileSync(path.join(root,'native-ios/App/N2WorkerSearchSheet.swift'),'utf8');
+const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView.swift'),'utf8');
+const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
 must(app,'N2ClinicalWorkspaceGateView()','inicio cifrado con importación PERSONAL');
@@ -29,6 +32,34 @@ assert(!app.includes('NativeRootView()'),'No puede abrirse el modo ficticio en i
 must(clinicalHome,'clinical-first-run-import-personal','importar PERSONAL como acción principal');
 must(clinicalHome,'clinical-first-run-restore-222','restauración opcional Build222');
 must(clinicalHome,'clinical-first-run-manual-worker','inicio manual sin Excel');
+for(const phrase of ['DanperBrandHeader {','Bienvenido',
+  'ACCESO RÁPIDO','Nueva atención','homeMetric('])
+  must(clinicalHome,phrase,'cabecera y estructura de Inicio Build222');
+for(const phrase of ['Image("BrandLogo")','danper-brand-header',
+  'ignoresSafeArea(edges:.top)','Text("SALUD MÓVIL")'])
+  must(theme,phrase,'cabecera roja con logo oficial');
+for(const phrase of ['N2WorkerSearchSheet(workers:context.workers',
+  'showWorkerSearch=true','attention-browse-workers','onSelect:{worker in'])
+  must(form,phrase,'búsqueda real desde Paso 1');
+for(const phrase of ['roster-global-search','roster-result-',
+  'private let pageSize=25','onNewWorker()'])
+  must(rosterSearch,phrase,'padrón nativo con una pulsación y páginas');
+for(const phrase of ['private func issueCodes(for stage:Int',
+  'private func focusFirstMissing','validationIssueCode',
+  'scrollIssueRequest=DanperScrollRequest(fieldID:field)',
+  'Button("Ir al campo")'])
+  must(form,phrase,'validación por código, desplazamiento y foco');
+for(const phrase of ['DanperScrollRequest:Equatable',
+  'onChange(of:jumpRequest)','confirmationDialog(title'])
+  must(theme,phrase,'componentes de navegación al error');
+for(const phrase of ['Procedimientos independientes',
+  'expand-other-procedures','treatment-medications',
+  'medication-procedure-group-'])
+  must(form,phrase,'tratamiento compacto y plegable');
+for(const phrase of ['rosterPage','matches.dropFirst(safePage*pageSize)',
+  'Button("Siguiente")'])
+  must(history,phrase,'paginación del Personal');
+
 must(clinicalHome,'N2FirstManualWorkerView()','registro inicial sin archivo');
 for(const phrase of ['N2EmptyDemoSnapshot.make()','N2SnapshotEditor.addWorker(',
   'activateOnlyWithConsent(source,approvedByUser:true)',
@@ -123,4 +154,5 @@ must(personal,'personal-xlsx-import-preview','vista previa de Excel');
 must(personal,'open-imported-clinical-workspace','abrir bóveda clínica tras importar');
 console.log('PASS: onboarding con origen explícito, demo realmente vacía, borrado verificado e importación protegida.');
 console.log('PASS: nueva vía sin Excel crea solo el primer trabajador manual con autenticación y fuente vacía original.');
+console.log('PASS: cabecera DANPER, búsqueda de padrón paginada, validación con foco y tratamiento compacto en B11.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
