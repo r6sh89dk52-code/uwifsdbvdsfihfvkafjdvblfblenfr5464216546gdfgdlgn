@@ -765,6 +765,17 @@ struct N2NativeClinicalFormView:View {
 
     private func treatmentSection(_ context:N2FormContext)->some View {
         Group {
+            independentProceduresSection()
+                .id("treatment-procedures")
+            if !layoutDetailOnly {
+                medicationPickerSection(context)
+            }
+            medicationFields(context)
+                .id("treatment-medications")
+        }
+    }
+
+    private func independentProceduresSection()->some View {
             DanperPanel("Procedimientos independientes") {
                 Text("Puedes registrar una curación u otro procedimiento por separado, incluso sin medicamentos.")
                     .font(.subheadline).foregroundStyle(.secondary)
@@ -836,8 +847,9 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
             }
-            .id("treatment-procedures")
-        if !layoutDetailOnly {
+    }
+
+    private func medicationPickerSection(_ context:N2FormContext)->some View {
         DanperPanel("Medicamentos e insumos") {
             Text("Cada producto mantiene su propio procedimiento. Toca una fila para editar cantidades, lote o presentación.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -876,12 +888,8 @@ struct N2NativeClinicalFormView:View {
             Text("\(context.products.clinical.count) productos · selección múltiple")
                 .font(.footnote).foregroundStyle(.secondary)
         }
-        }
-
-            medicationFields(context)
-                .id("treatment-medications")
-        }
     }
+
     private func appendClinicalMedication(_ code:String) {
         let med=N2FormMedication(code:code)
         form.items.append(med)
