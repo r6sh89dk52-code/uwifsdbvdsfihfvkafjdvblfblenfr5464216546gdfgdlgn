@@ -48,6 +48,25 @@ public enum N2NativeClinicalTransaction {
         let parts=calendar.dateComponents([.year,.month,.day],from:date)
         return String(format:"%04d-%02d-%02d",parts.year!,parts.month!,parts.day!)
     }
+    /// Historical encounters use their clinical time, never restoration time.
+    /// Backdating is safe only if the stock lot's own ledger has no later event.
+    private static func historicalAt(day:String,time:String,now:Int64)->Int64? {
+        let d=day.split(separator:"-").compactMap{Int($0)}
+        let t=time.split(separator:":").compactMap{Int($0)}
+        guard day.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
+                        options:.regularExpression) != nil,
+              d.count==3,t.count==2,(0...23).contains(t[0]),
+              (0...59).contains(t[1]) else{return nil}
+        var calendar=Calendar(identifier:.gregorian)
+        calendar.timeZone=TimeZone(identifier:"America/Lima")!
+        let expected=DateComponents(year:d[0],month:d[1],day:d[2],
+                                    hour:t[0],minute:t[1])
+        guard let moment=calendar.date(from:expected),
+              calendar.dateComponents([.year,.month,.day,.hour,.minute],
+                                      from:moment)==expected else{return nil}
+        let millis=Int64(moment.timeIntervalSince1970*1000)
+        return millis<=now ? millis:nil
+    }
     private static func mappings(_ data:Data) throws -> [Material] {
         guard let raw=try? JSONSerialization.jsonObject(with:data) as? [[String:Any]],
               raw.count==86 else {throw N2ClinicalError.invalidApprovedCatalog}
@@ -152,6 +171,10 @@ public enum N2NativeClinicalTransaction {
         }
         let verifiedSites=try N2StockSiteEvidence.resolve(root)
         let today=limaDay(at)
+        let historical=date != today
+        let eventAt: Int64? = historical
+            ? historicalAt(day:date,time:new["time"] as? String ?? "",now:at)
+            : at
         var linked=0,pending=0,already=0,reasons:[String]=[],added=0
         var lineID=""
         var outcomes:[String:String]=[:]
@@ -168,8 +191,8 @@ public enum N2NativeClinicalTransaction {
                 outcomes[itemID]="Descontado"
                 already+=1;continue
             }
-            if date != today {
-                mark("Fecha clínica histórica: no se reconstruye consumo físico.")
+            if eventAt==nil {
+                mark("Fecha clínica futura o inválida: el consumo queda registrado sin modificar el inventario.")
                 continue
             }
             let candidates=approved.filter{$0.clinicalCode==code &&
@@ -203,13 +226,26 @@ public enum N2NativeClinicalTransaction {
                       candidates.contains(where:{$0.kardexCode==lc && $0.kardexName==ln}),
                       let t=total(l),t>0,
                       let expiry=l["expires"] as? String,
-                      expiry.isEmpty || expiry>=today else{return false}
+                      expiry.isEmpty || expiry>=date else{return false}
+                if historical {
+                    guard let when=eventAt,
+                          let updated=number(l["updatedAt"]),updated<=Double(when),
+                          !movements.contains(where:{movement in
+                              movement["lotId"] as? String == l["id"] as? String &&
+                              (number(movement["at"]) ?? Double.greatestFiniteMagnitude)
+                                  > Double(when)
+                          }) else{return false}
+                }
                 if individual {
                     let stock=(l["catalogUnit"] as? String ?? "").uppercased()
                     return (item["unit"] as? String)?.uppercased()=="PAR" ?
                         stock=="PAR" : ["UND","TBL"].contains(stock)
                 }
                 return true
+            }
+            if eligible.isEmpty && historical {
+                mark("El lote fue registrado después de la atención o posee movimientos posteriores: reconstruir el saldo del corte sin restarlo otra vez del conteo actual.")
+                continue
             }
             if eligible.isEmpty && !scope.isEmpty {
                 mark("Sin stock vigente con sede verificada en el tópico elegido. No se usa stock ajeno ni de sede desconocida.");continue
@@ -276,7 +312,7 @@ public enum N2NativeClinicalTransaction {
                     open=true
                     if !individual {r=1}
                 }else {canPlan=false;break}
-                after["updatedAt"]=at
+                after["updatedAt"]=eventAt!
                 guard (total(after) ?? -1)>=0,
                       triple((total(after) ?? 0)-(total(before) ?? 0)) == (0.0 - take) else {
                     canPlan=false;break
@@ -313,7 +349,7 @@ public enum N2NativeClinicalTransaction {
                     "id":"ATT:\(id):ITEM:\(itemID)\(suffix)",
                     "lotId":before["id"]!,
                     "code":before["code"]!,"name":before["name"]!,
-                    "unit":before["catalogUnit"]!,"at":at,
+                    "unit":before["catalogUnit"]!,"at":eventAt!,
                     "kind":"use","description":"Consumo FEFO vinculado a atención",
                     "quantity":qty,"sealedAdded":0,"looseAdded":0,
                     "openedNewContainer":part.3,"excelQuantity":part.4,
