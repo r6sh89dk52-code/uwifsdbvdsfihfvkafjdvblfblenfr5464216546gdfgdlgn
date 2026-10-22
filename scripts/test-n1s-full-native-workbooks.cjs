@@ -25,8 +25,8 @@ for(let i=1;i<=10;i++){
    const found=ac.get(ref);
    assert.ok(found,'missing '+i+'!'+ref);
    const original=f(bc,ref),ours=f(ac,ref);
-   if(original && i===3 && /^[DEFG]\\d+$/.test(ref)) {
-     const row=Number(ref.match(/\\d+/)[0]);
+   if(original && i===3 && /^[DEFG]\d+$/.test(ref)) {
+     const row=Number(ref.match(/\d+/)[0]);
      const expiry={D:'J',E:'N',F:'R',G:'V'}[ref[0]]+row;
      const semaphore='IF('+expiry+'="","",IF('+expiry+'<TODAY(),2,IF('+expiry+'-TODAY()<=90,1,0)))';
      assert.equal(ours,semaphore,'semaforo vencimiento '+ref);
