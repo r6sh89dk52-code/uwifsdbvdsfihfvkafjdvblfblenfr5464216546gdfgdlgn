@@ -171,53 +171,128 @@ private struct N2ClinicalWorkspaceRootView:View {
     @State private var registeredDNI:String?
     @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @AppStorage("danper.appearance") private var appearance="system"
+    @AppStorage("danper.haptics.enabled") private var haptics=true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
         TabView(selection:$tab) {
             NavigationStack {
                 ScrollView {
-                    VStack(alignment:.leading,spacing:16) {
-                        DanperPanel {
-                            Label("ESPACIO CLÍNICO · FUENTE INDEPENDIENTE",
-                                  systemImage:"cross.case.fill")
-                                .font(.headline)
-                            Text("Evaluación técnica en curso. No utilizar con pacientes reales hasta aprobar las pruebas de restauración, inventario y exportación.")
-                                .font(.footnote).foregroundStyle(.orange)
+                    VStack(alignment:.leading,spacing:18) {
+                        HStack(spacing:11) {
+                            Image("BrandLogo").resizable().scaledToFit()
+                                .frame(width:44,height:44)
+                                .clipShape(RoundedRectangle(cornerRadius:11))
+                            VStack(alignment:.leading,spacing:1) {
+                                Text("DANPER")
+                                    .font(.system(.headline,design:.rounded,weight:.heavy))
+                                Text("SALUD MÓVIL")
+                                    .font(.caption2.weight(.bold)).tracking(1.3)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength:8)
+                            Button {withAnimation(reduceMotion ? nil : DanperStyle.animation){tab=3}} label:{
+                                Image(systemName:"gearshape")
+                                    .font(.title3)
+                                    .foregroundStyle(.primary)
+                                    .frame(width:44,height:44)
+                            }
+                            .accessibilityLabel("Ajustes")
+                        }
+                        VStack(alignment:.leading,spacing:9) {
+                            Text("DEPARTAMENTO DE SALUD")
+                                .font(.caption2.weight(.bold)).tracking(1.3)
+                                .foregroundStyle(DanperStyle.red)
+                            HStack(spacing:12) {
+                                Text("Bienvenido a DANPER")
+                                    .font(.system(.title,design:.rounded,weight:.bold))
+                                    .fixedSize(horizontal:false,vertical:true)
+                                Spacer(minLength:4)
+                                Image(systemName:"waveform.path.ecg")
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundStyle(DanperStyle.red)
+                            }
+                            Text("Registro ambulatorio local · Fuente clínica cifrada")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth:.infinity,alignment:.leading)
+                        .padding(19)
+                        .background(DanperStyle.surface,
+                                    in:RoundedRectangle(cornerRadius:20))
+                        if visualPalette=="salud" {
+                            HStack(spacing:8) {
+                                VStack(alignment:.leading,spacing:6) {
+                                    Label("SALUD OCUPACIONAL",
+                                          systemImage:"cross.case.fill")
+                                        .font(.caption2.weight(.bold))
+                                    Text("Prevención, atención y seguimiento")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("Un mismo registro para ambas sedes.")
+                                        .font(.caption).opacity(0.9)
+                                }.foregroundStyle(.white)
+                                Spacer(minLength:0)
+                                N2HealthMascot().frame(width:112,height:112)
+                            }
+                            .padding(.leading,16).padding(.trailing,6)
+                            .frame(maxWidth:.infinity,minHeight:124)
+                            .background(
+                                LinearGradient(colors:[
+                                    Color(red:0.02,green:0.38,blue:0.78),
+                                    Color(red:0.01,green:0.69,blue:0.89)],
+                                    startPoint:.leading,endPoint:.trailing),
+                                in:RoundedRectangle(cornerRadius:20))
                         }
                         Button {
-                            tab=1
+                            withAnimation(reduceMotion ? nil : DanperStyle.animation) {
+                                tab=1
+                            }
                         } label: {
-                            Label("Registrar nueva atención",systemImage:"plus.circle.fill")
+                            Label("Registrar nueva atención",
+                                  systemImage:"plus.circle.fill")
+                                .frame(maxWidth:.infinity,minHeight:48)
                         }
                         .buttonStyle(DanperPrimaryButton())
-                        NavigationLink {
-                            N2NativeInventoryView()
-                        } label: {
-                            Label("Inventario por lotes",systemImage:"shippingbox")
+                        .accessibilityIdentifier("clinical-home-new-attention")
+
+                        Text("Herramientas")
+                            .font(.title3.weight(.bold))
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                        LazyVGrid(columns:[GridItem(.flexible(),spacing:12),
+                                           GridItem(.flexible(),spacing:12)],
+                                  spacing:12) {
+                            homeTile("Personal","Padrón Excel",
+                                     symbol:"person.2.fill") {
+                                N2NativePersonalImportView()
+                            }
+                            homeTile("Kardex","Inventario y movimientos",
+                                     symbol:"shippingbox.fill") {
+                                N2Build222KardexHub()
+                            }
+                            homeTile("Indicador","Excel · 10 hojas",
+                                     symbol:"tablecells") {
+                                N2VerifiedIndicatorExportView()
+                            }
+                            homeTile("Historial","Atenciones registradas",
+                                     symbol:"list.clipboard.fill") {
+                                N2NativeHistoryView(useProtectedVault:true)
+                            }
+                            homeTile("Borradores","Registros pendientes",
+                                     symbol:"doc.text.fill") {
+                                N2NativeDraftsDashboard()
+                            }
+                            homeTile("Respaldo","Copia cifrada",
+                                     symbol:"lock.doc") {
+                                N2NativeBackupExportView()
+                            }
                         }
-                        .buttonStyle(DanperSecondaryButton())
-                        NavigationLink {
-                            N2VerifiedIndicatorExportView()
-                        } label: {
-                            Label("Indicador ambulatorio · Excel",systemImage:"tablecells")
-                        }
-                        .buttonStyle(DanperSecondaryButton())
-                        DanperToolLink(title:"Personal e historial",
-                                       symbol:"person.2.fill") {
-                            N2NativeHistoryView(useProtectedVault:true)
-                        }
-                        DanperToolLink(title:"Borradores pendientes",
-                                       symbol:"doc.text.fill") {
-                            N2NativeDraftsDashboard()
-                        }
-                        DanperToolLink(title:"Kardex y reportes",
-                                       symbol:"shippingbox.fill") {
-                            N2Build222KardexHub()
-                        }
+                        Label("Acceso protegido. Validar restauración, Kardex y Excel en el dispositivo antes de usar registros de pacientes reales.",
+                              systemImage:"lock.shield")
+                            .font(.caption).foregroundStyle(.secondary)
                         Button("Cerrar espacio clínico",role:.cancel) {onClose()}
                             .buttonStyle(DanperSecondaryButton())
-                    }.padding(16)
+                    }
+                    .padding(16)
                 }
-                .navigationTitle("DANPER · Clínica")
+                .navigationTitle("Inicio")
             }
             .tabItem {Label("Inicio",systemImage:"house.fill")}.tag(0)
             NavigationStack {
@@ -285,6 +360,10 @@ private struct N2ClinicalWorkspaceRootView:View {
         }
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
+        .preferredColorScheme(appearance=="system" ? nil :
+                             appearance=="dark" ? .dark : .light)
+        .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
+        .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
         .opacity(scenePhase == .active ? 1 : 0)
         .accessibilityHidden(scenePhase != .active)
         .allowsHitTesting(scenePhase == .active)
@@ -295,4 +374,33 @@ private struct N2ClinicalWorkspaceRootView:View {
             if phase != .active {onClose()}
         }
     }
+    private func homeTile<Destination:View>(
+        _ title:String,_ subtitle:String,symbol:String,
+        @ViewBuilder destination:()->Destination)->some View {
+        NavigationLink {
+            destination()
+        } label: {
+            VStack(alignment:.leading,spacing:9) {
+                Image(systemName:symbol)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(DanperStyle.red)
+                    .frame(width:43,height:43)
+                    .background(DanperStyle.red.opacity(0.09),
+                                in:RoundedRectangle(cornerRadius:13))
+                Text(title).font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                Text(subtitle).font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal:false,vertical:true)
+                Spacer(minLength:0)
+            }
+            .frame(maxWidth:.infinity,minHeight:119,alignment:.topLeading)
+            .padding(13)
+            .background(DanperStyle.surface,
+                        in:RoundedRectangle(cornerRadius:17))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("clinical-home-tool-"+title.lowercased())
+    }
+
 }
