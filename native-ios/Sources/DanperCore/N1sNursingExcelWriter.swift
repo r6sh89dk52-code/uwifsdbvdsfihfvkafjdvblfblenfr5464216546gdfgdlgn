@@ -326,8 +326,10 @@ internal enum N1sNursingExcelWriter {
                     with:" "+attr+"=\""+String(indices.count)+"\">")
             }
         }
-        strings=String(strings[..<rootOpen.lowerBound])+openTag+
-            indices.map{originalTokens[$0]}.joined()+String(strings[closing.lowerBound...])
+        let retainedStrings=indices.map { originalTokens[$0] }.joined()
+        let prefix=String(strings[..<rootOpen.lowerBound])
+        let suffix=String(strings[closing.lowerBound...])
+        strings=prefix + openTag + retainedStrings + suffix
         try set("xl/sharedStrings.xml",strings)
         try set("xl/worksheets/sheet2.xml",sheet)
 
