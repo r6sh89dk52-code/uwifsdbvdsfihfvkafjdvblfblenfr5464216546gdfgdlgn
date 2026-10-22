@@ -28,6 +28,9 @@ struct N2MedicationRowView:View {
     private var lots:[N2FormLot] {
         context.options(for:medication.code,at:visitDate,site:dispensingSite)
     }
+    private var availablePhysicalUnits:Double {
+        lots.reduce(0.0) { partial,lot in partial + lot.total }
+    }
     private var procedureSelection:Binding<String> {
         Binding(
             get:{medication.procedure},
@@ -167,7 +170,7 @@ struct N2MedicationRowView:View {
         DanperChoiceField(title:"Existencia física",selection:lotSelection,
                           options:[""]+lots.map(\.id),labels:lotLabels)
         if let first=lots.first {
-            Text("FEFO: \(first.id) · Disponible: \(lots.reduce(0.0){$0+$1.total}.formatted())")
+            Text("FEFO: \(first.id) · Disponible: \(availablePhysicalUnits.formatted())")
                 .font(.caption).foregroundStyle(.secondary)
         }else {
             Label("Sin existencia aprobada vigente. Se registrará como consumo pendiente.",
