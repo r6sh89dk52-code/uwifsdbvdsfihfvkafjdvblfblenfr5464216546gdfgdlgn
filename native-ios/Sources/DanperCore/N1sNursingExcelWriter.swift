@@ -198,6 +198,13 @@ internal enum N1sNursingExcelWriter {
             at:end.lowerBound)
         return(xml,count)
     }
+    /// Rewrites the misspelled stock total *label* only, never formulas or data.
+    private static func correctTotalStockLabel(_ xml:String)->String {
+        xml.replacingOccurrences(
+            of:#"(?i)(<t(?:\s[^>]*)?>)\s*TOTAL\s+ESTOCK\s*(</t>)"#,
+            with:"$1TOTAL STOCK$2",options:.regularExpression)
+    }
+
     /// Build 222 parity: the nursing export contains ONLY "KARDEX ENFERMERAS".
     /// Remove donor worksheet and all direct OOXML references (never change
     /// the original template on disk). Retain printerSettings2.bin and styles.
@@ -343,6 +350,9 @@ internal enum N1sNursingExcelWriter {
         let prefix=String(strings[..<rootOpen.lowerBound])
         let suffix=String(strings[closing.lowerBound...])
         strings=prefix + openTag + retainedStrings + suffix
+        // Correct the original typo in the header, preserving every other cell.
+        strings=correctTotalStockLabel(strings)
+        sheet=correctTotalStockLabel(sheet)
         try set("xl/sharedStrings.xml",strings)
         try set("xl/worksheets/sheet2.xml",sheet)
 
