@@ -10,12 +10,18 @@ struct N2NativeHistoryView: View {
     @State private var projection:N2NativeReadModel?
     @State private var query=""
     @State private var selectedDNI:String?
+    @State private var rosterPage=0
+    private let pageSize=25
     @State private var hasError=false
     private let accent=Color(red:0.88,green:0.09,blue:0.16)
 
     var body:some View {
         Group {
             if let projection {
+                let matches=projection.findWorkers(query)
+                let totalPages=max(1,(matches.count+pageSize-1)/pageSize)
+                let safePage=min(rosterPage,totalPages-1)
+                ScrollViewReader { proxy in
                 ScrollView {
                   VStack(alignment:.leading,spacing:16) {
                     DanperPanel {
@@ -26,7 +32,10 @@ struct N2NativeHistoryView: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
-                        ForEach(projection.findWorkers(query)) { w in
+                        Color.clear.frame(height:1).id("roster-page-top")
+                        Text("\(matches.count) resultados · Página \(safePage+1) de \(totalPages)")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(Array(matches.dropFirst(safePage*pageSize).prefix(pageSize))) { w in
                             Button {
                                 selectedDNI = w.dni
                             } label: {
@@ -46,6 +55,26 @@ struct N2NativeHistoryView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        if totalPages>1 {
+                            HStack {
+                                Button("Anterior") {
+                                    rosterPage=max(0,safePage-1)
+                                    withAnimation(.easeOut(duration:0.18)){
+                                        proxy.scrollTo("roster-page-top",anchor:.top)
+                                    }
+                                }.disabled(safePage==0)
+                                Spacer()
+                                Text("\(safePage+1) / \(totalPages)")
+                                    .font(.caption).monospacedDigit()
+                                Spacer()
+                                Button("Siguiente") {
+                                    rosterPage=min(totalPages-1,safePage+1)
+                                    withAnimation(.easeOut(duration:0.18)){
+                                        proxy.scrollTo("roster-page-top",anchor:.top)
+                                    }
+                                }.disabled(safePage==totalPages-1)
+                            }.buttonStyle(.bordered)
+                        }
                     }
                     DanperPanel("Historial completo") {
                         Text("\(projection.visits.filter{$0.status=="saved"}.count) atenciones guardadas · \(projection.visits.filter{$0.status=="draft"}.count) borradores")
@@ -61,8 +90,15 @@ struct N2NativeHistoryView: View {
                   }.padding(16)
                 }
                 .searchable(text:$query,prompt:"Buscar DNI, nombres o área")
+                .onChange(of:query) {_,_ in
+                    rosterPage=0
+                    withAnimation(.easeOut(duration:0.18)){
+                        proxy.scrollTo("roster-page-top",anchor:.top)
+                    }
+                }
                 .navigationDestination(item:$selectedDNI) { dni in
                     N2WorkerHistoryDetail(dni:dni,model:projection,realSource:useProtectedVault)
+                }
                 }
             } else {
                 ContentUnavailableView(
