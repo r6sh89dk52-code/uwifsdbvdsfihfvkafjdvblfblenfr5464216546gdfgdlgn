@@ -28,6 +28,7 @@ struct N2NativeWorkerEditorView:View {
     @State private var area=""
     @FocusState private var areaFocused:Bool
     @State private var areaSuggestionsVisible=true
+    @State private var areaSelectedByTap=false
     @State private var areaRevealTask:Task<Void,Never>?
     @Environment(\.danperReveal) private var reveal
     private let areaAnchor="worker-area-suggestions"
@@ -162,6 +163,10 @@ struct N2NativeWorkerEditorView:View {
                         TextField("Escribe o selecciona un área",text:$area)
                             .textInputAutocapitalization(.words)
                             .focused($areaFocused)
+                            .onTapGesture {
+                                areaSelectedByTap=false
+                                areaSuggestionsVisible=true
+                            }
                             .accessibilityIdentifier("worker-area-search")
                     }
                     if areaCatalogIncomplete {
@@ -185,9 +190,14 @@ struct N2NativeWorkerEditorView:View {
                             LazyVStack(spacing:6) {
                                 ForEach(areaSuggestions,id:\.self) { suggestion in
                                     Button {
-                                        area=suggestion
-                                        areaFocused=false
+                                        // Dismiss before changing the bound TextField.
+                                        // Prevent its onChange callback from reopening
+                                        // the same list after a one-tap selection.
+                                        areaRevealTask?.cancel()
+                                        areaSelectedByTap=true
                                         areaSuggestionsVisible=false
+                                        areaFocused=false
+                                        area=suggestion
                                     } label: {
                                         HStack(spacing:10) {
                                             Image(systemName:"building.2")
@@ -354,13 +364,18 @@ struct N2NativeWorkerEditorView:View {
         .onChange(of:birthDateText) {_,_ in revalidateAfterEdit()}
         .onChange(of:manualAgeText) {_,_ in revalidateAfterEdit()}
         .onChange(of:area) {_,_ in
-            if areaFocused {areaSuggestionsVisible=true}
-            requestAreaReveal()
+            if !areaSelectedByTap {
+                if areaFocused {areaSuggestionsVisible=true}
+                requestAreaReveal()
+            }
         }
         .onChange(of:areaFocused) {_,active in
-            if active {
+            if active && !areaSelectedByTap {
                 areaSuggestionsVisible=true
                 requestAreaReveal()
+            }
+            if !active && areaSelectedByTap {
+                areaSuggestionsVisible=false
             }
         }
         .onDisappear {areaRevealTask?.cancel()}
