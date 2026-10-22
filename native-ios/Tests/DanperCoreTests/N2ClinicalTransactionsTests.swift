@@ -124,6 +124,35 @@ final class N2ClinicalTransactionsTests: XCTestCase {
             XCTAssertEqual($0 as? N2ClinicalError,.invalidApprovedCatalog)
         }
     }
+    func testHistoricalSavedVisitDispensesAutomaticallyWhenLotChronologyAllows() throws {
+        let original=try source()
+        var historic=sample(original,id:"n2-historical-automatic")
+        historic["date"]="2026-10-15"
+        historic["time"]="10:00"
+        let output=try N2NativeClinicalTransaction.appendSavedVisit(
+            snapshot:data(original),visit:data(historic),
+            approvedCatalog:read("n2-reviewed-approved.json"),
+            at:time("2026-10-22"))
+        XCTAssertEqual(output.linked,1)
+        XCTAssertEqual(output.pending,0)
+        let root=try XCTUnwrap(JSONSerialization.jsonObject(with:output.snapshot) as? [String:Any])
+        let movements=try XCTUnwrap(root["stockMovements"] as? [[String:Any]])
+        let dated=movements.filter {
+            let link=$0["dispenseRef"] as? [String:Any]
+            return link?["attentionId"] as? String=="n2-historical-automatic"
+        }
+        XCTAssertFalse(dated.isEmpty)
+        for movement in dated {
+            let at=try XCTUnwrap(movement["at"] as? NSNumber)
+            XCTAssertEqual(at.int64Value,time("2026-10-15",hour:"15:00"))
+        }
+        let repeated=try N2NativeClinicalTransaction.retryCurrentSavedVisit(
+            snapshot:output.snapshot,visitID:"n2-historical-automatic",
+            approvedCatalog:read("n2-reviewed-approved.json"),
+            at:time("2026-10-22"))
+        XCTAssertEqual(repeated.physicalMovementsAdded,0)
+        XCTAssertEqual(repeated.alreadyLinked,1)
+    }
     func testHistoricalAndInsufficientStockRemainClinicallyPending() throws {
         let root=try source()
         var old=sample(root,id:"n2-old")
