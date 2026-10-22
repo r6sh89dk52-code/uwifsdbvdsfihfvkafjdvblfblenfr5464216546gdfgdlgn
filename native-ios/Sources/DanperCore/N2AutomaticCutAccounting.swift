@@ -88,8 +88,9 @@ public enum N2AutomaticCutAccounting {
             $0["kind"] as? String=="use" && $0["dispenseRef"] != nil
         },by:{movement -> String in
             let ref=movement["dispenseRef"] as? [String:Any] ?? [:]
-            return (ref["attentionId"] as? String ?? "")+"\u{001F}"+
-                   (ref["itemId"] as? String ?? "")
+            let attentionID=ref["attentionId"] as? String ?? ""
+            let itemID=ref["itemId"] as? String ?? ""
+            return [attentionID,itemID].joined(separator:"\u{001F}")
         })
         for visit in visits where visit["status"] as? String=="saved" {
             guard let visitID=visit["id"] as? String,
