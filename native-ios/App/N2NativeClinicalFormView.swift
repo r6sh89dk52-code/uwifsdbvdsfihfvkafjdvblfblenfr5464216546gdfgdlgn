@@ -78,8 +78,7 @@ struct N2NativeClinicalFormView:View {
     @State private var lastAutosaveTimestamp:Int64=0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    private let stepTitles=["Trabajador y alergias","Evaluación clínica",
-                            "Tratamiento y consumo","Confirmar atención"]
+    private let stepTitles=["Trabajador","Evaluación","Tratamiento","Resultado"]
     private var dateSelection:Binding<Date> {
         Binding(get:{
             let f=DateFormatter()
@@ -615,6 +614,10 @@ struct N2NativeClinicalFormView:View {
                 }
             }
 
+        }
+    }
+    private func clinicalSection()->some View {
+        VStack(alignment:.leading,spacing:16) {
             if let worker=currentWorker {
                 DanperPanel("Alergias del trabajador") {
                     Label("Revisión obligatoria antes del tratamiento",
@@ -650,9 +653,6 @@ struct N2NativeClinicalFormView:View {
                          allergySubstances.trimmingCharacters(in:.whitespaces).isEmpty))
                 }
             }
-        }
-    }
-    private func clinicalSection()->some View {
         DanperPanel("Evaluación clínica") {
             DanperDateField(title:"Fecha de atención",selection:dateSelection)
             DanperField(title:"Hora de atención") {
@@ -684,6 +684,7 @@ struct N2NativeClinicalFormView:View {
                     }.buttonStyle(.plain)
                 }
             }
+        }
         }
     }
     private var procedureGroups:[(title:String,symbol:String,values:[String])] {
