@@ -401,8 +401,8 @@ struct N2NativeClinicalFormView:View {
                 }
                 .onChange(of:form) {_,_ in
                     if highlightedField != nil {
+                        // Never resign first responder while the user fixes the field.
                         highlightedField=nil
-                        focusedField=nil
                     }
                     previewReady=false
                     if !form.blueBandage {form.returned=false}
