@@ -24,6 +24,8 @@ const app=fs.readFileSync(path.join(root,'native-ios/App/DANPERNativeApp.swift')
 const clinicalHome=fs.readFileSync(path.join(root,'native-ios/App/N2ClinicalWorkspaceView.swift'),'utf8');
 const rosterSearch=fs.readFileSync(path.join(root,'native-ios/App/N2WorkerSearchSheet.swift'),'utf8');
 const medicationRow=fs.readFileSync(path.join(root,'native-ios/App/N2MedicationRowView.swift'),'utf8');
+const cutCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2KardexCutPreview.swift'),'utf8');
+const cutView=fs.readFileSync(path.join(root,'native-ios/App/N2KardexCutPreviewView.swift'),'utf8');
 const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView.swift'),'utf8');
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
@@ -68,6 +70,26 @@ for(const phrase of ['@Binding var medication:N2FormMedication',
   'DanperCheckRow(selected:$medication.approveOpening)',
   'onRemove:()->Void'])
   must(medicationRow,phrase,'edición compacta enlazada al mismo FEFO y borrador');
+must(medicationRow,'expandedID==medication.id','medicamentos compactos por defecto');
+assert(!medicationRow.includes('expandedID==medication.id || medication.procedure.isEmpty'),
+  'un medicamento nuevo no debe desplegar todos los controles');
+must(form,'expandedMedication=nil','inserción compacta de nuevo producto');
+for(const key of ['kardex-register-current-stock','kardex-ninth-cut-preview',
+ 'N2NativeInventoryView(initialOperation:"lot")','N2KardexCutPreviewView()'])
+  must(kardex,key,'alta visible de stock y corte mensual');
+for(const key of ['public static func period(for day:String)',
+ 'public static func calculate(asOf:String','verifiedUsed','laterReceipts',
+ 'signedAdjustments','requiresOperatorReconciliation'])
+  must(cutCore,key,'reconstrucción matemática del día 9 sin mutaciones');
+for(const key of ['Previsualización · no modifica existencias',
+ 'Consumos físicos verificados desde el corte',
+ 'Hay consumos históricos sin conciliar',
+ 'Calcular saldo inicial estimado'])
+  must(cutView,key,'cálculo mostrado al usuario sin crear movimientos');
+assert(!cutView.includes('vault.addLot')&&!cutView.includes('vault.receiveStock') &&
+       !cutView.includes('vault.reconcileCount'),
+       'la estimación del corte no puede alterar existencias');
+
 
 for(const phrase of ['rosterPage','matches.dropFirst(safePage*pageSize)',
   'Button("Siguiente")'])
@@ -168,4 +190,5 @@ must(personal,'open-imported-clinical-workspace','abrir bóveda clínica tras im
 console.log('PASS: onboarding con origen explícito, demo realmente vacía, borrado verificado e importación protegida.');
 console.log('PASS: nueva vía sin Excel crea solo el primer trabajador manual con autenticación y fuente vacía original.');
 console.log('PASS: cabecera DANPER, búsqueda de padrón paginada, validación con foco y tratamiento compacto en B11.');
+console.log('PASS: Kardex presenta alta de stock y corte del día 9; filas de medicación compactas y sin baja de existencias en el cálculo previo.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
