@@ -204,6 +204,8 @@ struct DanperChoiceField:View {
     @Binding var selection:String
     let options:[String]
     var labels:[String:String]=[:]
+    var openRequest:Int=0
+    @State private var showRequestedOptions=false
     private func label(_ value:String)->String {labels[value] ?? value.capitalized(with:Locale(identifier:"es_PE"))}
     var body:some View {
         Menu {
@@ -221,7 +223,25 @@ struct DanperChoiceField:View {
                     Image(systemName:"chevron.up.chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 }.frame(minHeight:24)
             }
-        }.buttonStyle(.plain).accessibilityIdentifier("choice-"+title)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("choice-"+title)
+        // SwiftUI's Menu cannot be opened programmatically. When a
+        // validation error asks to open a picker, present the same options
+        // in a native confirmation dialog, without changing the normal Menu.
+        .confirmationDialog(title,isPresented:$showRequestedOptions,
+                            titleVisibility:.visible) {
+            ForEach(options,id:\.self) { option in
+                Button(label(option)){selection=option}
+            }
+            Button("Cancelar",role:.cancel){}
+        }
+        .onChange(of:openRequest) {old,new in
+            if new>0 && new != old {showRequestedOptions=true}
+        }
+        .onAppear {
+            if openRequest>0 {showRequestedOptions=true}
+        }
     }
 }
 
@@ -232,16 +252,34 @@ extension EnvironmentValues {
         set{self[DanperRevealKey.self]=newValue}
     }
 }
-/// Scrolls suggestions above the keyboard, rather than revealing only the input.
+/// A route request is unique even when the same field fails twice.
+struct DanperScrollRequest:Equatable {
+    let fieldID:String
+    let token=UUID()
+}
+/// Scrolls both keyboard suggestions and specific validation fields.
 struct DanperScrollView<Content:View>:View {
-    @ViewBuilder let content:Content
+    let jumpRequest:DanperScrollRequest?
+    let content:Content
+    init(jumpRequest:DanperScrollRequest?=nil,@ViewBuilder content:()->Content){
+        self.jumpRequest=jumpRequest
+        self.content=content()
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
         ScrollViewReader {proxy in
             ScrollView {content}
                 .environment(\.danperReveal,{id in
-                    withAnimation(reduceMotion ? nil : DanperStyle.animation){proxy.scrollTo(id,anchor:.top)}
+                    withAnimation(reduceMotion ? nil : DanperStyle.animation){
+                        proxy.scrollTo(id,anchor:.center)
+                    }
                 })
+                .onChange(of:jumpRequest) {_,request in
+                    guard let request else{return}
+                    withAnimation(reduceMotion ? nil : DanperStyle.animation){
+                        proxy.scrollTo(request.fieldID,anchor:.center)
+                    }
+                }
         }
     }
 }
