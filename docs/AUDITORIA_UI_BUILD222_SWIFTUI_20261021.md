@@ -16,6 +16,14 @@ Fecha: 21 de octubre de 2026. Referencia: `release/v0.21.12-build222-provisional
 | Personal | DNI, padrón, ficha laboral, importación | Importación PERSONAL y editor protegidos, búsqueda y propuestas nativas | Validar padrón grande y paginación en la pantalla de consulta |
 | Ajustes | Modos de apariencia, hápticos, recordatorios, respaldos | Azul institucional/rojo, claro/oscuro, navegación biométrica | Probar persistencia de preferencia, permisos y contraste |
 
+## Alta sin Excel (22 de octubre)
+- La pantalla normal ofrece **Comenzar sin Excel · registrar primer trabajador**, además de importación PERSONAL y restauración del respaldo.
+- La acción no crea una base vacía persistente: pide DNI, nombre y sede del primer trabajador. Antes de consentir no existe fuente nueva; al activarla crea **un solo trabajador introducido por el usuario**, cero atenciones, cero lotes y cero movimientos. No hay empleados ficticios precargados.
+- Emplea `N2SnapshotEditor.addWorker`, la auditoría clínica normal `N1lRealSnapshotGate.audit` y `N2ProtectedClinicalIOSVault.activateOnlyWithConsent`. Requiere autenticación del propietario y verifica la fuente antes/después de esa autenticación.
+- Si B11 ya tiene una base en la bóveda independiente, la operación está bloqueada. No sobrescribe la Build 222 ni sustituye una copia cifrada.
+- La ruta tiene pruebas del snapshot inicial y comprobación estructural de interfaz. **Falta compilar e interactuar con ella en iPhone 16**.
+- El Kardex en Movimientos, la paginación del Personal, la cobertura completa de animaciones y la experiencia real con teclado continúan como puntos pendientes de paridad.
+
 ## Reglas de seguridad y alcance
 - **No modificar** fórmulas, cantidades, movimientos FEFO, conciliación, stock o atenciones existentes durante el rediseño.
 - Inicio normal no inicializa trabajadores ficticios. Código de demo histórico es solo aislamiento de pruebas; no se añade al flujo clínico.
