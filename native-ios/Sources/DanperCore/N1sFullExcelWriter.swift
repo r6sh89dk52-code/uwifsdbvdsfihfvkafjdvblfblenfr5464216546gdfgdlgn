@@ -443,7 +443,12 @@ internal enum N1sFullExcelWriter {
                 let rebuilt=try sheetData(xml,headerRows:header,rows:sheetRows[no] ?? [],
                                           width:width,reviewed:formulasWritten,sheet:no,
                                           dateStyle:peruDateStyle)
-                let completed=try no==3 ? expirySemaphore(rebuilt) : rebuilt
+                let completed:String
+                if no==3 {
+                    completed=try expirySemaphore(rebuilt)
+                }else {
+                    completed=rebuilt
+                }
                 archive[i]=N1rStoredEntry(name:path,data:Data(completed.utf8))
                 continue
             }
