@@ -40,6 +40,25 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         XCTAssertEqual(first,try fixture("n1s-indicator-template-store.zip"))
         try write("n1s-indicator-native.xlsx",result.xlsx)
     }
+    func testIngresosExpirationSemaforoHasThreeIconColorsAndHidesNumericStatus() throws {
+        let result=try N1sFullExcelWriter.exportIndicator(
+            base:fixture("n1s-indicator-template-store.zip"),
+            manifest:fixture("n1s-indicator-plan.json"))
+        let archive=try N1rStoredZip.unpack(result.xlsx)
+        let xml=try XCTUnwrap(String(data:try XCTUnwrap(
+            archive.first{$0.name=="xl/worksheets/sheet3.xml"}).data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("sqref=\"D3:G434\""))
+        XCTAssertTrue(xml.contains("iconSet=\"3TrafficLights1\""))
+        XCTAssertTrue(xml.contains("showValue=\"0\""))
+        XCTAssertTrue(xml.contains("reverse=\"1\""))
+        for status in 0...2 {
+            XCTAssertTrue(xml.contains("type=\"num\" val=\"\(status)\""))
+        }
+        XCTAssertTrue(xml.contains("J3&lt;TODAY(),2"))
+        XCTAssertTrue(xml.contains("J3-TODAY()&lt;=90,1,0"))
+        XCTAssertFalse(xml.contains("<xm:sqref>D3:G439</xm:sqref>"))
+    }
+
     func testNursingOriginalWorkbook98RowsPlusPrintSettings() throws {
         let result=try N1sNursingExcelWriter.export(
             base:fixture("n1s-nursing-template-store.zip"),
