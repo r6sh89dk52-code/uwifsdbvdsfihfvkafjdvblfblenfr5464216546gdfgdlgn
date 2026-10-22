@@ -400,6 +400,10 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
                 .onChange(of:form) {_,_ in
+                    if highlightedField != nil {
+                        highlightedField=nil
+                        focusedField=nil
+                    }
                     previewReady=false
                     if !form.blueBandage {form.returned=false}
                     form.refreshProcedureSuggestions(catalog:context.products)
@@ -651,10 +655,11 @@ struct N2NativeClinicalFormView:View {
                             "unknown":"No evaluado",
                             "none":"Niega alergias conocidas",
                             "known":"Alergias reportadas"
-                        ],openRequest:highlightedField=="allergy-status" ? choiceOpenCounter : 0)
+                        ],openRequest:highlightedField=="allergy-status" ? choiceOpenCounter : 0,
+                          highlighted:highlightedField=="allergy-status")
                         .id("allergy-status")
                     if allergyStatus=="known" {
-                        DanperField(title:"Sustancias reportadas") {
+                        DanperField(title:"Sustancias reportadas",highlighted:highlightedField=="allergy-substances") {
                             TextField("Indica las sustancias",text:$allergySubstances,
                                       axis:.vertical).lineLimit(2...5)
                                 .focused($focusedField,equals:"allergy-substances")
@@ -678,24 +683,26 @@ struct N2NativeClinicalFormView:View {
         DanperPanel("Evaluación clínica") {
             DanperDateField(title:"Fecha de atención",selection:dateSelection)
                 .id("clinical-date")
-            DanperField(title:"Hora de atención") {
+            DanperField(title:"Hora de atención",highlighted:highlightedField=="clinical-time") {
                 TextField("HH:mm",text:$form.time).focused($focusedField,equals:"time")
                     .keyboardType(.numbersAndPunctuation)
             }.id("clinical-time")
             DanperChoiceField(title:"Tipo de atención",selection:$form.category,
-                options:categories,openRequest:highlightedField=="clinical-category" ? choiceOpenCounter : 0)
+                options:categories,openRequest:highlightedField=="clinical-category" ? choiceOpenCounter : 0,
+                highlighted:highlightedField=="clinical-category")
                 .id("clinical-category")
             if N1hClinicalValidator.systemRequired.contains(form.category) {
                 DanperChoiceField(title:"Sistema afectado",selection:$form.system,
-                    options:systems,openRequest:highlightedField=="clinical-system" ? choiceOpenCounter : 0)
+                    options:systems,openRequest:highlightedField=="clinical-system" ? choiceOpenCounter : 0,
+                    highlighted:highlightedField=="clinical-system")
                     .id("clinical-system")
                 if form.system=="OSTEOMUSCULAR" {
-                    DanperField(title:"Segmento anatómico") {
+                    DanperField(title:"Segmento anatómico",highlighted:highlightedField=="clinical-segment") {
                         TextField("Describe la zona afectada",text:$form.segment).focused($focusedField,equals:"segment")
                     }.id("clinical-segment")
                 }
             }
-            DanperField(title:"Diagnóstico presuntivo") {
+            DanperField(title:"Diagnóstico presuntivo",highlighted:highlightedField=="clinical-diagnosis") {
                 TextField("Escribe para buscar o registrar",text:$form.diagnosis,axis:.vertical)
                     .focused($focusedField,equals:"diagnosis").lineLimit(2...5)
             }.id("clinical-diagnosis")
@@ -816,7 +823,8 @@ struct N2NativeClinicalFormView:View {
                         get:{form.photoReviewed ? (form.photoSent ? "SI" : "NO") : ""},
                         set:{form.photoReviewed = !$0.isEmpty;form.photoSent = $0=="SI"}
                     ),options:["SI","NO"],labels:["SI":"Sí, se envió","NO":"No se envió"],
-                        openRequest:highlightedField=="treatment-photo" ? choiceOpenCounter : 0)
+                        openRequest:highlightedField=="treatment-photo" ? choiceOpenCounter : 0,
+                        highlighted:highlightedField=="treatment-photo")
                         .id("treatment-photo")
                 }
                 DanperCheckRow(selected:$form.blueBandage) {
@@ -862,7 +870,8 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
             ),options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"],
-                openRequest:highlightedField=="treatment-site" ? choiceOpenCounter : 0)
+                openRequest:highlightedField=="treatment-site" ? choiceOpenCounter : 0,
+                highlighted:highlightedField=="treatment-site")
                 .id("treatment-site")
             Text("\(context.products.clinical.count) productos · selección múltiple")
                 .font(.footnote).foregroundStyle(.secondary)
@@ -1186,7 +1195,7 @@ struct N2NativeClinicalFormView:View {
                 DanperChoiceField(title:"Situación al finalizar",selection:$form.permission,options:["NO","SI"],
                                   labels:["NO":"Continúa laborando","SI":"Se retira con permiso"])
                 if form.permission=="SI" {
-                    DanperField(title:"Hora del permiso") {
+                    DanperField(title:"Hora del permiso",highlighted:highlightedField=="result-permission-time") {
                         TextField("HH:mm",text:$form.permissionTime)
                             .keyboardType(.numbersAndPunctuation)
                             .focused($focusedField,equals:"permission-time")
