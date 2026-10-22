@@ -71,6 +71,7 @@ struct N2NativeClinicalFormView:View {
     @State private var editingWorkerDNI:String?
     @State private var allergyFeedback=""
     @State private var chooseProduct=false
+    @State private var showOtherProcedures=false
     @State private var chooseDraft=false
     @State private var draftToDelete:String?
     @State private var drafts=[N2RecoverableDraft]()
@@ -754,12 +755,83 @@ struct N2NativeClinicalFormView:View {
 
     private func treatmentSection(_ context:N2FormContext)->some View {
         Group {
+            DanperPanel("Procedimientos independientes") {
+                Text("Puedes registrar una curación u otro procedimiento por separado, incluso sin medicamentos.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                DanperCheckRow(selected:Binding(
+                    get:{form.procedures.contains("CURACION DE HERIDA")},
+                    set:{enabled in
+                        if enabled {
+                            if !form.procedures.contains("CURACION DE HERIDA") {
+                                form.procedures.append("CURACION DE HERIDA")
+                            }
+                        } else {
+                            form.procedures.removeAll{$0=="CURACION DE HERIDA"}
+                        }
+                    }
+                )) {
+                    Text("Se realizó CURACION DE HERIDA").font(.subheadline.weight(.semibold))
+                }
+                Button {
+                    withAnimation(reduceMotion ? nil : DanperStyle.animation) {
+                        showOtherProcedures.toggle()
+                    }
+                } label: {
+                    HStack(spacing:8) {
+                        Image(systemName:showOtherProcedures ? "chevron.down" : "chevron.right")
+                        Text("Otro procedimiento (opcional)").font(.subheadline.weight(.medium))
+                        Spacer()
+                        if !form.procedures.filter({$0 != "CURACION DE HERIDA"}).isEmpty {
+                            Text("\(form.procedures.filter{$0 != "CURACION DE HERIDA"}.count)")
+                                .font(.caption.weight(.bold))
+                        }
+                    }.foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight:44)
+                .accessibilityIdentifier("expand-other-procedures")
+                if showOtherProcedures {
+                    ForEach(procedureGroups.indices,id:\.self) { index in
+                        let group=procedureGroups[index]
+                        let choices=group.values.filter{$0 != "CURACION DE HERIDA"}
+                        if !choices.isEmpty {
+                            VStack(alignment:.leading,spacing:9) {
+                                Text(group.title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                ForEach(choices,id:\.self) { value in
+                                    procedureOption(value)
+                                }
+                            }.padding(9)
+                                .background(DanperStyle.canvas,
+                                            in:RoundedRectangle(cornerRadius:14))
+                        }
+                    }
+                }
+                if form.hasWound {
+                    DanperChoiceField(title:"¿Se envió la foto?",selection:Binding(
+                        get:{form.photoReviewed ? (form.photoSent ? "SI" : "NO") : ""},
+                        set:{form.photoReviewed = !$0.isEmpty;form.photoSent = $0=="SI"}
+                    ),options:["SI","NO"],labels:["SI":"Sí, se envió","NO":"No se envió"],
+                        openRequest:highlightedField=="treatment-photo" ? choiceOpenCounter : 0)
+                        .id("treatment-photo")
+                }
+                DanperCheckRow(selected:$form.blueBandage) {
+                    Text("Se colocó banda o curita azul").font(.subheadline)
+                }
+                if form.blueBandage {
+                    DanperCheckRow(selected:$form.returned) {
+                        Text("Se devolvió la banda o curita").font(.subheadline)
+                    }
+                }
+            }
+            .id("treatment-procedures")
         if !layoutDetailOnly {
         DanperPanel("Medicamentos e insumos") {
-            Text("Busca productos; valida procedimiento, cantidad y lote FEFO antes de guardar.")
+            Text("Cada producto mantiene su propio procedimiento. Toca una fila para editar cantidades, lote o presentación.")
                 .font(.caption).foregroundStyle(.secondary)
             Button {withAnimation(reduceMotion ? nil : DanperStyle.animation){chooseProduct.toggle()}} label: {
-                Label("Agregar medicamento o insumo",systemImage:"plus.circle.fill")
+                Label(form.items.isEmpty ? "Agregar medicamento/insumo" : "Agregar otro medicamento/insumo",systemImage:"plus")
             }
             .buttonStyle(DanperPrimaryButton())
             .accessibilityIdentifier("add-clinical-product")
@@ -793,47 +865,11 @@ struct N2NativeClinicalFormView:View {
                 .font(.footnote).foregroundStyle(.secondary)
         }
         }
-        medicationFields(context)
-            .id("treatment-medications")
-        DanperPanel("Procedimientos") {
-            Text("Acciones realizadas durante la atención")
-                .font(.subheadline.weight(.semibold))
-            Text("Marca únicamente lo realizado. Los medicamentos, sus lotes y consumos se registran arriba.")
-                .font(.caption).foregroundStyle(.secondary)
-                .id("treatment-procedures")
-            ForEach(procedureGroups.indices,id:\.self) { index in
-                let group=procedureGroups[index]
-                VStack(alignment:.leading,spacing:10) {
-                    Label(group.title,systemImage:group.symbol)
-                        .font(.subheadline.weight(.semibold)).foregroundStyle(DanperStyle.red)
-                    LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize
-                        ? [GridItem(.flexible())]
-                        : [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],
-                        spacing:10) {
-                        ForEach(group.values,id:\.self) {item in procedureOption(item)}
-                    }
-                }.padding(12)
-                    .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:16))
-            }
-            if !form.procedures.isEmpty {
-                Text("\(form.procedures.count) procedimiento(s) seleccionado(s)")
-                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            }
-            if form.hasWound {
-                DanperChoiceField(title:"¿Se envió la foto?",selection:Binding(
-                    get:{form.photoReviewed ? (form.photoSent ? "SI" : "NO") : ""},
-                    set:{form.photoReviewed = !$0.isEmpty;form.photoSent = $0=="SI"}
-                ),options:["SI","NO"],labels:["SI":"Sí, se envió","NO":"No se envió"],
-                    openRequest:highlightedField=="treatment-photo" ? choiceOpenCounter : 0)
-                    .id("treatment-photo")
-            }
-            DanperCheckRow(selected:$form.blueBandage) {Text("Se colocó banda o curita azul").font(.subheadline)}
-            if form.blueBandage {
-                DanperCheckRow(selected:$form.returned) {Text("Se devolvió la banda o curita").font(.subheadline)}
-            }
+
+            medicationFields(context)
+                .id("treatment-medications")
         }
     }
-        }
     private func appendClinicalMedication(_ code:String) {
         let med=N2FormMedication(code:code)
         form.items.append(med)
@@ -896,13 +932,13 @@ struct N2NativeClinicalFormView:View {
                 if !collapsedMedicationGroups.contains(group) {
                     ForEach($form.items) { $med in
                         if (med.procedure.isEmpty ? "POR CONFIRMAR" : med.procedure)==group {
-                            DanperPanel {
+                            VStack(alignment:.leading,spacing:9) {
                 Button {withAnimation(reduceMotion ? nil : DanperStyle.animation) {
                     expandedMedication = expandedMedication==med.id ? nil : med.id
                 }} label: {
-                    HStack(alignment:.top,spacing:12) {
+                    HStack(alignment:.top,spacing:9) {
                         Image(systemName:"cross.vial.fill").foregroundStyle(DanperStyle.red)
-                            .padding(10).background(DanperStyle.red.opacity(0.08),in:RoundedRectangle(cornerRadius:12))
+                            .frame(width:22)
                         VStack(alignment:.leading,spacing:6) {
                             Text(medicationName(med.code,context)).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
                             Text("Cantidad \(med.quantity) · \(med.procedure.isEmpty ? "Procedimiento pendiente" : med.procedure.capitalized)")
@@ -972,6 +1008,9 @@ struct N2NativeClinicalFormView:View {
                         Label("Quitar producto",systemImage:"trash").font(.caption.weight(.semibold))
                     }.buttonStyle(.plain)
                 }
+                .padding(11)
+                .background(DanperStyle.canvas,
+                            in:RoundedRectangle(cornerRadius:14))
                             }
                         }
                     }
