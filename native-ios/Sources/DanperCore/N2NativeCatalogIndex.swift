@@ -7,9 +7,15 @@ public struct N2ClinicalCatalogProduct:Equatable,Sendable,Identifiable {
     public let unit:String
 }
 public struct N2NursingCatalogProduct:Equatable,Sendable,Identifiable {
+    /// Internal Kardex reference; never a user-facing product code.
     public let id:String
     public let name:String
     public let group:String
+    /// Official U.M. from an approved mapping, if verified.
+    public let unit:String?
+    public init(id:String,name:String,group:String,unit:String?=nil) {
+        self.id=id;self.name=name;self.group=group;self.unit=unit
+    }
 }
 public struct N2ApprovedProductLink:Equatable,Sendable {
     public let clinicalCode:String
@@ -32,8 +38,7 @@ public struct N2NativeCatalogIndex:Sendable {
     public func nursingMatches(_ query:String)->[N2NursingCatalogProduct] {
         let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !q.isEmpty else{return nursing}
-        return nursing.filter{$0.id.localizedStandardContains(q) ||
-                              $0.name.localizedStandardContains(q) ||
+        return nursing.filter{$0.name.localizedStandardContains(q) ||
                               $0.group.localizedStandardContains(q)}
     }
     public func authorizedNursingOptions(for clinicalCode:String)->[N2NursingCatalogProduct] {
@@ -90,6 +95,21 @@ public enum N2NativeCatalogLoader {
         guard unique.count==86,!unique.contains("E-68"),
               links.filter{$0.clinicalCode=="16024400"}.count==2 else{
             throw N2CatalogError.invalidApprovals
+        }
+        // The 86 approved correspondences carry the authoritative unit.
+        // Unknown nursing units remain nil, never silently default to UND.
+        let byCode=Dictionary(uniqueKeysWithValues:clinical.map{($0.code,$0.unit)})
+        let units=Dictionary(uniqueKeysWithValues:links.compactMap{link -> (String,String)? in
+            guard let unit=byCode[link.clinicalCode] else{return nil}
+            return (link.kardexID,unit)
+        })
+        supplies=supplies.map { product in
+            // Explicitly confirmed by operator: "ALCOHOL 1 LT" is a bottle,
+            // not litres as a Kardex accounting unit.
+            let confirmed=units[product.id] ??
+                (product.id=="E-86" && product.name=="ALCOHOL 1 LT" ? "FCO" : nil)
+            return N2NursingCatalogProduct(id:product.id,name:product.name,
+                                           group:product.group,unit:confirmed)
         }
         return N2NativeCatalogIndex(clinical:clinical,nursing:supplies,
                                     approvals:links)
