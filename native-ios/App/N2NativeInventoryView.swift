@@ -96,7 +96,7 @@ struct N2NativeInventoryView:View {
         }
         guard selectedLot != nil,reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8
         else{return false}
-        let existingPackaged=!["UND","TBL","PAR","ML","LT"].contains(
+        let existingPackaged = !["UND","TBL","PAR","ML","LT"].contains(
             selectedLot?.unit.uppercased() ?? "UND")
         return !existingPackaged || amount.rounded()==amount
     }
