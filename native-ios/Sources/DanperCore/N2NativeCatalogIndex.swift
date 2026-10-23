@@ -99,10 +99,25 @@ public enum N2NativeCatalogLoader {
         // The 86 approved correspondences carry the authoritative unit.
         // Unknown nursing units remain nil, never silently default to UND.
         let byCode=Dictionary(uniqueKeysWithValues:clinical.map{($0.code,$0.unit)})
-        let units=Dictionary(uniqueKeysWithValues:links.compactMap{link -> (String,String)? in
+        var units=Dictionary(uniqueKeysWithValues:links.compactMap{link -> (String,String)? in
             guard let unit=byCode[link.clinicalCode] else{return nil}
             return (link.kardexID,unit)
         })
+        // Presentation exceptions explicitly confirmed by the operator.
+        // They apply ONLY to the nursing Kardex, never to the source
+        // clinical catalog or its approved cross-catalog identities.
+        // Tablets are dispensed as individual UND, not as TBL packages;
+        // clean examination gloves are tracked as CJA, not surgical PAR.
+        let verifiedExceptions:[(id:String,name:String,unit:String)]=[
+            ("E-18","LOPERAMIDA TAB","UND"),
+            ("E-94","GUANTES LIMPIOS M","CJA"),
+            ("E-95","GUANTES LIMPIOS S","CJA")
+        ]
+        for entry in verifiedExceptions {
+            guard supplies.contains(where:{$0.id==entry.id && $0.name==entry.name})
+            else {throw N2CatalogError.invalidNursingCatalog}
+            units[entry.id]=entry.unit
+        }
         supplies=supplies.map { product in
             // Explicitly confirmed by operator: "ALCOHOL 1 LT" is a bottle,
             // not litres as a Kardex accounting unit.
