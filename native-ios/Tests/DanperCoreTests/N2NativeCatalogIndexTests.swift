@@ -43,7 +43,10 @@ final class N2NativeCatalogIndexTests:XCTestCase {
         XCTAssertEqual(unit("E-86"),"FCO") // Alcohol 1 LT is a bottle.
         XCTAssertEqual(unit("E-64"),"PAR") // Surgical gloves remain pairs.
         XCTAssertEqual(unit("E-65"),"PAR")
-        XCTAssertNil(unit("E-20"))         // Never fabricate unknown units.
+        XCTAssertEqual(unit("E-20"),"UND") // Unmatched tablet still uses UND.
+        XCTAssertEqual(unit("E-25"),"UND") // Unmatched tablet still uses UND.
+        XCTAssertTrue(index.nursing.filter{$0.group=="TABLETAS"}.allSatisfy{$0.unit=="UND"})
+        XCTAssertNil(unit("E-68"))         // Never fabricate unknown non-tablet units.
         XCTAssertEqual(index.clinical.first(where:{$0.code=="16000158"})?.unit,"TBL")
         XCTAssertEqual(index.approvals.count,86)
     }
