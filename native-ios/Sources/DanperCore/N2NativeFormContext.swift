@@ -49,6 +49,7 @@ public struct N2FormLot:Equatable,Sendable,Identifiable {
     public let loose:Double
     public let opened:Double
     public var site:String=""
+    public var reference:String=""
     public var total:Double {Double(sealed)*capacity+loose+opened}
     public var needsOpening:Bool {opened <= 0 && loose <= 0 && sealed>0}
 }
@@ -128,7 +129,8 @@ public enum N2NativeFormContextReader {
             }
             return N2FormLot(id:id,kardexCode:code,name:name,unit:unit,
                              expires:expiry,capacity:capacity,sealed:sealed,
-                             loose:loose,opened:opened,site:sites[id] ?? "")
+                             loose:loose,opened:opened,site:sites[id] ?? "",
+                              reference:row["lot"] as? String ?? "")
         }
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
         return N2FormContext(revision:revision,workers:people,
