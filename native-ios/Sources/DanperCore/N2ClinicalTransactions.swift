@@ -169,7 +169,6 @@ public enum N2NativeClinicalTransaction {
                 throw N2ClinicalError.invalidVisit
             }
         }
-        let verifiedSites=try N2StockSiteEvidence.resolve(root)
         let today=limaDay(at)
         let historical=date != today
         let eventAt: Int64? = historical
@@ -215,12 +214,7 @@ public enum N2NativeClinicalTransaction {
                 mark("Cantidad física no verificada.");continue
             }
             let allowable=Set(candidates.map{$0.kardexCode})
-            let scope=new["dispensingSite"] as? String ?? ""
-            if !scope.isEmpty && !["LA VENTUROSA","PLVENTUROSA"].contains(scope) {
-                mark("Tópico de dispensación no verificado.");continue
-            }
             let eligible=lots.filter {l in
-                if !scope.isEmpty && verifiedSites[l["id"] as? String ?? ""] != scope {return false}
                 guard let lc=str(l["code"]),let ln=str(l["name"]),
                       allowable.contains(lc),
                       candidates.contains(where:{$0.kardexCode==lc && $0.kardexName==ln}),
@@ -247,8 +241,8 @@ public enum N2NativeClinicalTransaction {
                 mark("El lote fue registrado después de la atención o posee movimientos posteriores: reconstruir el saldo del corte sin restarlo otra vez del conteo actual.")
                 continue
             }
-            if eligible.isEmpty && !scope.isEmpty {
-                mark("Sin stock vigente con sede verificada en el tópico elegido. No se usa stock ajeno ni de sede desconocida.");continue
+            if eligible.isEmpty {
+                mark("Sin existencias FEFO disponibles en el inventario único.");continue
             }
             let chosen=eligible.first(where:{$0["id"] as? String == selected})
             if explicit != nil && (selected==nil || chosen==nil) {
