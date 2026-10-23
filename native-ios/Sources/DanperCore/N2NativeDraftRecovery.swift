@@ -8,6 +8,7 @@ public struct N2RecoverableDraft:Identifiable,Sendable {
     public let updatedAt:Int64
     public let workerName:String
     public let form:N2NativeFormDraft
+    public let stage:Int
 }
 
 public enum N2DraftRecoveryError:Error,Equatable {
@@ -80,7 +81,7 @@ public enum N2NativeDraftRecovery {
             draft.items=medications
             result.append(N2RecoverableDraft(id:id,updatedAt:timestamp.int64Value,
                     workerName:worker["name"] as? String ?? "",
-                    form:draft))
+                    form:draft,stage:max(0,min(3,(record["nativeDraftStep"] as? Int) ?? 0))))
         }
         return result.sorted {
             $0.updatedAt == $1.updatedAt ? $0.id<$1.id : $0.updatedAt>$1.updatedAt
