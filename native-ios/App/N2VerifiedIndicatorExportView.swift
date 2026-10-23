@@ -106,12 +106,12 @@ struct N2VerifiedIndicatorExportView:View {
             DanperPanel("Excel oficial · 10 hojas") {
                 Label("Exportar libro de 10 hojas",systemImage:"doc.richtext")
                     .font(.subheadline.weight(.semibold))
-                Text("Puedes exportar Ambas sedes en un libro único. Cada atención conserva su sede; ambos cierres físicos deben estar verificados.")
+                Text("Ambas sedes se incluyen en un libro único y cada atención conserva su origen. El inventario es compartido; el cierre del Excel aún conserva controles históricos que requieren validación.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             DanperPanel {
                 N2Build222StageHeading(step:1,title:"Elegir período")
-                Text("Corte oficial recomendado: del día 9 de un mes al día 8 del siguiente. Puedes ajustarlo para una consulta puntual; la conciliación por sede sigue siendo obligatoria.")
+                Text("Corte recomendado del día 9 al día 8. La clasificación por sede corresponde a las atenciones, no a existencias separadas.")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Usar período oficial 9 → 8") {
                     useOfficialCut()
@@ -132,15 +132,19 @@ struct N2VerifiedIndicatorExportView:View {
             }
             DanperPanel {
                 N2Build222StageHeading(step:2,title:"Comprobar atenciones y existencias")
-                Label("Las cantidades pendientes no se convierten en movimientos físicos ni en saldos cero.",
+                Label("Una atención terminada confirma su consumo. Las líneas históricas sin lote conciliado no deben convertirse en saldos inventados.",
                       systemImage:"checkmark.shield")
                     .font(.caption).foregroundStyle(.secondary)
+                DanperToolLink(title:"Revisar cierre del Indicador",
+                               symbol:"checkmark.shield") {
+                    N2ReconciliationView()
+                }
                 HStack(spacing:9) {
                     metricValue("\(selected.count)","Seleccionadas")
                     metricValue("\(inRange.count)","En el período")
                     metricValue("\(inRange.filter{$0.pendingPhysicalLines>0}.count)","Pendientes")
                 }
-                Text("Verifica que las atenciones tengan sede, stock y conteos respaldados. El modo provisional separa las cantidades declaradas de los movimientos físicos.")
+                Text("Revisa consumos y saldos del inventario único. Las líneas sin correspondencia de lote se incluyen solo como provisionales.")
                     .font(.caption).foregroundStyle(.secondary)
 
                 HStack {
@@ -174,7 +178,7 @@ struct N2VerifiedIndicatorExportView:View {
                             Text(DanperDatePresentation.displayDateTime(v.date,v.time)+" · "+v.diagnosis)
                                 .font(.caption).foregroundStyle(.secondary)
                             if v.pendingPhysicalLines>0 {
-                                Label("Consumo físico pendiente: requiere libro provisional",
+                                Label("Consumo aún sin lote conciliado: libro provisional",
                                       systemImage:"exclamationmark.triangle")
                                     .font(.caption2).foregroundStyle(.orange)
                             }
@@ -193,7 +197,7 @@ struct N2VerifiedIndicatorExportView:View {
                     }
                 }
                 if provisional {
-                    Text("BORRADOR: R incluye cantidades clínicas declaradas cuando falta salida física. Para cajas y frascos esto no acredita apertura. No modifica inventario ni acredita cierre.")
+                    Text("BORRADOR: R incluye consumos de atenciones terminadas sin lote conciliado. Para frascos o cajas no se inventa una apertura. No modifica inventario ni acredita cierre.")
                         .font(.footnote).foregroundStyle(.orange)
                 }
                 Button {
@@ -206,7 +210,7 @@ struct N2VerifiedIndicatorExportView:View {
                 Text(status).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
                 Text(provisional
-                     ? "Libro provisional: conserva consumos declarados y no acredita movimientos físicos pendientes."
+                     ? "Libro provisional: conserva consumos registrados sin inventar lotes ni cierres."
                      : "Libro oficial: requiere revisión de cierre, stock inicial y recuento final del período.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -311,7 +315,7 @@ struct N2VerifiedIndicatorExportView:View {
         }
         switch failure {
         case .unreviewedPeriod:
-            return "Falta revisión de cierre del período. En el libro conjunto se requiere tanto Fundo como Planta. Revísalos por separado desde Conciliación."
+            return "Falta revisión de cierre. Este generador aún valida pruebas históricas de cierre por sede, aunque el inventario sea único. Revísalas antes de exportar."
         case .invalidReconciliation:
             return "Falta stock inicial o recuento final verificable, o hay un movimiento de conciliación inconsistente. Revisa Conciliación de inventario."
         case .unverifiedDelivery:
