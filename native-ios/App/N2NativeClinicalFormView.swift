@@ -18,8 +18,6 @@ struct N2NativeClinicalFormView:View {
         layoutOnly=true
         layoutDetailOnly=detailOnly
         _savedLines=State(initialValue:layoutOutcomes)
-        _previewLines=State(initialValue:layoutOutcomes)
-        _previewReady=State(initialValue:!layoutOutcomes.isEmpty)
         _saved=State(initialValue:saved)
         _chooseProduct=State(initialValue:showCatalog)
         _expandedMedication=State(initialValue:nil)
@@ -47,10 +45,6 @@ struct N2NativeClinicalFormView:View {
     @State private var highlightedField:String?
     @State private var scrollIssueRequest:DanperScrollRequest?
     @State private var choiceOpenCounter=0
-    @State private var previewLines:[String:String]=[:]
-    @State private var previewReady=false
-    @State private var previewBusy=false
-    @State private var previewError=""
     @State private var savedLines:[String:String]=[:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("danper.haptics.enabled") private var haptics=true
