@@ -103,6 +103,12 @@ public enum N2NativeCatalogLoader {
             guard let unit=byCode[link.clinicalCode] else{return nil}
             return (link.kardexID,unit)
         })
+        // All products in the original TABLETAS nursing group are physically
+        // counted as UND, including rows without a clinical correspondence.
+        // This leaves every clinical code and its source unit unchanged.
+        for product in supplies where product.group=="TABLETAS" {
+            units[product.id]="UND"
+        }
         // Presentation exceptions explicitly confirmed by the operator.
         // They apply ONLY to the nursing Kardex, never to the source
         // clinical catalog or its approved cross-catalog identities.
