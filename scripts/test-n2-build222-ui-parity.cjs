@@ -221,6 +221,7 @@ for (const value of [
 for (const line of [
   'let confirmed=units[product.id] ??',
   'product.id=="E-86" && product.name=="ALCOHOL 1 LT" ? "FCO" : nil',
+  'product.group=="TABLETAS"',
   '("E-18","LOPERAMIDA TAB","UND")',
   '("E-94","GUANTES LIMPIOS M","CJA")',
   '("E-95","GUANTES LIMPIOS S","CJA")',
