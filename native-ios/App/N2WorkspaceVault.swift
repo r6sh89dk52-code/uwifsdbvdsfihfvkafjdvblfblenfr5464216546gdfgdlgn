@@ -77,6 +77,18 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
     }
+    /// Read-only accounting from the selected vault only.
+    /// Do not switch silently between demo and clinical data.
+    func automaticCutAccounting(through date:String) async throws
+        ->N2AutomaticCutAccounting.Result {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared
+                .automaticCutAccounting(through:date)
+        }
+        return try await N2SyntheticTrialIOSVault.shared
+            .automaticCutAccounting(through:date)
+    }
+
     func readPendingClinicalCorrection(visitID:String) async throws -> N2PendingClinicalCorrection? {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.readPendingClinicalCorrection(visitID:visitID)
