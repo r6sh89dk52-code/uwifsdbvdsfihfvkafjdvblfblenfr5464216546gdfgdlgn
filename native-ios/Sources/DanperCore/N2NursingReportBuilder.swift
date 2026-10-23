@@ -116,14 +116,10 @@ public enum N2NursingReportBuilder {
                 throw N2NursingReportError.invalidCatalog
             }
         }
-        guard site.isEmpty || ["LA VENTUROSA","PLVENTUROSA"].contains(site) else {
-            throw N2NursingReportError.invalidSource
-        }
-        guard !site.isEmpty else{return(lots,movements,products)}
-        let sites=try N2StockSiteEvidence.resolve(data)
-        let scoped=lots.filter{sites[$0["id"] as? String ?? ""]==site}
-        let ids=Set(scoped.compactMap{$0["id"] as? String})
-        return(scoped,movements.filter{ids.contains($0["lotId"] as? String ?? "")},products)
+        // The care-site belongs to each ATTENTION, never to its stock.
+        // Legacy lot-site annotations remain preserved but cannot split
+        // the single Kardex or omit stock from nursing exports.
+        return(lots,movements,products)
     }
     private static func day(lots:[[String:Any]],moves:[[String:Any]],
                             catalog:[[String:Any]],date:String,
