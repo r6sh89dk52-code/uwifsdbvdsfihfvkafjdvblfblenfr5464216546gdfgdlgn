@@ -47,6 +47,10 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: NativeTests
+        excludes:
+          - SyntheticFixtures/**
+      - path: NativeTests/SyntheticFixtures
+        type: folder
     dependencies:
       - target: DANPERNative
     settings:

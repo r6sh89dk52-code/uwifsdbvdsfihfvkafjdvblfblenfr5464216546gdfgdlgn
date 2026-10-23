@@ -104,10 +104,8 @@ final class N2PortableBackupInteropTests:XCTestCase {
                           "A differently encrypted archive must force a new review")
     }
     func testFullSyntheticClinicalBackupPreservesPhysicalHistoryAcrossReview()throws {
-        guard let fixture=Bundle.main.url(forResource:"n1e-clinical-stock",
-                   withExtension:"json",subdirectory:"N1sDemoResources") else{
-            throw XCTSkip("Clinical demo resource not bundled in this host")
-        }
+        let fixture=try XCTUnwrap(Bundle(for:Self.self).url(forResource:"n2-synthetic-clinical",
+                   withExtension:"json",subdirectory:"SyntheticFixtures"))
         let raw=try Data(contentsOf:fixture)
         let original=try N1eLegacyClinicalAudit.inspect(raw)
         let pass="N2-interop-full-clinical-backup-2026"

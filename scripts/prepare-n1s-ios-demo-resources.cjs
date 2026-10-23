@@ -23,8 +23,10 @@ try{
   cwd:root,env:{...process.env,DANPER_N1_FIXTURE_DIR:temporary},
   stdio:'inherit',timeout:180000
  });
- // Workbook references and an explicitly fictional clinical example are
- // bundled only in this evaluation build, never in the production bundle.
+ const testFixtures=path.join(root,'native-ios','NativeTests','SyntheticFixtures');
+ fs.mkdirSync(testFixtures,{recursive:true});
+ fs.copyFileSync(path.join(temporary,'n1e-clinical-stock.json'),
+   path.join(testFixtures,'n2-synthetic-clinical.json'));
  fs.mkdirSync(output,{recursive:true});
  for(const kind of ['indicator','nursing']){
   const prefix='n1s-'+kind;

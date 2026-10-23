@@ -119,13 +119,27 @@ final class N2OperationalMappingTests:XCTestCase {
         let alcohol=try XCTUnwrap(catalog.clinical.first{$0.code=="16000019"})
         var visit=(root["attentions"] as! [[String:Any]])[0]
         visit["id"]="operational-first"
+        visit["time"]="13:00"
         visit["items"]=[["id":"alcohol-item","code":alcohol.code,"name":alcohol.name,
             "unit":alcohol.unit,"quantity":1,"procedure":"OBSERVACION",
-            "physicalUse":["quantity":5,"confirmNewContainer":true]]]
+            "physicalUse":["quantity":5,"confirmNewContainer":false]]]
         let unmapped=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:source,visit:bytes(visit),approvedCatalog:fixture("n2-reviewed-approved.json"),at:now)
         XCTAssertEqual(unmapped.pending,1);XCTAssertEqual(unmapped.physicalMovementsAdded,0)
         let mapped=try N2OperationalMappings.append(snapshot:source,rule:rule("16000019","E-86"),catalog:catalog,explicitConsent:true)
-        let first=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:mapped,visit:bytes(visit),approvedCatalog:fixture("n2-reviewed-approved.json"),at:now)
+        let pending=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:mapped,visit:bytes(visit),approvedCatalog:fixture("n2-reviewed-approved.json"),at:now)
+        XCTAssertEqual(pending.pending,1);XCTAssertEqual(pending.physicalMovementsAdded,0)
+        let evidence=N2PendingDispensingEvidence(visitID:"operational-first",itemID:"alcohol-item",lotID:"operational-alcohol",
+            quantity:5,confirmNewContainer:true,operatorName:"OPERADOR FICTICIO",reason:"Apertura y consumo físicos verificados",at:now+1)
+        XCTAssertThrowsError(try evidence.append(snapshot:pending.snapshot,explicitConsent:false))
+        let authorized=try evidence.append(snapshot:pending.snapshot,explicitConsent:true)
+        let first=try N2NativeClinicalTransaction.retryCurrentSavedVisit(snapshot:authorized,visitID:"operational-first",approvedCatalog:fixture("n2-reviewed-approved.json"),at:now+1)
+        let firstRoot=try JSONSerialization.jsonObject(with:first.snapshot) as! [String:Any]
+        let original=try XCTUnwrap((firstRoot["attentions"] as! [[String:Any]]).first{$0["id"] as? String=="operational-first"})
+        let originalItems=original["items"] as! [[String:Any]]
+        XCTAssertEqual((originalItems[0]["physicalUse"] as? [String:Any])?["confirmNewContainer"] as? Bool,false)
+        XCTAssertEqual(try evidence.append(snapshot:first.snapshot,explicitConsent:true),first.snapshot)
+        let physical=(firstRoot["stockMovements"] as! [[String:Any]]).last
+        XCTAssertEqual(physical?["physicalEvidenceID"] as? String,evidence.id)
         XCTAssertEqual(first.linked,1);XCTAssertEqual(first.pending,0)
         visit["id"]="operational-second"
         var items=visit["items"] as! [[String:Any]]

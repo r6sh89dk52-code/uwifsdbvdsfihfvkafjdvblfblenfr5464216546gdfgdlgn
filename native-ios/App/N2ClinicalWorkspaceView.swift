@@ -196,7 +196,16 @@ struct N2ClinicalWorkspaceGateView:View {
 
 /// All children inherit a FIXED clinical environment. The independently
 /// mounted demo application's tabs keep their default .demo environment.
-private struct N2ClinicalWorkspaceRootView:View {
+struct N2ClinicalWorkspaceRootView:View {
+    init(onClose:@escaping ()->Void){self.onClose=onClose}
+    #if DEBUG
+    init(layoutCounts:(today:Int,week:Int,drafts:Int)) {
+        onClose={}
+        layoutOnly=true
+        _homeCounts=State(initialValue:layoutCounts)
+    }
+    #endif
+    private var layoutOnly=false
     let onClose:()->Void
     @Environment(\.n2WorkspaceVault) private var vault
     @State private var homeCounts:(today:Int,week:Int,drafts:Int)?
@@ -431,6 +440,7 @@ private struct N2ClinicalWorkspaceRootView:View {
         }
     }
     @MainActor private func refreshHomeCounts() async {
+        guard !layoutOnly else{return}
         do {
             guard let model=try await vault.readHistory() else {
                 homeCounts=nil

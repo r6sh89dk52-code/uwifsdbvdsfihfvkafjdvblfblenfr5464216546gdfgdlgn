@@ -56,6 +56,14 @@ public final class N2ProtectedClinicalVaultCore {
             physicalMovements:a.physicalMovements,
             pendingClinicalLines:a.pendingClinicalItems)
     }
+    public func confirmPendingDispensing(_ evidence:N2PendingDispensingEvidence,approvedCatalog:Data,
+                                         expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            let verified=try evidence.append(snapshot:$0,explicitConsent:true)
+            return try N2NativeClinicalTransaction.retryCurrentSavedVisit(snapshot:verified,
+                visitID:evidence.visitID,approvedCatalog:approvedCatalog,at:evidence.at).snapshot
+        }
+    }
     public func auxiliaryAccounting()throws->String {
         guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
         return try N2AuxiliaryInventory.accounting(snapshot:active.snapshot)

@@ -36,6 +36,7 @@ struct N2NativeClinicalFormView:View {
     private let procedures=N2ProcedureRules.procedures
     @State private var context:N2FormContext?
     @State private var pendingMappingCode:String?
+    @State private var pendingPhysicalItemID:String?
     @State private var form=N2NativeFormDraft()
     @State private var step=0
     @State private var busy=false
@@ -222,6 +223,12 @@ struct N2NativeClinicalFormView:View {
                                         Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
                                         Text("Cantidad \(med.quantity) · "+result).font(.caption).foregroundStyle(.secondary)
                                         if result != "Descontado" {
+                                            Button("Verificar cantidad y apertura pendiente") {pendingPhysicalItemID=med.id}
+                                                .sheet(isPresented:Binding(get:{pendingPhysicalItemID==med.id},set:{if !$0 {pendingPhysicalItemID=nil}})) {
+                                                    N2PendingDispensingView(visitID:form.id,medication:med,date:form.date,context:context,onSaved:{
+                                                        Task {await refreshDispensing(retry:false)}
+                                                    })
+                                                }
                                             Button("Resolver correspondencia") {pendingMappingCode=med.code}
                                                 .sheet(isPresented:Binding(get:{pendingMappingCode==med.code},set:{if !$0 {pendingMappingCode=nil}})) {
                                                     N2OperationalMappingView(code:med.code,context:context,onSaved:{

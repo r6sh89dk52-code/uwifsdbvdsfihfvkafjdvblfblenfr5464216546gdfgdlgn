@@ -19,6 +19,7 @@ const views=[
 'N2ReconciliationView.swift',
 'N2VerifiedNursingExportView.swift',
 'N2OperationalMappingView.swift',
+'N2PendingDispensingView.swift',
 'N2AuxiliaryInventoryView.swift'
 ];
 for(const item of views) {
@@ -36,7 +37,8 @@ const router=fs.readFileSync(path.join(app,'N2WorkspaceVault.swift'),'utf8');
 const clinical=fs.readFileSync(path.join(app,'N2ProtectedClinicalIOSVault.swift'),'utf8');
 const demo=fs.readFileSync(path.join(app,'N2SyntheticTrialIOSVault.swift'),'utf8');
 const calls=[...router.matchAll(/N2SyntheticTrialIOSVault\.shared\.(\w+)\(/g)].map(m=>m[1]);
-assert.equal(calls.length,33,'The bridge must expose the entire supported surface.');
+assert.equal(calls.length,34,'The bridge must expose the entire supported surface.');
+assert(calls.includes('confirmPendingDispensing'));
 assert(calls.includes('registerAuxiliaryLot'));
 assert(calls.includes('auxiliaryAccounting'));
 assert(calls.includes('confirmOperationalMapping'));

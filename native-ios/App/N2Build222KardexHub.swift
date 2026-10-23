@@ -5,6 +5,14 @@ import DanperCore
 /// Build 222 Kardex home screen, rebuilt as native navigation.
 /// Navigation never creates inventory movements or changes clinical data.
 struct N2Build222KardexHub:View {
+    init() {}
+    #if DEBUG
+    init(layoutLotCount:Int) {
+        layoutOnly=true
+        _lotCount=State(initialValue:layoutLotCount)
+    }
+    #endif
+    private var layoutOnly=false
     @Environment(\.n2WorkspaceVault) private var vault
     @State private var lotCount:Int?
     private var activePeriod:N2KardexCutPreview.Period? {
@@ -114,6 +122,7 @@ struct N2Build222KardexHub:View {
     }
 
     @MainActor private func readLotCount() async {
+        guard !layoutOnly else{return}
         do {
             let context=try await vault.clinicalFormContext()
             lotCount=context.lots.count

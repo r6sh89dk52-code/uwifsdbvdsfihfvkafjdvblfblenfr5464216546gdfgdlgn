@@ -8,6 +8,10 @@ import DanperCore
 /// layout, not Face ID, stock persistence or successful clinical administration.
 @MainActor final class N2ClinicalLayoutTests:XCTestCase {
     private func resource(_ name:String)throws->Data {
+        if name=="n2-synthetic-clinical" {
+            let url=try XCTUnwrap(Bundle(for:Self.self).url(forResource:name,withExtension:"json",subdirectory:"SyntheticFixtures"))
+            return try Data(contentsOf:url)
+        }
         let url=try XCTUnwrap(Bundle.main.url(forResource:name,withExtension:"json",subdirectory:"N1sDemoResources"))
         return try Data(contentsOf:url)
     }
@@ -21,6 +25,7 @@ import DanperCore
             .preferredColorScheme(dark ? .dark : .light)
             .environment(\.colorScheme,dark ? .dark : .light)
             .environment(\.locale,Locale(identifier:"es_PE"))
+            .environment(\.scenePhase,.active)
             .environment(\.dynamicTypeSize,large ? .accessibility3 : .large))
         let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
         let window=UIWindow(windowScene:scene)
@@ -49,6 +54,10 @@ import DanperCore
     }
     func testTreatmentCatalogCTAAndMedicationLayouts() async throws {
         let context=try context()
+        try await capture(NavigationStack {
+            N2PendingDispensingView(visitID:"fundo-unit",medication:N2FormMedication(code:"16000182"),
+                date:"2026-10-14",context:context,onSaved:{})
+        },name:"Conciliar-salida-pendiente",dark:false)
         var form=N2NativeFormDraft()
         form.dni=context.workers[0].dni
         form.date="2026-10-17";form.time="12:00"
@@ -115,7 +124,18 @@ import DanperCore
                 name:"Kardex-exportar-\(dark ? "oscuro" : "claro")",dark:dark)
         }
     }
+    func testHistoryAndKardexLayouts() async throws {
+        let model=try N2NativeSnapshotReader.read(resource("n2-synthetic-clinical"))
+        for dark in [false,true] {
+            try await capture(NavigationStack {N2NativeHistoryView(layoutProjection:model)},
+                name:"Historial-\(dark ? "oscuro":"claro")",dark:dark)
+            try await capture(NavigationStack {N2Build222KardexHub(layoutLotCount:3)},
+                name:"Kardex-\(dark ? "oscuro":"claro")",dark:dark)
+        }
+    }
     func testHomeLayouts() async throws {
+        try await capture(N2ClinicalWorkspaceRootView(layoutCounts:(0,0,0)),name:"Inicio-clinico-protegido-claro",dark:false)
+        try await capture(N2ClinicalWorkspaceRootView(layoutCounts:(0,0,0)),name:"Inicio-clinico-protegido-oscuro",dark:true)
         let snapshot=try resource("n2-synthetic-clinical")
         let model=try N2NativeSnapshotReader.read(snapshot)
         let metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())

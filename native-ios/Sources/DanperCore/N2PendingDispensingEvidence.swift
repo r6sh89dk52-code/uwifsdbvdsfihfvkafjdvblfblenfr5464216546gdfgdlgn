@@ -1,0 +1,56 @@
+import Foundation
+
+public struct N2PendingDispensingEvidence:Codable,Sendable,Equatable {
+    public let id:String
+    public let visitID:String
+    public let itemID:String
+    public let lotID:String
+    public let quantity:Double
+    public let confirmNewContainer:Bool
+    public let operatorName:String
+    public let reason:String
+    public let at:Int64
+    public let version:Int
+    public init(visitID:String,itemID:String,lotID:String,quantity:Double,
+                confirmNewContainer:Bool,operatorName:String,reason:String,at:Int64) {
+        id=UUID().uuidString;self.visitID=visitID;self.itemID=itemID;self.lotID=lotID
+        self.quantity=quantity;self.confirmNewContainer=confirmNewContainer
+        self.operatorName=operatorName;self.reason=reason;self.at=at;version=1
+    }
+    public enum Failure:Error {case invalidEvidence,invalidTarget}
+    public static func read(snapshot:Data)throws->[Self] {
+        guard let root=try JSONSerialization.jsonObject(with:snapshot) as? [String:Any] else{throw Failure.invalidTarget}
+        guard let value=root["nativePendingDispensingEvidence"] else{return []}
+        let records=try JSONDecoder().decode([Self].self,from:JSONSerialization.data(withJSONObject:value))
+        guard records.count<=500,Set(records.map(\.id)).count==records.count else{throw Failure.invalidEvidence}
+        for record in records {try record.validate()}
+        return records
+    }
+    private func validate()throws {
+        guard version==1,UUID(uuidString:id) != nil,!visitID.isEmpty,!itemID.isEmpty,!lotID.isEmpty,
+              quantity.isFinite,quantity>0,quantity<=10_000_000,at>0,
+              operatorName.trimmingCharacters(in:.whitespacesAndNewlines).count>=3,
+              reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=10 else{throw Failure.invalidEvidence}
+    }
+    public func append(snapshot:Data,explicitConsent:Bool)throws->Data {
+        try validate()
+        guard explicitConsent else{throw Failure.invalidEvidence}
+        _=try N1eLegacyClinicalAudit.inspect(snapshot)
+        guard var root=try JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
+              let visits=root["attentions"] as? [[String:Any]],
+              let visit=visits.first(where:{$0["id"] as? String==visitID && $0["status"] as? String=="saved"}),
+              let items=visit["items"] as? [[String:Any]],items.contains(where:{$0["id"] as? String==itemID}),
+              let lots=root["stockLots"] as? [[String:Any]],lots.contains(where:{$0["id"] as? String==lotID}),
+              let movements=root["stockMovements"] as? [[String:Any]] else{throw Failure.invalidTarget}
+        if movements.contains(where:{ movement in
+            let ref=movement["dispenseRef"] as? [String:Any]
+            return ref?["attentionId"] as? String==visitID && ref?["itemId"] as? String==itemID
+        }) {return snapshot}
+        var records=try Self.read(snapshot:snapshot)
+        if records.contains(self){return snapshot}
+        guard records.count<500,!records.contains(where:{$0.id==id}) else{throw Failure.invalidEvidence}
+        records.append(self)
+        root["nativePendingDispensingEvidence"]=try JSONSerialization.jsonObject(with:JSONEncoder().encode(records))
+        return try JSONSerialization.data(withJSONObject:root,options:.sortedKeys)
+    }
+}

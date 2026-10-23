@@ -119,6 +119,7 @@ public enum N2NativeClinicalTransaction {
         _=try N1fLosslessFieldGate.inspect(snapshot)
         let approved=try mappings(approvedCatalog)
         let operational=try N2OperationalMappings.read(snapshot)
+        let physicalEvidence=try N2PendingDispensingEvidence.read(snapshot:snapshot)
         guard var root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               var visits=root["attentions"] as? [[String:Any]],
               var lots=root["stockLots"] as? [[String:Any]],
@@ -171,7 +172,7 @@ public enum N2NativeClinicalTransaction {
             }
         }
         let today=limaDay(at)
-        let historical=date != today
+        let historical=date != today || !append
         let eventAt: Int64? = historical
             ? historicalAt(day:date,time:new["time"] as? String ?? "",now:at)
             : at
@@ -179,7 +180,13 @@ public enum N2NativeClinicalTransaction {
         var lineID=""
         var outcomes:[String:String]=[:]
         func mark(_ reason:String) {pending+=1;reasons.append(reason);outcomes[lineID]=reason}
-        for item in items {
+        for originalItem in items {
+            var item=originalItem
+            let evidence=physicalEvidence.last{$0.visitID==id && $0.itemID==item["id"] as? String && $0.at<=at}
+            if let evidence {
+                item["physicalUse"]=["lotId":evidence.lotID,"quantity":evidence.quantity,
+                                     "confirmNewContainer":evidence.confirmNewContainer]
+            }
             let itemID=item["id"] as! String,code=item["code"] as! String
             lineID=itemID
             let existing=movements.filter{
@@ -196,7 +203,7 @@ public enum N2NativeClinicalTransaction {
                 continue
             }
             let rule=operational.first{$0.clinicalCode==code && $0.clinicalName==item["name"] as? String && $0.clinicalUnit==item["unit"] as? String}
-            if let rule, historical && rule.confirmedAt>(eventAt ?? 0) {
+            if let rule, historical && rule.confirmedAt>(eventAt ?? 0) && evidence==nil {
                 mark("Correspondencia verificada después de la atención: requiere conciliación histórica.");continue
             }
             let candidates=rule.map { [Material(clinicalCode:$0.clinicalCode,clinicalName:$0.clinicalName,
@@ -364,6 +371,7 @@ public enum N2NativeClinicalTransaction {
                     auditedMovement["operationalMappingID"]=rule.id
                     auditedMovement["operationalMappingVersion"]=rule.version
                 }
+                if let evidence {auditedMovement["physicalEvidenceID"]=evidence.id}
                 movements.append(auditedMovement)
             }
             lots=probe

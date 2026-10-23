@@ -5,6 +5,14 @@ import DanperCore
 /// The preview route always uses a bundled synthetic JSON sample. A future
 /// real vault must authenticate before handing a snapshot to this view.
 struct N2NativeHistoryView: View {
+    init(useProtectedVault:Bool=false){self.useProtectedVault=useProtectedVault}
+    #if DEBUG
+    init(layoutProjection:N2NativeReadModel) {
+        layoutOnly=true
+        _projection=State(initialValue:layoutProjection)
+    }
+    #endif
+    private var layoutOnly=false
     @Environment(\.n2WorkspaceVault) private var vault
     var useProtectedVault = false
     @State private var projection:N2NativeReadModel?
@@ -144,6 +152,7 @@ struct N2NativeHistoryView: View {
     }
 
     private func load(force:Bool=false) async {
+        guard !layoutOnly else{return}
         guard force || projection==nil else {return}
         do {
             if useProtectedVault {

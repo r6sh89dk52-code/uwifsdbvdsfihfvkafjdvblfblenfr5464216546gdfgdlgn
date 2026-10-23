@@ -71,6 +71,10 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.deleteDraft(id:id,expectedRevision:expectedRevision)
     }
+    func confirmPendingDispensing(_ evidence:N2PendingDispensingEvidence,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.confirmPendingDispensing(evidence,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.confirmPendingDispensing(evidence,expectedRevision:expectedRevision)
+    }
     func auxiliaryAccounting() async throws->String {
         if isClinical {return try await N2ProtectedClinicalIOSVault.shared.auxiliaryAccounting()}
         return try await N2SyntheticTrialIOSVault.shared.auxiliaryAccounting()
