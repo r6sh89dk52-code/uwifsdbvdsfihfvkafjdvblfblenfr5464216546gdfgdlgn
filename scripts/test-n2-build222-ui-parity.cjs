@@ -86,8 +86,8 @@ for(const key of ['public static func period(for day:String)',
  'signedAdjustments','requiresOperatorReconciliation'])
   must(cutCore,key,'reconstrucción matemática del día 9 sin mutaciones');
 for(const key of ['KARDEX · UN SOLO INVENTARIO',
- 'Consumos día por día','automaticCutAccounting(through:format(Date()))',
- 'Stock estimado al día 9','row.usesByDay[date] ?? 0'])
+ 'Resumen del corte mensual','automaticCutAccounting(through:format(Date()))',
+ 'Stock estimado al día 9','El detalle de consumos diarios está en el Excel Kardex de Enfermeras'])
   must(cutView,key,'conciliación automática desde atenciones, sin escrituras');
 for(const key of ['visit["status"] as? String=="saved"',
  'line.daily[visitDay,default:0]+=n',
@@ -166,7 +166,7 @@ for(const label of ['private let stepTitles=["Trabajador","Evaluación","Tratami
 const allergyIndex=form.indexOf('DanperPanel("Alergias del trabajador")');
 assert(allergyIndex>form.indexOf('private func clinicalSection()'),
   'La revisión de alergias debe estar en Evaluación, como Build 222');
-must(kardex,'label:"Lotes registrados"','contador real de lotes');
+must(kardex,'label:"Lotes disponibles"','contador real de lotes');
 must(kardex,'vault.clinicalFormContext()','lectura de lotes sin estimaciones');
 
 
@@ -185,9 +185,9 @@ for(const term of ['worker-registration-dni','worker-save','worker-continue-atte
  'DanperPanel("Datos laborales")','DanperPanel("Datos personales")'])
   must(editor,term,'editor SwiftUI');
 assert.equal((form.match(/private func workerSection\(/g)||[]).length,1);
-for(const term of ['kardex-route-','Inventario físico','Entradas y salidas',
- 'Revisar pendientes anteriores','Exportar Kardex'])
-  must(kardex,term,'hub Kardex original');
+for(const term of ['kardex-route-','Registrar ingreso','Conciliar existencias',
+ 'Kardex de Enfermeras','Indicador Ambulatorio'])
+  must(kardex,term,'hub único sin menús duplicados');
 must(inventory,'init(initialOperation:String?=nil)','acción física de inventario');
 for(const view of [indicator,nursing])
   for(const term of ['N2Build222ExportProgress','N2Build222StageHeading(step:1',
@@ -211,7 +211,30 @@ assert.equal(codes.length,12,'Catálogo inesperadamente distinto: revisar manual
 must(home,'danper-visual-palette','selector de paleta de salud');
 must(home,'N2HealthMascot()','mascota SwiftUI');
 must(palette,'danper.visual.palette','tema nativo');
-console.log('PASS: Kardex de 4 acciones, Excel 3 etapas, 12 procedimientos únicos y tema azul presentes.');
+for (const value of [
+  'inventory-select-product','inventory-single-quantity','inventory-save-',
+  'Número de lote o referencia','Unidad o presentación','Vencimiento · DDMMAA',
+  'Cantidad disponible','Registrar stock'])
+  must(inventory,value,'formulario compacto de registro de medicamentos');
+for (const bad of ['Sede del inventario','Capacidad interna por envase',
+  'Envases sellados','Unidades sueltas','Contenido de envase abierto',
+  'Kardex físico protegido'])
+  assert(!inventory.includes(bad),'Inventario vuelve a mostrar campo interno: '+bad);
+assert(!form.includes('DanperPanel("Dispensación al guardar")'),
+       'No introducir segunda confirmación de consumo');
+assert(!form.includes('Actualizar verificación'),
+       'La atención se guarda y descuenta sin verificación manual');
+must(form,'step=record.stage','volver al paso del borrador recuperado');
+must(form,'step=recovered.stage','cargar borrador en su paso anterior');
+must(form,'makeDraftPatch(context:context,stage:step)',
+     'guardar etapa en borrador cifrado');
+must(clinicalTx,'Sin existencias FEFO disponibles en el inventario único.',
+     'no segmentar FEFO por sede');
+assert(!clinicalTx.includes('verifiedSites[l['),
+       'FEFO no debe filtrar lotes según sede');
+assert(!nursing.includes('let scoped=lots.filter'),
+       'El Kardex de Enfermeras no debe segregar stock por sede');
+console.log('PASS: Inventario único, atención sin doble confirmación, borrador en su paso, Kardex compacto y dos Excel.');
 console.log('PASS: estructura Build 222 (4 tabs), ingreso de trabajador, perfil, revisión de alergias y alta SwiftUI presentes.');
 console.log('PASS: inicio clínico, animaciones, grupos de tratamiento y Kardex aproximados a Build222.');
 for(const id of ['start-empty-demo','start-sample-demo','start-import-personal-xlsx','start-restore-build222'])
@@ -230,5 +253,5 @@ must(personal,'open-imported-clinical-workspace','abrir bóveda clínica tras im
 console.log('PASS: onboarding con origen explícito, demo realmente vacía, borrado verificado e importación protegida.');
 console.log('PASS: nueva vía sin Excel crea solo el primer trabajador manual con autenticación y fuente vacía original.');
 console.log('PASS: cabecera DANPER, búsqueda de padrón paginada, validación con foco y tratamiento compacto en B11.');
-console.log('PASS: Kardex presenta alta de stock y corte del día 9; filas de medicación compactas y sin baja de existencias en el cálculo previo.');
+console.log('PASS: Alta compacta con vencimiento DDMMAA; corte 9–8 resumido, movimientos diarios en Excel de Enfermeras.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
