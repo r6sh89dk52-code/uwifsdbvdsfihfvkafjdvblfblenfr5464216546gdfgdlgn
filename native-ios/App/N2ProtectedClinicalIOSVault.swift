@@ -153,10 +153,8 @@ actor N2ProtectedClinicalIOSVault {
     /// Read-only: never posts movements or reconfirms a completed visit.
     func automaticCutAccounting(through date:String)throws
         ->N2AutomaticCutAccounting.Result {
-        let source=try protectedStore().readVerifiedSnapshot()
-        return try N2AutomaticCutAccounting.calculate(
-            snapshot:source,mappings:resource("n2-approved-mappings"),
-            through:date)
+        return try protectedStore().automaticCutAccounting(
+            mappings:resource("n2-approved-mappings"),through:date)
     }
     func clinicalFormContext()throws->N2FormContext {
         let products=try resource("n2-ambulatory-products")
