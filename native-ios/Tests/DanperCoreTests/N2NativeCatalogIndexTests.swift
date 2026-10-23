@@ -27,7 +27,8 @@ final class N2NativeCatalogIndexTests:XCTestCase {
         XCTAssertEqual(index.authorizedNursingOptions(for:"16024400").count,2)
         XCTAssertTrue(index.authorizedNursingOptions(for:"99999999").isEmpty)
         XCTAssertEqual(index.clinicalMatches("16000182").first?.code,"16000182")
-        XCTAssertEqual(index.nursingMatches("E-68").first?.id,"E-68")
+        XCTAssertEqual(index.nursingMatches("NYLON AZUL 3/0").first?.id,"E-68")
+        XCTAssertTrue(index.nursingMatches("E-68").isEmpty) // IDs stay internal.
         XCTAssertFalse(index.approvals.contains{$0.kardexID=="E-68"})
     }
     func testOperatorConfirmedPresentationsAreLimitedToNursingKardex()throws {
