@@ -17,6 +17,27 @@ final class N2NativeClinicalFormTests:XCTestCase {
         return try N2NativeCatalogLoader.load(products:products,nursing:nursing,
                      approvedMappings:source("n2-reviewed-approved.json"))
     }
+    func testNursingCatalogUsesOnlyApprovedPresentationWithoutExposingUserCodes()throws {
+        let catalog=try self.catalog()
+        XCTAssertEqual(catalog.nursing.count,98)
+        XCTAssertEqual(catalog.approvals.count,86)
+        let clinicalUnits=Dictionary(uniqueKeysWithValues:catalog.clinical.map {
+            ($0.code,$0.unit)
+        })
+        for link in catalog.approvals {
+            let item=try XCTUnwrap(catalog.nursing.first{$0.id==link.kardexID})
+            XCTAssertEqual(item.unit,clinicalUnits[link.clinicalCode])
+        }
+        XCTAssertEqual(catalog.nursing.first{$0.id=="E-1"}?.unit,"UND")
+        XCTAssertEqual(catalog.nursing.first{$0.id=="E-86"}?.name,"ALCOHOL 1 LT")
+        XCTAssertEqual(catalog.nursing.first{$0.id=="E-86"}?.unit,"FCO")
+        // No approved correspondence for nylon: do not fabricate UND.
+        XCTAssertNil(catalog.nursing.first{$0.id=="E-68"}?.unit)
+        XCTAssertEqual(catalog.nursingMatches("ALCOHOL 1 LT").first?.name,
+                       "ALCOHOL 1 LT")
+        XCTAssertTrue(catalog.nursingMatches("E-86").isEmpty)
+    }
+
     private func at()->Int64 {
         Int64(ISO8601DateFormatter().date(from:"2026-10-14T18:00:00Z")!
             .timeIntervalSince1970*1000)
