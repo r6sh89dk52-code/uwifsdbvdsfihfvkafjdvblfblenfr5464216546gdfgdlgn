@@ -26,23 +26,6 @@ struct N2KardexCutPreviewView:View {
         formatter.dateFormat="yyyy-MM-dd"
         return formatter.string(from:date)
     }
-    private var dailyDates:[String] {
-        guard let accounting else{return []}
-        let formatter=DateFormatter()
-        formatter.locale=Locale(identifier:"en_US_POSIX")
-        formatter.timeZone=calendar.timeZone
-        formatter.dateFormat="yyyy-MM-dd"
-        guard let first=formatter.date(from:accounting.start),
-              let last=formatter.date(from:accounting.end) else{return []}
-        var dates=[String]()
-        var date=first
-        while date<=last && dates.count<32 {
-            dates.append(formatter.string(from:date))
-            guard let next=calendar.date(byAdding:.day,value:1,to:date) else{break}
-            date=next
-        }
-        return dates
-    }
     private var titles:[String:String] {
         Dictionary(uniqueKeysWithValues:(accounting?.rows ?? []).map {
             ($0.code,$0.name+" · "+$0.code)
@@ -55,15 +38,15 @@ struct N2KardexCutPreviewView:View {
                     Text("KARDEX · UN SOLO INVENTARIO")
                         .font(.caption2.weight(.bold)).tracking(1.2)
                         .foregroundStyle(DanperStyle.red)
-                    Text("Stock desde el día 9")
+                    Text("Resumen del corte mensual")
                         .font(.title2.weight(.bold))
-                    Text("Los consumos de las atenciones terminadas se cuentan automáticamente, aunque sean de fechas anteriores.")
+                    Text("Corte automático del día 9 al día 8. El siguiente período comienza cada día 9, sin borrar el inventario anterior.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 if let accounting {
                     DanperPanel("Corte mensual vigente") {
                         LabeledContent("Desde",value:DanperDatePresentation.display(accounting.start))
-                        LabeledContent("Hasta hoy",value:DanperDatePresentation.display(accounting.end))
+                        LabeledContent("Consultado al",value:DanperDatePresentation.display(accounting.end))
                         Text("Se utiliza el conteo actualmente registrado para estimar el saldo del día 9. No se crea un segundo Kardex ni se vuelven a descontar atenciones ya registradas.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
@@ -71,13 +54,12 @@ struct N2KardexCutPreviewView:View {
                         DanperPanel("Elegir medicamento o insumo") {
                             DanperChoiceField(title:"Producto",selection:$selectedCode,
                                 options:accounting.rows.map(\.code),labels:titles)
-                            Text("Los lotes siguen siendo internos para FEFO; los informes agrupan por código de medicamento.")
+                            Text("Resumen consolidado por producto. El detalle de consumos diarios está en el Excel Kardex de Enfermeras.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     if let selected {
                         summary(selected)
-                        dailyMovements(selected)
                     }else {
                         DanperPanel("Inventario sin movimientos") {
                             Text("No hay existencias ni consumos de productos reconocidos para este corte.")
@@ -128,27 +110,11 @@ struct N2KardexCutPreviewView:View {
                       systemImage:"exclamationmark.triangle")
                     .font(.caption).foregroundStyle(.orange)
             }
-            Text("Resultado de lectura, sin escritura: ningún lote o atención se modifica al consultar esta pantalla.")
+            Text("Los movimientos diarios se consultan en Kardex de Enfermeras. Esta pantalla no registra movimientos ni altera las existencias.")
                 .font(.caption2).foregroundStyle(.secondary)
         }
     }
 
-    private func dailyMovements(_ row:N2AutomaticCutAccounting.Row)->some View {
-        DanperPanel("Consumos día por día") {
-            Text("Cero significa que no existe un consumo computable para ese producto en ese día.")
-                .font(.caption).foregroundStyle(.secondary)
-            ForEach(dailyDates,id:\.self){date in
-                HStack(spacing:10) {
-                    Text(DanperDatePresentation.display(date))
-                        .font(.subheadline).foregroundStyle(.primary)
-                    Spacer()
-                    Text((row.usesByDay[date] ?? 0).formatted())
-                        .font(.subheadline.weight(.semibold)).monospacedDigit()
-                }.frame(minHeight:34)
-                Divider().opacity(0.4)
-            }
-        }
-    }
     @MainActor private func reload() async {
         failed=false
         status="Leyendo atenciones e inventario cifrados…"
