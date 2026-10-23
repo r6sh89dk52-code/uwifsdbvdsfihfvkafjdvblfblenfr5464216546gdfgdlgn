@@ -98,6 +98,16 @@ for(const key of ['visit["status"] as? String=="saved"',
   must(autoAccounting,key,'contabilización automática y única de atenciones terminadas');
 must(vaultSource,'func automaticCutAccounting(through date:String)',
      'consulta del inventario cifrado desde la fuente única');
+const vaultCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'),'utf8');
+must(vaultCore,'public func automaticCutAccounting(mappings:Data,through date:String)',
+     'API de lectura consolidada en la bóveda cifrada');
+assert(!vaultSource.includes('readVerifiedSnapshot()'),
+       'No invocar funciones inexistentes de lectura de inventario');
+assert(!/\+\s*\n\s*\(/.test(autoAccounting),
+       'No dividir una concatenación Swift después del operador +');
+must(autoAccounting,'[attentionID,itemID].joined(separator:',
+     'clave única de atención/medicamento sin concatenación inválida');
+
 for(const key of ['private static func historicalAt(',
  'if historical {','after["updatedAt"]=eventAt!',
  '"unit":before["catalogUnit"]!,"at":eventAt!'])
