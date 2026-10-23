@@ -90,9 +90,9 @@ struct N2KardexCutPreviewView:View {
     }
 
     private func summary(_ row:N2AutomaticCutAccounting.Row)->some View {
-        DanperPanel("Conciliación calculada") {
+        DanperPanel("Resumen estimado por producto") {
             Text(row.name).font(.headline)
-            LabeledContent("Existencias registradas hoy",
+            LabeledContent("Existencias registradas",
                            value:row.currentCount?.formatted() ?? "Sin conteo")
             LabeledContent("Consumos del período",value:row.reportedUse.formatted())
             LabeledContent("Ingresos posteriores al corte",value:row.received.formatted())
