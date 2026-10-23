@@ -269,7 +269,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
         ]
         return try JSONSerialization.data(withJSONObject:source)
     }
-    public func makeDraftPatch(context:N2FormContext)throws->Data {
+    public func makeDraftPatch(context:N2FormContext,stage:Int=0)throws->Data {
         let worker=context.workers.first(where:{$0.dni==dni})
         let workerRaw:[String:Any]=worker.map {
             ["dni":$0.dni,"name":$0.name,"area":$0.area,
@@ -298,7 +298,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             return row
         }
         return try JSONSerialization.data(withJSONObject:[
-            "worker":workerRaw,"items":itemRows,
+            "worker":workerRaw,"items":itemRows,"nativeDraftStep":max(0,min(3,stage)),
             "date":date,"time":time,"category":category,
             "dispensingSite":dispensingSite,
             "system":system,"segment":segment,"diagnosis":diagnosis,
