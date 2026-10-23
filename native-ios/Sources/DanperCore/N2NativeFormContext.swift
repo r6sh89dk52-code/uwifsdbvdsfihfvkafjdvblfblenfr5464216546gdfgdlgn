@@ -62,7 +62,6 @@ public struct N2FormContext:Sendable {
         let approved=Set(products.authorizedNursingOptions(for:code).map(\.id))
         return lots.filter {
             approved.contains($0.kardexCode) && $0.total>0 &&
-            (site.isEmpty || $0.site==site) &&
             ($0.expires.isEmpty || $0.expires>=date)
         }.sorted {
             let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
