@@ -216,6 +216,10 @@ for (const value of [
   'Número de lote o referencia','Unidad o presentación','Vencimiento · DDMMAA',
   'Cantidad disponible','Registrar stock'])
   must(inventory,value,'formulario compacto de registro de medicamentos');
+assert(!/\b(?:let|var)\s+\w+\s*=!/.test(inventory),
+       'Swift requiere separar la asignación de la negación (ej. let x = !condición)');
+must(inventory,'let existingPackaged = !',
+     'validación de envase sin error de sintaxis Swift');
 for (const bad of ['Sede del inventario','Capacidad interna por envase',
   'Envases sellados','Unidades sueltas','Contenido de envase abierto',
   'Kardex físico protegido'])
