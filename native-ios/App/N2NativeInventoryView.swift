@@ -68,7 +68,9 @@ struct N2NativeInventoryView:View {
         context?.lots.first{$0.id==selectedLotID}
     }
     private func stockUnits(_ lot:N2FormLot)->Double {
-        Double(lot.sealed)*lot.capacity + lot.loose + lot.opened
+        // Show Kardex U.M., not millilitres inside a sealed FCO/CJA.
+        let loose=["UND","TBL","PAR","ML","LT"].contains(lot.unit.uppercased())
+        return loose ? lot.total : Double(lot.sealed)
     }
     private var enteredQuantity:Double? {
         let raw=quantity.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -84,10 +86,13 @@ struct N2NativeInventoryView:View {
         // Infer only when the official product name actually states a
         // quantity. NEVER assume a bottle contains 100 mL by default.
         guard packaged,let name=material?.name.uppercased(),
-              let range=name.range(of:#"\b\d{1,4}\s*(ML|CC)\b"#,
+              let range=name.range(of:#"\b\d{1,4}\s*(ML|CC|LT|L)\b"#,
                                    options:.regularExpression) else{return 1}
-        let count=String(name[range]).prefix{ $0.isNumber }
-        return max(1,Int(count) ?? 1)
+        let token=String(name[range]).uppercased()
+        let digits=token.prefix{$0.isNumber}
+        let count=Int(digits) ?? 1
+        return max(1,min(10_000_000,count *
+            (token.contains("LT") || token.hasSuffix("L") ? 1000:1)))
     }
     private var expiryISO:String? {
         guard expiryEnabled else{return ""}
@@ -239,7 +244,7 @@ struct N2NativeInventoryView:View {
                     DanperChoiceField(title:"Medicamento y lote",
                         selection:$selectedLotID,options:context?.lots.map(\.id) ?? [],
                         labels:Dictionary(uniqueKeysWithValues:(context?.lots ?? []).map{
-                            ($0.id,$0.name+" · "+$0.id)
+                            ($0.id,$0.name+" · Lote "+($0.reference.isEmpty ? "sin referencia" : $0.reference))
                         }))
                     if let selectedLot {
                         LabeledContent("Existencia actual",
@@ -381,10 +386,10 @@ struct N2NativeInventoryView:View {
                 ForEach(context.lots){lot in
                     VStack(alignment:.leading,spacing:5) {
                         Text(lot.name).font(.subheadline.weight(.semibold))
-                        Text("Lote "+lot.id+" · "+lot.kardexCode)
+                        Text("Lote: "+(lot.reference.isEmpty ? "Sin referencia" : lot.reference))
                             .font(.caption).foregroundStyle(.secondary)
                         let total=stockUnits(lot)
-                        Text("Cantidad: \(total.formatted()) · Vence: \(DanperDatePresentation.display(lot.expires))")
+                        Text("Cantidad: \(total.formatted()) \(lot.unit) · Vence: \(DanperDatePresentation.display(lot.expires))")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth:.infinity,alignment:.leading)
