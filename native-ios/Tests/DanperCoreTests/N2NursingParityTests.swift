@@ -38,6 +38,19 @@ final class N2NursingParityTests:XCTestCase {
         XCTAssertTrue(emptyDay.rows.filter{$0.stockKnown}.allSatisfy{$0.consumed==0})
     }
 
+    func testNursingKardexUsesIdenticalUnifiedStockForBothCareSites()throws {
+        let source=try bytes("n1e-clinical-stock.json")
+        let (_,catalog)=try fixture()
+        let shared=try N2NursingReportBuilder.daily(
+            snapshot:source,catalog:catalog,date:"2026-10-14")
+        for location in ["LA VENTUROSA","PLVENTUROSA"] {
+            let result=try N2NursingReportBuilder.daily(
+                snapshot:source,catalog:catalog,date:"2026-10-14",
+                site:location)
+            XCTAssertEqual(result.rows,shared.rows)
+            XCTAssertEqual(result.warnings,shared.warnings)
+        }
+    }
     func testNursingDailyAndRangeMatchBuild222TypeScriptByAll98Rows()throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (reference,catalog)=try fixture()
