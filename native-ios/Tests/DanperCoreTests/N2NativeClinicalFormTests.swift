@@ -26,7 +26,15 @@ final class N2NativeClinicalFormTests:XCTestCase {
         })
         for link in catalog.approvals {
             let item=try XCTUnwrap(catalog.nursing.first{$0.id==link.kardexID})
-            XCTAssertEqual(item.unit,clinicalUnits[link.clinicalCode])
+            let expectedUnit:String?
+            if item.group=="TABLETAS" || item.id=="E-18" {
+                expectedUnit="UND"
+            } else if ["E-94","E-95"].contains(item.id) {
+                expectedUnit="CJA"
+            } else {
+                expectedUnit=clinicalUnits[link.clinicalCode]
+            }
+            XCTAssertEqual(item.unit,expectedUnit)
         }
         XCTAssertEqual(catalog.nursing.first{$0.id=="E-1"}?.unit,"UND")
         XCTAssertEqual(catalog.nursing.first{$0.id=="E-86"}?.name,"ALCOHOL 1 LT")

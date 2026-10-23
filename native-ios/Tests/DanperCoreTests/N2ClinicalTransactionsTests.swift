@@ -145,6 +145,9 @@ final class N2ClinicalTransactionsTests: XCTestCase {
         for movement in dated {
             let at=try XCTUnwrap(movement["at"] as? NSNumber)
             XCTAssertEqual(at.int64Value,time("2026-10-15",hour:"15:00"))
+            let reference=try XCTUnwrap(movement["dispenseRef"] as? [String:Any])
+            let confirmed=try XCTUnwrap(reference["confirmedAt"] as? NSNumber)
+            XCTAssertEqual(confirmed.int64Value,at.int64Value)
         }
         let repeated=try N2NativeClinicalTransaction.retryCurrentSavedVisit(
             snapshot:output.snapshot,visitID:"n2-historical-automatic",

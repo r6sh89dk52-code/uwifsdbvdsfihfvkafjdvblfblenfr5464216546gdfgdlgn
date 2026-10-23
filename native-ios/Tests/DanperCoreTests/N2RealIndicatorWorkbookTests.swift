@@ -3,6 +3,17 @@ import XCTest
 @testable import DanperCore
 
 final class N2RealIndicatorWorkbookTests:XCTestCase {
+    private func withPlantBottleCounts(_ events:[[String:Any]])->[[String:Any]] {
+        events + events.filter {
+            ["opening","count"].contains($0["kind"] as? String ?? "")
+        }.map { original in
+            var event=original
+            event["id"]=(original["id"] as! String)+"-bottle"
+            event["code"]="16000013"
+            event["quantity"]=(original["kind"] as? String)=="opening" ? 2 : 1
+            return event
+        }
+    }
     private func fixture(_ name:String)throws->Data {
         let dir=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
         return try Data(contentsOf:URL(fileURLWithPath:dir).appendingPathComponent(name))
@@ -26,7 +37,7 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
            "quantity":0,"reason":"Cierre revisado",
            "document":"","expires":"","periodEnd":"2026-11-08","voidOf":""]
         ]
-        snapshot["ambulatoryReconciliation"]=events
+        snapshot["ambulatoryReconciliation"]=withPlantBottleCounts(events)
         let raw=try JSONSerialization.data(withJSONObject:snapshot)
         let catalog=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
         let x=try N2VerifiedIndicatorWorkbook.export(
@@ -38,8 +49,8 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             selectedVisitIDs:Set(["planta-open","planta-tablet-carton"]))
         XCTAssertEqual(x.visits,2)
         XCTAssertEqual(x.rows,2)
-        XCTAssertEqual(x.missingOpening,431)
-        XCTAssertEqual(x.missingClosingCount,431)
+        XCTAssertEqual(x.missingOpening,430)
+        XCTAssertEqual(x.missingClosingCount,430)
     }
     func testJointFundoAndPlantaIndicatorRequiresBothReconciledPeriods()throws {
         var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
@@ -76,7 +87,7 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,
                            .unreviewedPeriod)
         }
-        snapshot["ambulatoryReconciliation"]=base+planta
+        snapshot["ambulatoryReconciliation"]=base+withPlantBottleCounts(planta)
         let verified=try JSONSerialization.data(withJSONObject:snapshot)
         let result=try N2VerifiedIndicatorWorkbook.export(
             snapshot:verified,products:products,mappings:mappings,
@@ -85,8 +96,8 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
         XCTAssertEqual(result.visits,4)
         XCTAssertEqual(result.rows,4)
         XCTAssertFalse(result.provisional)
-        XCTAssertEqual(result.missingOpening,431)
-        XCTAssertEqual(result.missingClosingCount,431)
+        XCTAssertEqual(result.missingOpening,430)
+        XCTAssertEqual(result.missingClosingCount,430)
         let entries=try N1rStoredZip.unpack(result.xlsx)
         let sheet=try XCTUnwrap(entries.first(where:{$0.name=="xl/worksheets/sheet5.xml"}))
         let xml=try XCTUnwrap(String(data:sheet.data,encoding:.utf8))

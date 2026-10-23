@@ -327,7 +327,7 @@ public enum N2NativeClinicalTransaction {
             let refCommon:[String:Any]=[
                 "attentionId":id,"itemId":itemID,"clinicalCode":code,
                 "clinicalName":item["name"]!,"clinicalUnit":item["unit"]!,
-                "clinicalQuantity":item["quantity"]!,"confirmedAt":at
+                "clinicalQuantity":item["quantity"]!,"confirmedAt":eventAt!
             ]
             let beforeCount=movements.count
             for (i,part) in parts.enumerated() {
