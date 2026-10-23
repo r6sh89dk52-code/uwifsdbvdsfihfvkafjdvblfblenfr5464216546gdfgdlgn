@@ -52,6 +52,9 @@ struct N2NativeInventoryView:View {
     private var selectedLot:N2FormLot? {
         context?.lots.first{$0.id==selectedLotID}
     }
+    private func stockUnits(_ lot:N2FormLot)->Double {
+        Double(lot.sealed)*lot.capacity + lot.loose + lot.opened
+    }
     private var enteredQuantity:Double? {
         let raw=quantity.trimmingCharacters(in:.whitespacesAndNewlines)
             .replacingOccurrences(of:",",with:".")
@@ -217,8 +220,7 @@ struct N2NativeInventoryView:View {
                         }))
                     if let selectedLot {
                         LabeledContent("Existencia actual",
-                            value:(Double(selectedLot.sealed)*selectedLot.capacity+
-                                   selectedLot.loose+selectedLot.opened).formatted())
+                            value:stockUnits(selectedLot).formatted())
                         LabeledContent("Vencimiento",
                             value:DanperDatePresentation.display(selectedLot.expires))
                     }
@@ -314,8 +316,7 @@ struct N2NativeInventoryView:View {
                         Text(lot.name).font(.subheadline.weight(.semibold))
                         Text("Lote "+lot.id+" · "+lot.kardexCode)
                             .font(.caption).foregroundStyle(.secondary)
-                        let total=Double(lot.sealed)*lot.capacity+
-                            lot.loose+lot.opened
+                        let total=stockUnits(lot)
                         Text("Cantidad: \(total.formatted()) · Vence: \(DanperDatePresentation.display(lot.expires))")
                             .font(.caption).foregroundStyle(.secondary)
                     }
