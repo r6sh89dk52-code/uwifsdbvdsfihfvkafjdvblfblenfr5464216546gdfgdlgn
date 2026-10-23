@@ -99,10 +99,23 @@ for(const key of ['visit["status"] as? String=="saved"',
 must(vaultSource,'func automaticCutAccounting(through date:String)',
      'consulta del inventario cifrado desde la fuente única');
 const vaultCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'),'utf8');
+const workspaceVault=fs.readFileSync(path.join(root,'native-ios/App/N2WorkspaceVault.swift'),'utf8');
 must(vaultCore,'public func automaticCutAccounting(mappings:Data,through date:String)',
      'API de lectura consolidada en la bóveda cifrada');
 assert(!vaultSource.includes('readVerifiedSnapshot()'),
        'No invocar funciones inexistentes de lectura de inventario');
+for (const [source,label] of [
+  [workspaceVault,'N2WorkspaceVault'],
+  [vaultSource,'bóveda clínica iOS'],
+  [demo,'bóveda de demostración']
+]) {
+  must(source,'func automaticCutAccounting(through date:String)',
+       'puente de lectura del corte mensual en '+label);
+}
+must(workspaceVault,'N2ProtectedClinicalIOSVault.shared',
+     'N2WorkspaceVault: la fuente clínica sigue separada');
+must(workspaceVault,'N2SyntheticTrialIOSVault.shared',
+     'N2WorkspaceVault: la fuente sintética sigue separada');
 assert(!/\+\s*\n\s*\(/.test(autoAccounting),
        'No dividir una concatenación Swift después del operador +');
 must(autoAccounting,'[attentionID,itemID].joined(separator:',
