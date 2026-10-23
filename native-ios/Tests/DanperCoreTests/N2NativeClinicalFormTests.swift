@@ -51,11 +51,12 @@ final class N2NativeClinicalFormTests:XCTestCase {
         draft.items[0].approveOpening=true
         let original=try source("n1e-clinical-stock.json")
         let next=try N2SnapshotEditor.upsertDraft(snapshot:original,id:draft.id,
-            changes:draft.makeDraftPatch(context:ctx),at:at())
+            changes:draft.makeDraftPatch(context:ctx,stage:2),at:at())
         let projected=try N2NativeDraftRecovery.read(next)
         let restored=try XCTUnwrap(projected.first{$0.id==draft.id})
         XCTAssertEqual(restored.form.procedures,draft.procedures)
         XCTAssertEqual(restored.form.dni,draft.dni)
+        XCTAssertEqual(restored.stage,2,"El borrador debe retomar Tratamiento, no Trabajador")
         XCTAssertEqual(restored.form.items.count,1)
         XCTAssertEqual(restored.form.dispensingSite,"LA VENTUROSA")
         XCTAssertEqual(restored.form.items[0].selectedLotID,"lot-selected")
