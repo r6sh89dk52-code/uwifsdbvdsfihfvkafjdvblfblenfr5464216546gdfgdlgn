@@ -79,14 +79,12 @@ struct N2VerifiedNursingExportView:View {
             }
             DanperPanel {
                 N2Build222StageHeading(step:1,title:"Elegir fechas y modalidad")
-                Text("Un inventario único: reporte de un día, semana, rango o acumulado desde el último corte del día 9. Los descuentos registrados se suman una sola vez por fecha.")
+                Text("Kardex único de ambas sedes. Las atenciones conservan su sede, pero los medicamentos se descuentan del mismo inventario.")
                     .font(.caption).foregroundStyle(.secondary)
                 DanperChoiceField(title:"Modalidad",selection:$reportMode,
                     options:["daily","weekly","cut","custom"],
                     labels:["daily":"Diario","weekly":"Semanal",
                             "cut":"Desde el 9 hasta la fecha","custom":"Rango personalizado"])
-                DanperChoiceField(title:"Sede del inventario",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
-                                  labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
                 if reportMode=="daily" {
                     DanperDateField(title:"Fecha de corte",selection:$day)
                     DanperChoiceField(title:"Turno",selection:$shift,
