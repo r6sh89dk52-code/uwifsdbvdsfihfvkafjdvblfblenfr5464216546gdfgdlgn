@@ -30,14 +30,15 @@ struct N2NativeInventoryView:View {
     @State private var workspace="overview"
     @State private var mode="lot"
     @State private var materialCode=""
-    @State private var unit="UND"
+    @State private var unit=""
     @State private var lotNumber=""
     @State private var quantity=""
     @State private var expiryEnabled=false
     @State private var expiryInput=""
     @State private var selectedLotID=""
     @State private var reason=""
-    @State private var picking=false
+    @State private var productSearch=""
+    @FocusState private var productSearchFocused:Bool
     @State private var busy=false
     @State private var failed=false
     @State private var message="Cargando inventario…"
@@ -45,7 +46,21 @@ struct N2NativeInventoryView:View {
     @State private var movementID=UUID().uuidString
     @State private var movementAt:Int64=0
 
-    private let availableUnits=["UND","TBL","PAR","FCO","CJA","PAQ","ML","LT"]
+    /// The exceptional selector offers only official units already
+    /// seen in the source catalog. It is not shown for approved matches.
+    private var verifiedUnitOptions:[String] {
+        let official=Set(context?.products.clinical.map(\.unit) ?? [])
+        return official.filter{!["TBL","ML","LT"].contains($0.uppercased())}
+            .sorted()
+    }
+    private var matchingProducts:[N2NursingCatalogProduct] {
+        guard let catalog=context?.products.nursing else{return []}
+        let q=productSearch.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard !q.isEmpty else{return []}
+        return Array(catalog.filter{
+            $0.name.localizedStandardContains(q)
+        }.prefix(15))
+    }
     private var material:N2NursingCatalogProduct? {
         context?.products.nursing.first{$0.id==materialCode}
     }
@@ -91,7 +106,8 @@ struct N2NativeInventoryView:View {
     private var valid:Bool {
         guard context != nil,!busy,let amount=enteredQuantity else{return false}
         if mode=="lot" {
-            return material != nil && !lotNumber.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
+            return material != nil && !unit.isEmpty &&
+                !lotNumber.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
                 expiryISO != nil && (!packaged || amount.rounded()==amount)
         }
         guard selectedLot != nil,reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8
@@ -173,7 +189,7 @@ struct N2NativeInventoryView:View {
             quantity=""
             reason=""
             selectedLotID=""
-            picking=false
+            productSearchFocused=false
         } label: {
             HStack(spacing:11) {
                 Image(systemName:symbol).font(.title3).foregroundStyle(DanperStyle.red)
@@ -205,8 +221,19 @@ struct N2NativeInventoryView:View {
                         TextField("Número del lote",text:$lotNumber)
                             .textInputAutocapitalization(.characters)
                     }
-                    DanperChoiceField(title:"Unidad o presentación",
-                                      selection:$unit,options:availableUnits)
+                    if let material {
+                        if let verified=material.unit {
+                            LabeledContent("Presentación",value:verified)
+                                .font(.subheadline)
+                                .accessibilityIdentifier("inventory-verified-unit")
+                        } else {
+                            Text("Este producto no tiene una unidad de medida comprobada. Selecciona su presentación real; DANPER no asignará UND automáticamente.")
+                                .font(.caption).foregroundStyle(.orange)
+                            DanperChoiceField(title:"Presentación por verificar",
+                                selection:$unit,options:verifiedUnitOptions)
+                                .accessibilityIdentifier("inventory-unmapped-unit")
+                        }
+                    }
                     expiryField
                 }else {
                     DanperChoiceField(title:"Medicamento y lote",
@@ -254,32 +281,76 @@ struct N2NativeInventoryView:View {
     }
     private var medicationSelector:some View {
         VStack(alignment:.leading,spacing:8) {
-            Text("Medicamento o insumo").font(.subheadline.weight(.semibold))
-            Button {
-                picking.toggle()
-            } label: {
-                HStack {
-                    Text(material.map{$0.name+" · "+$0.id} ??
-                         "Buscar medicamento o insumo oficial")
-                        .foregroundStyle(material == nil ? Color.secondary : Color.primary)
-                    Spacer()
-                    Image(systemName:"magnifyingglass").foregroundStyle(DanperStyle.red)
+            Text("Medicamento o insumo")
+                .font(.subheadline.weight(.semibold))
+            HStack(spacing:10) {
+                Image(systemName:"magnifyingglass")
+                    .foregroundStyle(DanperStyle.red)
+                TextField("Escribe el nombre del medicamento o insumo",
+                          text:$productSearch)
+                    .focused($productSearchFocused)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("inventory-select-product")
+                if !productSearch.isEmpty {
+                    Button {
+                        productSearch=""
+                        materialCode=""
+                        unit=""
+                        productSearchFocused=true
+                    } label: {
+                        Image(systemName:"xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Borrar búsqueda")
                 }
-                .padding(13)
-                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:12))
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("inventory-select-product")
-            if picking,let context {
-                DanperInlineSearch(title:"Buscar medicamento o insumo",
-                    placeholder:"Nombre o código E-",
-                    options:context.products.nursing.map{
-                        DanperSearchOption(id:$0.id,title:$0.name,
-                                           detail:$0.id+" · "+$0.group)
-                    },onSelect:{id in
-                        materialCode=id
-                        picking=false
-                    },onClose:{picking=false})
+            .padding(13)
+            .background(DanperStyle.canvas,
+                        in:RoundedRectangle(cornerRadius:12))
+            .onChange(of:productSearch){_,query in
+                if let chosen=material,query != chosen.name {
+                    materialCode=""
+                    unit=""
+                }
+            }
+            if productSearchFocused && !productSearch.isEmpty {
+                if matchingProducts.isEmpty {
+                    Text("No se encontraron medicamentos con ese nombre.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing:5) {
+                            ForEach(matchingProducts){product in
+                                Button {
+                                    materialCode=product.id
+                                    unit=product.unit ?? ""
+                                    productSearch=product.name
+                                    productSearchFocused=false
+                                } label: {
+                                    VStack(alignment:.leading,spacing:3) {
+                                        Text(product.name)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.primary)
+                                        if let unit=product.unit {
+                                            Text("Presentación: "+unit)
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .frame(maxWidth:.infinity,alignment:.leading)
+                                    .padding(11)
+                                    .background(DanperStyle.surface,
+                                                in:RoundedRectangle(cornerRadius:10))
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("inventory-result-"+product.id)
+                            }
+                        }
+                    }
+                    .frame(maxHeight:220)
+                }
             }
         }
     }
@@ -389,6 +460,8 @@ struct N2NativeInventoryView:View {
             movementAt=0
             workspace="overview"
             materialCode=""
+            productSearch=""
+            unit=""
             selectedLotID=""
             quantity=""
             lotNumber=""
