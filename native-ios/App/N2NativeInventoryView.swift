@@ -139,7 +139,7 @@ struct N2NativeInventoryView:View {
                 .foregroundStyle(DanperStyle.red)
             Text(workspace=="overview" ? "Medicamentos y existencias" : operationTitle)
                 .font(.title2.weight(.bold))
-            Text("Un solo stock para Fondo La Venturosa y PL Venturosa.")
+            Text("Un solo stock para Fundo La Venturosa y PL Venturosa.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .frame(maxWidth:.infinity,alignment:.leading)
