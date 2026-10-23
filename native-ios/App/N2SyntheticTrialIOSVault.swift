@@ -225,6 +225,13 @@ actor N2SyntheticTrialIOSVault {
     func deleteDraft(id:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().removeDraft(id:id,expectedRevision:expectedRevision)
     }
+    /// The sandbox uses its own encrypted synthetic namespace. The
+    /// accounting reader is read-only and never touches the clinical vault.
+    func automaticCutAccounting(through date:String)throws
+        ->N2AutomaticCutAccounting.Result {
+        return try protectedStore().automaticCutAccounting(
+            mappings:resource("n2-approved-mappings"),through:date)
+    }
     func clinicalFormContext()throws->N2FormContext {
         let products=try resource("n2-ambulatory-products")
         let nursing=try resource("n2-nursing-catalog")
