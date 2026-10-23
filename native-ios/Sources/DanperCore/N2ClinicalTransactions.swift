@@ -118,6 +118,7 @@ public enum N2NativeClinicalTransaction {
         _=try N1eLegacyClinicalAudit.inspect(snapshot)
         _=try N1fLosslessFieldGate.inspect(snapshot)
         let approved=try mappings(approvedCatalog)
+        let operational=try N2OperationalMappings.read(snapshot)
         guard var root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               var visits=root["attentions"] as? [[String:Any]],
               var lots=root["stockLots"] as? [[String:Any]],
@@ -194,7 +195,13 @@ public enum N2NativeClinicalTransaction {
                 mark("Fecha clínica futura o inválida: el consumo queda registrado sin modificar el inventario.")
                 continue
             }
-            let candidates=approved.filter{$0.clinicalCode==code &&
+            let rule=operational.first{$0.clinicalCode==code && $0.clinicalName==item["name"] as? String && $0.clinicalUnit==item["unit"] as? String}
+            if let rule, historical && rule.confirmedAt>(eventAt ?? 0) {
+                mark("Correspondencia verificada después de la atención: requiere conciliación histórica.");continue
+            }
+            let candidates=rule.map { [Material(clinicalCode:$0.clinicalCode,clinicalName:$0.clinicalName,
+                clinicalUnit:$0.clinicalUnit,kardexCode:$0.inventoryID,kardexName:$0.inventoryName)] }
+                ?? approved.filter{$0.clinicalCode==code &&
                 $0.clinicalName==item["name"] as? String &&
                 $0.clinicalUnit==item["unit"] as? String}
             if candidates.isEmpty {mark("Sin correspondencia aprobada.");continue}
@@ -203,11 +210,12 @@ public enum N2NativeClinicalTransaction {
             if candidates.count>1 && explicit==nil {
                 mark("Presentación Kardex ambigua: exige lote seleccionado.");continue
             }
-            if !individual && explicit==nil {
+            if !individual && explicit==nil && rule==nil {
                 mark("Envase: falta cantidad interna verificada.");continue
             }
             let selected=explicit.flatMap{str($0["lotId"])}
             let useQuantity=explicit.flatMap{number($0["quantity"])} ??
+                rule.flatMap { mapping in number(item["quantity"]).map{$0*mapping.physicalUnitsPerClinicalUnit} } ??
                 (individual ? number(item["quantity"]) : nil)
             guard let quantity=useQuantity,quantity>0,quantity<=10_000_000,
                   (!individual || quantity==number(item["quantity"])) else {
@@ -245,7 +253,7 @@ public enum N2NativeClinicalTransaction {
                 mark("Sin existencias FEFO disponibles en el inventario único.");continue
             }
             let chosen=eligible.first(where:{$0["id"] as? String == selected})
-            if explicit != nil && (selected==nil || chosen==nil) {
+            if selected != nil && chosen==nil {
                 mark("Existencia seleccionada no verificable.");continue
             }
             guard let kardex=chosen?["code"] as? String ?? (candidates.count==1 ?
@@ -321,7 +329,8 @@ public enum N2NativeClinicalTransaction {
                 mark("Plan FEFO incompleto. No se descontó stock.");continue
             }
             if parts.contains(where:{$0.3}) &&
-               explicit?["confirmNewContainer"] as? Bool != true {
+               explicit?["confirmNewContainer"] as? Bool != true &&
+               item["confirmNewContainer"] as? Bool != true {
                 mark("Falta autorizar apertura del nuevo envase.");continue
             }
             let refCommon:[String:Any]=[
@@ -350,7 +359,12 @@ public enum N2NativeClinicalTransaction {
                     "physicalChange":-qty,"before":before,"after":after,
                     "dispenseRef":ref
                 ]
-                movements.append(movement)
+                var auditedMovement=movement
+                if let rule {
+                    auditedMovement["operationalMappingID"]=rule.id
+                    auditedMovement["operationalMappingVersion"]=rule.version
+                }
+                movements.append(auditedMovement)
             }
             lots=probe
             added+=movements.count-beforeCount

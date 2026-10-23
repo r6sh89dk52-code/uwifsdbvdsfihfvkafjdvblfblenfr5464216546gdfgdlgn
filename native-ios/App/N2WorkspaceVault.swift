@@ -71,6 +71,24 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.deleteDraft(id:id,expectedRevision:expectedRevision)
     }
+    func auxiliaryAccounting() async throws->String {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.auxiliaryAccounting()}
+        return try await N2SyntheticTrialIOSVault.shared.auxiliaryAccounting()
+    }
+    func registerAuxiliaryLot(clinicalCode:String,lot:Data,operatorName:String,evidence:String,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,operatorName:operatorName,evidence:evidence,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,operatorName:operatorName,evidence:evidence,expectedRevision:expectedRevision)
+    }
+    func retryDispensing(visitID:String,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.retryDispensing(visitID:visitID,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.retryDispensing(visitID:visitID,expectedRevision:expectedRevision)
+    }
+    func confirmOperationalMapping(_ rule:N2OperationalMapping,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.confirmOperationalMapping(rule,expectedRevision:expectedRevision)
+        }
+        return try await N2SyntheticTrialIOSVault.shared.confirmOperationalMapping(rule,expectedRevision:expectedRevision)
+    }
     func clinicalFormContext() async throws -> N2FormContext {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()

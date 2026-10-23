@@ -156,6 +156,21 @@ actor N2ProtectedClinicalIOSVault {
         return try protectedStore().automaticCutAccounting(
             mappings:resource("n2-approved-mappings"),through:date)
     }
+    func auxiliaryAccounting()throws->String {try protectedStore().auxiliaryAccounting()}
+    func registerAuxiliaryLot(clinicalCode:String,lot:Data,operatorName:String,evidence:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let context=try clinicalFormContext()
+        return try protectedStore().registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,catalog:context.products,
+            operatorName:operatorName,evidence:evidence,at:Int64(Date().timeIntervalSince1970*1000),expectedRevision:expectedRevision)
+    }
+    func retryDispensing(visitID:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().retryDispensing(visitID:visitID,approvedCatalog:resource("n2-approved-mappings"),
+            at:Int64(Date().timeIntervalSince1970*1000),expectedRevision:expectedRevision)
+    }
+    func confirmOperationalMapping(_ rule:N2OperationalMapping,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let context=try clinicalFormContext()
+        return try protectedStore().confirmOperationalMapping(rule,catalog:context.products,
+            explicitConsent:true,expectedRevision:expectedRevision)
+    }
     func clinicalFormContext()throws->N2FormContext {
         let products=try resource("n2-ambulatory-products")
         let nursing=try resource("n2-nursing-catalog")

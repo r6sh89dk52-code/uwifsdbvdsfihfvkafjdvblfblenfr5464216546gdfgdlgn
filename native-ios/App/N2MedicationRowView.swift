@@ -13,6 +13,8 @@ struct N2MedicationRowView:View {
     let allergyWarning:Bool
     @Binding var expandedID:String?
     let onRemove:()->Void
+    var onMappingConfirmed:()->Void = {}
+    @State private var showMapping=false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var expanded:Bool {
@@ -30,6 +32,20 @@ struct N2MedicationRowView:View {
     }
     private var availablePhysicalUnits:Double {
         lots.reduce(0.0) { partial,lot in partial + lot.total }
+    }
+    private var requiresNewContainer:Bool {
+        let rule=context.operationalMappings.first{$0.clinicalCode==medication.code}
+        var remaining=medication.physicalQuantity>0 ? medication.physicalQuantity :
+            rule.map{Double(medication.quantity)*$0.physicalUnitsPerClinicalUnit} ??
+            (["UND","TBL","PAR"].contains(productUnit.uppercased()) ? Double(medication.quantity):0)
+        guard remaining>0 else{return false}
+        for lot in lots {
+            let available=lot.loose+lot.opened
+            if remaining>available && lot.sealed>0 && (lot.capacity>1 || lot.unit != "UND") {return true}
+            remaining-=lot.total
+            if remaining<=0 {return false}
+        }
+        return false
     }
     private var procedureSelection:Binding<String> {
         Binding(
@@ -103,6 +119,9 @@ struct N2MedicationRowView:View {
         .padding(11)
         .background(DanperStyle.canvas,
                     in:RoundedRectangle(cornerRadius:14))
+        .sheet(isPresented:$showMapping) {
+            N2OperationalMappingView(code:medication.code,context:context,onSaved:onMappingConfirmed)
+        }
     }
 
     private var editorFields:some View {
@@ -112,6 +131,13 @@ struct N2MedicationRowView:View {
             quantityControl
             procedureControl
             lotControl
+            if context.operationalMappings.contains(where:{$0.clinicalCode==medication.code}) {
+                Label("Correspondencia operativa verificada",systemImage:"checkmark.shield")
+                    .font(.caption)
+            } else {
+                Button("Verificar correspondencia o presentación") {showMapping=true}
+                    .font(.caption)
+            }
             Button(role:.destructive,action:onRemove) {
                 Label("Quitar producto",systemImage:"trash")
                     .font(.caption.weight(.semibold))
@@ -181,7 +207,7 @@ struct N2MedicationRowView:View {
                   systemImage:"exclamationmark.triangle")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        if !medication.selectedLotID.isEmpty {
+        if !lots.isEmpty {
             if let selected=lots.first(where:{$0.id==medication.selectedLotID}) {
                 Text("Existencia: \(selected.total.formatted()) · Capacidad por envase: \(selected.capacity.formatted())")
                     .font(.caption).foregroundStyle(.secondary)
@@ -190,7 +216,7 @@ struct N2MedicationRowView:View {
                 TextField("Cantidad física",value:$medication.physicalQuantity,
                           format:.number).keyboardType(.decimalPad)
             }
-            if lots.contains(where:{$0.sealed>0}) {
+            if requiresNewContainer {
                 DanperCheckRow(selected:$medication.approveOpening) {
                     Text("Autorizo abrir un frasco o caja nuevo")
                         .font(.subheadline)

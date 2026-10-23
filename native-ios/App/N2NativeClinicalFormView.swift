@@ -35,6 +35,7 @@ struct N2NativeClinicalFormView:View {
     private let systems=N2ClinicalFormOptions.systems
     private let procedures=N2ProcedureRules.procedures
     @State private var context:N2FormContext?
+    @State private var pendingMappingCode:String?
     @State private var form=N2NativeFormDraft()
     @State private var step=0
     @State private var busy=false
@@ -199,7 +200,9 @@ struct N2NativeClinicalFormView:View {
                         DanperPanel {
                             Image(systemName:savedLines.values.allSatisfy{$0=="Descontado"} ? "checkmark.circle.fill" : "checkmark.shield.fill").font(.system(size:48)).foregroundStyle(.green)
                             Text("Atención registrada").font(.title2.bold())
-                            if savedLines.values.contains(where:{$0 != "Descontado"}) {
+                            LabeledContent("Consumos descontados",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
+                            LabeledContent("Consumos pendientes",value:String(form.items.filter{savedLines[$0.id] != "Descontado"}.count))
+                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
                                 Label("Hay consumos sin salida física. Revisa el motivo de cada producto.",systemImage:"exclamationmark.triangle")
                                     .font(.footnote).foregroundStyle(.orange)
                             } else if !form.items.isEmpty {
@@ -218,10 +221,23 @@ struct N2NativeClinicalFormView:View {
                                     VStack(alignment:.leading,spacing:5) {
                                         Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
                                         Text("Cantidad \(med.quantity) · "+result).font(.caption).foregroundStyle(.secondary)
+                                        if result != "Descontado" {
+                                            Button("Resolver correspondencia") {pendingMappingCode=med.code}
+                                                .sheet(isPresented:Binding(get:{pendingMappingCode==med.code},set:{if !$0 {pendingMappingCode=nil}})) {
+                                                    N2OperationalMappingView(code:med.code,context:context,onSaved:{
+                                                        Task {await refreshDispensing(retry:false)}
+                                                    })
+                                                }
+                                        }
                                     }
                                 }
                             }
                             if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
+                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
+                                Button("Revisar consumos pendientes sin duplicar atención") {
+                                    Task {await refreshDispensing(retry:true)}
+                                }.disabled(busy)
+                            }
                             Button {startAnother()} label: {Label("Nueva atención",systemImage:"plus")}
                                 .buttonStyle(DanperPrimaryButton())
                             NavigationLink {N2NativeHistoryView(useProtectedVault:true)} label: {Label("Ver historial y consumos",systemImage:"clock.arrow.circlepath")}
@@ -860,19 +876,8 @@ struct N2NativeClinicalFormView:View {
                     },onClose:{chooseProduct=false})
             }
 
-            DanperChoiceField(title:"Tópico de dispensación",selection:Binding(
-                get:{form.dispensingSite},set:{site in
-                    guard site != form.dispensingSite else{return}
-                    form.dispensingSite=site
-                    for i in form.items.indices {
-                        form.items[i].selectedLotID="";form.items[i].physicalQuantity=0
-                        form.items[i].approveOpening=false
-                    }
-                }
-            ),options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"],
-                openRequest:highlightedField=="treatment-site" ? choiceOpenCounter : 0,
-                highlighted:highlightedField=="treatment-site")
-                .id("treatment-site")
+            Label("Inventario compartido · selección automática FEFO",systemImage:"shippingbox")
+                .font(.footnote).foregroundStyle(.secondary)
             Text("\(context.products.clinical.count) productos · selección múltiple")
                 .font(.footnote).foregroundStyle(.secondary)
         }
@@ -961,6 +966,15 @@ struct N2NativeClinicalFormView:View {
                             expandedID:$expandedMedication,
                             onRemove:{
                                 form.items.removeAll{$0.id==medication.id}
+                            },onMappingConfirmed:{
+                                Task { @MainActor in
+                                    autosaveTask?.cancel()
+                                    do {
+                                        self.context=try await vault.clinicalFormContext()
+                                        fault=false
+                                    }
+                                    catch {status="No se pudo actualizar el inventario. Vuelve a abrir la atención."}
+                                }
                             })
                     }
                 }
@@ -974,9 +988,6 @@ struct N2NativeClinicalFormView:View {
         if stage==2 {
             if form.procedures.isEmpty && form.items.isEmpty {
                 issues.append("treatment-selection")
-            }
-            if !form.items.isEmpty && form.dispensingSite.isEmpty {
-                issues.append("treatment-site")
             }
             if form.hasWound && !form.photoReviewed {
                 issues.append("treatment-photo")
@@ -1053,7 +1064,6 @@ struct N2NativeClinicalFormView:View {
     private var extraTreatmentRequirements:[String] {
         var missing=[String]()
         if form.procedures.isEmpty && form.items.isEmpty {missing.append("Selecciona al menos un procedimiento o producto.")}
-        if !form.items.isEmpty && form.dispensingSite.isEmpty {missing.append("Selecciona el tópico de dispensación.")}
         if form.hasWound && !form.photoReviewed {missing.append("Indica si se envió la foto.")}
         return missing
     }
@@ -1154,7 +1164,19 @@ struct N2NativeClinicalFormView:View {
     }
 
     @MainActor
-    private func load() async {
+    private func refreshDispensing(retry:Bool) async {
+        guard !busy else{return}
+        busy=true
+        defer {busy=false}
+        do {
+            let current=try await vault.clinicalFormContext()
+            if retry {_=try await vault.retryDispensing(visitID:form.id,expectedRevision:current.revision)}
+            context=try await vault.clinicalFormContext()
+            savedLines=try await vault.dispensingStatus(visitID:form.id)
+            status="Atención conservada. Consumos verificados nuevamente; revisa los pendientes."
+        } catch {status="No se pudo conciliar. La atención original permanece registrada; revisa los datos físicos y la cronología."}
+    }
+    @MainActor private func load() async {
         do {
             let source=try await vault.clinicalFormContext()
             context=source
@@ -1276,14 +1298,16 @@ struct N2NativeClinicalFormView:View {
             let raw=try form.makeSavedVisit(context:fresh)
             let outcome=try await vault.saveAttention(
                 raw,at:now,expectedRevision:fresh.revision)
-            savedLines=try await vault.dispensingStatus(visitID:form.id)
             saved=true
             N2DraftReminder.cancel(id:form.id,mode:vault.mode)
+            savedLines=try await vault.dispensingStatus(visitID:form.id)
             self.context=try await vault.clinicalFormContext()
             drafts=try await vault.readDrafts()
             status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."
         }catch {
-            status="No se pudo confirmar la atención. La operación fue rechazada y el stock no se debe descontar parcialmente."
+            status=saved
+                ? "Atención registrada y cifrada. No se pudo actualizar la vista de consumos; revisa el historial antes de intentar conciliarlos."
+                : "No se pudo confirmar la atención. La operación fue rechazada y el stock no se debe descontar parcialmente."
             fault=true
         }
     }

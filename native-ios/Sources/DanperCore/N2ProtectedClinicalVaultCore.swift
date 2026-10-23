@@ -56,6 +56,31 @@ public final class N2ProtectedClinicalVaultCore {
             physicalMovements:a.physicalMovements,
             pendingClinicalLines:a.pendingClinicalItems)
     }
+    public func auxiliaryAccounting()throws->String {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        return try N2AuxiliaryInventory.accounting(snapshot:active.snapshot)
+    }
+    public func registerAuxiliaryLot(clinicalCode:String,lot:Data,catalog:N2NativeCatalogIndex,
+                                     operatorName:String,evidence:String,at:Int64,
+                                     expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2AuxiliaryInventory.register(snapshot:$0,clinicalCode:clinicalCode,lot:lot,
+                catalog:catalog,operatorName:operatorName,evidence:evidence,at:at,explicitConsent:true)
+        }
+    }
+    public func retryDispensing(visitID:String,approvedCatalog:Data,at:Int64,
+                               expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeClinicalTransaction.retryCurrentSavedVisit(snapshot:$0,visitID:visitID,
+                approvedCatalog:approvedCatalog,at:at).snapshot
+        }
+    }
+    public func confirmOperationalMapping(_ rule:N2OperationalMapping,catalog:N2NativeCatalogIndex,
+                                         explicitConsent:Bool,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2OperationalMappings.append(snapshot:$0,rule:rule,catalog:catalog,explicitConsent:explicitConsent)
+        }
+    }
     public func inspect()throws->N2ProtectedStoreSummary? {
         guard let record=try journal.recover() else{return nil}
         return try summary(record)

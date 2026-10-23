@@ -54,13 +54,18 @@ public struct N2FormLot:Equatable,Sendable,Identifiable {
     public var needsOpening:Bool {opened <= 0 && loose <= 0 && sealed>0}
 }
 public struct N2FormContext:Sendable {
+    public var operationalMappings:[N2OperationalMapping]=[]
+    public var auxiliaryProducts:[N2NursingCatalogProduct]=[]
     public let revision:Int
     public let workers:[N2FormWorker]
     public let allergies:[String:N2FormAllergy]
     public let lots:[N2FormLot]
     public let products:N2NativeCatalogIndex
     public func options(for code:String,at date:String,site:String="")->[N2FormLot] {
-        let approved=Set(products.authorizedNursingOptions(for:code).map(\.id))
+        let operational=operationalMappings.filter{$0.clinicalCode==code}
+        let approved=Set(operational.isEmpty
+            ? products.authorizedNursingOptions(for:code).map(\.id)
+            : operational.map(\.inventoryID))
         return lots.filter {
             approved.contains($0.kardexCode) && $0.total>0 &&
             ($0.expires.isEmpty || $0.expires>=date)
@@ -133,8 +138,11 @@ public enum N2NativeFormContextReader {
                               reference:row["lot"] as? String ?? "")
         }
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
-        return N2FormContext(revision:revision,workers:people,
+        var result=N2FormContext(revision:revision,workers:people,
                              allergies:records,lots:all,products:products)
+        result.operationalMappings=try N2OperationalMappings.read(snapshot)
+        result.auxiliaryProducts=try N2AuxiliaryInventory.products(snapshot:snapshot)
+        return result
     }
 }
 
@@ -228,9 +236,10 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "unit":product.unit,"quantity":med.quantity,
                 "procedure":med.procedure,
                 "procedureConfirmed":med.procedureConfirmed,
-                "procedureSource":med.procedureSource
+                "procedureSource":med.procedureSource,
+                "confirmNewContainer":med.approveOpening
             ]
-            if !med.selectedLotID.isEmpty {
+            if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
                 // Preserve the operator's clinical record if stock changed
                 // while editing. The transactional engine verifies identity,
                 // availability and scope and records a pending reason instead.
@@ -286,12 +295,13 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "id":med.id,"code":med.code,"quantity":med.quantity,
                 "procedure":med.procedure,
                 "procedureConfirmed":med.procedureConfirmed,
-                "procedureSource":med.procedureSource
+                "procedureSource":med.procedureSource,
+                "confirmNewContainer":med.approveOpening
             ]
             if let catalog=context.products.clinical.first(where:{$0.code==med.code}) {
                 row["name"]=catalog.name;row["unit"]=catalog.unit
             }
-            if !med.selectedLotID.isEmpty {
+            if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
                 row["physicalUse"]=[
                     "lotId":med.selectedLotID,"quantity":med.physicalQuantity,
                     "confirmNewContainer":med.approveOpening

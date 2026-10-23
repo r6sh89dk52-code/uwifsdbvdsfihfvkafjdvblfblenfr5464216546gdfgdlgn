@@ -29,7 +29,7 @@ public enum N2NativeInventoryCommands {
         let opened=num(x["openedRemaining"]) ?? 0
         return triple(sealed * capacity + loose + opened)
     }
-    private static func validLot(_ l:[String:Any])->Bool {
+    static func validLot(_ l:[String:Any])->Bool {
         guard let id=l["id"] as? String,!id.isEmpty,
               let code=l["code"] as? String,!code.isEmpty,
               let name=l["name"] as? String,!name.isEmpty,

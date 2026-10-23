@@ -64,6 +64,7 @@ public enum N2NativeDraftRecovery {
                                          procedure:procedureName)
                 med.procedureConfirmed=row["procedureConfirmed"] as? Bool ?? !procedureName.isEmpty
                 med.procedureSource=row["procedureSource"] as? String ?? "manual"
+                med.approveOpening=row["confirmNewContainer"] as? Bool ?? false
                 if let physical=row["physicalUse"] {
                     guard let info=physical as? [String:Any],
                           let lotID=info["lotId"] as? String,

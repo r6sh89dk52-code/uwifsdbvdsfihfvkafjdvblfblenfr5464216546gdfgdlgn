@@ -17,7 +17,9 @@ const views=[
 'N2NativeBackupExportView.swift',
 'N2NativeDraftsDashboard.swift',
 'N2ReconciliationView.swift',
-'N2VerifiedNursingExportView.swift'
+'N2VerifiedNursingExportView.swift',
+'N2OperationalMappingView.swift',
+'N2AuxiliaryInventoryView.swift'
 ];
 for(const item of views) {
  const source=fs.readFileSync(path.join(app,item),'utf8');
@@ -34,7 +36,11 @@ const router=fs.readFileSync(path.join(app,'N2WorkspaceVault.swift'),'utf8');
 const clinical=fs.readFileSync(path.join(app,'N2ProtectedClinicalIOSVault.swift'),'utf8');
 const demo=fs.readFileSync(path.join(app,'N2SyntheticTrialIOSVault.swift'),'utf8');
 const calls=[...router.matchAll(/N2SyntheticTrialIOSVault\.shared\.(\w+)\(/g)].map(m=>m[1]);
-assert.equal(calls.length,29,'The bridge must expose the entire supported surface.');
+assert.equal(calls.length,33,'The bridge must expose the entire supported surface.');
+assert(calls.includes('registerAuxiliaryLot'));
+assert(calls.includes('auxiliaryAccounting'));
+assert(calls.includes('confirmOperationalMapping'));
+assert(calls.includes('retryDispensing'));
 for(const method of calls) {
  assert(clinical.includes('func '+method+'('),'Missing clinical method: '+method);
  assert(demo.includes('func '+method+'('),'Missing demo method: '+method);
@@ -44,6 +50,12 @@ for(const method of calls) {
 const gate=fs.readFileSync(path.join(app,'N2ClinicalWorkspaceView.swift'),'utf8');
 assert(gate.includes('.environment(\\.n2WorkspaceVault,.clinical)'));
 assert(gate.includes('evaluatePolicy(.deviceOwnerAuthentication'));
+assert(gate.includes('var authenticatedLaunch=false'));
+assert(gate.includes('if authenticatedLaunch && revision != nil'));
+const launch=fs.readFileSync(path.join(app,'DANPERNativeApp.swift'),'utf8');
+assert(launch.includes('if authenticated && scenePhase == .active'));
+assert(launch.includes('N2ClinicalWorkspaceGateView(authenticatedLaunch:true)'));
+assert(launch.includes('cycle==authCycle'));
 assert(gate.includes('if phase != .active {onClose()}'));
 const rootUI=fs.readFileSync(path.join(app,'NativeRootView.swift'),'utf8');
 assert(rootUI.includes('N2ClinicalWorkspaceGateView()'));
