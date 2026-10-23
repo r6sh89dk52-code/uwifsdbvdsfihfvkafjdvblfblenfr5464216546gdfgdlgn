@@ -79,9 +79,9 @@ struct N2FirstManualWorkerView:View {
                         Label("Primer trabajador registrado y bóveda cifrada verificada",
                               systemImage:"checkmark.shield.fill")
                             .foregroundStyle(.green)
-                        LabeledContent("Trabajadores","1")
-                        LabeledContent("Atenciones","0")
-                        LabeledContent("Lotes","0")
+                        LabeledContent("Trabajadores", value:"1")
+                        LabeledContent("Atenciones", value:"0")
+                        LabeledContent("Lotes", value:"0")
                         Button("Volver para entrar a DANPER") {dismiss()}
                             .buttonStyle(DanperPrimaryButton())
                     }
