@@ -160,6 +160,17 @@ public final class N2ProtectedClinicalVaultCore {
             snapshot:active.snapshot,catalog:catalog,template:template,
             start:start,end:end,responsible:responsible,site:site)
     }
+    /// Read-only 9th-day reconciliation against the encrypted single-source
+    /// journal. Never writes a stock movement or returns raw clinical records
+    /// to the SwiftUI screen.
+    public func automaticCutAccounting(mappings:Data,through date:String)
+        throws->N2AutomaticCutAccounting.Result {
+        guard let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2AutomaticCutAccounting.calculate(
+            snapshot:active.snapshot,mappings:mappings,through:date)
+    }
     public func sourceForEncryptedBackup()throws->Data {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
