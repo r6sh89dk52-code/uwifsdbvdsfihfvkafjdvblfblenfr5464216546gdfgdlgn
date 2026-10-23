@@ -393,18 +393,11 @@ struct N2NativeClinicalFormView:View {
                     allergyFeedback=context.allergies[dni]?.reviewed == true
                         ? "Alergias revisadas" : ""
                 }
-                .task(id:form) {
-                    if step==3 && !saved && !layoutOnly {
-                        do {try await Task.sleep(for:.milliseconds(800))} catch{return}
-                        await refreshDispensingPreview()
-                    }
-                }
                 .onChange(of:form) {_,_ in
                     if highlightedField != nil {
                         // Never resign first responder while the user fixes the field.
                         highlightedField=nil
                     }
-                    previewReady=false
                     if !form.blueBandage {form.returned=false}
                     form.refreshProcedureSuggestions(catalog:context.products)
                     scheduleDraft()
@@ -1080,23 +1073,6 @@ struct N2NativeClinicalFormView:View {
         let allergies=step==0 ? form.clinicalIssues(step:1,context:context).filter{$0.hasPrefix("allergy-")}.map{N2ClinicalFormOptions.messages[$0] ?? $0} : []
         return issues+allergies+(step==2 ? extraTreatmentRequirements : [])
     }
-    private var previewPending:Bool {previewReady && previewLines.values.contains{$0 != "Descontado"}}
-    @MainActor
-    private func refreshDispensingPreview() async {
-        guard !layoutOnly,!saved,!previewBusy,pendingRequirements.isEmpty else{return}
-        if form.items.isEmpty {previewReady=true;previewLines=[:];return}
-        previewBusy=true;previewReady=false;previewError=""
-        defer{previewBusy=false}
-        do {
-            let fresh=try await vault.clinicalFormContext()
-            let raw=try form.makeSavedVisit(context:fresh)
-            let results=try await vault.previewAttention(raw,visitID:form.id,at:now,expectedRevision:fresh.revision)
-            guard !Task.isCancelled else{return}
-            previewLines=results;previewReady=results.count==form.items.count
-        } catch {
-            if !Task.isCancelled {previewError="No se pudo comprobar el stock actual. Actualiza la verificación antes de guardar."}
-        }
-    }
     private func reviewSection(_ context:N2FormContext)->some View {
         Group {
             DanperPanel("Resumen de la atención") {
@@ -1112,34 +1088,6 @@ struct N2NativeClinicalFormView:View {
                 if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
                 Button("Editar evaluación") {step=1}.buttonStyle(DanperSecondaryButton())
             }
-            if !form.items.isEmpty {
-                DanperPanel("Dispensación al guardar") {
-                    if previewBusy {ProgressView("Comprobando stock y FEFO…")}
-                    if previewReady {
-                        ForEach(form.items) {med in
-                            let result=previewLines[med.id] ?? "Verificación incompleta"
-                            HStack(alignment:.top,spacing:10) {
-                                Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                    .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
-                                VStack(alignment:.leading,spacing:5) {
-                                    Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
-                                    Text(result=="Descontado" ? "Se descontará automáticamente al guardar" : "Sin salida física: "+result)
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    } else if !previewBusy {
-                        Text(previewError.isEmpty ? "Completa la revisión para comprobar los consumos." : previewError)
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button("Actualizar verificación") {Task {await refreshDispensingPreview()}}
-                            .buttonStyle(DanperSecondaryButton())
-                    }
-                    if previewPending {
-                        DanperToolLink(title:"Revisar existencias y sedes",symbol:"shippingbox") {N2NativeInventoryView()}
-                        Text("Guardar con pendientes conserva el registro clínico, pero no acredita una salida de stock.").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-            }
             DanperPanel("Resultado y controles") {
                 DanperChoiceField(title:"Situación al finalizar",selection:$form.permission,options:["NO","SI"],
                                   labels:["NO":"Continúa laborando","SI":"Se retira con permiso"])
@@ -1154,7 +1102,7 @@ struct N2NativeClinicalFormView:View {
                     Label(pendingRequirements.joined(separator:"\n"),systemImage:"exclamationmark.triangle")
                         .font(.footnote).foregroundStyle(.orange).fixedSize(horizontal:false,vertical:true)
                 }
-                Text("La atención y los consumos válidos se guardan juntos. Podrás revisar cualquier consumo pendiente en el historial.")
+                Text("Al guardar, los insumos de esta atención se registran como consumidos automáticamente en el inventario único. No hay segunda confirmación.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -1194,12 +1142,12 @@ struct N2NativeClinicalFormView:View {
                             .lineLimit(1).fixedSize(horizontal:false,vertical:true)
                     } else {
                         Label(step<3 ? "Siguiente" :
-                              (busy ? "Confirmando…" : previewPending ? "Guardar con pendientes" : "Guardar atención"),
+                              (busy ? "Confirmando…" : "Guardar atención"),
                               systemImage:step<3 ? "arrow.right" : "checkmark.shield.fill")
                     }
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy || previewBusy || (step==3 && !form.items.isEmpty && pendingRequirements.isEmpty && !previewReady && !layoutOnly))
+                .disabled(busy)
             }
 
         }
