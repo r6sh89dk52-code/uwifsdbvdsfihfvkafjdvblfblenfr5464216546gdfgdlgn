@@ -393,6 +393,7 @@ struct N2NativeClinicalFormView:View {
                     allergyFeedback=context.allergies[dni]?.reviewed == true
                         ? "Alergias revisadas" : ""
                 }
+                .onChange(of:step) {_,_ in scheduleDraft() }
                 .onChange(of:form) {_,_ in
                     if highlightedField != nil {
                         // Never resign first responder while the user fixes the field.
@@ -1171,7 +1172,7 @@ struct N2NativeClinicalFormView:View {
                     return
                 }
                 form=recovered.form
-                step=0
+                step=recovered.stage
                 status="Borrador recuperado."
             } else {
                 let (date,time)=limaClock()
@@ -1253,7 +1254,7 @@ struct N2NativeClinicalFormView:View {
             guard !Task.isCancelled else{return}
             do{
                 let latest=try await vault.clinicalFormContext()
-                let patch=try version.makeDraftPatch(context:context)
+                let patch=try version.makeDraftPatch(context:context,stage:step)
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
                 let result=try await vault.saveDraft(
@@ -1296,7 +1297,7 @@ struct N2NativeClinicalFormView:View {
     private func resume(_ record:N2RecoverableDraft) {
         autosaveTask?.cancel()
         form=record.form
-        step=0
+        step=record.stage
         collapsedMedicationGroups.removeAll()
         expandedMedication=nil
         chooseDraft=false
