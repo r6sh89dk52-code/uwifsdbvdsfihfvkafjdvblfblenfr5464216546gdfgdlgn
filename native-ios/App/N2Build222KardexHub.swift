@@ -57,6 +57,14 @@ struct N2Build222KardexHub:View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("kardex-register-current-stock")
 
+                NavigationLink {
+                    N2NativeInventoryView()
+                } label: {
+                    Label("Ver medicamentos y existencias registradas",
+                          systemImage:"shippingbox")
+                }
+                .buttonStyle(DanperSecondaryButton())
+
                 DanperPanel("Corte mensual · del día 9 al día 8") {
                     if let activePeriod {
                         LabeledContent("Inicio",value:DanperDatePresentation.display(activePeriod.start))
