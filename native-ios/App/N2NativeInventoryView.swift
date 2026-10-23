@@ -96,17 +96,7 @@ struct N2NativeInventoryView:View {
     }
     private var expiryISO:String? {
         guard expiryEnabled else{return ""}
-        guard expiryInput.count==6,expiryInput.allSatisfy(\.isNumber) else{return nil}
-        let part=Array(expiryInput)
-        let day=Int(String(part[0...1])) ?? 0
-        let month=Int(String(part[2...3])) ?? 0
-        let year=2000+(Int(String(part[4...5])) ?? 0)
-        var calendar=Calendar(identifier:.gregorian)
-        calendar.timeZone=TimeZone(identifier:"America/Lima")!
-        guard let date=calendar.date(from:DateComponents(year:year,month:month,day:day)),
-              calendar.dateComponents([.year,.month,.day],from:date)
-                == DateComponents(year:year,month:month,day:day) else{return nil}
-        return String(format:"%04d-%02d-%02d",year,month,day)
+        return N2ExpiryEntry.iso(expiryInput)
     }
     private var valid:Bool {
         guard context != nil,!busy,let amount=enteredQuantity else{return false}
@@ -365,13 +355,8 @@ struct N2NativeInventoryView:View {
                 Text("Tiene fecha de vencimiento").font(.subheadline)
             }
             if expiryEnabled {
-                DanperField(title:"Vencimiento · DDMMAA") {
-                    TextField("DDMMAA (ej. 311227)",text:$expiryInput)
-                        .keyboardType(.numberPad)
-                        .onChange(of:expiryInput){_,value in
-                            let sanitized=String(value.filter(\.isNumber).prefix(6))
-                            if expiryInput != sanitized {expiryInput=sanitized}
-                        }
+                DanperField(title:"Vencimiento · DD/MM/AA") {
+                    N2ExpiryTextField(text:$expiryInput).frame(minHeight:44)
                 }
                 if expiryISO==nil {
                     Text("Escribe seis dígitos: día, mes y año. No se abre el calendario.")

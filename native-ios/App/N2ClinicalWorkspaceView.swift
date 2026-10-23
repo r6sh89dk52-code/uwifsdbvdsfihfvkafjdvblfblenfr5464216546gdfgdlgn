@@ -6,10 +6,14 @@ import DanperCore
 /// A completely separate navigation tree. Environment value is a constant for
 /// this workspace's lifetime. Demo tabs beneath never hold clinical references.
 struct N2ClinicalWorkspaceGateView:View {
+    var authenticatedLaunch=false
     @Environment(\.scenePhase) private var scenePhase
     @State private var summary:N2ProtectedStoreSummary?
     @State private var busy=false
     @State private var showWorkspace=false
+    @State private var automaticallyEntered=false
+    @State private var gateContext:LAContext?
+    @State private var gateCycle=UUID()
     @State private var message="Verificando la bóveda clínica independiente…"
     @State private var invalidSource=false
 
@@ -104,12 +108,21 @@ struct N2ClinicalWorkspaceGateView:View {
         .navigationTitle("Acceso clínico")
         .danperFormChrome()
         .task {await refresh()}
+        .onChange(of:summary?.revision) {_,revision in
+            if authenticatedLaunch && revision != nil && scenePhase == .active && !invalidSource && !automaticallyEntered {
+                automaticallyEntered=true
+                showWorkspace=true
+            }
+        }
         // Returning from PERSONAL import must refresh the gate's source count.
         .onAppear {
             if scenePhase == .active {Task {await refresh()}}
         }
         .onChange(of:scenePhase) {_,phase in
             if phase != .active {
+                gateCycle=UUID()
+                gateContext?.invalidate()
+                gateContext=nil
                 showWorkspace=false
                 busy=false
                 summary=nil
@@ -145,12 +158,23 @@ struct N2ClinicalWorkspaceGateView:View {
         busy=true
         defer {busy=false}
         do {
+            if authenticatedLaunch {
+                guard let verified=try await N2ProtectedClinicalIOSVault.shared.inspect(),
+                      verified.revision>0,scenePhase == .active else{return}
+                summary=verified
+                showWorkspace=true
+                return
+            }
             let context=LAContext()
+            gateContext=context
+            let cycle=gateCycle
             guard try await context.evaluatePolicy(.deviceOwnerAuthentication,
                     localizedReason:"Entrar al espacio clínico independiente de DANPER") else {
                 message="Autenticación no autorizada."
                 return
             }
+            guard cycle==gateCycle,scenePhase == .active else{return}
+            gateContext=nil
             // Re-read AFTER authentication; an old cached count never grants
             // permission to access a missing or otherwise invalid source.
             guard let verified=try await N2ProtectedClinicalIOSVault.shared.inspect(),

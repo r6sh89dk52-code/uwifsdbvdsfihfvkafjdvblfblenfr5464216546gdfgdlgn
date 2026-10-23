@@ -12,11 +12,10 @@ struct DANPERNativeApp: App {
     @AppStorage("danper.appearance") private var appearance="system"
     @State private var authCycle=UUID()
     @State private var activeContext:LAContext?
-    @State private var authenticated = false
-    @State private var hasUnlockedOnce = false
-    @State private var unlocking = false
+    @State private var access=N2AccessSession()
+    private var authenticated:Bool {access.authenticated}
+    private var unlocking:Bool {access.running}
     @State private var authError = ""
-    @State private var autoAttemptedThisForeground = false
     @State private var manualRetryAvailable = false
     @AppStorage("danper.native.onboarding.v1.finished") private var onboardingFinished = false
 
@@ -48,9 +47,10 @@ struct DANPERNativeApp: App {
                     NativeRootView(layoutMetrics:N2DashboardMetrics.calculate(visits:[],now:Date()))
                     #endif
                 } else if onboardingFinished {
-                    if hasUnlockedOnce {
+                    if authenticated && scenePhase == .active {
                         NavigationStack {
-                            N2ClinicalWorkspaceGateView()
+                            N2ClinicalWorkspaceGateView(authenticatedLaunch:true)
+                                .id(authCycle)
                         }
                             .opacity(authenticated && scenePhase == .active ? 1 : 0)
                             .accessibilityHidden(!authenticated || scenePhase != .active)
@@ -74,9 +74,7 @@ struct DANPERNativeApp: App {
                     authCycle=UUID()
                     activeContext?.invalidate()
                     activeContext=nil
-                    unlocking=false
-                    authenticated = false
-                    autoAttemptedThisForeground = false
+                    access.lock()
                     manualRetryAvailable = false
                 } else if phase == .active {
                     attemptAutomaticUnlock()
@@ -90,19 +88,24 @@ struct DANPERNativeApp: App {
     }
 
     private func attemptAutomaticUnlock() {
-        guard !interactionProbe,onboardingFinished, scenePhase == .active,
-              !authenticated, !autoAttemptedThisForeground else { return }
+        guard !interactionProbe,!shellProbe,onboardingFinished, scenePhase == .active,
+              access.reserveAutomatic() else { return }
         // One automatic attempt per foreground entry avoids Face ID cancellation loops.
-        autoAttemptedThisForeground = true
-        authenticate()
+        let cycle=authCycle
+        Task { @MainActor in
+            try? await Task.sleep(for:.milliseconds(350))
+            guard cycle==authCycle,scenePhase == .active,!manualRetryAvailable else{return}
+            authenticate()
+        }
     }
 
     private func authenticate() {
-        guard !unlocking else { return }
-        unlocking = true
+        guard onboardingFinished,scenePhase == .active,access.begin() else { return }
         manualRetryAvailable = false
         authError = ""
         let context = LAContext()
+        context.localizedCancelTitle="Cancelar"
+        context.localizedFallbackTitle="Usar código del dispositivo"
         activeContext=context
         let cycle=authCycle
         context.evaluatePolicy(.deviceOwnerAuthentication,
@@ -110,12 +113,12 @@ struct DANPERNativeApp: App {
             DispatchQueue.main.async {
                 guard cycle==authCycle else{return}
                 activeContext=nil
-                unlocking = false
-                authenticated = success
-                if success { hasUnlockedOnce = true }
+                access.complete(success:success)
                 if !success {
                     manualRetryAvailable = true
-                    authError = error?.localizedDescription ?? "No se pudo confirmar la autenticación del dispositivo."
+                    let code=(error as? LAError)?.code
+                    authError = code == .userCancel || code == .appCancel || code == .systemCancel
+                        ? "Autenticación cancelada" : "No se pudo verificar tu identidad"
                 }
             }
         }
@@ -126,25 +129,28 @@ struct DANPERNativeApp: App {
 /// Build222 branded welcome: red upper field and rounded lower access panel.
 /// Authentication is owned by the app lifecycle above; this is presentation only.
 struct DanperAccessView:View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared=false
     let unlocking:Bool
     let canRetry:Bool
     let error:String
     let onUnlock:()->Void
     var body:some View {
-        GeometryReader {geo in
-            VStack(spacing:0) {
-                VStack(spacing:18) {
-                    Spacer(minLength:20)
+        ScrollView {
+            VStack(spacing:28) {
+                VStack(spacing:12) {
+                    Image("BrandLogo").resizable().scaledToFit()
+                        .frame(maxWidth:180,maxHeight:120)
+                        .padding(20)
+                        .background(.white,in:RoundedRectangle(cornerRadius:24))
                     Text("DANPER").font(.system(.largeTitle,design:.rounded,weight:.heavy))
                     Text("SALUD MÓVIL").font(.caption.weight(.bold)).tracking(2)
-                    Image(systemName:"cross.case.fill").font(.system(size:32))
-                        .frame(width:82,height:82).background(.white.opacity(0.16),in:Circle()).padding(.vertical,12)
-                    Text("Bienvenido").font(.largeTitle)
+                    Text("Bienvenido").font(.largeTitle.bold())
                     Text("Departamento de Salud").font(.title3)
-                    Spacer(minLength:28)
-                }.foregroundStyle(.white).frame(maxWidth:.infinity,minHeight:geo.size.height*0.57)
-                VStack(spacing:18) {
-                    Spacer(minLength:22)
+                }.foregroundStyle(.white).frame(maxWidth:.infinity).padding(.top,32)
+                VStack(spacing:16) {
+                    Label("Acceso protegido",systemImage:"lock.shield.fill")
+                        .font(.headline)
                     Text("Tu espacio para una atención más rápida, organizada y segura.")
                         .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     if !error.isEmpty {Text(error).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center)}
@@ -158,10 +164,15 @@ struct DanperAccessView:View {
                     }
                     Text("Acceso protegido con Face ID o código del iPhone").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Label("Modo de prueba · datos ficticios",systemImage:"lock.shield").font(.caption2).foregroundStyle(.secondary)
-                    Spacer(minLength:22)
-                }.padding(.horizontal,24).frame(maxWidth:.infinity)
+                }.padding(24).frame(maxWidth:.infinity)
                     .background(DanperStyle.surface,in:UnevenRoundedRectangle(topLeadingRadius:32,topTrailingRadius:32))
-            }.frame(minHeight:geo.size.height).background(DanperStyle.red)
+            }.padding(20).frame(maxWidth:540)
+                .frame(maxWidth:.infinity)
+                .opacity(appeared ? 1:0)
+                .offset(y:appeared ? 0:12)
         }.background(DanperStyle.red.ignoresSafeArea())
+            .onAppear {
+                withAnimation(reduceMotion ? nil : .easeOut(duration:0.3)){appeared=true}
+            }
     }
 }

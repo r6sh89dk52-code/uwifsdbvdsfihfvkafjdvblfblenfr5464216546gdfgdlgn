@@ -35,7 +35,7 @@ const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
-must(app,'N2ClinicalWorkspaceGateView()','inicio cifrado con importación PERSONAL');
+must(app,'N2ClinicalWorkspaceGateView(authenticatedLaunch:true)','inicio cifrado tras autenticación con importación PERSONAL');
 assert(!app.includes('NativeRootView()'),'No puede abrirse el modo ficticio en inicio normal');
 must(clinicalHome,'clinical-first-run-import-personal','importar PERSONAL como acción principal');
 must(clinicalHome,'clinical-first-run-restore-222','restauración opcional Build222');
@@ -215,7 +215,7 @@ must(palette,'danper.visual.palette','tema nativo');
 for (const value of [
   'inventory-select-product','inventory-single-quantity','inventory-save-',
   'Número de lote o referencia','Escribe el nombre del medicamento o insumo',
-  'inventory-verified-unit','Vencimiento · DDMMAA',
+  'inventory-verified-unit','Vencimiento · DD/MM/AA',
   'Cantidad disponible','Registrar stock'])
   must(inventory,value,'formulario compacto de registro de medicamentos');
 for (const line of [
