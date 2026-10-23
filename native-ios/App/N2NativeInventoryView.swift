@@ -96,19 +96,15 @@ struct N2NativeInventoryView:View {
         }
         guard selectedLot != nil,reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8
         else{return false}
-        return !packaged || amount.rounded()==amount
+        let existingPackaged=!["UND","TBL","PAR","ML","LT"].contains(
+            selectedLot?.unit.uppercased() ?? "UND")
+        return !existingPackaged || amount.rounded()==amount
     }
     private var operationTitle:String {
         switch mode {
         case "receipt":return "Registrar ingreso"
         case "count":return "Actualizar conteo"
         default:return "Registrar medicamento"
-        }
-    }
-    private var currentTotal:Double {
-        (context?.lots ?? []).reduce(0) {total,lot in
-            let capacity=lot.capacity
-            return total + Double(lot.sealed)*capacity + lot.loose + lot.opened
         }
     }
 
