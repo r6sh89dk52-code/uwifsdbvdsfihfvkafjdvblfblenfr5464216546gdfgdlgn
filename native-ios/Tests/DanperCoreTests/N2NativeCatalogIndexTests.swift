@@ -30,6 +30,23 @@ final class N2NativeCatalogIndexTests:XCTestCase {
         XCTAssertEqual(index.nursingMatches("E-68").first?.id,"E-68")
         XCTAssertFalse(index.approvals.contains{$0.kardexID=="E-68"})
     }
+    func testOperatorConfirmedPresentationsAreLimitedToNursingKardex()throws {
+        let (clinical,nursing,mappings)=try sources()
+        let index=try N2NativeCatalogLoader.load(products:clinical,nursing:nursing,
+                                                   approvedMappings:mappings)
+        func unit(_ id:String)->String? {
+            index.nursing.first(where:{$0.id==id})?.unit
+        }
+        XCTAssertEqual(unit("E-18"),"UND") // Loperamida TAB: physically counted per unit.
+        XCTAssertEqual(unit("E-94"),"CJA") // Non-sterile gloves M are boxes.
+        XCTAssertEqual(unit("E-95"),"CJA") // Non-sterile gloves S are boxes.
+        XCTAssertEqual(unit("E-86"),"FCO") // Alcohol 1 LT is a bottle.
+        XCTAssertEqual(unit("E-64"),"PAR") // Surgical gloves remain pairs.
+        XCTAssertEqual(unit("E-65"),"PAR")
+        XCTAssertNil(unit("E-20"))         // Never fabricate unknown units.
+        XCTAssertEqual(index.clinical.first(where:{$0.code=="16000158"})?.unit,"TBL")
+        XCTAssertEqual(index.approvals.count,86)
+    }
     func testModifiedMappingOrClinicalCatalogIsRejected()throws {
         let (clinical,nursing,mappings)=try sources()
         var corrupt=try XCTUnwrap(JSONSerialization.jsonObject(with:mappings)
