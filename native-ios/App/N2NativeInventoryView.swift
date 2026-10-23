@@ -122,7 +122,7 @@ struct N2NativeInventoryView:View {
                 }
                 if !message.isEmpty {
                     Label(message,systemImage:failed ? "exclamationmark.triangle" : "info.circle")
-                        .font(.caption).foregroundStyle(failed ? .orange : .secondary)
+                        .font(.caption).foregroundStyle(failed ? Color.orange : Color.secondary)
                         .fixedSize(horizontal:false,vertical:true)
                 }
             }.padding(16)
@@ -263,7 +263,7 @@ struct N2NativeInventoryView:View {
                 HStack {
                     Text(material.map{$0.name+" · "+$0.id} ??
                          "Buscar medicamento o insumo oficial")
-                        .foregroundStyle(material == nil ? .secondary : .primary)
+                        .foregroundStyle(material == nil ? Color.secondary : Color.primary)
                     Spacer()
                     Image(systemName:"magnifyingglass").foregroundStyle(DanperStyle.red)
                 }
@@ -314,9 +314,9 @@ struct N2NativeInventoryView:View {
                         Text(lot.name).font(.subheadline.weight(.semibold))
                         Text("Lote "+lot.id+" · "+lot.kardexCode)
                             .font(.caption).foregroundStyle(.secondary)
-                        Text("Cantidad: "+(Double(lot.sealed)*lot.capacity+
-                                           lot.loose+lot.opened).formatted()+
-                             " · Vence: "+DanperDatePresentation.display(lot.expires))
+                        let total=Double(lot.sealed)*lot.capacity+
+                            lot.loose+lot.opened
+                        Text("Cantidad: \(total.formatted()) · Vence: \(DanperDatePresentation.display(lot.expires))")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth:.infinity,alignment:.leading)
