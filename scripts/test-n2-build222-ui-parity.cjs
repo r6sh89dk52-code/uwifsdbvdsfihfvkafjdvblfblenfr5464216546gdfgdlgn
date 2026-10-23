@@ -10,6 +10,7 @@ const form=fs.readFileSync(path.join(root,'native-ios/App/N2NativeClinicalFormVi
 const editor=fs.readFileSync(path.join(root,'native-ios/App/N2NativeWorkerEditorView.swift'),'utf8');
 const kardex=fs.readFileSync(path.join(root,'native-ios/App/N2Build222KardexHub.swift'),'utf8');
 const inventory=fs.readFileSync(path.join(root,'native-ios/App/N2NativeInventoryView.swift'),'utf8');
+const catalog=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeCatalogIndex.swift'),'utf8');
 const indicator=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedIndicatorExportView.swift'),'utf8');
 const nursing=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedNursingExportView.swift'),'utf8');
 const reportStages=fs.readFileSync(path.join(root,'native-ios/App/N2Build222ExportStages.swift'),'utf8');
@@ -213,9 +214,26 @@ must(home,'N2HealthMascot()','mascota SwiftUI');
 must(palette,'danper.visual.palette','tema nativo');
 for (const value of [
   'inventory-select-product','inventory-single-quantity','inventory-save-',
-  'Número de lote o referencia','Unidad o presentación','Vencimiento · DDMMAA',
+  'Número de lote o referencia','Escribe el nombre del medicamento o insumo',
+  'inventory-verified-unit','Vencimiento · DDMMAA',
   'Cantidad disponible','Registrar stock'])
   must(inventory,value,'formulario compacto de registro de medicamentos');
+for (const line of [
+  'let confirmed=units[product.id] ??',
+  'product.id=="E-86" && product.name=="ALCOHOL 1 LT" ? "FCO" : nil',
+  'unit:confirmed'
+]) must(catalog,line,'unidad médica confirmada, sin asumir UND');
+assert(!inventory.includes('Nombre o código E-'),
+       'La búsqueda no debe sugerir códigos internos como texto visible');
+assert(!inventory.includes('material.map{$0.name+" · "+$0.id}'),
+       'El producto seleccionado se muestra solo por nombre');
+assert(!inventory.includes('detail:$0.id+" · "+$0.group'),
+       'No mostrar E- como detalle de sugerencias');
+assert(inventory.includes('materialCode=product.id') &&
+       inventory.includes('unit=product.unit ?? ""'),
+       'Elegir un producto debe cargar su unidad automáticamente');
+assert(inventory.includes('TextField("Escribe el nombre del medicamento o insumo"'),
+       'El buscador debe ser editable inmediatamente, sin segunda lupa');
 assert(!/\b(?:let|var)\s+\w+\s*=!/.test(inventory),
        'Swift requiere separar la asignación de la negación (ej. let x = !condición)');
 must(inventory,'let existingPackaged = !',
