@@ -2,14 +2,14 @@ import Foundation
 import SwiftUI
 import DanperCore
 
-/// Independent N2 stock operations: register a lot, receive more supplies,
-/// and reconcile an explicitly counted lot. No guessed package sizes.
+/// One stock for Fondo/Planta. Lot identifiers and FEFO remain internal;
+/// care site belongs only to the clinical attention.
 struct N2NativeInventoryView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     private var layoutOnly=false
+
     init(initialOperation:String?=nil) {
-        if let initialOperation,
-           ["lot","receipt","count"].contains(initialOperation) {
+        if let initialOperation,["lot","receipt","count"].contains(initialOperation) {
             _workspace=State(initialValue:"edit")
             _mode=State(initialValue:initialOperation)
         }
@@ -18,302 +18,390 @@ struct N2NativeInventoryView:View {
     init(layoutContext:N2FormContext,operation:String?=nil) {
         layoutOnly=true
         _context=State(initialValue:layoutContext)
-        _message=State(initialValue:"\(layoutContext.lots.count) lotes disponibles")
-        if let operation {_workspace=State(initialValue:"edit");_mode=State(initialValue:operation)}
+        _message=State(initialValue:"\(layoutContext.lots.count) lotes registrados")
+        if let operation {
+            _workspace=State(initialValue:"edit")
+            _mode=State(initialValue:operation)
+        }
     }
     #endif
+
     @State private var context:N2FormContext?
     @State private var workspace="overview"
     @State private var mode="lot"
     @State private var materialCode=""
-    @State private var site=""
-    @State private var container="unidad"
     @State private var unit="UND"
     @State private var lotNumber=""
-    @State private var cap="1"
-    @State private var sealed="0"
-    @State private var loose="0"
-    @State private var opened="0"
+    @State private var quantity=""
     @State private var expiryEnabled=false
-    @State private var expiry=Date()
-    @State private var lotID=UUID().uuidString
-    @State private var movementID=UUID().uuidString
-    @State private var movementAt:Int64=0
+    @State private var expiryInput=""
     @State private var selectedLotID=""
     @State private var reason=""
-    @State private var search=""
     @State private var picking=false
     @State private var busy=false
     @State private var failed=false
     @State private var message="Cargando inventario…"
+    @State private var lotID=UUID().uuidString
+    @State private var movementID=UUID().uuidString
+    @State private var movementAt:Int64=0
 
+    private let availableUnits=["UND","TBL","PAR","FCO","CJA","PAQ","ML","LT"]
     private var material:N2NursingCatalogProduct? {
         context?.products.nursing.first{$0.id==materialCode}
     }
-    private var counts:(Int,Double,Double,Int)? {
-        guard let number=Int(sealed),(0...10_000_000).contains(number),
-              let extra=decimal(loose),(0...10_000_000).contains(extra),
-              let openedCount=decimal(opened),(0...10_000_000).contains(openedCount),
-              let capacity=Int(cap),(1...10_000_000).contains(capacity) else{return nil}
-        return(number,extra,openedCount,capacity)
+    private var selectedLot:N2FormLot? {
+        context?.lots.first{$0.id==selectedLotID}
     }
-    private func decimal(_ s:String)->Double? {
-        guard let value=Double(s.replacingOccurrences(of:",",with:".")),
-              value.isFinite else{return nil}
-        return value
+    private var enteredQuantity:Double? {
+        let raw=quantity.trimmingCharacters(in:.whitespacesAndNewlines)
+            .replacingOccurrences(of:",",with:".")
+        guard let q=Double(raw),q.isFinite,q>0,q<=10_000_000,
+              (q*1000).rounded()==q*1000 else{return nil}
+        return q
     }
-    private func localDay(_ day:Date)->String {
-        let fmt=DateFormatter()
-        fmt.dateFormat="yyyy-MM-dd"
-        fmt.timeZone=TimeZone(identifier:"America/Lima")
-        return fmt.string(from:day)
+    private var packaged:Bool {
+        !["UND","TBL","PAR","ML","LT"].contains(unit)
+    }
+    private var lotCapacity:Int {
+        // Infer only when the official product name actually states a
+        // quantity. NEVER assume a bottle contains 100 mL by default.
+        guard packaged,let name=material?.name.uppercased(),
+              let range=name.range(of:#"\b\d{1,4}\s*(ML|CC)\b"#,
+                                   options:.regularExpression) else{return 1}
+        let count=String(name[range]).prefix{ $0.isNumber }
+        return max(1,Int(count) ?? 1)
+    }
+    private var expiryISO:String? {
+        guard expiryEnabled else{return ""}
+        guard expiryInput.count==6,expiryInput.allSatisfy(\.isNumber) else{return nil}
+        let part=Array(expiryInput)
+        let day=Int(String(part[0...1])) ?? 0
+        let month=Int(String(part[2...3])) ?? 0
+        let year=2000+(Int(String(part[4...5])) ?? 0)
+        var calendar=Calendar(identifier:.gregorian)
+        calendar.timeZone=TimeZone(identifier:"America/Lima")!
+        guard let date=calendar.date(from:DateComponents(year:year,month:month,day:day)),
+              calendar.dateComponents([.year,.month,.day],from:date)
+                == DateComponents(year:year,month:month,day:day) else{return nil}
+        return String(format:"%04d-%02d-%02d",year,month,day)
     }
     private var valid:Bool {
-        guard context != nil,!busy else{return false}
-        if mode=="site" {return !selectedLotID.isEmpty && !site.isEmpty && reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8}
-        guard let values=counts else{return false}
-        if mode=="lot"{
-            return material != nil && !site.isEmpty && values.2<=Double(values.3)
+        guard context != nil,!busy,let amount=enteredQuantity else{return false}
+        if mode=="lot" {
+            return material != nil && !lotNumber.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
+                expiryISO != nil && (!packaged || amount.rounded()==amount)
         }
-        guard !selectedLotID.isEmpty &&
-              reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8 else{
-            return false
+        guard selectedLot != nil,reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8
+        else{return false}
+        return !packaged || amount.rounded()==amount
+    }
+    private var operationTitle:String {
+        switch mode {
+        case "receipt":return "Registrar ingreso"
+        case "count":return "Actualizar conteo"
+        default:return "Registrar medicamento"
         }
-        if mode=="receipt" {
-            return values.0>0 || values.1>0
+    }
+    private var currentTotal:Double {
+        (context?.lots ?? []).reduce(0) {total,lot in
+            let capacity=lot.capacity
+            return total + Double(lot.sealed)*capacity + lot.loose + lot.opened
         }
-        return values.2<=Double(
-            context?.lots.first{$0.id==selectedLotID}?.capacity ?? 0)
     }
 
     var body:some View {
         DanperScrollView {
-          VStack(alignment:.leading,spacing:16) {
-            VStack(alignment:.leading,spacing:4) {
-                Text("GESTIÓN DE EXISTENCIAS")
-                    .font(.caption2.weight(.bold)).tracking(1.1)
-                    .foregroundStyle(DanperStyle.red)
-                Text("Inventario de enfermería")
-                    .font(.system(.title2,design:.rounded,weight:.bold))
-            }
-            .frame(maxWidth:.infinity,alignment:.leading)
-            DanperPanel("Inventario registrado · 98 productos") {
-                Label("Kardex físico protegido",
-                      systemImage:"lock.shield.fill")
-                Text("Registra existencias y revisa los lotes de cada sede. La capacidad de cajas y frascos se indica al registrar el lote.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                Text(message).font(.footnote)
-                    .foregroundStyle(failed ? Color.red : Color.secondary)
-            }
-            if workspace=="overview" {
-                DanperPanel("¿Qué necesitas hacer?") {
-                    ForEach(["lot","receipt","count"],id:\.self) {action in
-                        Button {
-                            mode=action;workspace="edit"
-                        } label: {
-                            HStack {
-                                Label(["lot":"Registrar lote","receipt":"Ingreso extraordinario","count":"Conteo físico"][action]!,systemImage:action=="lot" ? "plus.circle" : action=="receipt" ? "tray.and.arrow.down" : "checkmark.shield")
-                                Spacer();Image(systemName:"chevron.right")
-                            }.padding(14).foregroundStyle(.primary).frame(minHeight:52)
-                                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
-                        }.buttonStyle(.plain)
-                    }
+            VStack(alignment:.leading,spacing:14) {
+                header
+                if workspace=="overview" {
+                    inventorySummary
+                    operationChoices
+                    lotList
+                }else {
+                    entryForm
                 }
-            } else {
-            Button {workspace="overview"} label:{Label("Volver al inventario",systemImage:"chevron.left")}.buttonStyle(DanperSecondaryButton())
-            if mode=="site" {
-                DanperPanel("Verificar sede original del lote") {
-                    Text(context?.lots.first{$0.id==selectedLotID}?.name ?? selectedLotID).font(.headline)
-                    Text("Confirma la sede a la que pertenecen el lote y su historial. Esta operación no es un traslado ni cambia cantidades.").font(.footnote).foregroundStyle(.secondary)
-                    DanperChoiceField(title:"Sede verificada",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
-                    DanperField(title:"Evidencia de la sede original") {TextField("Justificación (mínimo 8 caracteres)",text:$reason,axis:.vertical)}
-                    Button {Task {await commit()}} label:{Label("Confirmar sede original",systemImage:"mappin.and.ellipse")}
-                        .buttonStyle(DanperPrimaryButton()).disabled(!valid)
+                if !message.isEmpty {
+                    Label(message,systemImage:failed ? "exclamationmark.triangle" : "info.circle")
+                        .font(.caption).foregroundStyle(failed ? .orange : .secondary)
+                        .fixedSize(horizontal:false,vertical:true)
                 }
-            } else {
-            DanperPanel("Operación") {
-                DanperChoiceField(title:"Operación",selection:$mode,options:["lot","receipt","count"],
-                                  labels:["lot":"Registrar lote","receipt":"Ingreso extraordinario","count":"Conciliar conteo físico"])
-                if mode=="lot" {
-                    Button {picking.toggle()} label:{
-                        Label(material.map{$0.name+" · "+$0.id} ??
-                              "Seleccionar material oficial",
-                              systemImage:"magnifyingglass")
-                    }
-                    if picking,let context {
-                        DanperInlineSearch(title:"Material oficial de enfermería",placeholder:"Nombre o código E-",
-                            options:context.products.nursing.map{DanperSearchOption(id:$0.id,title:$0.name,detail:$0.id+" · "+$0.group)},
-                            onSelect:{id in materialCode=id;picking=false},onClose:{picking=false})
-                    }
-                    DanperChoiceField(title:"Sede del inventario",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
-                    DanperField(title:"N.º de lote o referencia") {
-                    TextField("N.º de lote o referencia",text:$lotNumber)
-                }
-                    DanperChoiceField(title:"Unidad del catálogo",selection:$unit,options:["UND","TBL","PAR","CJA","PAQ","FCO","LT","ML"],labels:Dictionary(uniqueKeysWithValues:["UND","TBL","PAR","CJA","PAQ","FCO","LT","ML"].map{($0,$0)}))
-                    DanperChoiceField(title:"Presentación física",selection:$container,options:["unidad","caja","frasco","paquete","blister","otro"])
-                    DanperField(title:"Capacidad interna por envase") {
-                    TextField("Capacidad interna por envase",text:$cap)
-                        .keyboardType(.numberPad)
-                }
-                    DanperCheckRow(selected:$expiryEnabled) {Text("Registrar fecha de vencimiento")}
-                    if expiryEnabled {
-                        DanperDateField(title:"Vencimiento",selection:$expiry)
-                    }
-                }else{
-                    DanperChoiceField(title:"Lote registrado",selection:$selectedLotID,options:context?.lots.map(\.id) ?? [],
-                                      labels:Dictionary(uniqueKeysWithValues:(context?.lots ?? []).map{($0.id,$0.name+" · "+$0.id)}))
-                    if let current=context?.lots.first(where:{$0.id==selectedLotID}) {
-                        LabeledContent("Existencia sellada",
-                                       value:String(current.sealed))
-                        LabeledContent("Contenido abierto",
-                                       value:String(current.opened))
-                        LabeledContent("Capacidad comprobada",
-                                       value:String(current.capacity))
-                        if mode=="count" {
-                            Text("Introduce el conteo físico total actual. La diferencia se registra como ajuste auditado.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                    DanperField(title:"Justificación obligatoria") {
-                    TextField("Justificación obligatoria",text:$reason,
-                              axis:.vertical).lineLimit(2...4)
-                }
-                }
-            }
-            DanperPanel(mode=="count" ? "Conteo físico actual" :
-                    mode=="receipt" ? "Cantidades adicionales" : "Existencias iniciales") {
-                DanperField(title:"Envases sellados") {
-                    TextField("Envases sellados",text:$sealed)
-                    .keyboardType(.numberPad)
-                }
-                DanperField(title:"Unidades sueltas") {
-                    TextField("Unidades sueltas",text:$loose)
-                    .keyboardType(.decimalPad)
-                }
-                if mode != "receipt" {
-                    DanperField(title:"Contenido de envase abierto") {
-                    TextField("Contenido de envase abierto",text:$opened)
-                        .keyboardType(.decimalPad)
-                }
-                }
-                Text("Distingue envases sellados, material suelto y remanente abierto. La U.M. del Kardex se conserva.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            DanperPanel("Confirmación") {
-                Button {
-                    Task {await commit()}
-                } label: {
-                    Label(busy ? "Guardando…" : "Guardar movimiento",
-                          systemImage:"checkmark.shield.fill")
-                }.buttonStyle(DanperPrimaryButton()).disabled(!valid)
-            }
-            }
-            }
-            if workspace=="overview" {
-            DanperPanel("Lotes actuales") {
-                if let context {
-                    ForEach(context.lots){lot in
-                        VStack(alignment:.leading,spacing:4){
-                            Text(lot.name+" · "+lot.kardexCode).font(.headline)
-                            Label(lot.site.isEmpty ? "Sede sin verificar" : lot.site,systemImage:lot.site.isEmpty ? "exclamationmark.triangle" : "mappin.and.ellipse")
-                                .font(.caption).foregroundStyle(lot.site.isEmpty ? Color.orange : Color.secondary)
-                            if lot.site.isEmpty {
-                                Button("Verificar sede original") {
-                                    selectedLotID=lot.id;site="";reason="";mode="site";workspace="edit"
-                                }.buttonStyle(DanperSecondaryButton())
-                            }
-                            Text("Sello: \(lot.sealed) · Abierto: \(lot.opened) · Suelto: \(lot.loose)")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Text("Lote: "+lot.id+" · Vence: "+DanperDatePresentation.display(lot.expires))
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
-                    }
-                }
-            }
-            }
-          }.padding(16)
+            }.padding(16)
         }
-        .navigationTitle("Inventario y lotes")
+        .navigationTitle("Inventario")
+        .navigationBarTitleDisplayMode(.inline)
         .danperFormChrome()
         .task {if !layoutOnly {await load()}}
     }
-    @MainActor
-    private func load() async {
-        do{
+
+    private var header:some View {
+        VStack(alignment:.leading,spacing:5) {
+            Text("KARDEX · INVENTARIO ÚNICO")
+                .font(.caption2.weight(.bold)).tracking(1.1)
+                .foregroundStyle(DanperStyle.red)
+            Text(workspace=="overview" ? "Medicamentos y existencias" : operationTitle)
+                .font(.title2.weight(.bold))
+            Text("Un solo stock para Fondo La Venturosa y PL Venturosa.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth:.infinity,alignment:.leading)
+    }
+    private var inventorySummary:some View {
+        HStack(spacing:10) {
+            summary(String(context?.products.nursing.count ?? 98),"Productos oficiales")
+            summary(String(context?.lots.count ?? 0),"Lotes registrados")
+        }
+    }
+    private func summary(_ value:String,_ description:String)->some View {
+        VStack(alignment:.leading,spacing:6) {
+            Text(value).font(.title2.weight(.bold)).foregroundStyle(DanperStyle.red)
+            Text(description).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth:.infinity,minHeight:77,alignment:.leading)
+        .padding(14)
+        .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:14))
+    }
+    private var operationChoices:some View {
+        DanperPanel("¿Qué deseas hacer?") {
+            action("lot","Registrar medicamento","Añadir producto, lote y cantidad disponible","plus.circle.fill")
+            action("receipt","Registrar ingreso","Sumar unidades a un lote existente","tray.and.arrow.down")
+            action("count","Actualizar conteo","Corregir existencias según lo contado","checkmark.shield")
+        }
+    }
+    private func action(_ kind:String,_ name:String,_ detail:String,_ symbol:String)->some View {
+        Button {
+            mode=kind
+            workspace="edit"
+            quantity=""
+            reason=""
+            selectedLotID=""
+            picking=false
+        } label: {
+            HStack(spacing:11) {
+                Image(systemName:symbol).font(.title3).foregroundStyle(DanperStyle.red)
+                VStack(alignment:.leading,spacing:3) {
+                    Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName:"chevron.right").font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .frame(maxWidth:.infinity,alignment:.leading)
+            .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+        }
+        .buttonStyle(.plain)
+    }
+    private var entryForm:some View {
+        VStack(alignment:.leading,spacing:12) {
+            Button {
+                workspace="overview"
+            } label: {
+                Label("Volver al inventario",systemImage:"chevron.left")
+            }.buttonStyle(DanperSecondaryButton())
+
+            DanperPanel(operationTitle) {
+                if mode=="lot" {
+                    medicationSelector
+                    DanperField(title:"Número de lote o referencia") {
+                        TextField("Número del lote",text:$lotNumber)
+                            .textInputAutocapitalization(.characters)
+                    }
+                    DanperChoiceField(title:"Unidad o presentación",
+                                      selection:$unit,options:availableUnits)
+                    expiryField
+                }else {
+                    DanperChoiceField(title:"Medicamento y lote",
+                        selection:$selectedLotID,options:context?.lots.map(\.id) ?? [],
+                        labels:Dictionary(uniqueKeysWithValues:(context?.lots ?? []).map{
+                            ($0.id,$0.name+" · "+$0.id)
+                        }))
+                    if let selectedLot {
+                        LabeledContent("Existencia actual",
+                            value:(Double(selectedLot.sealed)*selectedLot.capacity+
+                                   selectedLot.loose+selectedLot.opened).formatted())
+                        LabeledContent("Vencimiento",
+                            value:DanperDatePresentation.display(selectedLot.expires))
+                    }
+                    DanperField(title:"Motivo del movimiento") {
+                        TextField("Ej. Reposición o conteo realizado",
+                                  text:$reason,axis:.vertical)
+                            .lineLimit(2...3)
+                    }
+                }
+                DanperField(title:mode=="lot" ? "Cantidad disponible" :
+                                   mode=="receipt" ? "Cantidad que ingresa" :
+                                   "Cantidad contada") {
+                    TextField("Ingresa una cantidad",text:$quantity)
+                        .keyboardType(.decimalPad)
+                        .accessibilityIdentifier("inventory-single-quantity")
+                }
+                if mode=="lot" {
+                    Text("Registra la cantidad que realmente tienes hoy. No se considerará automáticamente un ingreso adicional.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Button {
+                    Task {await commit()}
+                } label: {
+                    Label(busy ? "Guardando…" : mode=="count" ?
+                          "Guardar conteo" : mode=="receipt" ?
+                          "Guardar ingreso" : "Registrar stock",
+                          systemImage:"checkmark.circle.fill")
+                        .frame(maxWidth:.infinity)
+                }
+                .buttonStyle(DanperPrimaryButton())
+                .disabled(!valid)
+                .accessibilityIdentifier("inventory-save-"+mode)
+            }
+        }
+    }
+    private var medicationSelector:some View {
+        VStack(alignment:.leading,spacing:8) {
+            Text("Medicamento o insumo").font(.subheadline.weight(.semibold))
+            Button {
+                picking.toggle()
+            } label: {
+                HStack {
+                    Text(material.map{$0.name+" · "+$0.id} ??
+                         "Buscar medicamento o insumo oficial")
+                        .foregroundStyle(material == nil ? .secondary : .primary)
+                    Spacer()
+                    Image(systemName:"magnifyingglass").foregroundStyle(DanperStyle.red)
+                }
+                .padding(13)
+                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:12))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("inventory-select-product")
+            if picking,let context {
+                DanperInlineSearch(title:"Buscar medicamento o insumo",
+                    placeholder:"Nombre o código E-",
+                    options:context.products.nursing.map{
+                        DanperSearchOption(id:$0.id,title:$0.name,
+                                           detail:$0.id+" · "+$0.group)
+                    },onSelect:{id in
+                        materialCode=id
+                        picking=false
+                    },onClose:{picking=false})
+            }
+        }
+    }
+    private var expiryField:some View {
+        VStack(alignment:.leading,spacing:7) {
+            DanperCheckRow(selected:$expiryEnabled) {
+                Text("Tiene fecha de vencimiento").font(.subheadline)
+            }
+            if expiryEnabled {
+                DanperField(title:"Vencimiento · DDMMAA") {
+                    TextField("DDMMAA (ej. 311227)",text:$expiryInput)
+                        .keyboardType(.numberPad)
+                        .onChange(of:expiryInput){_,value in
+                            let sanitized=String(value.filter(\.isNumber).prefix(6))
+                            if expiryInput != sanitized {expiryInput=sanitized}
+                        }
+                }
+                if expiryISO==nil {
+                    Text("Escribe seis dígitos: día, mes y año. No se abre el calendario.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+    private var lotList:some View {
+        DanperPanel("Stock y lotes registrados") {
+            if let context, !context.lots.isEmpty {
+                ForEach(context.lots){lot in
+                    VStack(alignment:.leading,spacing:5) {
+                        Text(lot.name).font(.subheadline.weight(.semibold))
+                        Text("Lote "+lot.id+" · "+lot.kardexCode)
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Cantidad: "+(Double(lot.sealed)*lot.capacity+
+                                           lot.loose+lot.opened).formatted()+
+                             " · Vence: "+DanperDatePresentation.display(lot.expires))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth:.infinity,alignment:.leading)
+                    Divider()
+                }
+            } else {
+                Text("Todavía no hay medicamentos registrados.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+    }
+    @MainActor private func load() async {
+        do {
             context=try await vault.clinicalFormContext()
-            message="Inventario verificado; lotes: \(context?.lots.count ?? 0)."
             failed=false
+            message=""
         }catch{
             failed=true
             context=nil
-            message="No hay fuente clínica N2 verificada; el inventario queda bloqueado."
+            message="No se pudo leer el inventario. No se modificó ningún registro."
         }
     }
-    @MainActor
-    private func commit() async {
-        guard valid,let current=context else{return}
-        let values=counts ?? (0,0.0,0.0,1)
+    @MainActor private func commit() async {
+        guard valid,let current=context,let qty=enteredQuantity else{return}
         busy=true
         failed=false
         defer{busy=false}
-        if movementAt==0 {
-            movementAt=Int64(Date().timeIntervalSince1970*1000)
-        }
-        do{
+        if movementAt==0 {movementAt=Int64(Date().timeIntervalSince1970*1000)}
+        do {
             let result:N2ProtectedStoreSummary
-            switch mode {
-            case "site":
-                result=try await vault.verifyOriginalStockSite(
-                    eventID:movementID,lotID:selectedLotID,site:site,reason:reason,
-                    at:movementAt,expectedRevision:current.revision)
-            case "lot":
-                guard let material else{return}
+            if mode=="lot" {
+                guard let material,let expiryISO else{return}
+                let isPack=packaged
                 let record:[String:Any]=[
                     "id":lotID,"code":material.id,"name":material.name,
                     "catalogUnit":unit,"lot":lotNumber,
-                    "site":site,
-                    "expires":expiryEnabled ? localDay(expiry) : "",
-                    "container":container,"unitsPerContainer":values.3,
-                    "sealedContainers":values.0,"looseUnits":values.1,
-                    "openedRemaining":values.2,"updatedAt":movementAt
+                    "expires":expiryISO,
+                    "container":isPack ? (
+                        unit=="FCO" ? "frasco" : unit=="CJA" ? "caja" : "paquete"
+                    ) : "unidad",
+                    "unitsPerContainer":isPack ? lotCapacity : 1,
+                    "sealedContainers":isPack ? Int(qty) : 0,
+                    "looseUnits":isPack ? 0 : qty,
+                    "openedRemaining":0,"updatedAt":movementAt
                 ]
-                let data=try JSONSerialization.data(withJSONObject:record)
-                result=try await vault.addLot(
-                    data,expectedRevision:current.revision)
-            case "receipt":
-                result=try await vault.receiveStock(
-                    movementID:movementID,lotID:selectedLotID,at:movementAt,
-                    sealedAdded:values.0,looseAdded:values.1,
-                    reason:reason,expectedRevision:current.revision)
-            default:
-                result=try await vault.reconcileCount(
-                    movementID:movementID,lotID:selectedLotID,at:movementAt,
-                    sealed:values.0,loose:values.1,opened:values.2,
-                    reason:reason,expectedRevision:current.revision)
+                let bytes=try JSONSerialization.data(withJSONObject:record)
+                result=try await vault.addLot(bytes,expectedRevision:current.revision)
+            }else {
+                guard let selectedLot else{return}
+                let isPack = !["UND","TBL","PAR","ML","LT"].contains(
+                    selectedLot.unit.uppercased())
+                if mode=="receipt" {
+                    result=try await vault.receiveStock(
+                        movementID:movementID,lotID:selectedLot.id,at:movementAt,
+                        sealedAdded:isPack ? Int(qty) : 0,
+                        looseAdded:isPack ? 0:qty,
+                        reason:reason,expectedRevision:current.revision)
+                }else {
+                    // Preserve opened-bottle remainder when recounting sealed
+                    // containers; no artificial opening/consumption.
+                    result=try await vault.reconcileCount(
+                        movementID:movementID,lotID:selectedLot.id,at:movementAt,
+                        sealed:isPack ? Int(qty) : 0,
+                        loose:isPack ? selectedLot.loose:qty,
+                        opened:isPack ? selectedLot.opened:0,
+                        reason:reason,expectedRevision:current.revision)
+                }
             }
             _ = result
             context=try await vault.clinicalFormContext()
-            // Disable a second tap with stale quantities after a successful
-            // receipt or lot creation. Failed writes retain the same ID/clock
-            // so an uncertain network/UI retry cannot silently double-count.
             movementID=UUID().uuidString
             lotID=UUID().uuidString
             movementAt=0
             workspace="overview"
-            reason=""
             materialCode=""
             selectedLotID=""
+            quantity=""
             lotNumber=""
-            cap="1"
-            sealed="0"
-            loose="0"
-            opened="0"
             expiryEnabled=false
-            message=mode=="site" ? "Sede original verificada. Las cantidades y movimientos se conservaron." : "Inventario actualizado correctamente."
-        }catch {
+            expiryInput=""
+            reason=""
+            message="Existencias registradas correctamente en el Kardex único."
+        }catch{
             failed=true
-            message="Operación no aplicada: verifica materiales, cantidades, lotes y revisión vigente. El identificador se conserva para impedir duplicar un ingreso al reintentar."
+            message="No se guardó la operación. Revisa lote, cantidad y existencias sin crear registros duplicados."
         }
     }
 }
-
