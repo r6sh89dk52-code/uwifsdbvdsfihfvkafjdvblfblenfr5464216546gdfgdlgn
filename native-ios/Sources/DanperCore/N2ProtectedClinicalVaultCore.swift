@@ -183,6 +183,15 @@ public final class N2ProtectedClinicalVaultCore {
             selectedVisitIDs:ids,allowPending:allowPending)
     }
 
+    public func exportOccupationalVigilance(start:String,end:String) throws
+        ->N2OccupationalVigilanceWorkbook.Result {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2OccupationalVigilanceWorkbook.export(
+            snapshot:active.snapshot,start:start,end:end)
+    }
+
     public func exportVerifiedDailyNursingWorkbook(
         catalog:Data,template:Data,date:String,shift:String,
         responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
