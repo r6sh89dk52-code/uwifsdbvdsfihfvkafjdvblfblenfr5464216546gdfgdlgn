@@ -155,10 +155,12 @@ final class N2NursingParityTests:XCTestCase {
         let xml=try XCTUnwrap(String(data:excel.data,encoding:.utf8))
         // Unregistered items appear as numeric zero, never a blank cell.
         // stockKnown remains false: no physical count or fictitious lot exists.
-        XCTAssertTrue(xml.contains("<c r=\"D7\"><v>0</v></c>"))
-        XCTAssertTrue(xml.contains("<c r=\"E7\"><v>0</v></c>"))
-        XCTAssertTrue(xml.contains("<c r=\"G7\"><v>0</v></c>"))
-        XCTAssertFalse(root["stockLots"] as? [[String:Any]] == nil)
+        for cell in ["D7","E7","G7"] {
+            // The official template may retain a style attribute on a cell.
+            let regex="<c r=\""+cell+"\"[^>]*><v>0</v></c>"
+            XCTAssertNotNil(xml.range(of:regex,options:.regularExpression),cell)
+        }
+        XCTAssertEqual((root["stockLots"] as? [[String:Any]])?.count,0)
     }
 
     func testRangeIsAlwaysLabeledAsConsolidatedPeriod() throws {
