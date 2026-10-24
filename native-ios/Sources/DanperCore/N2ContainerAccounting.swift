@@ -84,9 +84,13 @@ public enum N2ContainerAccounting {
                   N2ContainerAccounting.isContainer(unit:before["catalogUnit"] as? String ?? "") else{return false}
             let exhausted=movement["declaredExhaustedByNewOpening"] as? Bool == true
             if exhausted {
+                let removed=(before["openedRemaining"] as? NSNumber)?.doubleValue ?? -1
                 guard count==1,
                       movement["containerDisposition"] as? String=="agotado",
                       before["volumeTrackingEnabled"] as? Bool != true,
+                      (before["looseUnits"] as? NSNumber)?.doubleValue==0,
+                      removed.isFinite,removed>=0,
+                      (movement["physicalChange"] as? NSNumber)?.doubleValue == -removed,
                       (after["openedRemaining"] as? NSNumber)?.doubleValue==0,
                       (after["looseUnits"] as? NSNumber)?.doubleValue==0 else{
                     return false
@@ -128,6 +132,9 @@ public enum N2ContainerAccounting {
               let unit=lot["catalogUnit"] as? String,isContainer(unit:unit),
               openCount(lot)==1,
               lot["volumeTrackingEnabled"] as? Bool != true,
+              ((lot["looseUnits"] as? NSNumber)?.doubleValue ?? -1)==0,
+              let previousRemainder=(lot["openedRemaining"] as? NSNumber)?.doubleValue,
+              previousRemainder.isFinite,previousRemainder>=0,
               at>=(lot["updatedAt"] as? Int64 ?? Int64.max),
               operatorName.count>=3 else{return nil}
         var after=lot
@@ -147,7 +154,9 @@ public enum N2ContainerAccounting {
             "declaredExhaustedByNewOpening":true,
             "operatorName":operatorName,
             "description":"Agotamiento del envase anterior confirmado al abrir uno nuevo",
-            "quantity":0,"excelQuantity":0,"physicalChange":0,
+            // This is the physical remainder declared exhausted, NOT a
+            // second nursing Kardex opening (R remains exactly 0).
+            "quantity":0,"excelQuantity":0,"physicalChange":-previousRemainder,
             "openedNewContainer":false,"sealedAdded":0,"looseAdded":0,
             "before":lot,"after":after]
         guard validMovement(event) else{return nil}
