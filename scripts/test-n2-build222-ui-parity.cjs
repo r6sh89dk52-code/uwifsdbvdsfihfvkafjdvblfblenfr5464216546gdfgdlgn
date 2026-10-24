@@ -528,14 +528,14 @@ for(const needle of [
   '"reusePreviouslyOpened":med.reusePreviouslyOpened'
 ]) must(formData,needle,'declaración explícita de envase abierto');
 for(const needle of [
-  'attestAlreadyOpen(',
-  'existingOpenAttested',
+  'attestedReuse(',
+  'reuseWithoutRecordedOpening',
   '"physicalChange":0',
-  '"containerDisposition":"ya_abierto"'
+  '"excelQuantity":0',
 ]) must(containerCore,needle,'reclasificación auditada sin inventar una apertura antigua');
 for(const needle of [
   'let declaredReuse =',
-  'N2ContainerAccounting.attestAlreadyOpen(',
+  'N2ContainerAccounting.attestedReuse(',
   'selectedForAccounting',
   'movements.append(contentsOf:pendingClosures)'
 ]) must(clinicalTx,needle,'FEFO apertura previa con actual R0');
