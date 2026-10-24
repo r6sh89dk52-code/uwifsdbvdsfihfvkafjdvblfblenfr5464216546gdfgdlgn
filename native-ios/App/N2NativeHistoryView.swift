@@ -160,7 +160,9 @@ struct N2NativeHistoryView: View {
                     }
                   }.padding(16)
                 }
-                .searchable(text:$query,prompt:"Buscar DNI, nombres o área")
+                .searchable(text:$query,prompt:showWorkers
+                    ? "Buscar DNI, nombres o área"
+                    : "Buscar trabajador, DNI, diagnóstico o fecha")
                 .task(id:query) {
                     // Do not filter and re-layout 9,648 workers on every
                     // keystroke. A brief cancellable debounce keeps search
@@ -281,6 +283,11 @@ private struct N2RecordedVisitDetailView:View {
                                 Text(med.name).font(.subheadline.weight(.semibold))
                                 Text("Cantidad clínica: \(med.quantity) · "+med.procedure)
                                     .font(.caption).foregroundStyle(.secondary)
+                                if med.quantity != med.originalQuantity {
+                                    Label("Original: \(med.originalQuantity). El movimiento físico no se alteró.",
+                                          systemImage:"info.circle")
+                                        .font(.caption2).foregroundStyle(.orange)
+                                }
                             }
                             .frame(maxWidth:.infinity,alignment:.leading)
                             Divider()
