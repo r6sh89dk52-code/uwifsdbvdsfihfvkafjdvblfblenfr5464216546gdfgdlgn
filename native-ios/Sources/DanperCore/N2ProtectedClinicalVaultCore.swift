@@ -195,13 +195,15 @@ public final class N2ProtectedClinicalVaultCore {
     }
     public func exportVerifiedRangeNursingWorkbook(
         catalog:Data,template:Data,start:String,end:String,
-        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
+        responsible:String,site:String="",mappings:Data?=nil,
+        reconstructFromCount:Bool=false)throws->N2VerifiedNursingWorkbook.Result {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
         }
         return try N2VerifiedNursingWorkbook.exportRange(
             snapshot:active.snapshot,catalog:catalog,template:template,
-            start:start,end:end,responsible:responsible,site:site)
+            start:start,end:end,responsible:responsible,site:site,
+            mappings:mappings,reconstructFromCount:reconstructFromCount)
     }
     /// Read-only 9th-day reconciliation against the encrypted single-source
     /// journal. Never writes a stock movement or returns raw clinical records
