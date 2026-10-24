@@ -38,6 +38,9 @@ struct N2NativeClinicalFormView:View {
     @State private var pendingMappingItemID:String?
     @State private var pendingPhysicalItemID:String?
     @State private var showStockRegistration=false
+    @State private var containerDecisionIDs=[String]()
+    @State private var containerDecisionIndex=0
+    @State private var showContainerDecision=false
     @State private var form=N2NativeFormDraft()
     @State private var step=0
     @State private var busy=false
@@ -367,6 +370,20 @@ struct N2NativeClinicalFormView:View {
                     }
                 } message: {
                     Text("Posible coincidencia con alergia declarada: \(allergyMatches.joined(separator: ", ")). Esta alerta usa solo texto; no verifica principios activos ni reacciones cruzadas. Comprueba la indicación antes de cualquier administración.")
+                }
+                .alert(containerDecisionTitle,isPresented:$showContainerDecision) {
+                    Button("Sí, abrí uno nuevo · Kardex 1") {
+                        recordContainerDecision(opened:true)
+                    }
+                    Button("No, usé el abierto · Kardex 0") {
+                        recordContainerDecision(opened:false)
+                    }
+                    Button("Volver",role:.cancel) {
+                        containerDecisionIDs=[]
+                        containerDecisionIndex=0
+                    }
+                } message: {
+                    Text(containerDecisionMessage)
                 }
                 .alert("Trabajador no registrado",isPresented:$showMissingWorker) {
                     Button("Registrar trabajador") {
@@ -1226,7 +1243,8 @@ struct N2NativeClinicalFormView:View {
                         } else {presentValidation(errors)}
                     } else {
                         let errors=(0...3).flatMap{issueCodes(for:$0,context:context)}
-                        if errors.isEmpty {Task {await confirm()}}
+                        if errors.isEmpty {beginContainerReview(context)}
+
                         else {presentValidation(errors)}
                     }
                 } label: {
@@ -1376,6 +1394,107 @@ struct N2NativeClinicalFormView:View {
             }
         }
     }
+    /// Each container is confirmed in an explicit save-time dialog. Editing
+    /// the medication row is no longer needed just to declare an opening.
+    private func containerCodes(_ medication:N2FormMedication,
+                                context:N2FormContext)->Set<String> {
+        let verified=context.products.authorizedNursingOptions(for:medication.code)
+        let operational=context.operationalMappings.filter{
+            $0.clinicalCode==medication.code
+        }.map(\.inventoryID)
+        return Set(verified.map(\.id)+operational)
+    }
+    private func isContainerMedication(_ medication:N2FormMedication,
+                                        context:N2FormContext)->Bool {
+        let ids=containerCodes(medication,context:context)
+        if context.lots.contains(where:{
+            ids.contains($0.kardexCode) &&
+            N2ContainerAccounting.isContainer(unit:$0.unit)
+        }) {return true}
+        return context.products.nursing.contains(where:{
+            ids.contains($0.id) &&
+            ($0.unit.map{N2ContainerAccounting.isContainer(unit:$0)} ?? false)
+        })
+    }
+    private var containerDecisionMedication:N2FormMedication? {
+        guard containerDecisionIDs.indices.contains(containerDecisionIndex) else{
+            return nil
+        }
+        let itemID=containerDecisionIDs[containerDecisionIndex]
+        return form.items.first(where:{$0.id==itemID})
+    }
+    private var containerDecisionName:String {
+        guard let item=containerDecisionMedication else{return "el producto"}
+        return context?.products.clinical.first(where:{$0.code==item.code})?.name
+            ?? item.code
+    }
+    private var containerDecisionTitle:String {
+        guard let item=containerDecisionMedication,let context else{
+            return "¿Abriste un envase nuevo?"
+        }
+        let codes=containerCodes(item,context:context)
+        let units=context.lots.filter{codes.contains($0.kardexCode)}.map(\.unit) +
+            context.products.nursing.filter{codes.contains($0.id)}.compactMap(\.unit)
+        let kind=units.contains(where:{$0.uppercased()=="CJA"}) ? "caja" :
+            units.contains(where:{$0.uppercased()=="FCO"}) ? "frasco" : "envase"
+        return "¿Abriste un \(kind) nuevo?"
+    }
+    private var containerDecisionMessage:String {
+        let order=containerDecisionIndex+1
+        let total=containerDecisionIDs.count
+        return "\(containerDecisionName) · \(order) de \(total). Marca Sí solo si abriste un envase físicamente. Si había uno abierto del mismo producto, Sí también confirma que el anterior se agotó. No marca reutilización (Kardex 0)."
+    }
+    private func beginContainerReview(_ context:N2FormContext) {
+        guard !busy,!saved else{return}
+        containerDecisionIDs=form.items.filter{
+            isContainerMedication($0,context:context)
+        }.map(\.id)
+        containerDecisionIndex=0
+        if containerDecisionIDs.isEmpty {
+            Task {await confirm()}
+        } else {
+            showContainerDecision=true
+        }
+    }
+    private func recordContainerDecision(opened:Bool) {
+        guard let context,let item=containerDecisionMedication,
+              let idx=form.items.firstIndex(where:{$0.id==item.id}) else{
+            showContainerDecision=false
+            containerDecisionIDs=[]
+            return
+        }
+        let linked=containerCodes(item,context:context)
+        let alreadyOpen=context.lots.contains(where:{
+            linked.contains($0.kardexCode) && $0.openContainers>0
+        })
+        let earlierOpened=form.items.prefix(idx).contains(where:{prior in
+            prior.approveOpening &&
+            !containerCodes(prior,context:context).isDisjoint(with:linked)
+        })
+        // Yes confirms exhaustion of the prior open container. This flag is
+        // assessed atomically in the ledger, never treated as an extra debit.
+        form.items[idx].approveOpening=opened
+        form.items[idx].newContainers=opened ? 1:0
+        form.items[idx].closePriorContainer=opened && (alreadyOpen || earlierOpened)
+        if form.items[idx].selectedLotID.isEmpty,
+           let first=context.options(for:item.code,at:form.date,
+                                     site:form.dispensingSite).first {
+            form.items[idx].selectedLotID=first.id
+        }
+        showContainerDecision=false
+        containerDecisionIndex+=1
+        if containerDecisionIndex==containerDecisionIDs.count {
+            containerDecisionIDs=[]
+            containerDecisionIndex=0
+            Task {await confirm()}
+        }else {
+            Task { @MainActor in
+                await Task.yield()
+                showContainerDecision=true
+            }
+        }
+    }
+
     @MainActor
     private func confirm() async {
         guard let context,!busy,!saved,!fault else{return}
