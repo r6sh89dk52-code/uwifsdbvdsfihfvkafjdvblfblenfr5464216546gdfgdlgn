@@ -288,7 +288,13 @@ public enum N2VerifiedIndicatorWorkbook {
                     } else if allowPending,let declared=integer(row["quantity"]),declared>0 {
                         let inventoryCodes=Set(mapped.filter{$0["clinicalCode"] as? String==code}.compactMap{$0["kardexCode"] as? String})
                             .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
-                        let container=N2ContainerAccounting.isContainer(unit:type) || stock.contains {
+                            .union(N2UserReviewedKardexLinks.candidates(for:code).map(\.kardexID))
+                        // No fictitious R=n for user-reviewed boxes/bottles
+                        // whose opening was not explicitly declared.
+                        let confirmedPackaging = !Set(["E-86","E-94","E-95"])
+                            .isDisjoint(with:inventoryCodes)
+                        let container=confirmedPackaging ||
+                            N2ContainerAccounting.isContainer(unit:type) || stock.contains {
                             inventoryCodes.contains(string($0["code"])) &&
                                 N2ContainerAccounting.isContainer(unit:string($0["catalogUnit"]))
                         }
