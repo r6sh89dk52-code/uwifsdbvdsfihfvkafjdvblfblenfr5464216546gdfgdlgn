@@ -416,6 +416,19 @@ for(const fragment of [
 ]) must(indicatorBook,fragment,'proyección provisional de diez hojas sin duplicar stock');
 console.log('PASS: aperturas históricas y proyección provisional 10 hojas con controles de evidencia.');
 
+const formContext=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeFormContext.swift'),'utf8');
+const pendingView=fs.readFileSync(path.join(root,'native-ios/App/N2PendingDispensingView.swift'),'utf8');
+must(formContext,'func historicalOptions(for code:String,at date:String)',
+  'lotes agotados visibles solo para documentación histórica');
+must(pendingView,'context.historicalOptions(for:medication.code,at:date)',
+  'declaración anterior incluso con saldo actual 0');
+must(pendingView,'Guardar declaración histórica (R=1/0)',
+  'distinguir conciliación contable antigua de FEFO actual');
+must(history,'context.historicalOptions(for:line.code,at:detail.date)',
+  'historial permite seleccionar apertura histórica de un lote agotado');
+console.log('PASS: lotes agotados se pueden documentar retrospectivamente sin habilitar FEFO agotado.');
+
+
 
 
 
