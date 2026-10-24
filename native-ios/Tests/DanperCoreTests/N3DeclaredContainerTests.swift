@@ -128,6 +128,19 @@ final class N3DeclaredContainerTests:XCTestCase {
         XCTAssertEqual(closings.count,1)
         XCTAssertEqual(closings[0]["containerDisposition"] as? String,"agotado")
         XCTAssertEqual((closings[0]["excelQuantity"] as? NSNumber)?.doubleValue,0)
+        // The emptied prior bottle removes its residual physical contents
+        // once, while only the NEW opening produces Kardex R=1.
+        XCTAssertEqual((closings[0]["physicalChange"] as? NSNumber)?.doubleValue,-1)
+        XCTAssertEqual((closings[0]["quantity"] as? NSNumber)?.doubleValue,0)
+        var corrupted=all
+        var forged=try XCTUnwrap(corrupted["stockMovements"] as? [[String:Any]])
+        guard let closingIndex=forged.firstIndex(where:{
+            $0["kind"] as? String=="containerState"
+        }) else {return XCTFail("Falta movimiento de agotamiento")}
+        forged[closingIndex]["physicalChange"]=0
+        corrupted["stockMovements"]=forged
+        XCTAssertThrowsError(try N1eLegacyClinicalAudit.inspect(bytes(corrupted)),
+                             "Un remanente agotado no puede falsificar cambio físico 0")
         XCTAssertEqual(try lot(saved.snapshot)["declaredOpenContainers"] as? Int,1)
         XCTAssertEqual(try lot(saved.snapshot)["sealedContainers"] as? Int,1)
         XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(saved.snapshot)
