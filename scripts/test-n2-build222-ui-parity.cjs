@@ -286,6 +286,28 @@ assert(!form.includes('Button("Verificar cantidad y apertura pendiente")'),
        'No pedir aperturas para consumos sin stock');
 assert(!form.includes('Button("Resolver correspondencia")'),
        'No mostrar vinculación redundante cuando el motivo real es stock');
+
+for (const key of [
+  'committedQuery=query',
+  '.task(id:query)',
+  'Contabilizado en el corte 9–8 · sin salida física verificada',
+  'history-register-actual-stock-',
+  'reconstructedCount',
+  'Registro clínico incorporado una sola vez al cálculo'
+]) must(history,key,'historial muestra reconstrucción sin inventar movimiento');
+for (const key of [
+  'private var clinicalOnlyMatches:',
+  'context.products.authorizedNursingOptions(for:product.code).isEmpty',
+  'N2AuxiliaryInventoryView(code:auxiliaryCode,context:context',
+  'inventory-auxiliary-'
+]) must(inventory,key,'buscar insumos clínicos externos al Kardex de 98');
+for (const key of [
+  'await previousAutosave?.value',
+  'let lines=try await vault.dispensingLines(visitID:form.id)',
+  'guard !Task.isCancelled,!saved,!busy else{return}',
+  'drafts.removeAll(where:{$0.id==form.id})'
+]) must(form,key,'guardado atómico sin carrera con borrador y sin lecturas redundantes');
+
 console.log('PASS: pendientes con una sola acción pertinente: stock, vínculo, lote o cronología.');
 for(const phrase of [
   'kardexID:"E-20"','clinicalCode:"16025008"',
