@@ -35,6 +35,25 @@ final class N2PendingResolutionTests:XCTestCase {
             XCTAssertEqual(N2PendingResolution.forReason(reason),.reviewChronology,reason)
         }
     }
+    func testHistoricStatusDescribesActualCauseWithoutSuggestingFalseDebit() {
+        let lateLot="El lote fue registrado después de la atención o posee movimientos posteriores: reconstruir el saldo del corte sin restarlo otra vez del conteo actual."
+        let lateMapping="Correspondencia vinculada después de la atención: requiere conciliación histórica."
+        let invalid="Fecha clínica futura o inválida: el consumo queda registrado sin modificar el inventario."
+        XCTAssertEqual(N2PendingResolution.forReason(lateLot),.reviewChronology)
+        XCTAssertEqual(N2PendingResolution.historicalTitle(forReason:lateLot),
+                       "Lote posterior a la atención")
+        XCTAssertTrue(N2PendingResolution.historicalGuidance(forReason:lateLot)
+                      .contains("no vuelvas a descontarlo"))
+        XCTAssertEqual(N2PendingResolution.forReason(lateMapping),.reviewChronology)
+        XCTAssertEqual(N2PendingResolution.historicalTitle(forReason:lateMapping),
+                       "Vínculo confirmado después de la atención")
+        XCTAssertTrue(N2PendingResolution.historicalGuidance(forReason:lateMapping)
+                      .contains("no demuestra una salida física antigua"))
+        XCTAssertEqual(N2PendingResolution.historicalTitle(forReason:invalid),
+                       "Revisar fecha de la atención")
+        XCTAssertTrue(N2PendingResolution.historicalGuidance(forReason:invalid)
+                      .contains("Revisa la fecha original"))
+    }
     func testUserFacingMessagesDoNotConfuseStockAndCorrespondence() {
         XCTAssertEqual(N2PendingResolution.registerStock.summary,
                        "No hay stock disponible para descontar")
