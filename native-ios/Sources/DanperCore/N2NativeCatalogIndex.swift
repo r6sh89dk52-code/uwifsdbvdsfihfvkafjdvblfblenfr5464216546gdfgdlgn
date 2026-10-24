@@ -43,7 +43,8 @@ public struct N2NativeCatalogIndex:Sendable {
     }
     public func authorizedNursingOptions(for clinicalCode:String)->[N2NursingCatalogProduct] {
         let codes=Set(approvals.filter{$0.clinicalCode==clinicalCode}.map{$0.kardexID})
-        return nursing.filter{codes.contains($0.id)}
+        let reviewed=Set(N2UserReviewedKardexLinks.candidates(for:clinicalCode).map(\.kardexID))
+        return nursing.filter{codes.contains($0.id) || reviewed.contains($0.id)}
     }
 }
 public enum N2NativeCatalogLoader {
@@ -96,6 +97,9 @@ public enum N2NativeCatalogLoader {
               links.filter{$0.clinicalCode=="16024400"}.count==2 else{
             throw N2CatalogError.invalidApprovals
         }
+        // New user-reviewed identities remain separate from official approvals.
+        // Validate each code and exact label before offering the association.
+        try N2UserReviewedKardexLinks.validate(clinical:clinical,nursing:supplies,approvals:links)
         // The 86 approved correspondences carry the authoritative unit.
         // Unknown nursing units remain nil, never silently default to UND.
         let byCode=Dictionary(uniqueKeysWithValues:clinical.map{($0.code,$0.unit)})
