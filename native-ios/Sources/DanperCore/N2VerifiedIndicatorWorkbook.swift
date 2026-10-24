@@ -433,6 +433,36 @@ public enum N2VerifiedIndicatorWorkbook {
                 string($0["date"])==start &&
                 string($0["periodEnd"])==end})
         }) else {throw Failure.unreviewedPeriod}
+        // Provisional full-period preview only: one shared inventory,
+        // never an invented site-specific physical opening or count.
+        // Official export still requires the existing audited reviews.
+        let allPeriodIDs=Set(visits.filter {
+            string($0["status"])=="saved" &&
+            string($0["date"])>=start && string($0["date"])<=end
+        }.compactMap{$0["id"] as? String})
+        let isWholePeriod=selectedVisitIDs==allPeriodIDs
+        let periodStart=try? N2KardexCutPreview.period(for:end).start
+        let projectedCut:N2AutomaticCutAccounting.Result? =
+            allowPending && subdivision=="AMBAS" &&
+            isWholePeriod && periodStart==start
+            ? try? N2AutomaticCutAccounting.calculate(
+                snapshot:clinical,mappings:mappings,through:end)
+            : nil
+        var clinicalToNursing=[String:Set<String>]()
+        for entry in mapped {
+            if let clinical=entry["clinicalCode"] as? String,
+               let kardex=entry["kardexCode"] as? String {
+                clinicalToNursing[clinical,default:[]].insert(kardex)
+            }
+        }
+        for entry in N2UserReviewedKardexLinks.links {
+            clinicalToNursing[entry.clinicalCode,default:[]].insert(entry.kardexID)
+        }
+        for entry in operational {
+            clinicalToNursing[entry.clinicalCode]=[entry.inventoryID]
+        }
+        let projectedByKardex=Dictionary(uniqueKeysWithValues:
+            (projectedCut?.rows ?? []).map{($0.code,$0)})
         var summary=[String:[String:Any]]()
         var openingCount=0,closingCount=0
         for item in catalogue {
@@ -495,6 +525,26 @@ public enum N2VerifiedIndicatorWorkbook {
             }
             if knownOpenings==sites.count && knownClosings==sites.count {
                 row["difference"]=combinedFinal-combinedClosing
+            }
+            // A computed stock balance can be shown in the explicitly
+            // provisional indicator only if all visits are selected, the
+            // identity is unique and its opening/count are reconstructible.
+            // These estimates NEVER replace official reconciliation events.
+            if allowPending && subdivision=="AMBAS",
+               let codes=clinicalToNursing[code],codes.count==1,
+               let kardex=codes.first,
+               let estimate=projectedByKardex[kardex],
+               estimate.unknownContainerOpenings==0,
+               let beginning=estimate.opening,
+               let physicalCount=estimate.currentCount,
+               beginning>=0,physicalCount>=0,
+               beginning.rounded()==beginning,
+               physicalCount.rounded()==physicalCount,
+               row["opening"]==nil,row["count"]==nil {
+                row["opening"]=Int(beginning)
+                row["count"]=Int(physicalCount)
+                row["closing"]=Int(physicalCount)
+                row["difference"]=0
             }
             summary[code]=row
         }
