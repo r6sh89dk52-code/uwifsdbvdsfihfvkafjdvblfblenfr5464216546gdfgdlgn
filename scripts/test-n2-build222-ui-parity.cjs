@@ -346,6 +346,27 @@ for(const fragment of [
   'Revisar consumo anterior'
 ]) must(form,fragment,'resultado evita vinculación ya confirmada');
 console.log('PASS: enlaces confirmados en bloque omiten modal repetido incluso para pendientes previos.');
+for(const fragment of [
+  'N2PendingResolution.historicalTitle(forReason:line.result)',
+  'N2PendingResolution.historicalGuidance(forReason:line.result)',
+  'Label("Entender este pendiente",systemImage:"info.circle")',
+  'case .explainHistorical(let reason):',
+  'No hay descuento retroactivo'
+]) {
+  // Screen copy must explain why a saved visit cannot debit later stock.
+  if (fragment==='No hay descuento retroactivo') {
+    must(history,'La atención ya está guardada. Agregar existencias ahora no demuestra el saldo anterior.',
+      'historial no recalcula movimientos retroactivos');
+  } else {
+    must(history,fragment,'historial de pendientes cronológicos informado');
+  }
+}
+for(const phrase of [
+  'N2PendingResolution.historicalTitle(forReason:result)',
+  'N2PendingResolution.historicalGuidance(forReason:result)'
+]) must(form,phrase,'resultado de atención histórica contextual');
+console.log('PASS: pendiente histórico indica causa específica y ofrece explicación segura.');
+
 
 
 
