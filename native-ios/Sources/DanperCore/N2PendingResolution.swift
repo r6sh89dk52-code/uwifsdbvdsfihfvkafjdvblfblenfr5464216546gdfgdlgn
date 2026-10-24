@@ -34,11 +34,13 @@ public enum N2PendingResolution:Equatable,Sendable {
         }
         if text.hasPrefix("Fecha clínica futura o inválida") ||
            text.hasPrefix("El lote fue registrado después de la atención") ||
-           text.hasPrefix("Correspondencia verificada después de la atención") {
+           text.hasPrefix("Correspondencia verificada después de la atención") ||
+           text.hasPrefix("Correspondencia vinculada después de la atención") {
             return .reviewChronology
         }
         let physicalReasons=[
             "Presentación Kardex ambigua",
+            "Diferencia de presentación",
             "Presentaciones de stock incompatibles",
             "Presentación no seleccionada",
             "Existencia seleccionada no verificable",
