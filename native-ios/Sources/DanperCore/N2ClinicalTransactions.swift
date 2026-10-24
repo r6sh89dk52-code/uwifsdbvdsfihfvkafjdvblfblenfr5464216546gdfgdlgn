@@ -324,6 +324,29 @@ public enum N2NativeClinicalTransaction {
                      item["previousContainerExhausted"] as? Bool == true)
                 var stagedLots=lots
                 var pendingClosures=[[String:Any]]()
+                let declaredReuse =
+                    (explicit?["reusePreviouslyOpened"] as? Bool == true ||
+                     item["reusePreviouslyOpened"] as? Bool == true)
+                // The save dialog's explicit NO attests physical reuse of a
+                // box previously opened. If the physical count classified
+                // all boxes as sealed, reclassify ONE into "already open"
+                // without changing total stock or inventing an old R=1.
+                // Never apply this to historical/retried records.
+                if openings==0 && declaredReuse && !historical &&
+                   !stock.contains(where:{N2ContainerAccounting.openCount($0)>0}),
+                   let candidate=stock.first(where:{
+                       ($0["sealedContainers"] as? Int ?? 0)>0
+                   }),
+                   let idx=stagedLots.firstIndex(where:{
+                       $0["id"] as? String==candidate["id"] as? String
+                   }),
+                   let attested=N2ContainerAccounting.attestAlreadyOpen(
+                       lot:stagedLots[idx],attentionID:id,itemID:itemID,
+                       operatorName:str(new["responsible"]) ?? "ENFERMERIA DANPER",
+                       at:eventAt!) {
+                    stagedLots[idx]=attested.after
+                    pendingClosures.append(attested.event)
+                }
                 if openings>0 && exhaustPrevious {
                     guard !historical else {
                         mark("Revisa la apertura anterior: no puede cerrarse automáticamente durante una conciliación histórica.");continue
@@ -350,8 +373,13 @@ public enum N2NativeClinicalTransaction {
                     let lotID=previous["id"] as? String
                     return stagedLots.first(where:{$0["id"] as? String==lotID})
                 }
+                let selectedForAccounting:String? = openings==0 && declaredReuse
+                    ? reconciledStock.first(where:{
+                        N2ContainerAccounting.openCount($0)>0
+                      })?["id"] as? String
+                    : selected
                 guard let parts=N2ContainerAccounting.allocate(
-                    lots:reconciledStock,selected:selected,
+                    lots:reconciledStock,selected:selectedForAccounting,
                     openings:openings,volume:quantity,at:eventAt!) else {
                     mark(openings==0 ? "No hay envase abierto verificable: indica que abriste uno nuevo. No se descontó stock." :
                         "Apertura declarada, cierre previo o cantidad no verificables. No se descontó stock.");continue
