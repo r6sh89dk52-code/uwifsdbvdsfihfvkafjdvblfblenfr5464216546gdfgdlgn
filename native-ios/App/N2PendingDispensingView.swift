@@ -18,6 +18,17 @@ struct N2PendingDispensingView:View {
     @State private var consent=false
     @State private var busy=false
     @State private var message=""
+    private var isHistorical:Bool {
+        let formatter=DateFormatter()
+        formatter.locale=Locale(identifier:"en_US_POSIX")
+        formatter.timeZone=TimeZone(identifier:"America/Lima")
+        formatter.dateFormat="yyyy-MM-dd"
+        return date<formatter.string(from:Date())
+    }
+    private var selectableLots:[N2FormLot] {
+        isHistorical ? context.historicalOptions(for:medication.code,at:date) :
+                       context.options(for:medication.code,at:date)
+    }
     var body:some View {
         NavigationStack {
             Form {
@@ -26,11 +37,15 @@ struct N2PendingDispensingView:View {
                     Text("Conserva la atención original. Solo se descontarán las aperturas declaradas verificables por correspondencia, stock y cronología. El volumen es opcional.").font(.footnote)
                     Picker("Lote compatible",selection:$lotID) {
                         Text("Seleccionar").tag("")
-                        ForEach(context.options(for:medication.code,at:date)) { lot in
+                        ForEach(selectableLots) { lot in
                             let balance=N2ContainerAccounting.isContainer(unit:lot.unit) ?
                                 "\(lot.sealed) cerrados / \(lot.openContainers) abiertos":"\(lot.total.formatted()) \(lot.unit)"
                             Text("\(lot.name) · \(lot.reference) · \(balance)").tag(lot.id)
                         }
+                    }
+                    if isHistorical {
+                        Text("Si el lote fue registrado después de esta atención, puedes documentar aquí una apertura antigua (R=1) o el uso del mismo envase abierto (R=0), incluso si el saldo actual es cero. Se contabiliza en el corte reconstruido, sin descontar de nuevo las existencias actuales.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                     TextField("Cantidad física realmente utilizada",text:$quantity).keyboardType(.decimalPad)
                     if let lot=context.lots.first(where:{$0.id==lotID}) {
@@ -45,7 +60,10 @@ struct N2PendingDispensingView:View {
                     TextField("Responsable",text:$operatorName)
                     TextField("Evidencia y motivo",text:$reason,axis:.vertical).lineLimit(2...4)
                     Toggle("Confirmo la cantidad física y la evidencia",isOn:$consent)
-                    Button("Verificar y conciliar sin duplicar atención") {Task {await save()}}
+                    Button(isHistorical ? "Guardar declaración histórica (R=1/0)" :
+                                              "Verificar y conciliar sin duplicar atención") {
+                        Task {await save()}
+                    }
                         .disabled(busy || !consent || lotID.isEmpty)
                 }
                 if !message.isEmpty {Text(message).foregroundStyle(.orange)}
