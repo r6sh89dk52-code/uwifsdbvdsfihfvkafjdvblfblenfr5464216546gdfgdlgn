@@ -283,6 +283,25 @@ assert(!form.includes('Button("Verificar cantidad y apertura pendiente")'),
 assert(!form.includes('Button("Resolver correspondencia")'),
        'No mostrar vinculación redundante cuando el motivo real es stock');
 console.log('PASS: pendientes con una sola acción pertinente: stock, vínculo, lote o cronología.');
+for (const key of [
+  'N2PendingResolution.forReason(line.result)',
+  'Label(resolution.summary,systemImage:',
+  'Label("Registrar existencias",systemImage:"shippingbox.fill")',
+  'Label("Vincular producto",systemImage:"link")',
+  'N2NativeInventoryView(initialOperation:"lot")',
+  'N2OperationalMappingView(code:code,context:context',
+  'N2PendingDispensingView(',
+  'readCorrectionDetail(visitID:visitID)',
+  'retryDispensing(visitID:visitID',
+  'navigationTitle("Consumos")',
+  'case .reviewChronology:'
+]) must(history,key,'historial con resolución contextual de consumos');
+assert(!history.includes('Label(line.result,systemImage:'),
+       'Historial no debe mostrar mensajes crudos FEFO en la vista principal');
+assert(!history.includes('navigationTitle("Consumos de la atención")'),
+       'Título de consumos no debe truncarse con cabecera grande');
+console.log('PASS: historial muestra causas comprensibles y acciones por estado, sin duplicación de atención.');
+
 
 console.log('PASS: Inventario único, atención sin doble confirmación, borrador en su paso, Kardex compacto y dos Excel.');
 console.log('PASS: estructura Build 222 (4 tabs), ingreso de trabajador, perfil, revisión de alergias y alta SwiftUI presentes.');
