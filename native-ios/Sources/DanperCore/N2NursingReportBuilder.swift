@@ -261,5 +261,59 @@ public enum N2NursingReportBuilder {
         return N2NursingReport(date:start,periodEnd:end,
                                rows:resulting,warnings:unique)
     }
+    /// Builds the 9-to-8 period as a non-mutating reconciliation against a
+    /// later physical count. Saved unit usages are counted once, even when
+    /// the lot was first entered after an earlier clinical attention.
+    /// This must NEVER be used to create FEFO movements or debit current stock.
+    public static func reconstructedCut(snapshot:Data,catalog:Data,mappings:Data,
+                                        start:String,end:String,site:String="")throws->N2NursingReport {
+        let period=try N2KardexCutPreview.period(for:end)
+        guard period.start==start,iso(end) else {
+            throw N2NursingReportError.invalidDay
+        }
+        let projection=try N2AutomaticCutAccounting.calculate(
+            snapshot:snapshot,mappings:mappings,through:end)
+        let (_,_,products)=try decoded(snapshot,catalog,site:site)
+        let original=try range(snapshot:snapshot,catalog:catalog,
+                               start:start,end:end,site:site)
+        let existing=Dictionary(uniqueKeysWithValues:original.rows.map{($0.code,$0)})
+        let calculated=Dictionary(uniqueKeysWithValues:projection.rows.map{($0.code,$0)})
+        var warnings=[String]()
+        var rows=[N2NursingRow]()
+        for product in products {
+            let code=product["id"] as! String
+            let name=product["name"] as! String
+            let baseline=existing[code]
+            let estimate=calculated[code]
+            let isKnown=estimate?.currentCount != nil
+            if let estimate,estimate.unknownContainerOpenings>0 {
+                warnings.append(name+": existen aperturas sin declarar; no se infiere R.")
+            }
+            if let estimate,estimate.reportedUse>0 && estimate.currentCount==nil {
+                warnings.append(name+": consumos anteriores sin conteo de cierre verificable.")
+            }
+            if let estimate,estimate.currentCount != nil && estimate.opening==nil {
+                warnings.append(name+": el saldo inicial requiere conciliación documental.")
+            }
+            let opening=estimate?.opening ?? 0
+            let used=estimate?.reportedUse ?? 0
+            let changes=rounded((estimate?.received ?? 0)+(estimate?.adjusted ?? 0))
+            let endCount=estimate?.currentCount ?? 0
+            // Missing lots show numeric zero while stockKnown remains false.
+            // A count entered after an old attention is the end-of-period
+            // physical balance; the historic consumption is added back to S/I.
+            rows.append(N2NursingRow(code:code,name:name,donated:false,
+                stockKnown:isKnown,initial:rounded(opening),
+                extraordinary:isKnown ? changes : 0,
+                total:isKnown ? rounded(opening+changes) : 0,
+                consumed:isKnown ? rounded(used) : 0,
+                closing:isKnown ? rounded(endCount) : 0,
+                expiry:baseline?.expiry ?? "",fs:nil))
+        }
+        // No old stock movements are re-issued, even for an unlinked saved
+        // tablet. Unknown bottles remain marked pending, not manufactured R=1.
+        return N2NursingReport(date:start,periodEnd:end,rows:rows,warnings:warnings)
+    }
+
 }
 
