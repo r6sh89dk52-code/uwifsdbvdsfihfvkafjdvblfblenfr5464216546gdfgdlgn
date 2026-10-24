@@ -1476,10 +1476,15 @@ struct N2NativeClinicalFormView:View {
         form.items[idx].approveOpening=opened
         form.items[idx].newContainers=opened ? 1:0
         form.items[idx].closePriorContainer=opened && (alreadyOpen || earlierOpened)
-        if form.items[idx].selectedLotID.isEmpty,
-           let first=context.options(for:item.code,at:form.date,
-                                     site:form.dispensingSite).first {
-            form.items[idx].selectedLotID=first.id
+        if form.items[idx].selectedLotID.isEmpty {
+            let available=context.options(for:item.code,at:form.date,
+                                          site:form.dispensingSite)
+            let preferred=opened
+                ? available.first(where:{$0.sealed>0})
+                : available.first(where:{$0.openContainers>0})
+            if let chosen=preferred ?? available.first {
+                form.items[idx].selectedLotID=chosen.id
+            }
         }
         showContainerDecision=false
         containerDecisionIndex+=1
