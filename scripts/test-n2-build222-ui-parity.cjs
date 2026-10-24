@@ -313,7 +313,7 @@ console.log('PASS: revisión masiva confirmada y stock sin lote expresado como 0
 
 for (const key of [
   'N2PendingResolution.forReason(line.result)',
-  'Label(resolution.summary,systemImage:',
+  'Label(projectedInCut && line.result != "Descontado"',
   'Label("Registrar existencias",systemImage:"shippingbox.fill")',
   'Label("Vincular producto",systemImage:"link")',
   'N2NativeInventoryView(initialOperation:"lot")',
