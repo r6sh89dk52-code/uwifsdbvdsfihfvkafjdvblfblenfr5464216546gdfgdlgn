@@ -1468,6 +1468,7 @@ struct N2NativeClinicalFormView:View {
         })
         // Yes confirms exhaustion of the prior open container. This flag is
         // assessed atomically in the ledger, never treated as an extra debit.
+        form.items[idx].reusePreviouslyOpened = !opened
         form.items[idx].approveOpening=opened
         form.items[idx].newContainers=opened ? 1:0
         form.items[idx].closePriorContainer=opened && (alreadyOpen || earlierOpened)
