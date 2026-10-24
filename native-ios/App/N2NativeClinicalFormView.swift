@@ -1439,7 +1439,7 @@ struct N2NativeClinicalFormView:View {
     private var containerDecisionMessage:String {
         let order=containerDecisionIndex+1
         let total=containerDecisionIDs.count
-        return "\(containerDecisionName) · \(order) de \(total). SÍ: abriste una caja o frasco nuevo (Kardex 1). NO: utilizaste uno abierto anteriormente (Kardex 0), sin restar una nueva caja. Si su apertura anterior no figura en el inventario, DANPER conservará tu declaración sin crear una apertura pasada ni alterar las existencias."
+        return "\(containerDecisionName) · \(order) de \(total). SÍ: abriste una caja o frasco nuevo (Kardex 1) y confirmas agotado el anterior si había uno abierto. NO: utilizaste uno abierto anteriormente (Kardex 0), sin restar una nueva caja. Si su apertura anterior no figura en el inventario, DANPER conservará tu declaración sin crear una apertura pasada ni alterar las existencias."
     }
     private func beginContainerReview(_ context:N2FormContext) {
         guard !busy,!saved else{return}
