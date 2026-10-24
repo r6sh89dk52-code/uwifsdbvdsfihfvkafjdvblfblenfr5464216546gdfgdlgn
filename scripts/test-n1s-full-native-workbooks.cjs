@@ -125,7 +125,16 @@ for(let row=7;row<=104;row++){
                  Date.UTC(1899,11,30))/86400000;
    assert.equal(Number(renderedValue),serial,'sortable nursing expiry '+ref);
   }else {
-   assert.equal(renderedValue,originalValue,'nurse value '+ref);
+   // The old Build 222 fixture leaves no-lot numeric cells blank.
+   // Native Kardex correctly preserves all 98 rows with explicit numeric 0.
+   if(['D','E','F','G','H'].includes(col) &&
+      originalValue==='' && renderedValue==='0') {
+     assert.ok(target,'numeric zero must have a physical cell at '+ref);
+     assert.ok(!['s','inlineStr','str'].includes(target.getAttribute('t')),
+       'stock zero must be numeric, not text: '+ref);
+   } else {
+     assert.equal(renderedValue,originalValue,'nurse value '+ref);
+   }
   }
  }
 }
