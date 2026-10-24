@@ -395,6 +395,28 @@ must(indicatorBook,'for link in N2UserReviewedKardexLinks.links','10 hojas admit
 must(history,'cut.projectedClinicalLines','historial distingue inclusión al corte de salida física');
 console.log('PASS: corte 9–8 reconstruido y vinculado con 98 filas, 92 relaciones sin inventar movimientos.');
 
+for(const fragment of [
+  'N2PendingDispensingEvidence.read(snapshot:snapshot)',
+  'let declaredHistory=',
+  'historical.newContainers ??',
+  'projectedClinicalLines.insert(id)'
+]) must(autoCut,fragment,'apertura 1/0 histórica declarada sin alterar stock actual');
+for(const fragment of [
+  'Label("Declarar apertura histórica (1/0)",',
+  'context.options(for:line.code,at:detail.date)',
+  'Consumo incluido en saldo reconstruido',
+  'cut.projectedClinicalLines'
+]) must(history,fragment,'declaración histórica y estado contable separados de FEFO');
+for(const fragment of [
+  'let projectedCut:N2AutomaticCutAccounting.Result?',
+  'isWholePeriod && periodStart==start',
+  'linkMultiplicity[kardex]==1',
+  'estimate.reportedUse==Double(used)',
+  'row["difference"]=projectedClosing-Int(physicalCount)'
+]) must(indicatorBook,fragment,'proyección provisional de diez hojas sin duplicar stock');
+console.log('PASS: aperturas históricas y proyección provisional 10 hojas con controles de evidencia.');
+
+
 
 
 
