@@ -42,6 +42,45 @@ final class N2AutomaticCutAccountingTests:XCTestCase {
         XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(input).physicalMovements,
                        try N1eLegacyClinicalAudit.inspect(input).physicalMovements)
     }
+
+    func testReconstructedNursingCutUsesRecordedBalanceAndClinicalUseOnce()throws {
+        let snapshot=try source("n1e-clinical-stock.json")
+        let mappings=try source("n2-reviewed-approved.json")
+        let projection=try N2AutomaticCutAccounting.calculate(
+            snapshot:snapshot,mappings:mappings,through:"2026-10-22")
+        let nursing=try source("n2-nursing-parity.json")
+        let manifest=try XCTUnwrap(JSONSerialization.jsonObject(with:nursing) as? [String:Any])
+        let catalog=try JSONSerialization.data(withJSONObject:manifest["catalog"]!)
+        let report=try N2NursingReportBuilder.reconstructedCut(
+            snapshot:snapshot,catalog:catalog,mappings:mappings,
+            start:"2026-10-09",end:"2026-10-22")
+        XCTAssertEqual(report.rows.count,98)
+        XCTAssertEqual(report.date,"2026-10-09")
+        XCTAssertEqual(report.periodEnd,"2026-10-22")
+        let tablets=try XCTUnwrap(report.rows.first{$0.code=="E-22"})
+        let projected=try XCTUnwrap(projection.rows.first{$0.code=="E-22"})
+        XCTAssertEqual(tablets.consumed,projected.reportedUse)
+        XCTAssertEqual(tablets.initial,projected.opening ?? 0)
+        XCTAssertEqual(tablets.closing,projected.currentCount ?? 0)
+        XCTAssertEqual(tablets.total-tablets.consumed,tablets.closing,accuracy:0.001)
+        let packaged=try XCTUnwrap(report.rows.first{$0.code=="E-57"})
+        XCTAssertEqual(packaged.consumed,1) // One declared opening, subsequent reuse = 0.
+        // Repeating a read-only reconstruction must never edit source events.
+        let again=try N2NursingReportBuilder.reconstructedCut(
+            snapshot:snapshot,catalog:catalog,mappings:mappings,
+            start:"2026-10-09",end:"2026-10-22")
+        XCTAssertEqual(report.rows,again.rows)
+    }
+    func testReconstructionRejectsRangesWithoutNinthDayOpening()throws {
+        let snapshot=try source("n1e-clinical-stock.json")
+        let nursing=try source("n2-nursing-parity.json")
+        let parsed=try XCTUnwrap(JSONSerialization.jsonObject(with:nursing) as? [String:Any])
+        let catalog=try JSONSerialization.data(withJSONObject:parsed["catalog"]!)
+        XCTAssertThrowsError(try N2NursingReportBuilder.reconstructedCut(
+            snapshot:snapshot,catalog:catalog,
+            mappings:source("n2-reviewed-approved.json"),
+            start:"2026-10-10",end:"2026-10-22"))
+    }
     func testEndBeforeNinthSelectsPreviousMonthlyCut()throws {
         let result=try N2AutomaticCutAccounting.calculate(
             snapshot:source("n1e-clinical-stock.json"),
