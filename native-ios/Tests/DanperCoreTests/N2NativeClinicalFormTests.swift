@@ -71,6 +71,19 @@ final class N2NativeClinicalFormTests:XCTestCase {
             code:"16000182",quantity:2,procedure:"OBSERVACION")]}
         return(draft,context)
     }
+    func testHistoricOptionsIncludeDocumentedEmptyBottlesWithoutFEFOAvailability()throws {
+        let catalog=try self.catalog()
+        let old=N2FormLot(id:"empty-lot-history",kardexCode:"E-86",
+                          name:"ALCOHOL 1 LT",unit:"FCO",expires:"",
+                          capacity:1000,sealed:0,loose:0,opened:0)
+        let context=N2FormContext(revision:1,workers:[],allergies:[:],
+                                  lots:[old],products:catalog)
+        XCTAssertTrue(context.options(for:"16000019",at:"2026-10-23").isEmpty)
+        XCTAssertEqual(context.historicalOptions(for:"16000019",
+                       at:"2026-10-23").map(\.id),["empty-lot-history"])
+        XCTAssertTrue(context.historicalOptions(for:"16000182",
+                      at:"2026-10-23").isEmpty)
+    }
     func testDraftRecoveryRetainsMultipleProceduresAndPhysicalChoices()throws {
         var (draft,ctx)=try form()
         draft.procedures=["OBSERVACION","CURACION DE HERIDA","CONTROL"]
