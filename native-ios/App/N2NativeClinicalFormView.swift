@@ -35,7 +35,7 @@ struct N2NativeClinicalFormView:View {
     private let systems=N2ClinicalFormOptions.systems
     private let procedures=N2ProcedureRules.procedures
     @State private var context:N2FormContext?
-    @State private var pendingMappingCode:String?
+    @State private var pendingMappingItemID:String?
     @State private var pendingPhysicalItemID:String?
     @State private var showStockRegistration=false
     @State private var form=N2NativeFormDraft()
@@ -239,17 +239,19 @@ struct N2NativeClinicalFormView:View {
                                                 } label: {
                                                     Label("Registrar existencias",systemImage:"shippingbox.fill")
                                                 }
+                                                .buttonStyle(.bordered)
                                                 .accessibilityIdentifier("pending-stock-"+med.code)
                                             case .verifyCorrespondence:
                                                 Button {
-                                                    pendingMappingCode=med.code
+                                                    pendingMappingItemID=med.id
                                                 } label: {
                                                     Label("Vincular producto",systemImage:"link")
                                                 }
+                                                .buttonStyle(.bordered)
                                                 .accessibilityIdentifier("pending-mapping-"+med.code)
                                                 .sheet(isPresented:Binding(
-                                                    get:{pendingMappingCode==med.code},
-                                                    set:{if !$0 {pendingMappingCode=nil}}
+                                                    get:{pendingMappingItemID==med.id},
+                                                    set:{if !$0 {pendingMappingItemID=nil}}
                                                 )) {
                                                     N2OperationalMappingView(code:med.code,context:context,onSaved:{
                                                         Task {await refreshDispensing(retry:false)}
@@ -264,6 +266,7 @@ struct N2NativeClinicalFormView:View {
                                                           : "Revisar datos del consumo",
                                                           systemImage:"checkmark.shield")
                                                 }
+                                                .buttonStyle(.bordered)
                                                 .accessibilityIdentifier("pending-physical-"+med.code)
                                                 .sheet(isPresented:Binding(
                                                     get:{pendingPhysicalItemID==med.id},
@@ -288,7 +291,10 @@ struct N2NativeClinicalFormView:View {
                             if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
                                 Button("Volver a comprobar pendientes") {
                                     Task {await refreshDispensing(retry:true)}
-                                }.disabled(busy)
+                                }
+                                .buttonStyle(DanperSecondaryButton())
+                                .accessibilityIdentifier("pending-recheck")
+                                .disabled(busy)
                             }
                             Button {startAnother()} label: {Label("Nueva atención",systemImage:"plus")}
                                 .buttonStyle(DanperPrimaryButton())
