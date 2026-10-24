@@ -26,6 +26,34 @@ saldo sin descontar de nuevo una atención pasada. Para el corte mensual
 - Los 98 productos del Kardex conservan sus filas; sin lote se escribe
   `0`, conservando `stockKnown=false` para distinguirlo de un conteo certificado.
 
+## Nueva elección al registrar stock (iPhone 16)
+
+El botón **Registrar stock** abre un `SwiftUI.alert` centrado con dos
+opciones explícitas, más `Cancelar`:
+
+1. **Stock inicial del día 9:** la cantidad escrita es el saldo con que
+   comenzó el corte 9–8. Con los consumos clínicos previos del período,
+   DANPER calcula cuánto debería quedar hoy. Solo se acepta si el
+   resultado es no negativo y no presupone aperturas desconocidas.
+2. **Stock físico que tengo hoy:** la cantidad escrita es el conteo real
+   al registrar el lote. Se guarda intacta y se reconstruye la
+   apertura con los consumos ya registrados (sin segundo descuento).
+
+La elección se almacena en cada lote (`stockRegistrationBasis`,
+`stockRegistrationCutStart`, `stockRegistrationEnteredQuantity`,
+`stockRegistrationCurrentQuantity`). No cambia el día original de
+las atenciones ni crea movimientos FEFO adicionales.
+
+**Ejemplo de aceptación:** hay 3 tabletas consumidas desde el 9 y
+el usuario escribe 23 para `Stock inicial`: la existencia actual
+de ese lote será 20, y el saldo reconstruido al día 9 será 23.
+Si elige `Stock físico actual` e ingresa 20: el saldo guardado
+es 20 y el inicial reconstruido también 23.
+
+No se permite asignar un segundo stock inicial duplicado a un
+producto con lotes ya registrados: usar conteo o ingreso adicional.
+La app nunca estima aperturas nuevas de frascos o cajas sin declaración.
+
 ## Dónde quedó conectado
 
 1. `N2AutomaticCutAccounting`: cálculo 9–8, 86+6+operativas,
