@@ -228,6 +228,11 @@ public enum N2NativeClinicalTransaction {
             let explicit=item["physicalUse"] as? [String:Any]
             let selectedUnit=lots.first{$0["id"] as? String==explicit?["lotId"] as? String}?["catalogUnit"] as? String
             let allowable=Set(candidates.map{$0.kardexCode})
+            // With no physical Kardex lot, the answer is stock 0, not
+            // "missing conversion", and definitely not an invented debit.
+            if !lots.contains(where:{allowable.contains($0["code"] as? String ?? "")}) {
+                mark("Sin existencias FEFO disponibles en el inventario único.");continue
+            }
             let presentationUnits=Set(lots.filter{allowable.contains($0["code"] as? String ?? "")}
                 .compactMap{$0["catalogUnit"] as? String})
             if presentationUnits.count>1 && selectedUnit==nil {
