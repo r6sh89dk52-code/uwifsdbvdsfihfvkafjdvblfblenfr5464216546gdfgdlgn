@@ -62,6 +62,7 @@ public enum N2OperationalMappings {
         try validate(rule)
         let inventory=catalog.nursing + (try N2AuxiliaryInventory.products(snapshot:snapshot))
         guard explicitConsent,
+              !N2UserReviewedKardexLinks.unmatched.contains(rule.inventoryID),
               catalog.clinical.contains(where:{$0.code==rule.clinicalCode && $0.name==rule.clinicalName && $0.unit==rule.clinicalUnit}),
               inventory.contains(where:{$0.id==rule.inventoryID && $0.name==rule.inventoryName && $0.unit==rule.presentation}) else {
             throw Failure.invalidRule
