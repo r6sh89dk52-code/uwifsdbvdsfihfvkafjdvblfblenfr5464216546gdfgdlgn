@@ -218,7 +218,17 @@ struct N2NativeClinicalFormView:View {
                             reviewValue("Diagnóstico",form.diagnosis)
                             ForEach(form.items) {med in
                                 let result=savedLines[med.id] ?? "Pendiente de conciliar"
-                                let resolution=N2PendingResolution.forReason(result)
+                                let storedResolution=N2PendingResolution.forReason(result)
+                                let alreadyLinked = !context.products.authorizedNursingOptions(
+                                    for:med.code).isEmpty ||
+                                    context.operationalMappings.contains(where:{
+                                        $0.clinicalCode==med.code
+                                    })
+                                let resolvedStock = !context.options(for:med.code,at:form.date).isEmpty
+                                let resolution:N2PendingResolution =
+                                    storedResolution == .verifyCorrespondence && alreadyLinked
+                                    ? (resolvedStock ? .verifyPhysicalUse : .registerStock)
+                                    : storedResolution
                                 HStack(alignment:.top,spacing:10) {
                                     Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                                         .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
@@ -232,7 +242,9 @@ struct N2NativeClinicalFormView:View {
                                         if result != "Descontado" {
                                             switch resolution {
                                             case .registerStock:
-                                                Text("No hay existencias FEFO utilizables. Si tienes stock físico, regístralo; si no, conserva el pendiente.")
+                                                Text(alreadyLinked && storedResolution == .verifyCorrespondence
+                                                     ? "Producto ya vinculado. La atención anterior aún requiere revisar stock y cronología antes de cualquier descuento."
+                                                     : "No hay existencias FEFO utilizables. Si tienes stock físico, regístralo; si no, conserva el pendiente.")
                                                     .font(.caption).foregroundStyle(.secondary)
                                                 Button {
                                                     showStockRegistration=true
@@ -262,7 +274,8 @@ struct N2NativeClinicalFormView:View {
                                                     pendingPhysicalItemID=med.id
                                                 } label: {
                                                     Label(resolution == .verifyPhysicalUse
-                                                          ? "Revisar lote o apertura"
+                                                          ? (alreadyLinked && storedResolution == .verifyCorrespondence
+                                                              ? "Revisar consumo anterior" : "Revisar lote o apertura")
                                                           : "Revisar datos del consumo",
                                                           systemImage:"checkmark.shield")
                                                 }
