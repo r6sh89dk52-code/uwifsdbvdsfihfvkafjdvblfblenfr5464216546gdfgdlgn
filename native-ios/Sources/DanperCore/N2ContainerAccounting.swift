@@ -103,6 +103,42 @@ public enum N2ContainerAccounting {
         else{return false}
         return true
     }
+    /// A save-time confirmation may explicitly attest that ONE previously
+    /// open container was exhausted before opening the next. The closure
+    /// is an auditable containerState event (Kardex R=0), not another use.
+    /// Never infer a closure while tracking a measured internal remainder.
+    static func exhaustedByNextOpening(lot:[String:Any],attentionID:String,
+                                       itemID:String,operatorName:String,
+                                       at:Int64)->(after:[String:Any],event:[String:Any])? {
+        guard let lotID=lot["id"] as? String,!lotID.isEmpty,
+              let code=lot["code"] as? String,
+              let name=lot["name"] as? String,
+              let unit=lot["catalogUnit"] as? String,isContainer(unit:unit),
+              openCount(lot)==1,
+              lot["volumeTrackingEnabled"] as? Bool != true,
+              ((lot["openedRemaining"] as? NSNumber)?.doubleValue ?? 0)==0,
+              ((lot["looseUnits"] as? NSNumber)?.doubleValue ?? 0)==0,
+              at>=(lot["updatedAt"] as? Int64 ?? Int64.max),
+              operatorName.count>=3 else{return nil}
+        var after=lot
+        after["declaredOpenContainers"]=0
+        after["updatedAt"]=at
+        after["volumeTrackingEnabled"]=false
+        let event:[String:Any]=[
+            "id":"ATT:\(attentionID):ITEM:\(itemID):PREVIOUS-EXHAUSTED:\(lotID)",
+            "lotId":lotID,"code":code,"name":name,"unit":unit,
+            "kind":"containerState","at":at,
+            "containerAccountingVersion":1,"closedContainers":1,
+            "containerDisposition":"agotado",
+            "operatorName":operatorName,
+            "description":"Agotamiento del envase anterior confirmado al abrir uno nuevo",
+            "quantity":0,"excelQuantity":0,"physicalChange":0,
+            "openedNewContainer":false,"sealedAdded":0,"looseAdded":0,
+            "before":lot,"after":after]
+        guard validMovement(event) else{return nil}
+        return (after,event)
+    }
+
     public static func close(snapshot:Data,lotID:String,count:Int,disposition:String,
                              operatorName:String,reason:String,at:Int64)throws->Data {
         _=try N1eLegacyClinicalAudit.inspect(snapshot)
