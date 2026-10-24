@@ -30,6 +30,7 @@ const cutView=fs.readFileSync(path.join(root,'native-ios/App/N2KardexCutPreviewV
 const autoAccounting=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2AutomaticCutAccounting.swift'),'utf8');
 const vaultSource=fs.readFileSync(path.join(root,'native-ios/App/N2ProtectedClinicalIOSVault.swift'),'utf8');
 const clinicalTx=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ClinicalTransactions.swift'),'utf8');
+const pendingResolution=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2PendingResolution.swift'),'utf8');
 
 const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView.swift'),'utf8');
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
@@ -261,6 +262,28 @@ assert(!clinicalTx.includes('verifiedSites[l['),
        'FEFO no debe filtrar lotes según sede');
 assert(!nursing.includes('let scoped=lots.filter'),
        'El Kardex de Enfermeras no debe segregar stock por sede');
+for(const key of [
+  'case .registerStock:','case .verifyCorrespondence:',
+  'case .verifyPhysicalUse, .reviewPending:',
+  'case .reviewChronology:','showStockRegistration=true',
+  'N2NativeInventoryView(initialOperation:"lot")',
+  'Label("Registrar existencias",systemImage:"shippingbox.fill")',
+  'Label("Vincular producto",systemImage:"link")',
+  '"Revisar lote o apertura"','"Volver a comprobar pendientes"'
+]) must(form,key,'resolución contextual y única de consumos pendientes');
+for(const key of [
+  'case registerStock','case verifyCorrespondence','case verifyPhysicalUse',
+  'case reviewChronology',
+  'Sin existencias FEFO disponibles',
+  'Sin correspondencia aprobada.',
+  'No hay envase abierto verificable'
+]) must(pendingResolution,key,'clasificación conservadora de los motivos reales');
+assert(!form.includes('Button("Verificar cantidad y apertura pendiente")'),
+       'No pedir aperturas para consumos sin stock');
+assert(!form.includes('Button("Resolver correspondencia")'),
+       'No mostrar vinculación redundante cuando el motivo real es stock');
+console.log('PASS: pendientes con una sola acción pertinente: stock, vínculo, lote o cronología.');
+
 console.log('PASS: Inventario único, atención sin doble confirmación, borrador en su paso, Kardex compacto y dos Excel.');
 console.log('PASS: estructura Build 222 (4 tabs), ingreso de trabajador, perfil, revisión de alergias y alta SwiftUI presentes.');
 console.log('PASS: inicio clínico, animaciones, grupos de tratamiento y Kardex aproximados a Build222.');
