@@ -35,6 +35,16 @@ final class N2PendingResolutionTests:XCTestCase {
             XCTAssertEqual(N2PendingResolution.forReason(reason),.reviewChronology,reason)
         }
     }
+    func testUserFacingMessagesDoNotConfuseStockAndCorrespondence() {
+        XCTAssertEqual(N2PendingResolution.registerStock.summary,
+                       "No hay stock disponible para descontar")
+        XCTAssertEqual(N2PendingResolution.verifyCorrespondence.summary,
+                       "Falta vincular el producto al inventario")
+        XCTAssertEqual(N2PendingResolution.verifyPhysicalUse.summary,
+                       "Falta comprobar lote o apertura")
+        XCTAssertEqual(N2PendingResolution.reviewChronology.summary,
+                       "Pendiente por revisión de fecha e historial")
+    }
     func testUnrecognizedReasonIsNotTreatedAsMissingStock() {
         XCTAssertEqual(N2PendingResolution.forReason("Pendiente de conciliar"),.reviewPending)
     }
