@@ -1212,7 +1212,7 @@ struct N2NativeClinicalFormView:View {
                     Label(pendingRequirements.joined(separator:"\n"),systemImage:"exclamationmark.triangle")
                         .font(.footnote).foregroundStyle(.orange).fixedSize(horizontal:false,vertical:true)
                 }
-                Text("Al guardar se vincula el consumo al inventario único. Los envases solo se descuentan por aperturas declaradas; usar un envase abierto registra Kardex 0. Sin apertura confirmada ni envase abierto, queda pendiente.")
+                Text("Antes de guardar, DANPER preguntará por cada frasco o caja si abriste uno nuevo (Kardex 1) o usaste el que ya estaba abierto (Kardex 0). No necesitas abrir los detalles de cada insumo. Si no hay envases disponibles, quedará pendiente.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -1442,7 +1442,7 @@ struct N2NativeClinicalFormView:View {
     private var containerDecisionMessage:String {
         let order=containerDecisionIndex+1
         let total=containerDecisionIDs.count
-        return "\(containerDecisionName) · \(order) de \(total). Marca Sí solo si abriste un envase físicamente. Si había uno abierto del mismo producto, Sí también confirma que el anterior se agotó. No marca reutilización (Kardex 0)."
+        return "\(containerDecisionName) · \(order) de \(total). SÍ: abriste físicamente otro (Kardex 1) y confirmas agotado el anterior si existía. NO: reutilizaste un envase abierto (Kardex 0). Si no hay ninguno abierto, la salida quedará pendiente."
     }
     private func beginContainerReview(_ context:N2FormContext) {
         guard !busy,!saved else{return}
