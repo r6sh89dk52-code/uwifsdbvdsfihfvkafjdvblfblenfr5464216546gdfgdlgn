@@ -211,11 +211,11 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.exportVerifiedDailyNursingWorkbook(date:date,shift:shift,responsible:responsible,site:site)
     }
-    func exportVerifiedRangeNursingWorkbook(start:String,end:String,responsible:String,site:String="") async throws -> N2VerifiedNursingWorkbook.Result {
+    func exportVerifiedRangeNursingWorkbook(start:String,end:String,responsible:String,site:String="",reconstructFromCount:Bool=false) async throws -> N2VerifiedNursingWorkbook.Result {
         if isClinical {
-            return try await N2ProtectedClinicalIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site)
+            return try await N2ProtectedClinicalIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site,reconstructFromCount:reconstructFromCount)
         }
-        return try await N2SyntheticTrialIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site)
+        return try await N2SyntheticTrialIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site,reconstructFromCount:reconstructFromCount)
     }
     func exportPortableEncryptedBackup(password:String) async throws -> Data {
         if isClinical {
