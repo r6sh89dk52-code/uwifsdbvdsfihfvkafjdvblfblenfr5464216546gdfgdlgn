@@ -87,3 +87,20 @@ Registrar y conservar el output de cada comando. Si falta el último script en e
 - Mantener Build 222 como referencia y app operativa; no migrar automáticamente su bóveda a esta versión de prueba.
 - Las funciones nuevas no compensan fallos en una función base. El criterio de sustitución es **paridad demostrada + integridad de datos + uso diario verificable**, no número de módulos.
 - Esta auditoría compara implementaciones disponibles y brechas concretas. Es exhaustiva **en cobertura del inventario funcional revisado**, pero no puede certificarse como auditoría de ejecución integral sin simulador/iPhone ni Excel. El estado correcto sigue siendo **«implementación avanzada, reemplazo no aprobado»**.
+
+## Ampliación del 24/10 · Historial, edición y lotes
+**Implementación en rama N2, SIN ejecución nueva de Xcode/Swift en este corte.**
+1. Historial separado del directorio PERSONAL: únicamente atenciones guardadas, orden cronológico descendente, filtro por trabajador/DNI/diagnóstico/fecha, quince filas por página y navegación directa a la ficha.
+2. La ficha clínica abre sus datos y tratamientos con un toque; solo el botón explícito «Editar atención» solicita confirmación SI/NO y abre el editor auditado.
+3. El contador de borradores de Inicio abre el listado de borradores. La opción «Trabajadores» conserva su buscador paginado y separado.
+4. Inventario agrupado por código y nombre del producto, con lotes independientes ordenados por vencimiento (FEFO visual), referencia, existencias y acciones individuales.
+5. Editar lote permite **solo corregir referencia y vencimiento en lotes sin movimientos**, con responsable y motivo. No altera cantidades. Para ajustar existencias está «Actualizar conteo», que conserva un movimiento auditado. En lotes con movimientos queda expresamente prohibida la reescritura de la referencia/vencimiento que está dentro de los documentos de movimiento.
+6. Las cantidades clínicas de un producto registrado pueden rectificarse en una atención pasada mediante `itemClinicalQuantities`: quedan como `correctedClinicalQuantity` en la proyección clínica, conservando `quantity` original, `dispenseRef`, lotes y stockMovements intactos. La discrepancia entra automáticamente al conjunto que bloquea exportar esa atención al Indicador oficial hasta revisión física/documental, sin fabricar compensación de inventario.
+7. **Límite consciente**: todavía NO se ha implementado cambiar libremente la identidad de un producto, insertar o quitar medicamentos ya vinculados, cambiar trabajador/fecha/hora de una atención vinculada o reescribir movimientos pasados. Esos casos requieren una cadena documentada de anulación/ajuste/dispensación y su verificación integral con Excel, por lo que siguen como **paridad no aprobada**.
+
+### Puertas de prueba adicionales
+- Crear >15 atenciones ficticias; verificar páginas 1/2, orden descendente, filtros y acceso directo sin elegir primero al trabajador.
+- Pulsar contador de borradores y recuperar el seleccionado.
+- Dos lotes del mismo medicamento; desplegable único con vencimientos/saldos separados; cambiar metadatos de un lote SIN movimientos; rechazar metadatos en lote CON movimientos.
+- Corregir la cantidad clínica de una atención antigua y confirmar que la pantalla histórica muestra el valor corregido y el valor físico original, que R/movimientos/saldo no cambian, que la rectificación aparece en el registro auditado y que el Excel oficial pide revisión en vez de exportar un dato incongruente.
+- Verificar el esquema de firmas para dispositivo real, restauración y rendimiento tras actualizar. **No sustituir Build 222** antes de completar las puertas originales P0 y estas nuevas.
