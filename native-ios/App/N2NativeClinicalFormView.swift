@@ -277,25 +277,16 @@ struct N2NativeClinicalFormView:View {
                                                     })
                                                 }
                                             case .verifyPhysicalUse, .reviewPending:
+                                                Text("La atención clínica ya está guardada. Kardex R=0 solo se confirma si existe una caja o frasco previamente abierto en un lote FEFO vigente. El stock registrado como cerrado no se convierte automáticamente en abierto.")
+                                                    .font(.caption).foregroundStyle(.secondary)
                                                 Button {
-                                                    pendingPhysicalItemID=med.id
+                                                    showStockRegistration=true
                                                 } label: {
-                                                    Label(resolution == .verifyPhysicalUse
-                                                          ? (alreadyLinked && storedResolution == .verifyCorrespondence
-                                                              ? "Revisar consumo anterior" : "Revisar lote o apertura")
-                                                          : "Revisar datos del consumo",
-                                                          systemImage:"checkmark.shield")
+                                                    Label("Ir al Kardex · revisar estado del envase",
+                                                          systemImage:"shippingbox.fill")
                                                 }
                                                 .buttonStyle(.bordered)
-                                                .accessibilityIdentifier("pending-physical-"+med.code)
-                                                .sheet(isPresented:Binding(
-                                                    get:{pendingPhysicalItemID==med.id},
-                                                    set:{if !$0 {pendingPhysicalItemID=nil}}
-                                                )) {
-                                                    N2PendingDispensingView(visitID:form.id,medication:med,date:form.date,context:context,onSaved:{
-                                                        Task {await refreshDispensing(retry:false)}
-                                                    })
-                                                }
+                                                .accessibilityIdentifier("pending-container-stock-"+med.code)
                                             case .reviewChronology:
                                                 Label(N2PendingResolution.historicalGuidance(forReason:result),
                                                       systemImage:"calendar.badge.exclamationmark")
