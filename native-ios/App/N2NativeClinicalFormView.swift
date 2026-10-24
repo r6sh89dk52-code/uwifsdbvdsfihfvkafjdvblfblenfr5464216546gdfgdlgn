@@ -1377,12 +1377,16 @@ struct N2NativeClinicalFormView:View {
             guard !Task.isCancelled else{return}
             do{
                 let latest=try await vault.clinicalFormContext()
+                // A cancelled autosave must never race the final save with
+                // the same journal revision or replace its success banner.
+                guard !Task.isCancelled,!saved,!busy else{return}
                 let patch=try version.makeDraftPatch(context:context,stage:step)
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
                 let result=try await vault.saveDraft(
                     id:version.id,changes:patch,at:timestamp,
                     expectedRevision:latest.revision)
+                guard !Task.isCancelled,!saved,!busy else{return}
                 lastAutosaveTimestamp=timestamp
                 await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
                 status="Borrador cifrado · revisión \(result.revision)."
@@ -1503,25 +1507,38 @@ struct N2NativeClinicalFormView:View {
     @MainActor
     private func confirm() async {
         guard let context,!busy,!saved,!fault else{return}
-        autosaveTask?.cancel()
+        let previousAutosave=autosaveTask
+        autosaveTask=nil
+        previousAutosave?.cancel()
         busy=true
+        status="Guardando la atención y verificando los consumos…"
         defer{busy=false}
+        // If an autosave already reached the journal, allow it to complete
+        // BEFORE reading the revision for this final, atomic clinical save.
+        await previousAutosave?.value
         do {
             let fresh=try await vault.clinicalFormContext()
             let raw=try form.makeSavedVisit(context:fresh)
             let outcome=try await vault.saveAttention(
                 raw,at:now,expectedRevision:fresh.revision)
             saved=true
+            fault=false
+            drafts.removeAll(where:{$0.id==form.id})
             N2DraftReminder.cancel(id:form.id,mode:vault.mode)
-            savedLines=try await vault.dispensingStatus(visitID:form.id)
-            savedKardex=Dictionary(uniqueKeysWithValues:try await vault.dispensingLines(visitID:form.id).compactMap{line in line.kardexQuantity.map{(line.id,$0)}})
-            self.context=try await vault.clinicalFormContext()
-            drafts=try await vault.readDrafts()
-            status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."
+            status="Atención guardada correctamente · revisión \(outcome.revision)."
+            // A single read provides BOTH physical status and R. Avoid four
+            // consecutive decryptions of a 9,000+ worker clinical vault.
+            do {
+                let lines=try await vault.dispensingLines(visitID:form.id)
+                savedLines=Dictionary(uniqueKeysWithValues:lines.map{($0.id,$0.result)})
+                savedKardex=Dictionary(uniqueKeysWithValues:lines.compactMap{
+                    line in line.kardexQuantity.map{(line.id,$0)}
+                })
+            }catch {
+                status="Atención guardada y cifrada. El detalle de consumos no se pudo actualizar: consúltalo en Historial."
+            }
         }catch {
-            status=saved
-                ? "Atención registrada y cifrada. No se pudo actualizar la vista de consumos; revisa el historial antes de intentar conciliarlos."
-                : "No se pudo confirmar la atención. La operación fue rechazada y el stock no se debe descontar parcialmente."
+            status="No se pudo confirmar la atención. No repitas el registro sin revisar primero Historial y Borradores."
             fault=true
         }
     }
