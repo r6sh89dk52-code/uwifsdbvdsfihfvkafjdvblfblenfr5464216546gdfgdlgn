@@ -234,7 +234,11 @@ struct N2NativeClinicalFormView:View {
                                         .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
                                     VStack(alignment:.leading,spacing:5) {
                                         Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
-                                        Text("Cantidad \(med.quantity) · "+resolution.summary).font(.caption).foregroundStyle(.secondary)
+                                        Text("Cantidad \(med.quantity) · " +
+                                                 (resolution == .reviewChronology
+                                                  ? N2PendingResolution.historicalTitle(forReason:result)
+                                                  : resolution.summary))
+                                                .font(.caption).foregroundStyle(.secondary)
                                         if let quantity=savedKardex[med.id] {
                                             Text("Kardex R: \(quantity.formatted())"+(quantity==0 ? " · Uso de envase abierto, sin nuevo descuento":""))
                                                 .font(.caption).foregroundStyle(.secondary)
@@ -290,7 +294,7 @@ struct N2NativeClinicalFormView:View {
                                                     })
                                                 }
                                             case .reviewChronology:
-                                                Label("Requiere revisión cronológica. No se hará un descuento retroactivo sin evidencia.",
+                                                Label(N2PendingResolution.historicalGuidance(forReason:result),
                                                       systemImage:"calendar.badge.exclamationmark")
                                                     .font(.caption).foregroundStyle(.secondary)
                                             case .completed:
