@@ -572,5 +572,41 @@ must(personal,'open-imported-clinical-workspace','abrir bóveda clínica tras im
 console.log('PASS: onboarding con origen explícito, demo realmente vacía, borrado verificado e importación protegida.');
 console.log('PASS: nueva vía sin Excel crea solo el primer trabajador manual con autenticación y fuente vacía original.');
 console.log('PASS: cabecera DANPER, búsqueda de padrón paginada, validación con foco y tratamiento compacto en B11.');
+const correctionUI=fs.readFileSync(path.join(root,'native-ios/App/N2ClinicalCorrectionView.swift'),'utf8');
+const correctionCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ClinicalCorrections.swift'),'utf8');
+const stockCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeInventoryCommands.swift'),'utf8');
+for(const needle of [
+  'visitsPageSize=15',
+  'ForEach(Array(savedVisits.dropFirst(safeVisitsPage*visitsPageSize).prefix(visitsPageSize)))',
+  'N2RecordedVisitDetailView(visitID:visit.id',
+  '¿Deseas editar esta atención?',
+  'history-request-edit-'
+]) must(history,needle,'Historial de atenciones paginado con acceso directo y confirmación');
+for(const needle of [
+  'clinical-home-draft-count-link',
+  'N2NativeHistoryView(useProtectedVault:true,showWorkers:true)'
+]) must(clinicalHome,needle,'Borradores pulsables y directorio separado');
+for(const needle of [
+  'groupedLots',
+  'DisclosureGroup {',
+  'inventory-edit-lot-',
+  'N2LotMetadataEditor(lot:lot',
+  'inventory-group-'
+]) must(inventory,needle,'Inventario agrupado y edición auditada de lotes');
+must(stockCore,'correctUnusedLot(snapshot:Data','corrección solo de lotes sin movimientos');
+must(stockCore,'!movements.contains(where:{$0["lotId"] as? String==lotID})',
+    'bloqueo de modificación de lotes utilizados');
+for(const needle of [
+  'itemClinicalQuantities',
+  'correctedClinicalQuantity',
+  'pending.insert(visitID)'
+]) must(correctionCore,needle,'rectificación clínica de cantidad sin segunda dispensación');
+for(const needle of [
+  'correction-item-quantity-',
+  'itemQuantities',
+  'med.quantity'
+]) must(correctionUI,needle,'corrección visual de dosis histórica');
+console.log('PASS: historial 15/página, borradores, lotes agrupados y edición clínica auditada sin rehacer FEFO.');
+
 console.log('PASS: Alta compacta con vencimiento DDMMAA; corte 9–8 resumido, movimientos diarios en Excel de Enfermeras.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
