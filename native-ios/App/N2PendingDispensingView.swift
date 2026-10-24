@@ -6,7 +6,18 @@ struct N2PendingDispensingView:View {
     let medication:N2FormMedication
     let date:String
     let context:N2FormContext
+    let historicalAccountingOnly:Bool
     let onSaved:()->Void
+    init(visitID:String,medication:N2FormMedication,date:String,
+         context:N2FormContext,historicalAccountingOnly:Bool=false,
+         onSaved:@escaping ()->Void) {
+        self.visitID=visitID
+        self.medication=medication
+        self.date=date
+        self.context=context
+        self.historicalAccountingOnly=historicalAccountingOnly
+        self.onSaved=onSaved
+    }
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.dismiss) private var dismiss
     @State private var lotID=""
@@ -23,7 +34,7 @@ struct N2PendingDispensingView:View {
         formatter.locale=Locale(identifier:"en_US_POSIX")
         formatter.timeZone=TimeZone(identifier:"America/Lima")
         formatter.dateFormat="yyyy-MM-dd"
-        return date<formatter.string(from:Date())
+        return historicalAccountingOnly || date<formatter.string(from:Date())
     }
     private var selectableLots:[N2FormLot] {
         isHistorical ? context.historicalOptions(for:medication.code,at:date) :
