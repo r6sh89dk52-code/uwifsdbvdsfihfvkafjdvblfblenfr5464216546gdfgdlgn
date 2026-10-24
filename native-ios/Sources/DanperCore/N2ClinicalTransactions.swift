@@ -230,7 +230,10 @@ public enum N2NativeClinicalTransaction {
             let allowable=Set(candidates.map{$0.kardexCode})
             // With no physical Kardex lot, the answer is stock 0, not
             // "missing conversion", and definitely not an invented debit.
-            if !lots.contains(where:{allowable.contains($0["code"] as? String ?? "")}) {
+            if !lots.contains(where:{l in
+                allowable.contains(l["code"] as? String ?? "") &&
+                ((total(l) ?? 0)>0 || N2ContainerAccounting.openCount(l)>0)
+            }) {
                 mark("Sin existencias FEFO disponibles en el inventario único.");continue
             }
             let presentationUnits=Set(lots.filter{allowable.contains($0["code"] as? String ?? "")}
