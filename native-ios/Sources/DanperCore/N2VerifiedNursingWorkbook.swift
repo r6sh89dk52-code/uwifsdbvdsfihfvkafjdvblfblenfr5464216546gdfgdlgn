@@ -33,9 +33,20 @@ public enum N2VerifiedNursingWorkbook {
     /// Verified multi-day report, explicitly labeled CONSOLIDADO with start/end.
     public static func exportRange(snapshot:Data,catalog:Data,template:Data,
                                    start:String,end:String,responsible:String,
-                                   site:String="")throws->Result {
-        let report=try N2NursingReportBuilder.range(
-            snapshot:snapshot,catalog:catalog,start:start,end:end,site:site)
+                                   site:String="",mappings:Data?=nil,
+                                   reconstructFromCount:Bool=false)throws->Result {
+        // Retrospective count-based reconstruction is opt-in for the 9th-day
+        // export only; arbitrary date ranges keep the original physical ledger.
+        let report:N2NursingReport
+        if reconstructFromCount {
+            guard let mappings else{throw Failure.incompleteOrUnreconciled}
+            report=try N2NursingReportBuilder.reconstructedCut(
+                snapshot:snapshot,catalog:catalog,mappings:mappings,
+                start:start,end:end,site:site)
+        } else {
+            report=try N2NursingReportBuilder.range(
+                snapshot:snapshot,catalog:catalog,start:start,end:end,site:site)
+        }
         guard report.rows.count==98,report.exportable else{
             throw Failure.incompleteOrUnreconciled
         }
