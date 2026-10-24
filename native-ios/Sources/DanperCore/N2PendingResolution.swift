@@ -22,6 +22,20 @@ public enum N2PendingResolution:Equatable,Sendable {
         }
     }
 
+    public static func historicalTitle(forReason reason:String)->String {
+        if reason.hasPrefix("El lote fue registrado después de la atención") {
+            return "Lote posterior a la atención"
+        }
+        if reason.hasPrefix("Correspondencia vinculada después de la atención") ||
+           reason.hasPrefix("Correspondencia verificada después de la atención") {
+            return "Vínculo confirmado después de la atención"
+        }
+        if reason.hasPrefix("Fecha clínica futura o inválida") {
+            return "Revisar fecha de la atención"
+        }
+        return "Conciliación histórica pendiente"
+    }
+
     /// Explains historical blocks without implying a prior stock count
     /// can safely be debited using a lot entered at a later date.
     public static func historicalGuidance(forReason reason:String)->String {
