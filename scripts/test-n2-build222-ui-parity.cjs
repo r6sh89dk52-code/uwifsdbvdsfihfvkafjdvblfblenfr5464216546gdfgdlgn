@@ -432,6 +432,31 @@ must(history,'historicalAccountingOnly:',
   'historial selecciona conciliación contable en lugar de forzar FEFO actual');
 console.log('PASS: lotes agotados se pueden documentar retrospectivamente sin habilitar FEFO agotado.');
 
+const stockChoice=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2StockRegistrationChoice.swift'),'utf8');
+for(const key of [
+  '.alert("¿Qué representa esta cantidad?"',
+  'Button("Stock inicial del día 9")',
+  'Button("Stock físico que tengo hoy")',
+  'showStockBasisAlert=true',
+  'N2StockRegistrationChoice.resolve(basis,quantity:qty',
+  'stockRegistrationBasis":basis.rawValue',
+  'stockRegistrationCutStart":period.start',
+  'stockRegistrationCurrentQuantity":amount.todayPhysical',
+  'if basis == .opening &&',
+  'current.lots.contains(where:{$0.kardexCode==material.id})'
+]) must(inventory,key,'selector central de stock inicial o actual y persistencia de criterio');
+for(const key of [
+  'case opening = "period-opening"',
+  'case countedNow = "physical-count"',
+  'todayPhysical:physicallyLeft',
+  'todayPhysical:quantity',
+  'quantity-use+receipts+adjustments',
+  'quantity+use-receipts-adjustments',
+  'Failure.ambiguousHistoricalOpenings'
+]) must(stockChoice,key,'lógica única de stock inicial y físico contado');
+console.log('PASS: registro de lote solicita elegir inicio día 9 o conteo actual y aplica cálculo sin doble descuento.');
+
+
 
 
 
