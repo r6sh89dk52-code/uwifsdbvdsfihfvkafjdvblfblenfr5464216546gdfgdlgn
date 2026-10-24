@@ -312,9 +312,11 @@ struct N2VisitDispensingView:View {
                         Text(line.name).font(.subheadline.weight(.semibold))
                         Text("Cantidad clínica: "+line.quantity.formatted())
                             .font(.caption).foregroundStyle(.secondary)
-                        Label(resolution == .reviewChronology
-                              ? N2PendingResolution.historicalTitle(forReason:line.result)
-                              : resolution.summary,systemImage:resolution == .completed
+                        Label(projectedInCut && line.result != "Descontado"
+                              ? "Consumo incluido en saldo reconstruido · salida física pendiente"
+                              : (resolution == .reviewChronology
+                                  ? N2PendingResolution.historicalTitle(forReason:line.result)
+                                  : resolution.summary),systemImage:resolution == .completed
                               ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .font(.caption)
                             .foregroundStyle(resolution == .completed ? Color.green : Color.orange)
@@ -532,7 +534,20 @@ struct N2VisitDispensingView:View {
             dateFormatter.dateFormat="yyyy-MM-dd"
             let today=dateFormatter.string(from:Date())
             let cut=try await vault.automaticCutAccounting(through:today)
-            projectedClinicalLines=cut.projectedClinicalLines
+            // Only label a historical line as balanced when a real counted
+            // lot yields an opening value. Without it, the line stays pending.
+            projectedClinicalLines=Set(lines.compactMap {line -> String? in
+                let key=visitID+"\u{001F}"+line.id
+                guard cut.projectedClinicalLines.contains(key) else{return nil}
+                var codes=Set(context?.products.authorizedNursingOptions(
+                    for:line.code).map(\.id) ?? [])
+                codes.formUnion(context?.operationalMappings.filter{
+                    $0.clinicalCode==line.code
+                }.map(\.inventoryID) ?? [])
+                return cut.rows.contains(where:{
+                    codes.contains($0.code) && $0.opening != nil
+                }) ? key : nil
+            })
         } catch {
             projectedClinicalLines=[]
         }
