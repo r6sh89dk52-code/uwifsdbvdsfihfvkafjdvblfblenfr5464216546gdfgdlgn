@@ -33,11 +33,6 @@ struct N2MedicationRowView:View {
     private var availablePhysicalUnits:Double {
         lots.reduce(0.0) { partial,lot in partial + (N2ContainerAccounting.isContainer(unit:lot.unit) ? Double(lot.sealed):lot.total) }
     }
-    private var requiresNewContainer:Bool {
-        let available=medication.selectedLotID.isEmpty ? lots : lots.filter{$0.id==medication.selectedLotID}
-        return available.contains{N2ContainerAccounting.isContainer(unit:$0.unit)} &&
-            !available.contains{$0.openContainers>0}
-    }
     private var procedureSelection:Binding<String> {
         Binding(
             get:{medication.procedure},
@@ -212,17 +207,11 @@ struct N2MedicationRowView:View {
                           format:.number).keyboardType(.decimalPad)
             }
             if lots.contains(where:{N2ContainerAccounting.isContainer(unit:$0.unit)}) {
-                Text(requiresNewContainer ? "Sin envase abierto: confirma la apertura para dispensar." :
-                    "Se utilizará el envase abierto. Kardex: 0, salvo nueva apertura declarada.")
+                Label("Al guardar la atención, DANPER preguntará automáticamente si abriste un frasco o caja nuevo (1) o usaste uno abierto (0). No necesitas marcarlo aquí.",
+                      systemImage:"checkmark.shield")
                     .font(.caption).foregroundStyle(.secondary)
-                DanperCheckRow(selected:$medication.approveOpening) {
-                    Text("Abrir nuevo envase · apertura realmente realizada")
-                        .font(.subheadline)
-                }
-                if medication.approveOpening {
-                    Stepper("Envases abiertos: \(medication.newContainers)",value:$medication.newContainers,in:1...100)
-                }
-                Text("El volumen es opcional e independiente del Kardex; no determina aperturas ni agotamientos.").font(.caption)
+                Text("El volumen es opcional; nunca se infiere una apertura por el volumen utilizado.")
+                    .font(.caption).foregroundStyle(.secondary)
             } else if lots.contains(where:{$0.capacity>1 && $0.sealed>0}) {
                 DanperCheckRow(selected:$medication.approveOpening) {
                     Text("Confirmo la apertura física para extraer unidades individuales; el Kardex conserva su unidad individual.")
