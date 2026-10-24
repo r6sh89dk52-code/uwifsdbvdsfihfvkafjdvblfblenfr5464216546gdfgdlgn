@@ -505,7 +505,6 @@ struct N2NativeInventoryView:View {
                 guard let material,let expiryISO,let lotCapacity,
                       let basis else{return}
                 let isPack=packaged
-                let calendar=Calendar(identifier:.gregorian)
                 let formatter=DateFormatter()
                 formatter.locale=Locale(identifier:"en_US_POSIX")
                 formatter.timeZone=TimeZone(identifier:"America/Lima")
