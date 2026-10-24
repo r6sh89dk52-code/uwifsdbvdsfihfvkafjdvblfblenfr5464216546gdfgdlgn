@@ -67,34 +67,24 @@ public enum N2ContainerAccounting {
         return after
     }
     static func validMovement(_ movement:[String:Any])->Bool {
-        if movement["kind"] as? String == "containerState",
-           movement["existingOpenAttested"] as? Bool == true {
+        if movement["kind"] as? String=="use",
+           movement["reuseWithoutRecordedOpening"] as? Bool == true {
             guard let before=movement["before"] as? [String:Any],
                   let after=movement["after"] as? [String:Any],
-                  let capacity=(before["unitsPerContainer"] as? NSNumber)?.doubleValue,
-                  let opened=(before["openedRemaining"] as? NSNumber)?.doubleValue,
-                  let loose=(before["looseUnits"] as? NSNumber)?.doubleValue,
-                  let sealed=before["sealedContainers"] as? Int,
-                  sealed>0,capacity>=1,opened==0,loose==0,
+                  let sealed=before["sealedContainers"] as? Int,sealed>0,
                   openCount(before)==0,
-                  before["volumeTrackingEnabled"] as? Bool != true,
+                  isContainer(unit:before["catalogUnit"] as? String ?? ""),
+                  integer(movement["containerAccountingVersion"])==1,
+                  integer(movement["declaredOpenings"])==0,
                   let at=movement["at"] as? Int64,
                   at >= (before["updatedAt"] as? Int64 ?? Int64.max),
-                  let why=movement["description"] as? String,why.count>=10,
-                  let actor=movement["operatorName"] as? String,actor.count>=3,
-                  movement["containerDisposition"] as? String=="ya_abierto",
-                  integer(movement["containerAccountingVersion"])==1,
                   (movement["quantity"] as? NSNumber)?.doubleValue==0,
                   (movement["excelQuantity"] as? NSNumber)?.doubleValue==0,
                   (movement["physicalChange"] as? NSNumber)?.doubleValue==0,
                   movement["openedNewContainer"] as? Bool == false,
-                  isContainer(unit:before["catalogUnit"] as? String ?? "")
+                  (movement["dispenseRef"] as? [String:Any])?["reusePreviouslyOpened"] as? Bool == true
                   else{return false}
             var expected=before
-            expected["sealedContainers"]=sealed-1
-            expected["openedRemaining"]=capacity
-            expected["declaredOpenContainers"]=1
-            expected["volumeTrackingEnabled"]=false
             expected["updatedAt"]=at
             return (try? JSONSerialization.data(withJSONObject:expected,options:.sortedKeys))
                 == (try? JSONSerialization.data(withJSONObject:after,options:.sortedKeys))
@@ -151,47 +141,16 @@ public enum N2ContainerAccounting {
         else{return false}
         return true
     }
-    /// The operator says the container was already physically open, although
-    /// the current stock entry still classifies it as sealed. Reclassify one
-    /// package WITHOUT inventing a past opening (R=1), without altering the
-    /// counted total, and WITHOUT a second stock debit. The same attention
-    /// then obtains R=0 from the genuine current-use movement.
-    static func attestAlreadyOpen(lot:[String:Any],attentionID:String,
-        itemID:String,operatorName:String,at:Int64)
-        ->(after:[String:Any],event:[String:Any])? {
-        guard let id=lot["id"] as? String,!id.isEmpty,
-              let code=lot["code"] as? String,
-              let name=lot["name"] as? String,
-              let unit=lot["catalogUnit"] as? String,isContainer(unit:unit),
-              let sealed=lot["sealedContainers"] as? Int,sealed>0,
-              let cap=(lot["unitsPerContainer"] as? NSNumber)?.doubleValue,cap>=1,
-              (lot["looseUnits"] as? NSNumber)?.doubleValue==0,
-              (lot["openedRemaining"] as? NSNumber)?.doubleValue==0,
+    static func attestedReuse(lot:[String:Any],at:Int64)->[String:Any]? {
+        guard isContainer(unit:lot["catalogUnit"] as? String ?? ""),
               openCount(lot)==0,
-              lot["volumeTrackingEnabled"] as? Bool != true,
-              at >= (lot["updatedAt"] as? Int64 ?? Int64.max),
-              operatorName.count>=3 else{return nil}
+              (lot["sealedContainers"] as? Int ?? 0)>0,
+              at >= (lot["updatedAt"] as? Int64 ?? Int64.max)
+        else{return nil}
         var after=lot
-        after["sealedContainers"]=sealed-1
-        after["openedRemaining"]=cap
-        after["declaredOpenContainers"]=1
-        after["volumeTrackingEnabled"]=false
         after["updatedAt"]=at
-        let event:[String:Any]=[
-            "id":"ATT:\(attentionID):ITEM:\(itemID):ALREADY-OPEN:\(id)",
-            "lotId":id,"code":code,"name":name,"unit":unit,
-            "at":at,"kind":"containerState","containerAccountingVersion":1,
-            "existingOpenAttested":true,"containerDisposition":"ya_abierto",
-            "operatorName":operatorName,
-            "description":"Envase previamente abierto declarado durante la atención; fecha original no acreditada",
-            "quantity":0,"excelQuantity":0,"physicalChange":0,
-            "openedNewContainer":false,"sealedAdded":0,"looseAdded":0,
-            "before":lot,"after":after
-        ]
-        guard validMovement(event) else{return nil}
-        return (after,event)
+        return after
     }
-
     /// A save-time confirmation may explicitly attest that ONE previously
     /// open container was exhausted before opening the next. The closure
     /// is an auditable containerState event (Kardex R=0), not another use.
