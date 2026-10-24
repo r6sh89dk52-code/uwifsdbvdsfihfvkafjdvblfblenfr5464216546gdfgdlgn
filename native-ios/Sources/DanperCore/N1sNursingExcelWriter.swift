@@ -435,14 +435,17 @@ internal enum N1sNursingExcelWriter {
             name:entries[styleEntry].name,data:Data(updatedStyles.utf8))
         for (i,row) in rows.enumerated() {
             let n=String(i+7)
-            let known=(row["stockKnown"] as? Bool)==true
-            sheet=try patch(sheet,address:"D"+n,value:known ? row["initial"] : nil)
-            sheet=try patch(sheet,address:"E"+n,value:known ? row["extraordinary"] : nil)
-            sheet=try patch(sheet,address:"F"+n,value:known ? row["total"] : nil,
-                            formula:known ? "D"+n+"+E"+n : nil)
-            sheet=try patch(sheet,address:"G"+n,value:known ? row["consumed"] : nil)
-            sheet=try patch(sheet,address:"H"+n,value:known ? row["final"] : nil,
-                            formula:known ? "F"+n+"-G"+n : nil)
+            // Explicit zero-valued balance for every official Kardex row.
+            // A missing lot means 0 recorded stock, not a fabricated lot.
+            // stockKnown is preserved in the manifest for audit provenance;
+            // showing 0 never authorizes a physical use or an opening.
+            sheet=try patch(sheet,address:"D"+n,value:row["initial"])
+            sheet=try patch(sheet,address:"E"+n,value:row["extraordinary"])
+            sheet=try patch(sheet,address:"F"+n,value:row["total"],
+                            formula:"D"+n+"+E"+n)
+            sheet=try patch(sheet,address:"G"+n,value:row["consumed"])
+            sheet=try patch(sheet,address:"H"+n,value:row["final"],
+                            formula:"F"+n+"-G"+n)
             let expiry=(row["expiry"] as? String) ?? ""
             let numericExpiry:Double?
             if expiry.isEmpty {
