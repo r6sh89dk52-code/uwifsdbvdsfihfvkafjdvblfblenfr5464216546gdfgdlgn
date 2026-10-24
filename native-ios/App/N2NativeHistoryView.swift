@@ -496,6 +496,10 @@ struct N2VisitDispensingView:View {
                                                     quantity:med.quantity,
                                                     procedure:med.procedure),
                         date:detail.date,context:context,
+                        historicalAccountingOnly:
+                            N2PendingResolution.forReason(lines.first(where:{
+                                $0.id==itemID
+                            })?.result ?? "") == .reviewChronology,
                         onSaved:{
                             selectedAction=nil
                             Task {await load()}
