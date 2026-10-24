@@ -143,7 +143,7 @@ public enum N2AutomaticCutAccounting {
                     line.daily[visitDay,default:0]+=debit
                 }else if let historical=declaredHistory.last(where:{
                     $0.visitID==visitID && $0.itemID==itemID &&
-                    $0.at<=Int64((num([ "timestamp":NSNumber(value:1) ]["timestamp"]) ?? 1)) * Int64.max
+                    day(Double($0.at))<=date
                 }),
                     let verifiedLot=lots.first(where:{$0["id"] as? String==historical.lotID}),
                     verifiedLot["code"] as? String==match.code,
