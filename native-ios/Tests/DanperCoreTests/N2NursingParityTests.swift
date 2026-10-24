@@ -129,7 +129,7 @@ final class N2NursingParityTests:XCTestCase {
             date:"2026-02-30",shift:"CONSOLIDADO",
             responsible:"OPERADOR FICTICIO"))
     }
-    func testRosterOnlySourceExportsBlankUnknownStockWithoutInventingZeros()throws {
+    func testRosterOnlySourceExportsZeroRecordedStockWithoutCreatingLots()throws {
         let original=try bytes("n1e-clinical-stock.json")
         var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
         let people=try XCTUnwrap(root["workers"] as? [[String:Any]])
@@ -153,8 +153,12 @@ final class N2NursingParityTests:XCTestCase {
         XCTAssertFalse(archive.contains{$0.name=="xl/worksheets/sheet1.xml"})
         let excel=try XCTUnwrap(archive.first{$0.name=="xl/worksheets/sheet2.xml"})
         let xml=try XCTUnwrap(String(data:excel.data,encoding:.utf8))
-        XCTAssertTrue(xml.contains("D7"))
-        XCTAssertFalse(xml.contains("<c r=\"D7\"><v>0</v></c>"))
+        // Unregistered items appear as numeric zero, never a blank cell.
+        // stockKnown remains false: no physical count or fictitious lot exists.
+        XCTAssertTrue(xml.contains("<c r=\"D7\"><v>0</v></c>"))
+        XCTAssertTrue(xml.contains("<c r=\"E7\"><v>0</v></c>"))
+        XCTAssertTrue(xml.contains("<c r=\"G7\"><v>0</v></c>"))
+        XCTAssertFalse(root["stockLots"] as? [[String:Any]] == nil)
     }
 
     func testRangeIsAlwaysLabeledAsConsolidatedPeriod() throws {
