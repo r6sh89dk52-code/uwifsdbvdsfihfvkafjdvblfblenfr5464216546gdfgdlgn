@@ -31,6 +31,10 @@ const autoAccounting=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCo
 const vaultSource=fs.readFileSync(path.join(root,'native-ios/App/N2ProtectedClinicalIOSVault.swift'),'utf8');
 const clinicalTx=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ClinicalTransactions.swift'),'utf8');
 const pendingResolution=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2PendingResolution.swift'),'utf8');
+const batchReviewed=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2UserReviewedKardexLinks.swift'),'utf8');
+const officialWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N1sNursingExcelWriter.swift'),'utf8');
+const mappingCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2OperationalMapping.swift'),'utf8');
+const mappingView=fs.readFileSync(path.join(root,'native-ios/App/N2OperationalMappingView.swift'),'utf8');
 
 const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView.swift'),'utf8');
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
@@ -283,6 +287,30 @@ assert(!form.includes('Button("Verificar cantidad y apertura pendiente")'),
 assert(!form.includes('Button("Resolver correspondencia")'),
        'No mostrar vinculación redundante cuando el motivo real es stock');
 console.log('PASS: pendientes con una sola acción pertinente: stock, vínculo, lote o cronología.');
+for(const phrase of [
+  'kardexID:"E-20"','clinicalCode:"16025008"',
+  'kardexID:"E-68"','clinicalCode:"16000178"',
+  'kardexID:"E-86"','clinicalCode:"16000019"',
+  'kardexID:"E-94"','clinicalCode:"10000929"',
+  'kardexID:"E-95"','clinicalCode:"16000127"',
+  'kardexID:"E-97"','clinicalCode:"16021493"',
+  '"E-25","E-81","E-82","E-84","E-85","E-98"'
+]) must(batchReviewed,phrase,'seis confirmaciones y seis exclusiones');
+must(mappingCore,'!N2UserReviewedKardexLinks.unmatched.contains(rule.inventoryID)',
+    'NO CORRESPONDE nunca se vincula en core');
+must(mappingView,'!N2UserReviewedKardexLinks.unmatched.contains($0.id)',
+    'NO CORRESPONDE nunca se sugiere en UI');
+must(clinicalTx,'N2UserReviewedKardexLinks.candidates(for:code)',
+    'resolver asociaciones de revisión masiva');
+must(inventory,'DisclosureGroup("Sin lotes registrados · stock 0")',
+    'visualizar los 98 productos sin lote a 0');
+for(const phrase of ['address:"D"+n,value:row["initial"]',
+                     'address:"E"+n,value:row["extraordinary"]',
+                     'address:"G"+n,value:row["consumed"]',
+                     'address:"H"+n,value:row["final"]'])
+  must(officialWriter,phrase,'exportar 0 numérico sin crear lotes');
+console.log('PASS: revisión masiva confirmada y stock sin lote expresado como 0.');
+
 for (const key of [
   'N2PendingResolution.forReason(line.result)',
   'Label(resolution.summary,systemImage:',
