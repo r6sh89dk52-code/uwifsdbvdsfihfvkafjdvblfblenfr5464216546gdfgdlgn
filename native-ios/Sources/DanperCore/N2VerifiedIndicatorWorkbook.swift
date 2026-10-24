@@ -156,6 +156,12 @@ public enum N2VerifiedIndicatorWorkbook {
                   !a.isEmpty,!b.isEmpty else{throw Failure.invalidCatalog}
             approved.insert(a+"|"+b)
         }
+        // User-approved batch identities are separate from the 86 official
+        // associations, but the exported clinical event must still recognize
+        // an actual FEFO movement produced for these reviewed products.
+        for link in N2UserReviewedKardexLinks.links {
+            approved.insert(link.clinicalCode+"|"+link.kardexID)
+        }
         var linesByItem=[String:Double]()
         for m in movement {
             guard m["kind"] as? String=="use",
