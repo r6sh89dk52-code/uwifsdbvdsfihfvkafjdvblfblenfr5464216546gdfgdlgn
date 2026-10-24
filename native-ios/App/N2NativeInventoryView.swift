@@ -53,6 +53,8 @@ struct N2NativeInventoryView:View {
     @State private var movementID=UUID().uuidString
     @State private var movementAt:Int64=0
     @State private var showStockBasisAlert=false
+    @State private var auxiliaryCode=""
+    @State private var showAuxiliaryInventory=false
 
     /// The exceptional selector offers only official units already
     /// seen in the source catalog. It is not shown for approved matches.
@@ -79,6 +81,22 @@ struct N2NativeInventoryView:View {
             !registered.contains(product.id) &&
             (query.isEmpty || product.name.localizedStandardContains(query))
         }
+    }
+    /// The 432-product clinical catalog can contain supplies that are NOT
+    /// among the 98 official nursing Kardex rows (e.g. ALGODON 500 GR).
+    /// Expose these through a distinct auxiliary ledger, never by inventing
+    /// official E- codes or modifying the 98-row workbook.
+    private var clinicalOnlyMatches:[N2ClinicalCatalogProduct] {
+        guard let context else{return []}
+        let query=productSearch.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard query.count>=2 else{return []}
+        return Array(context.products.clinical.filter { product in
+            product.name.localizedStandardContains(query) &&
+            context.products.authorizedNursingOptions(for:product.code).isEmpty &&
+            !context.operationalMappings.contains(where:{
+                $0.clinicalCode==product.code
+            })
+        }.prefix(12))
     }
     private var material:N2NursingCatalogProduct? {
         context?.products.nursing.first{$0.id==materialCode}
@@ -158,6 +176,14 @@ struct N2NativeInventoryView:View {
         .task {if !layoutOnly {await load()}}
         .sheet(item:$closingLot) {lot in
             N2ContainerStateView(lot:lot,revision:context?.revision ?? 0) {Task {await load()}}
+        }
+        .sheet(isPresented:$showAuxiliaryInventory) {
+            if let context,!auxiliaryCode.isEmpty {
+                N2AuxiliaryInventoryView(code:auxiliaryCode,context:context,onSaved:{
+                    showAuxiliaryInventory=false
+                    Task {await load()}
+                })
+            }
         }
         .alert("¿Qué representa esta cantidad?",
                isPresented:$showStockBasisAlert) {
@@ -374,10 +400,11 @@ struct N2NativeInventoryView:View {
                 }
             }
             if productSearchFocused && !productSearch.isEmpty {
-                if matchingProducts.isEmpty {
-                    Text("No se encontraron medicamentos con ese nombre.")
+                if matchingProducts.isEmpty && clinicalOnlyMatches.isEmpty {
+                    Text("No se encontró ese producto en el Kardex oficial ni en el catálogo clínico.")
                         .font(.caption).foregroundStyle(.secondary)
-                } else {
+                }
+                if !matchingProducts.isEmpty {
                     ScrollView {
                         LazyVStack(spacing:5) {
                             ForEach(matchingProducts){product in
@@ -409,6 +436,35 @@ struct N2NativeInventoryView:View {
                     }
                     .frame(maxHeight:220)
                     .id("inventory-product-results")
+                }
+                if !clinicalOnlyMatches.isEmpty {
+                    VStack(alignment:.leading,spacing:8) {
+                        Text("Catálogo clínico · Inventario auxiliar")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text("Estos productos no ocupan filas del Kardex oficial de 98. Regístralos separadamente con su presentación y conteo físico.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(clinicalOnlyMatches){product in
+                            Button {
+                                auxiliaryCode=product.code
+                                productSearchFocused=false
+                                showAuxiliaryInventory=true
+                            } label: {
+                                HStack {
+                                    VStack(alignment:.leading,spacing:3) {
+                                        Text(product.name).font(.subheadline.weight(.semibold))
+                                        Text("Inventario auxiliar · "+product.unit).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName:"arrow.up.right.square")
+                                }
+                                .frame(maxWidth:.infinity,alignment:.leading)
+                                .padding(11)
+                                .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:10))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("inventory-auxiliary-"+product.code)
+                        }
+                    }
                 }
             }
         }
