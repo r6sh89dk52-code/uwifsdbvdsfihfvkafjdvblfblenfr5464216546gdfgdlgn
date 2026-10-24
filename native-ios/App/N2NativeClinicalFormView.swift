@@ -1480,15 +1480,32 @@ struct N2NativeClinicalFormView:View {
         form.items[idx].approveOpening=opened
         form.items[idx].newContainers=opened ? 1:0
         form.items[idx].closePriorContainer=opened && (alreadyOpen || earlierOpened)
-        if form.items[idx].selectedLotID.isEmpty {
-            let available=context.options(for:item.code,at:form.date,
-                                          site:form.dispensingSite)
+        // Clinical quantity remains the number of needles/items used.
+        // For a box/bottle declared REUSED, physical volume is not
+        // implicitly the clinical quantity; official nursing R is zero.
+        form.items[idx].physicalQuantity=0
+        let available=context.options(for:item.code,at:form.date,
+                                      site:form.dispensingSite)
+        let previouslySelected=available.first(where:{
+            $0.id==form.items[idx].selectedLotID
+        })
+        // A previously selected SEALED lot must never defeat the user's
+        // explicit "No, I reused an OPEN one". Pick the earliest-expiring
+        // verifiably open lot even if the row already had another lot ID.
+        // If the opening happened on an earlier row of this same visit,
+        // the FEFO transaction will see that staged opening.
+        let matchingExisting=opened
+            ? (previouslySelected?.sealed ?? 0)>0
+            : ((previouslySelected?.openContainers ?? 0)>0 ||
+               (earlierOpened && previouslySelected != nil))
+        if !matchingExisting {
             let preferred=opened
                 ? available.first(where:{$0.sealed>0})
                 : available.first(where:{$0.openContainers>0})
-            if let chosen=preferred ?? available.first {
-                form.items[idx].selectedLotID=chosen.id
-            }
+                    ?? (earlierOpened
+                        ? available.first(where:{$0.sealed>0}):nil)
+            // Do not silently choose a sealed box for a declared reuse.
+            form.items[idx].selectedLotID=preferred?.id ?? ""
         }
         showContainerDecision=false
         containerDecisionIndex+=1
