@@ -5,7 +5,10 @@ import DanperCore
 /// The preview route always uses a bundled synthetic JSON sample. A future
 /// real vault must authenticate before handing a snapshot to this view.
 struct N2NativeHistoryView: View {
-    init(useProtectedVault:Bool=false){self.useProtectedVault=useProtectedVault}
+    init(useProtectedVault:Bool=false,showWorkers:Bool=false){
+        self.useProtectedVault=useProtectedVault
+        self.showWorkers=showWorkers
+    }
     #if DEBUG
     init(layoutProjection:N2NativeReadModel) {
         layoutOnly=true
@@ -15,12 +18,15 @@ struct N2NativeHistoryView: View {
     private var layoutOnly=false
     @Environment(\.n2WorkspaceVault) private var vault
     var useProtectedVault = false
+    private var showWorkers=false
     @State private var projection:N2NativeReadModel?
     @State private var query=""
     @State private var committedQuery=""
     @State private var selectedDNI:String?
     @State private var rosterPage=0
+    @State private var visitsPage=0
     private let pageSize=25
+    private let visitsPageSize=15
     @State private var hasError=false
     private let accent=Color(red:0.88,green:0.09,blue:0.16)
 
@@ -28,6 +34,16 @@ struct N2NativeHistoryView: View {
         Group {
             if let projection {
                 let matches=projection.findWorkers(committedQuery)
+                let savedVisits=projection.visits.filter{
+                    $0.status=="saved" &&
+                    (committedQuery.isEmpty ||
+                     $0.workerName.localizedStandardContains(committedQuery) ||
+                     $0.workerDNI.localizedStandardContains(committedQuery) ||
+                     $0.diagnosis.localizedStandardContains(committedQuery) ||
+                     $0.date.localizedStandardContains(committedQuery))
+                }
+                let visitPages=max(1,(savedVisits.count+visitsPageSize-1)/visitsPageSize)
+                let safeVisitsPage=min(visitsPage,visitPages-1)
                 let totalPages=max(1,(matches.count+pageSize-1)/pageSize)
                 let safePage=min(rosterPage,totalPages-1)
                 ScrollViewReader { proxy in
@@ -40,6 +56,7 @@ struct N2NativeHistoryView: View {
                         Text(useProtectedVault ? "Consulta los registros y sus consumos guardados." : "Consulta las atenciones disponibles.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
+                    if showWorkers {
                     DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
                         Color.clear.frame(height:1).id("roster-page-top")
                         Text("\(matches.count) resultados · Página \(safePage+1) de \(totalPages)")
@@ -85,15 +102,60 @@ struct N2NativeHistoryView: View {
                             }.buttonStyle(.bordered)
                         }
                     }
-                    DanperPanel("Historial completo") {
-                        Text("\(projection.visits.filter{$0.status=="saved"}.count) atenciones guardadas · \(projection.visits.filter{$0.status=="draft"}.count) borradores")
-                            .font(.subheadline)
-                        Text("\(projection.pendingClinicalLines) consumo(s) sin confirmación física; nunca se sustituyen por cero.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        ForEach(projection.visits) { visit in
-                            visitCell(visit)
-                                .padding(14).frame(maxWidth:.infinity,alignment:.leading)
-                                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
+                    }
+                    if !showWorkers {
+                        DanperPanel("Atenciones registradas") {
+                            Color.clear.frame(height:1).id("history-visits-top")
+                            Text("\(savedVisits.count) atenciones · Página \(safeVisitsPage+1) de \(visitPages)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text("Toca una atención para ver sus datos, tratamiento, consumos o solicitar una rectificación.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            ForEach(Array(savedVisits.dropFirst(safeVisitsPage*visitsPageSize).prefix(visitsPageSize))) { visit in
+                                NavigationLink {
+                                    N2RecordedVisitDetailView(visitID:visit.id,
+                                        visit:visit,realSource:useProtectedVault)
+                                } label: {
+                                    HStack(alignment:.top,spacing:10) {
+                                        VStack(alignment:.leading,spacing:5) {
+                                            Text(visit.workerName)
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(DanperDatePresentation.displayDateTime(visit.date,visit.time))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                            Text(visit.diagnosis.isEmpty ? "Sin diagnóstico":visit.diagnosis)
+                                                .font(.footnote).foregroundStyle(.secondary)
+                                            if visit.pendingPhysicalLines>0 {
+                                                Label("\(visit.pendingPhysicalLines) salida(s) históricas por verificar",
+                                                      systemImage:"info.circle")
+                                                    .font(.caption2).foregroundStyle(.orange)
+                                            }
+                                        }
+                                        Spacer()
+                                        Image(systemName:"chevron.right")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    .padding(13)
+                                    .frame(maxWidth:.infinity,alignment:.leading)
+                                    .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("history-visit-"+visit.id)
+                            }
+                            if visitPages>1 {
+                                HStack {
+                                    Button("Anterior") {
+                                        visitsPage=max(0,safeVisitsPage-1)
+                                        proxy.scrollTo("history-visits-top",anchor:.top)
+                                    }.disabled(safeVisitsPage==0)
+                                    Spacer()
+                                    Text("\(safeVisitsPage+1)/\(visitPages)")
+                                        .font(.caption).monospacedDigit()
+                                    Spacer()
+                                    Button("Siguiente") {
+                                        visitsPage=min(visitPages-1,safeVisitsPage+1)
+                                        proxy.scrollTo("history-visits-top",anchor:.top)
+                                    }.disabled(safeVisitsPage>=visitPages-1)
+                                }.buttonStyle(.bordered)
+                            }
                         }
                     }
                   }.padding(16)
@@ -108,7 +170,8 @@ struct N2NativeHistoryView: View {
                     guard !Task.isCancelled else{return}
                     committedQuery=query
                     rosterPage=0
-                    proxy.scrollTo("roster-page-top",anchor:.top)
+                    visitsPage=0
+                    proxy.scrollTo(showWorkers ? "roster-page-top":"history-visits-top",anchor:.top)
                 }
                 .navigationDestination(item:$selectedDNI) { dni in
                     N2WorkerHistoryDetail(dni:dni,model:projection,realSource:useProtectedVault)
@@ -125,7 +188,7 @@ struct N2NativeHistoryView: View {
                         "Verificación de registros ficticios."))
             }
         }
-        .navigationTitle("Personal e historial")
+        .navigationTitle(showWorkers ? "Personal" : "Historial de atenciones")
         .danperFormChrome()
         .task {await load()}
         .refreshable {await load(force:true)}
@@ -174,6 +237,106 @@ struct N2NativeHistoryView: View {
         } catch {
             hasError=true
         }
+    }
+}
+
+/// One-tap access to the saved clinical record; correction is separately
+/// confirmed before presenting the authenticated, append-only editor.
+private struct N2RecordedVisitDetailView:View {
+    let visitID:String
+    let visit:N2VisitIndexRow
+    let realSource:Bool
+    @Environment(\.n2WorkspaceVault) private var vault
+    @State private var detail:N2CorrectionDetail?
+    @State private var loading=false
+    @State private var failed=false
+    @State private var askEdit=false
+    @State private var editing=false
+
+    var body:some View {
+        ScrollView {
+            VStack(alignment:.leading,spacing:14) {
+                DanperPanel("Atención registrada") {
+                    LabeledContent("Trabajador",value:visit.workerName)
+                    LabeledContent("DNI",value:visit.workerDNI)
+                    LabeledContent("Fecha",value:DanperDatePresentation.displayDateTime(visit.date,visit.time))
+                    LabeledContent("Diagnóstico",value:detail?.diagnosis ?? visit.diagnosis)
+                    if let d=detail {
+                        LabeledContent("Tipo",value:d.category)
+                        LabeledContent("Sistema afectado",value:d.system)
+                        LabeledContent("Segmento",value:d.segment)
+                        LabeledContent("Responsable",value:d.responsible)
+                        LabeledContent("Situación al finalizar",value:d.workStatus)
+                        LabeledContent("Procedimientos",value:d.procedures.joined(separator:", "))
+                    }
+                }
+                if let d=detail {
+                    DanperPanel("Tratamiento y cantidades") {
+                        if d.medications.isEmpty {
+                            Text("Atención sin medicamentos ni insumos.")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(d.medications,id:\.id) { med in
+                            VStack(alignment:.leading,spacing:4) {
+                                Text(med.name).font(.subheadline.weight(.semibold))
+                                Text("Cantidad clínica: \(med.quantity) · "+med.procedure)
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                            Divider()
+                        }
+                    }
+                }
+                if realSource {
+                    DanperPanel {
+                        NavigationLink {
+                            N2VisitDispensingView(visitID:visitID)
+                        } label: {
+                            Label("Ver consumos y movimientos",systemImage:"pills.fill")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                        Button {
+                            askEdit=true
+                        } label: {
+                            Label("Editar atención",systemImage:"square.and.pencil")
+                        }
+                        .buttonStyle(DanperPrimaryButton())
+                        .accessibilityIdentifier("history-request-edit-"+visitID)
+                        Text("Antes de modificar se pedirá confirmación. Las rectificaciones conservan la atención y sus movimientos originales.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if loading {ProgressView("Abriendo atención…")}
+                if failed {
+                    Label("No se pudieron leer todos los detalles. La atención original está intacta.",
+                          systemImage:"exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+            }.padding(16)
+        }
+        .navigationTitle("Detalle de atención")
+        .navigationBarTitleDisplayMode(.inline)
+        .danperFormChrome()
+        .task {await load()}
+        .confirmationDialog("¿Deseas editar esta atención?",
+            isPresented:$askEdit,titleVisibility:.visible) {
+            Button("Sí, editar atención"){editing=true}
+            Button("No, solo consultar",role:.cancel){}
+        } message: {
+            Text("Se guardará una rectificación auditada; los movimientos de inventario no se reescribirán automáticamente.")
+        }
+        .navigationDestination(isPresented:$editing) {
+            N2ClinicalCorrectionView(visitID:visitID)
+        }
+    }
+    @MainActor private func load() async {
+        guard realSource else{return}
+        loading=true
+        defer {loading=false}
+        do {
+            detail=try await vault.readCorrectionDetail(visitID:visitID)
+            failed=false
+        } catch {failed=true}
     }
 }
 
