@@ -30,6 +30,15 @@ final class N2NativeCatalogIndexTests:XCTestCase {
         XCTAssertEqual(index.nursingMatches("NYLON AZUL 3/0").first?.id,"E-68")
         XCTAssertTrue(index.nursingMatches("E-68").isEmpty) // IDs stay internal.
         XCTAssertFalse(index.approvals.contains{$0.kardexID=="E-68"})
+        // ALGODON is an approved source product, but NOT a row in
+        // the frozen 98-product nursing worksheet. It needs AUX stock.
+        XCTAssertEqual(index.clinical.first(where:{$0.code=="16000028"})?.name,
+                       "ALGODON 500 GR")
+        XCTAssertEqual(index.clinical.first(where:{$0.code=="16000028"})?.unit,"PAQ")
+        XCTAssertFalse(index.nursing.contains(where:{
+            $0.name.localizedStandardContains("ALGODON")
+        }))
+        XCTAssertTrue(index.authorizedNursingOptions(for:"16000028").isEmpty)
     }
     func testOperatorConfirmedPresentationsAreLimitedToNursingKardex()throws {
         let (clinical,nursing,mappings)=try sources()
