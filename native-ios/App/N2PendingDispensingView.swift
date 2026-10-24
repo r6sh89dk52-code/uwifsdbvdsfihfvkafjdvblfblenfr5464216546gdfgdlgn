@@ -36,6 +36,10 @@ struct N2PendingDispensingView:View {
         formatter.dateFormat="yyyy-MM-dd"
         return historicalAccountingOnly || date<formatter.string(from:Date())
     }
+    private var selectedLotIsContainer:Bool {
+        guard let lot=context.lots.first(where:{$0.id==lotID}) else{return false}
+        return N2ContainerAccounting.isContainer(unit:lot.unit)
+    }
     private var selectableLots:[N2FormLot] {
         isHistorical ? context.historicalOptions(for:medication.code,at:date) :
                        context.options(for:medication.code,at:date)
@@ -45,7 +49,10 @@ struct N2PendingDispensingView:View {
             Form {
                 Section("Verificar salida pendiente") {
                     Text(context.products.clinical.first{$0.code==medication.code}?.name ?? medication.code)
-                    Text("Conserva la atención original. Solo se descontarán las aperturas declaradas verificables por correspondencia, stock y cronología. El volumen es opcional.").font(.footnote)
+                    Text(isHistorical
+                        ? "La atención original permanece intacta. Esta declaración documenta la apertura antigua en el corte, sin descontar inventario actual."
+                        : "Se verificará el lote y la salida física sin crear otra atención.")
+                        .font(.footnote)
                     Picker("Lote compatible",selection:$lotID) {
                         Text("Seleccionar").tag("")
                         ForEach(selectableLots) { lot in
@@ -58,16 +65,33 @@ struct N2PendingDispensingView:View {
                         Text("Si el lote fue registrado después de esta atención, puedes documentar aquí una apertura antigua (R=1) o el uso del mismo envase abierto (R=0), incluso si el saldo actual es cero. Se contabiliza en el corte reconstruido, sin descontar de nuevo las existencias actuales.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    TextField("Cantidad física realmente utilizada",text:$quantity).keyboardType(.decimalPad)
+                    if !isHistorical || !selectedLotIsContainer {
+                        TextField("Cantidad física realmente utilizada",text:$quantity)
+                            .keyboardType(.decimalPad)
+                    }
                     if let lot=context.lots.first(where:{$0.id==lotID}) {
                         Text(N2ContainerAccounting.isContainer(unit:lot.unit) ?
                             "Envases cerrados: \(lot.sealed) · Abiertos declarados: \(lot.openContainers). El volumen solo se registra si existe seguimiento interno verificado." :
                             "Existencia individual: \(lot.total.formatted()) \(lot.unit).")
                             .font(.caption)
                     }
-                    Toggle("Abrí un nuevo envase (declaración explícita)",isOn:$opening)
-                    if opening {Stepper("Envases realmente abiertos: \(newContainers)",value:$newContainers,in:1...100)}
-                    Text("Con envase abierto: Kardex 0. El volumen es opcional; no se inferirán aperturas.").font(.caption)
+                    if isHistorical && selectedLotIsContainer {
+                        Picker("¿Abriste un envase en esa atención?",selection:$opening) {
+                            Text("No · Kardex 0").tag(false)
+                            Text("Sí · Kardex 1").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        Text("Marca solo lo que recuerdas o tienes documentado. No declarar una apertura si no está verificada.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Toggle("Abrí un nuevo envase (declaración explícita)",isOn:$opening)
+                        if opening {
+                            Stepper("Envases realmente abiertos: \(newContainers)",
+                                    value:$newContainers,in:1...100)
+                        }
+                        Text("Con envase abierto: Kardex 0. El volumen es opcional; no se inferirán aperturas.")
+                            .font(.caption)
+                    }
                     TextField("Responsable",text:$operatorName)
                     TextField("Evidencia y motivo",text:$reason,axis:.vertical).lineLimit(2...4)
                     Toggle("Confirmo la cantidad física y la evidencia",isOn:$consent)
@@ -80,7 +104,7 @@ struct N2PendingDispensingView:View {
                 if !message.isEmpty {Text(message).foregroundStyle(.orange)}
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Conciliar consumo")
+            .navigationTitle(isHistorical ? "Consumo histórico" : "Verificar consumo")
             .navigationBarTitleDisplayMode(.inline)
             .danperFormChrome()
             .toolbar {Button("Cancelar"){dismiss()}}
@@ -93,8 +117,10 @@ struct N2PendingDispensingView:View {
         busy=true;defer {busy=false}
         do {
             let evidence=N2PendingDispensingEvidence(visitID:visitID,itemID:medication.id,lotID:lotID,
-                quantity:amount,confirmNewContainer:opening,operatorName:operatorName,reason:reason,
-                at:Int64(Date().timeIntervalSince1970*1000),newContainers:opening ? newContainers:0)
+                quantity:isHistorical && selectedLotIsContainer ? 0:amount,
+                confirmNewContainer:opening,operatorName:operatorName,reason:reason,
+                at:Int64(Date().timeIntervalSince1970*1000),
+                newContainers:opening ? (isHistorical && selectedLotIsContainer ? 1:newContainers):0)
             _=try await vault.confirmPendingDispensing(evidence,expectedRevision:context.revision)
             onSaved();dismiss()
         } catch {message="No se pudo verificar la operación. La atención permanece guardada. Actualiza el inventario y revisa la evidencia."}
