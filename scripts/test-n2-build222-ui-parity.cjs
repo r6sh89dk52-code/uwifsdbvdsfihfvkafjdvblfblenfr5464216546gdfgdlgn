@@ -484,8 +484,10 @@ for(const key of [
   'static func exhaustedByNextOpening(',
   '"kind":"containerState"',
   '"containerDisposition":"agotado"',
-  '"excelQuantity":0'
-]) must(containerCore,key,'cierre anterior verificado sin consumo adicional');
+  '"excelQuantity":0',
+  '"physicalChange":-previousRemainder',
+  '(movement["physicalChange"] as? NSNumber)?.doubleValue == -removed'
+]) must(containerCore,key,'cierre anterior con R=0 y diferencia física auditable');
 for(const key of [
   'exhaustPrevious',
   'active.count==1',
