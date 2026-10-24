@@ -27,6 +27,9 @@ public enum N2AutomaticCutAccounting {
         public let end:String
         public let rows:[Row]
         public let unmatchedClinicalLines:Int
+        /// Saved clinical lines incorporated into the period projection but
+        /// not physically debited. Never treat these as FEFO movement IDs.
+        public let projectedClinicalLines:Set<String>
         public var hasUnresolvedHistory:Bool {
             unmatchedClinicalLines>0 || rows.contains{$0.unknownContainerOpenings>0}
         }
@@ -81,7 +84,20 @@ public enum N2AutomaticCutAccounting {
             var unlinked=0,unknownPackage=0
             var daily=[String:Double]()
         }
+        // A confirmed association is a product identity, not permission to
+        // guess an opening/dispensing or to alter old physical lots.
+        for reviewed in N2UserReviewedKardexLinks.links {
+            catalog[Key(clinicalCode:reviewed.clinicalCode,
+                        name:reviewed.clinicalName,unit:reviewed.clinicalUnit),default:[]]
+                .append((code:reviewed.kardexID,name:reviewed.kardexName))
+        }
+        for rule in try N2OperationalMappings.read(snapshot) {
+            catalog[Key(clinicalCode:rule.clinicalCode,
+                        name:rule.clinicalName,unit:rule.clinicalUnit)] =
+                [(code:rule.inventoryID,name:rule.inventoryName)]
+        }
         var totals=[String:Acc]()
+        var projectedClinicalLines=Set<String>()
         var ids=Set<String>()
         var unresolved=0
         let linked=Dictionary(grouping:movements.filter{
@@ -125,6 +141,8 @@ public enum N2AutomaticCutAccounting {
                     line.used+=debit
                     line.daily[visitDay,default:0]+=debit
                 }else if ["UND","TBL","PAR"].contains(unit.uppercased()) &&
+                    // E-86 / E-94 / E-95 need a real declared opening, never R=n.
+                    !["E-86","E-94","E-95"].contains(match.code) &&
                     !lots.contains(where:{$0["code"] as? String==match.code &&
                         N2ContainerAccounting.isContainer(unit:$0["catalogUnit"] as? String ?? "")}) {
                     // A saved attention confirms its units, even when it was
@@ -132,6 +150,7 @@ public enum N2AutomaticCutAccounting {
                     line.used+=n
                     line.daily[visitDay,default:0]+=n
                     line.unlinked+=1
+                    projectedClinicalLines.insert(id)
                 }else {
                     // Open bottle=1, reuse=0 cannot be recovered without an
                     // opening movement. Clinical use remains confirmed.
@@ -202,6 +221,7 @@ public enum N2AutomaticCutAccounting {
                 usesByDay:item.daily.mapValues(round))
         }.sorted{$0.code<$1.code}
         return Result(start:period.start,end:date,rows:rows,
-                      unmatchedClinicalLines:unresolved)
+                      unmatchedClinicalLines:unresolved,
+                      projectedClinicalLines:projectedClinicalLines)
     }
 }
