@@ -403,7 +403,7 @@ for(const fragment of [
 ]) must(autoCut,fragment,'apertura 1/0 histórica declarada sin alterar stock actual');
 for(const fragment of [
   'Label("Declarar apertura histórica (1/0)",',
-  'context.options(for:line.code,at:detail.date)',
+  'context.historicalOptions(for:line.code,at:detail.date)',
   'Consumo incluido en saldo reconstruido',
   'cut.projectedClinicalLines'
 ]) must(history,fragment,'declaración histórica y estado contable separados de FEFO');
@@ -455,6 +455,46 @@ for(const key of [
   'Failure.ambiguousHistoricalOpenings'
 ]) must(stockChoice,key,'lógica única de stock inicial y físico contado');
 console.log('PASS: registro de lote solicita elegir inicio día 9 o conteo actual y aplica cálculo sin doble descuento.');
+
+const containerCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ContainerAccounting.swift'),'utf8');
+const formData=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeFormContext.swift'),'utf8');
+for(const key of [
+  '.alert(containerDecisionTitle,isPresented:$showContainerDecision)',
+  'Button("Sí, abrí uno nuevo · Kardex 1")',
+  'Button("No, usé el abierto · Kardex 0")',
+  'beginContainerReview(context)',
+  'recordContainerDecision(opened:true)',
+  'recordContainerDecision(opened:false)',
+  'containerDecisionIndex+=1',
+  'Task {await confirm()}',
+  'form.items[idx].closePriorContainer=opened && (alreadyOpen || earlierOpened)'
+]) must(form,key,'pregunta obligatoria para cada frasco/caja al guardar atención');
+for(const key of [
+  'Al guardar la atención, DANPER preguntará automáticamente',
+  'El volumen es opcional; nunca se infiere una apertura'
+]) must(medicationRow,key,'eliminar casilla de apertura fácil de olvidar');
+assert(!medicationRow.includes('DanperCheckRow(selected:$medication.approveOpening)') ||
+       medicationRow.includes('Confirmo la apertura física para extraer unidades individuales'),
+       'el control de frascos/cajas debe estar al guardar, no oculto en cada fila');
+for(const key of [
+  'previousContainerExhausted',
+  'closePriorContainer:Bool=false'
+]) must(formData,key,'evidencia explícita del envase anterior agotado');
+for(const key of [
+  'static func exhaustedByNextOpening(',
+  '"kind":"containerState"',
+  '"containerDisposition":"agotado"',
+  '"excelQuantity":0'
+]) must(containerCore,key,'cierre anterior verificado sin consumo adicional');
+for(const key of [
+  'exhaustPrevious',
+  'active.count==1',
+  'pendingClosures',
+  'N2ContainerAccounting.exhaustedByNextOpening(',
+  'movements.append(contentsOf:pendingClosures)'
+]) must(clinicalTx,key,'transición atómica de apertura nueva y agotamiento previo');
+console.log('PASS: alertas 1/0 por cada envase, cierre anterior auditable sin doble descuento.');
+
 
 
 
