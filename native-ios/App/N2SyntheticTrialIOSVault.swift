@@ -319,6 +319,13 @@ actor N2SyntheticTrialIOSVault {
         try protectedStore().registerStockLot(lot,
             nursingCatalog:resource("n2-nursing-catalog"),expectedRevision:expectedRevision)
     }
+    func correctUnusedLot(lotID:String,reference:String,expires:String,
+        reason:String,operatorName:String,at:Int64,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().correctUnusedLot(lotID:lotID,reference:reference,
+            expires:expires,reason:reason,operatorName:operatorName,
+            at:at,expectedRevision:expectedRevision)
+    }
     func receiveStock(movementID:String,lotID:String,at:Int64,
                       sealedAdded:Int,looseAdded:Double,reason:String,
                       expectedRevision:Int)throws->N2ProtectedStoreSummary {
