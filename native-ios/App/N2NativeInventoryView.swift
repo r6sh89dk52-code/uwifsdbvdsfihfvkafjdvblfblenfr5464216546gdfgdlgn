@@ -40,6 +40,7 @@ struct N2NativeInventoryView:View {
     @State private var capacityConfirmed=false
     @State private var selectedLotID=""
     @State private var closingLot:N2FormLot?
+    @State private var editingLot:N2FormLot?
     @State private var reason=""
     @State private var productSearch=""
     @State private var zeroStockQuery=""
@@ -97,6 +98,26 @@ struct N2NativeInventoryView:View {
                 $0.clinicalCode==product.code
             })
         }.prefix(12))
+    }
+    private struct LotGroup:Identifiable {
+        var id:String{code}
+        let code:String
+        let name:String
+        let total:Int
+        let lots:[N2FormLot]
+    }
+    private var groupedLots:[LotGroup] {
+        guard let context else{return []}
+        return Dictionary(grouping:context.lots,by:\.kardexCode).map{code,lots in
+            LotGroup(code:code,name:lots.first?.name ?? code,
+                total:lots.count,lots:lots.sorted{
+                    let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
+                    let b=$1.expires.isEmpty ? "9999-12-31":$1.expires
+                    return a==b ? $0.reference<$1.reference:a<b
+                })
+        }.sorted{
+            $0.name.localizedStandardCompare($1.name)==.orderedAscending
+        }
     }
     private var material:N2NursingCatalogProduct? {
         context?.products.nursing.first{$0.id==materialCode}
@@ -176,6 +197,9 @@ struct N2NativeInventoryView:View {
         .task {if !layoutOnly {await load()}}
         .sheet(item:$closingLot) {lot in
             N2ContainerStateView(lot:lot,revision:context?.revision ?? 0) {Task {await load()}}
+        }
+        .sheet(item:$editingLot) {lot in
+            N2LotMetadataEditor(lot:lot,onSaved:{Task {await load()}})
         }
         .sheet(isPresented:$showAuxiliaryInventory) {
             if let context,!auxiliaryCode.isEmpty {
@@ -508,29 +532,65 @@ struct N2NativeInventoryView:View {
         }
     }
     private var lotList:some View {
-        DanperPanel("Stock y lotes registrados") {
-            if let context, !context.lots.isEmpty {
-                ForEach(context.lots){lot in
-                    VStack(alignment:.leading,spacing:5) {
-                        Text(lot.name).font(.subheadline.weight(.semibold))
-                        Text("Lote: "+(lot.reference.isEmpty ? "Sin referencia" : lot.reference))
-                            .font(.caption).foregroundStyle(.secondary)
-                        let total=stockUnits(lot)
-                        Text("Cantidad: \(total.formatted()) \(lot.unit) · Vence: \(DanperDatePresentation.display(lot.expires))")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if !["UND","TBL","PAR","ML","LT"].contains(lot.unit.uppercased()) {
-                            Text("Envases abiertos declarados: \(lot.openContainers)")
-                                .font(.caption).foregroundStyle(.secondary)
-                            if lot.openContainers>0 {
-                                Button("Declarar agotado, cerrado o descartado") {closingLot=lot}
+        DanperPanel("Inventario por medicamento") {
+            if !groupedLots.isEmpty {
+                Text("\(groupedLots.count) medicamentos · \(context?.lots.count ?? 0) lotes registrados")
+                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(groupedLots) {group in
+                    DisclosureGroup {
+                        ForEach(group.lots) {lot in
+                            VStack(alignment:.leading,spacing:9) {
+                                HStack {
+                                    Text("Lote: "+(lot.reference.isEmpty ? "Sin referencia":lot.reference))
+                                        .font(.subheadline.weight(.semibold))
+                                    Spacer()
+                                    Text("\(stockUnits(lot).formatted()) \(lot.unit)")
+                                        .font(.subheadline.weight(.semibold))
+                                        .monospacedDigit()
+                                }
+                                Text("Vencimiento: "+DanperDatePresentation.display(lot.expires))
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if N2ContainerAccounting.isContainer(unit:lot.unit) {
+                                    Text("Abiertos: \(lot.openContainers)")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                HStack {
+                                    Button {
+                                        editingLot=lot
+                                    } label: {
+                                        Label("Editar lote",systemImage:"square.and.pencil")
+                                    }.buttonStyle(.bordered)
+                                        .accessibilityIdentifier("inventory-edit-lot-"+lot.id)
+                                    Button {
+                                        selectedLotID=lot.id
+                                        mode="count"
+                                        workspace="edit"
+                                        quantity=""
+                                    } label: {
+                                        Label("Actualizar conteo",systemImage:"checkmark.shield")
+                                    }.buttonStyle(.bordered)
+                                }
+                                if lot.openContainers>0 &&
+                                   N2ContainerAccounting.isContainer(unit:lot.unit) {
+                                    Button("Declarar agotado, cerrado o descartado") {
+                                        closingLot=lot
+                                    }
                                     .font(.caption)
+                                }
+                                Divider()
                             }
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                            .accessibilityIdentifier("inventory-lot-"+lot.reference)
+                        }
+                    } label: {
+                        HStack {
+                            Text(group.name).font(.subheadline.weight(.semibold))
+                            Spacer(minLength:8)
+                            Text("\(group.total) lote(s)")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    .frame(maxWidth:.infinity,alignment:.leading)
-                    .accessibilityElement(children:.contain)
-                    .accessibilityIdentifier("inventory-lot-"+lot.reference)
-                    Divider()
+                    .accessibilityIdentifier("inventory-group-"+group.code)
                 }
             } else {
                 Text("Todavía no hay medicamentos registrados.")
@@ -538,6 +598,7 @@ struct N2NativeInventoryView:View {
             }
         }
     }
+
     @MainActor private func load() async {
         do {
             context=try await vault.clinicalFormContext()
