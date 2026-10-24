@@ -273,7 +273,7 @@ for(const key of [
   'N2NativeInventoryView(initialOperation:"lot")',
   'Label("Registrar existencias",systemImage:"shippingbox.fill")',
   'Label("Vincular producto",systemImage:"link")',
-  '"Revisar lote o apertura"','"Volver a comprobar pendientes"'
+  'pending-container-stock-','"Volver a comprobar pendientes"'
 ]) must(form,key,'resolución contextual y única de consumos pendientes');
 for(const key of [
   'case registerStock','case verifyCorrespondence','case verifyPhysicalUse',
@@ -359,13 +359,13 @@ for(const fragment of [
   'storedResolution == .verifyCorrespondence && alreadyLinked',
   'context?.products.authorizedNursingOptions(',
   'Producto ya vinculado al Kardex',
-  'Revisar consumo anterior'
+  'history-pending-container-stock-'
 ]) must(history,fragment,'historial no reabre vinculación ya revisada');
 for(const fragment of [
   'storedResolution == .verifyCorrespondence && alreadyLinked',
   'context.products.authorizedNursingOptions(',
   'Producto ya vinculado.',
-  'Revisar consumo anterior'
+  'pending-container-stock-'
 ]) must(form,fragment,'resultado evita vinculación ya confirmada');
 console.log('PASS: enlaces confirmados en bloque omiten modal repetido incluso para pendientes previos.');
 for(const fragment of [
@@ -517,6 +517,33 @@ for(const key of [
   'N2ContainerAccounting.exhaustedByNextOpening(',
   'movements.append(contentsOf:pendingClosures)'
 ]) must(clinicalTx,key,'transición atómica de apertura nueva y agotamiento previo');
+for(const needle of [
+  'form.items[idx].physicalQuantity=0',
+  'reusePreviouslyOpened = !opened',
+  'available.first(where:{$0.openContainers>0})',
+  'pending-container-stock-'
+]) must(form,needle,'reutilización automática FEFO con R0 y sin modal redundante');
+for(const needle of [
+  'reusePreviouslyOpened:Bool=false',
+  '"reusePreviouslyOpened":med.reusePreviouslyOpened'
+]) must(formData,needle,'declaración explícita de envase abierto');
+for(const needle of [
+  'attestAlreadyOpen(',
+  'existingOpenAttested',
+  '"physicalChange":0',
+  '"containerDisposition":"ya_abierto"'
+]) must(containerCore,needle,'reclasificación auditada sin inventar una apertura antigua');
+for(const needle of [
+  'let declaredReuse =',
+  'N2ContainerAccounting.attestAlreadyOpen(',
+  'selectedForAccounting',
+  'movements.append(contentsOf:pendingClosures)'
+]) must(clinicalTx,needle,'FEFO apertura previa con actual R0');
+for(const needle of [
+  'history-pending-container-stock-',
+  'Ir al Kardex · comprobar envase'
+]) must(history,needle,'pendiente vincula al inventario y no a cantidad física duplicada');
+
 console.log('PASS: alertas 1/0 por cada envase, cierre anterior auditable sin doble descuento.');
 
 
