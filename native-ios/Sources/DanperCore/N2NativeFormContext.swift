@@ -179,6 +179,7 @@ public struct N2FormMedication:Equatable,Sendable,Identifiable {
     public var approveOpening:Bool
     /// User explicitly confirmed the previously open container was exhausted.
     public var closePriorContainer:Bool=false
+    public var reusePreviouslyOpened:Bool=false
     public var newContainers:Int=1
     public init(id:String=UUID().uuidString,code:String,quantity:Int=1,
                 procedure:String="",selectedLotID:String="",
@@ -260,7 +261,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "procedureConfirmed":med.procedureConfirmed,
                 "procedureSource":med.procedureSource,
                 "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
-                "previousContainerExhausted":med.approveOpening && med.closePriorContainer
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
             ]
             if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
                 // Preserve the operator's clinical record if stock changed
@@ -273,7 +275,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                     "lotId":med.selectedLotID,
                     "quantity":med.physicalQuantity,
                     "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
-                "previousContainerExhausted":med.approveOpening && med.closePriorContainer
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
                 ] as [String:Any]
             }
             lines.append(row)
@@ -321,7 +324,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "procedureConfirmed":med.procedureConfirmed,
                 "procedureSource":med.procedureSource,
                 "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
-                "previousContainerExhausted":med.approveOpening && med.closePriorContainer
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
             ]
             if let catalog=context.products.clinical.first(where:{$0.code==med.code}) {
                 row["name"]=catalog.name;row["unit"]=catalog.unit
@@ -330,7 +334,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 row["physicalUse"]=[
                     "lotId":med.selectedLotID,"quantity":med.physicalQuantity,
                     "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
-                "previousContainerExhausted":med.approveOpening && med.closePriorContainer
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
                 ] as [String:Any]
             }
             return row
