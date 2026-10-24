@@ -291,6 +291,11 @@ actor N2ProtectedClinicalIOSVault {
             allowPending:allowPending)
     }
 
+    func exportOccupationalVigilance(start:String,end:String)throws
+        ->N2OccupationalVigilanceWorkbook.Result {
+        try protectedStore().exportOccupationalVigilance(start:start,end:end)
+    }
+
     func exportVerifiedDailyNursingWorkbook(date:String,shift:String,
         responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
         guard let source=Bundle.main.url(
