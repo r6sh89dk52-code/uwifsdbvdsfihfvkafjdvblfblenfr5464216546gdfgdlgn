@@ -108,6 +108,11 @@ struct N2Build222KardexHub:View {
                                  symbol:"tablecells",id:"indicator"){
                         N2VerifiedIndicatorExportView()
                     }
+                    linkedAction("Vigilancia ocupacional",
+                                 subtitle:"Excel de una hoja · sistema osteomuscular",
+                                 symbol:"figure.walk.motion",id:"vigilance"){
+                        N2OccupationalVigilanceExportView()
+                    }
                 }
 
                 Label("Inventario compartido entre ambas sedes. Cada atención terminada registra su consumo automáticamente; los lotes son internos y no se exportan.",
