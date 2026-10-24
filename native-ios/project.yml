@@ -1,4 +1,8 @@
 name: DANPERNative
+settings:
+  base:
+    CODE_SIGN_IDENTITY[sdk=iphonesimulator*]: "-"
+    CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]: YES
 options:
   bundleIdPrefix: pe.danper.saludmovil.native
   deploymentTarget:

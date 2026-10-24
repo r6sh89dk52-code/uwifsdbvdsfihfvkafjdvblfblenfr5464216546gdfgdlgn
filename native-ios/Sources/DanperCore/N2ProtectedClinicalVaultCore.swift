@@ -9,6 +9,7 @@ public struct N2DispensingLine:Identifiable,Sendable {
     public let code:String
     public let quantity:Double
     public let result:String
+    public var kardexQuantity:Double?=nil
 }
 public struct N2ProtectedStoreSummary: Sendable {
     public let revision:Int
@@ -64,6 +65,13 @@ public final class N2ProtectedClinicalVaultCore {
                 visitID:evidence.visitID,approvedCatalog:approvedCatalog,at:evidence.at).snapshot
         }
     }
+    public func closeContainers(lotID:String,count:Int,disposition:String,operatorName:String,
+                                reason:String,at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2ContainerAccounting.close(snapshot:$0,lotID:lotID,count:count,disposition:disposition,
+                operatorName:operatorName,reason:reason,at:at)
+        }
+    }
     public func auxiliaryAccounting()throws->String {
         guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
         return try N2AuxiliaryInventory.accounting(snapshot:active.snapshot)
@@ -111,13 +119,15 @@ public final class N2ProtectedClinicalVaultCore {
         let outcomes=visit["nativeDispensing"] as? [String:String] ?? [:]
         return items.map { item in
             let id=item["id"] as? String ?? ""
-            let linked=movements.contains { m in
+            let linkedMovements=movements.filter { m in
                 guard let ref=m["dispenseRef"] as? [String:Any] else{return false}
                 return ref["attentionId"] as? String==visitID && ref["itemId"] as? String==id
             }
+            let linked = !linkedMovements.isEmpty
+            let kardex=linked ? linkedMovements.reduce(0.0){$0+(($1["excelQuantity"] as? NSNumber)?.doubleValue ?? 0)} : nil
             return N2DispensingLine(id:id,name:item["name"] as? String ?? "",
                 code:item["code"] as? String ?? "",quantity:(item["quantity"] as? NSNumber)?.doubleValue ?? 0,
-                result:linked ? "Descontado" : (outcomes[id] ?? "Pendiente de conciliar: registro histórico sin salida verificada"))
+                result:linked ? "Descontado" : (outcomes[id] ?? "Pendiente de conciliar: registro histórico sin salida verificada"),kardexQuantity:kardex)
         }
     }
     public func dispensingStatus(visitID:String)throws->[String:String] {

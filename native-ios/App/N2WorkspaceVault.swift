@@ -75,6 +75,10 @@ struct N2WorkspaceVault:Sendable {
         if isClinical {return try await N2ProtectedClinicalIOSVault.shared.confirmPendingDispensing(evidence,expectedRevision:expectedRevision)}
         return try await N2SyntheticTrialIOSVault.shared.confirmPendingDispensing(evidence,expectedRevision:expectedRevision)
     }
+    func closeContainers(lotID:String,count:Int,disposition:String,operatorName:String,reason:String,at:Int64,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.closeContainers(lotID:lotID,count:count,disposition:disposition,operatorName:operatorName,reason:reason,at:at,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.closeContainers(lotID:lotID,count:count,disposition:disposition,operatorName:operatorName,reason:reason,at:at,expectedRevision:expectedRevision)
+    }
     func auxiliaryAccounting() async throws->String {
         if isClinical {return try await N2ProtectedClinicalIOSVault.shared.auxiliaryAccounting()}
         return try await N2SyntheticTrialIOSVault.shared.auxiliaryAccounting()

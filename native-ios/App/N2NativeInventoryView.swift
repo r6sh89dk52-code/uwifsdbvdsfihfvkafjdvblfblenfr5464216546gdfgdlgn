@@ -35,10 +35,16 @@ struct N2NativeInventoryView:View {
     @State private var quantity=""
     @State private var expiryEnabled=false
     @State private var expiryInput=""
+    @State private var capacityInput=""
+    @State private var capacityEvidence=""
+    @State private var capacityConfirmed=false
     @State private var selectedLotID=""
+    @State private var closingLot:N2FormLot?
     @State private var reason=""
     @State private var productSearch=""
     @FocusState private var productSearchFocused:Bool
+    @Environment(\.danperReveal) private var reveal
+    @State private var revealTask:Task<Void,Never>?
     @State private var busy=false
     @State private var failed=false
     @State private var message="Cargando inventario…"
@@ -80,19 +86,14 @@ struct N2NativeInventoryView:View {
         return q
     }
     private var packaged:Bool {
-        !["UND","TBL","PAR","ML","LT"].contains(unit)
+        !unit.isEmpty && !["UND","TBL","PAR","ML","LT"].contains(unit)
     }
-    private var lotCapacity:Int {
-        // Infer only when the official product name actually states a
-        // quantity. NEVER assume a bottle contains 100 mL by default.
-        guard packaged,let name=material?.name.uppercased(),
-              let range=name.range(of:#"\b\d{1,4}\s*(ML|CC|LT|L)\b"#,
-                                   options:.regularExpression) else{return 1}
-        let token=String(name[range]).uppercased()
-        let digits=token.prefix{$0.isNumber}
-        let count=Int(digits) ?? 1
-        return max(1,min(10_000_000,count *
-            (token.contains("LT") || token.hasSuffix("L") ? 1000:1)))
+    private var lotCapacity:Int? {
+        guard packaged else{return 1}
+        if capacityInput.isEmpty {return 1}
+        guard let value=Int(capacityInput),value>0,value<=10_000_000,
+              capacityConfirmed,capacityEvidence.trimmingCharacters(in:.whitespacesAndNewlines).count>=10 else{return nil}
+        return value
     }
     private var expiryISO:String? {
         guard expiryEnabled else{return ""}
@@ -103,7 +104,7 @@ struct N2NativeInventoryView:View {
         if mode=="lot" {
             return material != nil && !unit.isEmpty &&
                 !lotNumber.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
-                expiryISO != nil && (!packaged || amount.rounded()==amount)
+                expiryISO != nil && lotCapacity != nil && (!packaged || amount.rounded()==amount)
         }
         guard selectedLot != nil,reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8
         else{return false}
@@ -141,6 +142,12 @@ struct N2NativeInventoryView:View {
         .navigationBarTitleDisplayMode(.inline)
         .danperFormChrome()
         .task {if !layoutOnly {await load()}}
+        .sheet(item:$closingLot) {lot in
+            N2ContainerStateView(lot:lot,revision:context?.revision ?? 0) {Task {await load()}}
+        }
+        .onChange(of:materialCode) {_,_ in
+            capacityInput="";capacityEvidence="";capacityConfirmed=false
+        }
     }
 
     private var header:some View {
@@ -230,6 +237,24 @@ struct N2NativeInventoryView:View {
                         }
                     }
                     expiryField
+                    if packaged {
+                        DanperField(title:"Capacidad interna opcional verificada por envase") {
+                            TextField("mL o unidades internas por envase",text:$capacityInput)
+                                .keyboardType(.numberPad)
+                                .accessibilityIdentifier("inventory-container-capacity")
+                                .onChange(of:capacityInput) {_,_ in capacityConfirmed=false}
+                        }
+                        DanperField(title:"Evidencia de capacidad y unidad interna") {
+                            TextField("Etiqueta o recuento verificado",text:$capacityEvidence,axis:.vertical)
+                                .lineLimit(2...4)
+                                .accessibilityIdentifier("inventory-capacity-evidence")
+                        }
+                        DanperCheckRow(selected:$capacityConfirmed) {
+                            Text("Confirmo la capacidad real del envase")
+                        }
+                        Text("No se presupone una capacidad. Usa la misma unidad interna al registrar la correspondencia y el consumo físico.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }else {
                     DanperChoiceField(title:"Medicamento y lote",
                         selection:$selectedLotID,options:context?.lots.map(\.id) ?? [],
@@ -309,6 +334,13 @@ struct N2NativeInventoryView:View {
                     materialCode=""
                     unit=""
                 }
+                revealTask?.cancel()
+                if productSearchFocused && !query.isEmpty {
+                    revealTask=Task { @MainActor in
+                        do {try await Task.sleep(for:.milliseconds(220))}catch{return}
+                        if productSearchFocused {reveal("inventory-product-results")}
+                    }
+                }
             }
             if productSearchFocused && !productSearch.isEmpty {
                 if matchingProducts.isEmpty {
@@ -345,6 +377,7 @@ struct N2NativeInventoryView:View {
                         }
                     }
                     .frame(maxHeight:220)
+                    .id("inventory-product-results")
                 }
             }
         }
@@ -376,8 +409,18 @@ struct N2NativeInventoryView:View {
                         let total=stockUnits(lot)
                         Text("Cantidad: \(total.formatted()) \(lot.unit) · Vence: \(DanperDatePresentation.display(lot.expires))")
                             .font(.caption).foregroundStyle(.secondary)
+                        if !["UND","TBL","PAR","ML","LT"].contains(lot.unit.uppercased()) {
+                            Text("Envases abiertos declarados: \(lot.openContainers)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            if lot.openContainers>0 {
+                                Button("Declarar agotado, cerrado o descartado") {closingLot=lot}
+                                    .font(.caption)
+                            }
+                        }
                     }
                     .frame(maxWidth:.infinity,alignment:.leading)
+                    .accessibilityElement(children:.contain)
+                    .accessibilityIdentifier("inventory-lot-"+lot.reference)
                     Divider()
                 }
             } else {
@@ -406,9 +449,9 @@ struct N2NativeInventoryView:View {
         do {
             let result:N2ProtectedStoreSummary
             if mode=="lot" {
-                guard let material,let expiryISO else{return}
+                guard let material,let expiryISO,let lotCapacity else{return}
                 let isPack=packaged
-                let record:[String:Any]=[
+                var record:[String:Any]=[
                     "id":lotID,"code":material.id,"name":material.name,
                     "catalogUnit":unit,"lot":lotNumber,
                     "expires":expiryISO,
@@ -420,6 +463,14 @@ struct N2NativeInventoryView:View {
                     "looseUnits":isPack ? 0 : qty,
                     "openedRemaining":0,"updatedAt":movementAt
                 ]
+                if isPack {
+                    record["declaredOpenContainers"]=0
+                    record["volumeTrackingEnabled"] = !capacityInput.isEmpty
+                    if !capacityInput.isEmpty {
+                        record["capacityEvidence"]=capacityEvidence
+                        record["capacityVerifiedAt"]=movementAt
+                    }
+                }
                 let bytes=try JSONSerialization.data(withJSONObject:record)
                 result=try await vault.addLot(bytes,expectedRevision:current.revision)
             }else {
@@ -457,6 +508,9 @@ struct N2NativeInventoryView:View {
             lotNumber=""
             expiryEnabled=false
             expiryInput=""
+            capacityInput=""
+            capacityEvidence=""
+            capacityConfirmed=false
             reason=""
             message="Existencias registradas correctamente en el Kardex único."
         }catch{

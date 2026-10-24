@@ -224,7 +224,7 @@ struct N2VerifiedIndicatorExportView:View {
         .alert("¿Generar un libro provisional?",isPresented:$confirmProvisional) {
             Button("Generar provisional") {Task {await export()}}
             Button("Cancelar",role:.cancel) {}
-        } message: {Text("Las cantidades declaradas pendientes no son movimientos físicos de Kardex. El archivo quedará identificado como PROVISIONAL.")}
+        } message: {Text("Las cantidades individuales declaradas pendientes no son movimientos físicos de Kardex. Un envase sin apertura verificable no se convierte en R, ni siquiera en un provisional: concílialo o excluye esa atención. El archivo quedará identificado como PROVISIONAL.")}
         .task {if !layoutOnly {await load()}}
         .onChange(of:startDate) {_,_ in selectConfirmed()}
         .onChange(of:endDate) {_,_ in selectConfirmed()}
@@ -319,7 +319,7 @@ struct N2VerifiedIndicatorExportView:View {
         case .invalidReconciliation:
             return "Falta stock inicial o recuento final verificable, o hay un movimiento de conciliación inconsistente. Revisa Conciliación de inventario."
         case .unverifiedDelivery:
-            return "Una atención seleccionada tiene un consumo sin entrega confirmada o una corrección pendiente. Desmárcala o usa un libro provisional cuando corresponda."
+            return "Una atención seleccionada tiene un consumo sin entrega confirmada o una corrección pendiente. Concilia la evidencia o desmárcala. Los envases sin apertura verificable no se exportan como R, tampoco en un provisional."
         case .invalidVisit:
             return "Una atención tiene sede no verificada o datos obligatorios incompletos. Confirma la ubicación en Personal antes de exportar ambas sedes."
         case .invalidPeriod:

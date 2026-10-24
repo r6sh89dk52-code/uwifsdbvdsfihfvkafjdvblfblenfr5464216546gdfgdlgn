@@ -108,18 +108,14 @@ struct N2ClinicalWorkspaceGateView:View {
         .navigationTitle("Acceso clínico")
         .danperFormChrome()
         .task {await refresh()}
-        .onChange(of:summary?.revision) {_,revision in
-            if authenticatedLaunch && revision != nil && scenePhase == .active && !invalidSource && !automaticallyEntered {
-                automaticallyEntered=true
-                showWorkspace=true
-            }
-        }
+        .onChange(of:summary?.revision) {_,_ in enterVerifiedWorkspaceIfReady()}
         // Returning from PERSONAL import must refresh the gate's source count.
         .onAppear {
             if scenePhase == .active {Task {await refresh()}}
         }
         .onChange(of:scenePhase) {_,phase in
-            if phase != .active {
+            if phase == .active {enterVerifiedWorkspaceIfReady()}
+            else if phase == .background {
                 gateCycle=UUID()
                 gateContext?.invalidate()
                 gateContext=nil
@@ -134,6 +130,13 @@ struct N2ClinicalWorkspaceGateView:View {
             }
             .environment(\.n2WorkspaceVault,.clinical)
         }
+    }
+
+    @MainActor private func enterVerifiedWorkspaceIfReady() {
+        guard authenticatedLaunch,summary != nil,scenePhase == .active,
+              !invalidSource,!automaticallyEntered else{return}
+        automaticallyEntered=true
+        showWorkspace=true
     }
 
     @MainActor private func refresh() async {
@@ -436,7 +439,7 @@ struct N2ClinicalWorkspaceRootView:View {
             if old==1 && current != 1 {registeredDNI=nil}
         }
         .onChange(of:scenePhase) {_,phase in
-            if phase != .active {onClose()}
+            if phase == .background {onClose()}
         }
     }
     @MainActor private func refreshHomeCounts() async {

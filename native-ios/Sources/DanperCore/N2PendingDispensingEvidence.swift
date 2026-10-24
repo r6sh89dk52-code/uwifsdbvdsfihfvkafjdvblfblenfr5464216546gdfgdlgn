@@ -11,11 +11,13 @@ public struct N2PendingDispensingEvidence:Codable,Sendable,Equatable {
     public let reason:String
     public let at:Int64
     public let version:Int
+    public var newContainers:Int?
     public init(visitID:String,itemID:String,lotID:String,quantity:Double,
-                confirmNewContainer:Bool,operatorName:String,reason:String,at:Int64) {
+                confirmNewContainer:Bool,operatorName:String,reason:String,at:Int64,newContainers:Int?=nil) {
         id=UUID().uuidString;self.visitID=visitID;self.itemID=itemID;self.lotID=lotID
         self.quantity=quantity;self.confirmNewContainer=confirmNewContainer
         self.operatorName=operatorName;self.reason=reason;self.at=at;version=1
+        self.newContainers=newContainers ?? (confirmNewContainer ? 1:0)
     }
     public enum Failure:Error {case invalidEvidence,invalidTarget}
     public static func read(snapshot:Data)throws->[Self] {
@@ -28,7 +30,8 @@ public struct N2PendingDispensingEvidence:Codable,Sendable,Equatable {
     }
     private func validate()throws {
         guard version==1,UUID(uuidString:id) != nil,!visitID.isEmpty,!itemID.isEmpty,!lotID.isEmpty,
-              quantity.isFinite,quantity>0,quantity<=10_000_000,at>0,
+              quantity.isFinite,quantity>=0,quantity<=10_000_000,at>0,
+              newContainers == nil || ((0...10_000).contains(newContainers!) && (newContainers==0 || confirmNewContainer)),
               operatorName.trimmingCharacters(in:.whitespacesAndNewlines).count>=3,
               reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=10 else{throw Failure.invalidEvidence}
     }

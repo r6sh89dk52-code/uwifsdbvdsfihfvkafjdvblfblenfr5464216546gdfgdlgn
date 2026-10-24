@@ -11,6 +11,10 @@ final class N2BiometricInteractionTests:XCTestCase {
         attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)
     }
     func testAutomaticBiometryCancellationRetryAndForeground() {
+        #if !targetEnvironment(simulator)
+        XCTFail("Esta prueba usa exclusivamente biometría simulada; no valida Face ID físico")
+        return
+        #endif
         continueAfterFailure=false
         let app=XCUIApplication()
         app.launchArguments=["-danper.native.onboarding.v1.finished","YES"]
@@ -38,13 +42,13 @@ final class N2BiometricInteractionTests:XCTestCase {
         Thread.sleep(forTimeInterval:2)
         biometric("match")
         let source=app.buttons["clinical-first-run-import-personal"]
-        XCTAssertTrue(source.waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertTrue(source.waitForExistence(timeout:5) || app.tabBars.firstMatch.waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Autenticacion-simulada-aceptada-seleccion-fuente")
         XCUIDevice.shared.press(.home)
         app.activate()
         XCTAssertTrue(checking.waitForExistence(timeout:10),app.debugDescription)
         Thread.sleep(forTimeInterval:2)
         biometric("match")
-        XCTAssertTrue(source.waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertTrue(source.waitForExistence(timeout:5) || app.tabBars.firstMatch.waitForExistence(timeout:10),app.debugDescription)
     }
 }

@@ -108,19 +108,25 @@ public enum N2AutomaticCutAccounting {
                       n.rounded()==n else {throw Failure.invalidSource}
                 let id=visitID+"\u{001F}"+itemID
                 guard ids.insert(id).inserted else{throw Failure.duplicateLine}
+                let events=linked[id] ?? []
                 let candidates=catalog[Key(clinicalCode:code,name:name,unit:unit)] ?? []
-                if candidates.count != 1 {unresolved+=1;continue}
-                let match=candidates[0]
+                let match:(code:String,name:String)
+                if let event=events.first,let inventoryCode=event["code"] as? String,
+                   let inventoryName=event["name"] as? String {
+                    match=(inventoryCode,inventoryName)
+                }else if candidates.count==1 {match=candidates[0]}
+                else {unresolved+=1;continue}
                 var line=totals[match.code] ?? Acc()
                 line.name=match.name
                 line.clinical+=n
-                let events=linked[id] ?? []
                 if !events.isEmpty {
                     // Recorded opening/reuse R has authority for containers.
                     let debit=events.reduce(0.0){$0+(num($1["excelQuantity"]) ?? 0)}
                     line.used+=debit
                     line.daily[visitDay,default:0]+=debit
-                }else if ["UND","TBL","PAR"].contains(unit.uppercased()) {
+                }else if ["UND","TBL","PAR"].contains(unit.uppercased()) &&
+                    !lots.contains(where:{$0["code"] as? String==match.code &&
+                        N2ContainerAccounting.isContainer(unit:$0["catalogUnit"] as? String ?? "")}) {
                     // A saved attention confirms its units, even when it was
                     // entered before its initial lot was catalogued.
                     line.used+=n
@@ -142,10 +148,14 @@ public enum N2AutomaticCutAccounting {
             var line=totals[code] ?? Acc()
             if let name=m["name"] as? String {line.name=name}
             if m["kind"] as? String=="extraordinary" {
-                let quantity=num(m["physicalChange"]) ?? 0
+                let before=m["before"] as? [String:Any] ?? [:]
+                let quantity=N2ContainerAccounting.isContainer(unit:before["catalogUnit"] as? String ?? "") ?
+                    (num(m["sealedAdded"]) ?? 0) : (num(m["physicalChange"]) ?? 0)
                 line.received+=quantity
             }else if m["kind"] as? String=="adjustment" {
-                line.adjusted += (num(m["physicalChange"]) ?? 0)
+                let before=m["before"] as? [String:Any] ?? [:],after=m["after"] as? [String:Any] ?? [:]
+                line.adjusted += N2ContainerAccounting.isContainer(unit:before["catalogUnit"] as? String ?? "") ?
+                    (num(after["sealedContainers"]) ?? 0)-(num(before["sealedContainers"]) ?? 0) : (num(m["physicalChange"]) ?? 0)
             }
             totals[code]=line
         }
@@ -159,7 +169,14 @@ public enum N2AutomaticCutAccounting {
             }
         }
         let rows=totals.map {code,item -> Row in
-            let associated=lotsByCode[code] ?? []
+            let associated=(lotsByCode[code] ?? []).compactMap {lot -> [String:Any]? in
+                let events=movements.filter{$0["lotId"] as? String==lot["id"] as? String}
+                    .sorted{(num($0["at"]) ?? 0)<(num($1["at"]) ?? 0)}
+                let initial=(events.first?["before"] as? [String:Any]) ?? lot
+                guard day(num(initial["updatedAt"]) ?? 0)<=date else{return nil}
+                let later=events.first{day(num($0["at"]) ?? 0)>date}
+                return (later?["before"] as? [String:Any]) ?? lot
+            }
             // Current counted stock is known only if a lot is on record.
             // Packaged material needs opening-unit evidence, not mL totals.
             let count:Double?=associated.isEmpty ? nil : associated.reduce(0.0){sum,l in

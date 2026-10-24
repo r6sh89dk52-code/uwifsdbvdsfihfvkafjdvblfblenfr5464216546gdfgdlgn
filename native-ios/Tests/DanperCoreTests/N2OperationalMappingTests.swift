@@ -106,6 +106,46 @@ final class N2OperationalMappingTests:XCTestCase {
         XCTAssertEqual(official.rows.count,98)
         XCTAssertEqual(catalog.approvals.count,86)
     }
+    func testClinicalUnitsMappedToVerifiedBoxDebitDeclaredBoxesNotVisitsOrClinicalUnits()throws {
+        let index=try catalog()
+        let clinical=try XCTUnwrap(index.clinical.first{$0.code=="10000929"})
+        let inventory=try XCTUnwrap(index.nursing.first{$0.id=="E-94"})
+        XCTAssertEqual(inventory.unit,"CJA")
+        let mapping=N2OperationalMapping(clinical:clinical,inventory:inventory,physicalUnit:"UND",conversion:1,
+            confirmedAt:now-1000,operatorName:"OPERADOR FICTICIO",evidence:"Caja y presentación verificadas en prueba sintética")
+        var root=try JSONSerialization.jsonObject(with:fixture("n1e-clinical-stock.json")) as! [String:Any]
+        var lots=root["stockLots"] as! [[String:Any]]
+        lots.append(["id":"declared-gloves","code":inventory.id,"name":inventory.name,"catalogUnit":"CJA",
+            "lot":"SYNTHETIC","expires":"2027-01-01","container":"caja","unitsPerContainer":1,
+            "sealedContainers":2,"looseUnits":0,"openedRemaining":0,"declaredOpenContainers":0,
+            "volumeTrackingEnabled":false,"updatedAt":now-2000])
+        root["stockLots"]=lots
+        var snapshot=try N2OperationalMappings.append(snapshot:bytes(root),rule:mapping,catalog:index,explicitConsent:true)
+        var visit=(root["attentions"] as! [[String:Any]])[0]
+        for count in 0..<3 {
+            visit["id"]="gloves-\(count)"
+            visit["items"]=[["id":"gloves-item","code":clinical.code,"name":clinical.name,
+                "unit":clinical.unit,"quantity":count+1,"procedure":"OBSERVACION","confirmNewContainer":count==0,
+                "newContainers":count==0 ? 1:0]]
+            let result=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:snapshot,visit:bytes(visit),
+                approvedCatalog:fixture("n2-reviewed-approved.json"),at:now+Int64(count))
+            XCTAssertEqual(result.linked,1,result.pendingReasons.joined(separator:";"))
+            snapshot=result.snapshot
+        }
+        let final=try JSONSerialization.jsonObject(with:snapshot) as! [String:Any]
+        let movements=(final["stockMovements"] as! [[String:Any]]).filter{$0["lotId"] as? String=="declared-gloves"}
+        XCTAssertEqual(movements.compactMap{($0["excelQuantity"] as? NSNumber)?.intValue},[1,0,0])
+        XCTAssertTrue(movements.allSatisfy{($0["quantity"] as? NSNumber)?.intValue==0})
+        let cut=try N2AutomaticCutAccounting.calculate(snapshot:snapshot,mappings:fixture("n2-reviewed-approved.json"),through:"2026-10-14")
+        XCTAssertEqual(cut.rows.first{$0.code=="E-94"}?.reportedUse,1)
+        let plan=try JSONSerialization.jsonObject(with:fixture("n1s-indicator-plan.json")) as! [String:Any]
+        let book=try N2VerifiedIndicatorWorkbook.export(snapshot:snapshot,products:bytes(plan["catalog"]!),
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-10-09",end:"2026-11-08",subdivision:"LA VENTUROSA",
+            selectedVisitIDs:Set((0..<3).map{"gloves-\($0)"}),allowPending:true)
+        XCTAssertEqual(book.rows,3)
+        XCTAssertEqual(book.pendingLines,0)
+    }
     func testAlcoholTwoBottlesReusesOpenedContentAndNeverDoubleDebits()throws {
         let catalog=try catalog()
         var root=try JSONSerialization.jsonObject(with:fixture("n1e-clinical-stock.json")) as! [String:Any]

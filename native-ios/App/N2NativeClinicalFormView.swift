@@ -48,6 +48,7 @@ struct N2NativeClinicalFormView:View {
     @State private var scrollIssueRequest:DanperScrollRequest?
     @State private var choiceOpenCounter=0
     @State private var savedLines:[String:String]=[:]
+    @State private var savedKardex:[String:Double]=[:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("danper.haptics.enabled") private var haptics=true
     @State private var saved=false
@@ -201,13 +202,13 @@ struct N2NativeClinicalFormView:View {
                         DanperPanel {
                             Image(systemName:savedLines.values.allSatisfy{$0=="Descontado"} ? "checkmark.circle.fill" : "checkmark.shield.fill").font(.system(size:48)).foregroundStyle(.green)
                             Text("Atención registrada").font(.title2.bold())
-                            LabeledContent("Consumos descontados",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
+                            LabeledContent("Consumos vinculados al Kardex",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
                             LabeledContent("Consumos pendientes",value:String(form.items.filter{savedLines[$0.id] != "Descontado"}.count))
                             if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
                                 Label("Hay consumos sin salida física. Revisa el motivo de cada producto.",systemImage:"exclamationmark.triangle")
                                     .font(.footnote).foregroundStyle(.orange)
                             } else if !form.items.isEmpty {
-                                Label("Dispensación descontada automáticamente",systemImage:"checkmark.circle.fill")
+                                Label("Kardex verificado según unidades o aperturas declaradas",systemImage:"checkmark.circle.fill")
                                     .font(.footnote).foregroundStyle(.green)
                             }
                             Text(currentWorker?.name ?? form.dni).font(.headline)
@@ -222,19 +223,30 @@ struct N2NativeClinicalFormView:View {
                                     VStack(alignment:.leading,spacing:5) {
                                         Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
                                         Text("Cantidad \(med.quantity) · "+result).font(.caption).foregroundStyle(.secondary)
+                                        if let quantity=savedKardex[med.id] {
+                                            Text("Kardex R: \(quantity.formatted())"+(quantity==0 ? " · Uso de envase abierto, sin nuevo descuento":""))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
                                         if result != "Descontado" {
                                             Button("Verificar cantidad y apertura pendiente") {pendingPhysicalItemID=med.id}
+                                                .accessibilityIdentifier("pending-physical-"+med.code)
                                                 .sheet(isPresented:Binding(get:{pendingPhysicalItemID==med.id},set:{if !$0 {pendingPhysicalItemID=nil}})) {
                                                     N2PendingDispensingView(visitID:form.id,medication:med,date:form.date,context:context,onSaved:{
                                                         Task {await refreshDispensing(retry:false)}
                                                     })
                                                 }
-                                            Button("Resolver correspondencia") {pendingMappingCode=med.code}
-                                                .sheet(isPresented:Binding(get:{pendingMappingCode==med.code},set:{if !$0 {pendingMappingCode=nil}})) {
-                                                    N2OperationalMappingView(code:med.code,context:context,onSaved:{
-                                                        Task {await refreshDispensing(retry:false)}
-                                                    })
-                                                }
+                                            if context.operationalMappings.contains(where:{$0.clinicalCode==med.code}) {
+                                                Label("Correspondencia operativa verificada",systemImage:"checkmark.shield")
+                                                    .font(.caption)
+                                            } else {
+                                                Button("Resolver correspondencia") {pendingMappingCode=med.code}
+                                                    .accessibilityIdentifier("pending-mapping-"+med.code)
+                                                    .sheet(isPresented:Binding(get:{pendingMappingCode==med.code},set:{if !$0 {pendingMappingCode=nil}})) {
+                                                        N2OperationalMappingView(code:med.code,context:context,onSaved:{
+                                                            Task {await refreshDispensing(retry:false)}
+                                                        })
+                                                    }
+                                            }
                                         }
                                     }
                                 }
@@ -715,6 +727,7 @@ struct N2NativeClinicalFormView:View {
             }
             DanperField(title:"Diagnóstico presuntivo",highlighted:highlightedField=="clinical-diagnosis") {
                 TextField("Escribe para buscar o registrar",text:$form.diagnosis,axis:.vertical)
+                    .accessibilityIdentifier("clinical-diagnosis-input")
                     .focused($focusedField,equals:"diagnosis").lineLimit(2...5)
             }.id("clinical-diagnosis")
             if !form.diagnosis.isEmpty {
@@ -1114,7 +1127,7 @@ struct N2NativeClinicalFormView:View {
                     Label(pendingRequirements.joined(separator:"\n"),systemImage:"exclamationmark.triangle")
                         .font(.footnote).foregroundStyle(.orange).fixedSize(horizontal:false,vertical:true)
                 }
-                Text("Al guardar, los insumos de esta atención se registran como consumidos automáticamente en el inventario único. No hay segunda confirmación.")
+                Text("Al guardar se vincula el consumo al inventario único. Los envases solo se descuentan por aperturas declaradas; usar un envase abierto registra Kardex 0. Sin apertura confirmada ni envase abierto, queda pendiente.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -1180,6 +1193,7 @@ struct N2NativeClinicalFormView:View {
             if retry {_=try await vault.retryDispensing(visitID:form.id,expectedRevision:current.revision)}
             context=try await vault.clinicalFormContext()
             savedLines=try await vault.dispensingStatus(visitID:form.id)
+            savedKardex=Dictionary(uniqueKeysWithValues:try await vault.dispensingLines(visitID:form.id).compactMap{line in line.kardexQuantity.map{(line.id,$0)}})
             status="Atención conservada. Consumos verificados nuevamente; revisa los pendientes."
         } catch {status="No se pudo conciliar. La atención original permanece registrada; revisa los datos físicos y la cronología."}
     }
@@ -1308,6 +1322,7 @@ struct N2NativeClinicalFormView:View {
             saved=true
             N2DraftReminder.cancel(id:form.id,mode:vault.mode)
             savedLines=try await vault.dispensingStatus(visitID:form.id)
+            savedKardex=Dictionary(uniqueKeysWithValues:try await vault.dispensingLines(visitID:form.id).compactMap{line in line.kardexQuantity.map{(line.id,$0)}})
             self.context=try await vault.clinicalFormContext()
             drafts=try await vault.readDrafts()
             status="Atención confirmada y cifrada en revisión \(outcome.revision). Comprobar consumos pendientes desde el historial."

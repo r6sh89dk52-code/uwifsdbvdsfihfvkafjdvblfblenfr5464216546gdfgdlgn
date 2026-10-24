@@ -140,6 +140,15 @@ struct DanperFormChrome:ViewModifier {
     @AppStorage("danper.visual.palette") private var visualPalette="danper"
     func body(content:Content)->some View {
         content
+            .toolbar {
+                ToolbarItemGroup(placement:.keyboard) {
+                    Spacer()
+                    Button("Ocultar teclado") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)
+                    }
+                    .accessibilityIdentifier("danper-dismiss-keyboard")
+                }
+            }
             .scrollContentBackground(.hidden)
             .background(DanperStyle.canvas)
             .tint(DanperStyle.red)
@@ -330,6 +339,7 @@ struct DanperScrollView<Content:View>:View {
     var body:some View {
         ScrollViewReader {proxy in
             ScrollView {content}
+                .scrollDismissesKeyboard(.interactively)
                 .environment(\.danperReveal,{id in
                     withAnimation(reduceMotion ? nil : DanperStyle.animation){
                         proxy.scrollTo(id,anchor:.center)
@@ -362,11 +372,11 @@ struct DanperInlineSearch:View {
     @State private var revealTask:Task<Void,Never>?
     @State private var searchAnchor="inline-"+UUID().uuidString
     @Environment(\.danperReveal) private var reveal
-    private func revealResults() {
+    private func revealResults(initial:Bool=false) {
         revealTask?.cancel()
         revealTask=Task { @MainActor in
             do {try await Task.sleep(for:.milliseconds(220))} catch{return}
-            if focused {reveal(searchAnchor)}
+            if focused || initial {reveal(searchAnchor)}
         }
     }
     private var matches:[DanperSearchOption] {
@@ -408,6 +418,7 @@ struct DanperInlineSearch:View {
             }
         }
         .id(searchAnchor)
+        .onAppear {revealResults(initial:true)}
         .onChange(of:query){_,_ in revealResults()}
         .onChange(of:focused){_,isFocused in if isFocused {revealResults()}}
         .onDisappear{revealTask?.cancel()}

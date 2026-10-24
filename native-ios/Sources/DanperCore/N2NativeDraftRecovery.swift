@@ -64,7 +64,8 @@ public enum N2NativeDraftRecovery {
                                          procedure:procedureName)
                 med.procedureConfirmed=row["procedureConfirmed"] as? Bool ?? !procedureName.isEmpty
                 med.procedureSource=row["procedureSource"] as? String ?? "manual"
-                med.approveOpening=row["confirmNewContainer"] as? Bool ?? false
+                med.approveOpening=row["confirmNewContainer"] as? Bool == true && (row["newContainers"] as? Int ?? 0)>0
+                med.newContainers=row["newContainers"] as? Int ?? 1
                 if let physical=row["physicalUse"] {
                     guard let info=physical as? [String:Any],
                           let lotID=info["lotId"] as? String,
@@ -75,7 +76,8 @@ public enum N2NativeDraftRecovery {
                     }
                     med.selectedLotID=lotID
                     med.physicalQuantity=quantity
-                    med.approveOpening=consent
+                    med.approveOpening=consent && (info["newContainers"] as? Int ?? 0)>0
+                    med.newContainers=info["newContainers"] as? Int ?? med.newContainers
                 }
                 medications.append(med)
             }

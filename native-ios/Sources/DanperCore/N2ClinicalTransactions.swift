@@ -185,7 +185,8 @@ public enum N2NativeClinicalTransaction {
             let evidence=physicalEvidence.last{$0.visitID==id && $0.itemID==item["id"] as? String && $0.at<=at}
             if let evidence {
                 item["physicalUse"]=["lotId":evidence.lotID,"quantity":evidence.quantity,
-                                     "confirmNewContainer":evidence.confirmNewContainer]
+                                     "confirmNewContainer":evidence.confirmNewContainer,
+                                     "newContainers":evidence.newContainers ?? 0]
             }
             let itemID=item["id"] as! String,code=item["code"] as! String
             lineID=itemID
@@ -212,28 +213,33 @@ public enum N2NativeClinicalTransaction {
                 $0.clinicalName==item["name"] as? String &&
                 $0.clinicalUnit==item["unit"] as? String}
             if candidates.isEmpty {mark("Sin correspondencia aprobada.");continue}
-            let individual=["UND","TBL","PAR"].contains((item["unit"] as! String).uppercased())
             let explicit=item["physicalUse"] as? [String:Any]
+            let selectedUnit=lots.first{$0["id"] as? String==explicit?["lotId"] as? String}?["catalogUnit"] as? String
+            let allowable=Set(candidates.map{$0.kardexCode})
+            let presentationUnits=Set(lots.filter{allowable.contains($0["code"] as? String ?? "")}
+                .compactMap{$0["catalogUnit"] as? String})
+            if presentationUnits.count>1 && selectedUnit==nil {
+                mark("Presentaciones de stock incompatibles: selecciona y verifica el lote físico.");continue
+            }
+            let containerProduct=selectedUnit.map{N2ContainerAccounting.isContainer(unit:$0)} ?? lots.contains {
+                allowable.contains($0["code"] as? String ?? "") && N2ContainerAccounting.isContainer(unit:$0["catalogUnit"] as? String ?? "") }
+            let individual = !containerProduct && ["UND","TBL","PAR"].contains((item["unit"] as! String).uppercased())
             if candidates.count>1 && explicit==nil {
                 mark("Presentación Kardex ambigua: exige lote seleccionado.");continue
             }
-            if !individual && explicit==nil && rule==nil {
-                mark("Envase: falta cantidad interna verificada.");continue
-            }
             let selected=explicit.flatMap{str($0["lotId"])}
-            let useQuantity=explicit.flatMap{number($0["quantity"])} ??
+            let useQuantity=explicit.flatMap{number($0["quantity"])} ?? (containerProduct ? 0 : nil) ??
                 rule.flatMap { mapping in number(item["quantity"]).map{$0*mapping.physicalUnitsPerClinicalUnit} } ??
                 (individual ? number(item["quantity"]) : nil)
-            guard let quantity=useQuantity,quantity>0,quantity<=10_000_000,
+            guard let quantity=useQuantity,quantity>=0,(containerProduct || quantity>0),quantity<=10_000_000,
                   (!individual || quantity==number(item["quantity"])) else {
                 mark("Cantidad física no verificada.");continue
             }
-            let allowable=Set(candidates.map{$0.kardexCode})
             let eligible=lots.filter {l in
                 guard let lc=str(l["code"]),let ln=str(l["name"]),
                       allowable.contains(lc),
                       candidates.contains(where:{$0.kardexCode==lc && $0.kardexName==ln}),
-                      let t=total(l),t>0,
+                      let t=total(l),(t>0 || (containerProduct && N2ContainerAccounting.openCount(l)>0)),
                       let expiry=l["expires"] as? String,
                       expiry.isEmpty || expiry>=date else{return false}
                 if historical {
@@ -267,7 +273,7 @@ public enum N2NativeClinicalTransaction {
                          candidates[0].kardexCode : nil) else {
                 mark("Presentación no seleccionada.");continue
             }
-            if !individual && eligible.contains(where:{$0["code"] as? String == kardex &&
+            if !containerProduct && !individual && eligible.contains(where:{$0["code"] as? String == kardex &&
                 (($0["container"] as? String)=="unidad" ||
                  (number($0["unitsPerContainer"]) ?? 0)<=1)}) {
                 mark("Capacidad del envase no verificada.");continue
@@ -278,6 +284,47 @@ public enum N2NativeClinicalTransaction {
                     let db=(b["expires"] as? String).flatMap{$0.isEmpty ? nil:$0} ?? "9999-12-31"
                     return da==db ? (a["id"] as! String)<(b["id"] as! String) : da<db
                 }
+            if containerProduct {
+                let declared=explicit?["newContainers"] ?? item["newContainers"]
+                let consent=explicit?["confirmNewContainer"] as? Bool == true || item["confirmNewContainer"] as? Bool == true
+                let openingNumber=declared.flatMap{number($0)} ?? 0
+                guard openingNumber>=0,openingNumber<=10_000,openingNumber.rounded()==openingNumber,
+                      openingNumber==0 || consent else {
+                    mark("Confirma la cantidad de envases realmente abiertos.");continue
+                }
+                let openings=Int(openingNumber)
+                guard let parts=N2ContainerAccounting.allocate(lots:stock,selected:selected,
+                    openings:openings,volume:quantity,at:eventAt!) else {
+                    mark(openings==0 ? "No hay envase abierto verificable: confirma Abrir nuevo envase. No se descontó stock." :
+                        "Apertura declarada o volumen no verificable en el lote seleccionado. No se descontó stock.");continue
+                }
+                for (index,part) in parts.enumerated() {
+                let before=part.before,after=part.after
+                var ref:[String:Any]=["attentionId":id,"itemId":itemID,"clinicalCode":code,
+                    "clinicalName":item["name"]!,"clinicalUnit":item["unit"]!,
+                    "clinicalQuantity":item["quantity"]!,"confirmedAt":eventAt!,"containerAccountingVersion":1]
+                let suffix=parts.count>1 ? ":PART:\(index+1)":""
+                if parts.count>1 {
+                    ref["partIndex"]=index+1;ref["partCount"]=parts.count
+                    ref["physicalTotal"]=quantity;ref["declaredOpeningTotal"]=openings
+                }
+                var movement:[String:Any]=[
+                    "id":"ATT:\(id):ITEM:\(itemID)\(suffix)","lotId":before["id"]!,
+                    "code":before["code"]!,"name":before["name"]!,"unit":before["catalogUnit"]!,
+                    "at":eventAt!,"kind":"use","description":"Apertura declarada / uso de envase abierto",
+                    "containerAccountingVersion":1,"declaredOpenings":part.openings,
+                    "quantity":part.volume,"sealedAdded":0,"looseAdded":0,
+                    "openedNewContainer":part.openings>0,"excelQuantity":part.openings,
+                    "physicalChange":-part.volume,"before":before,"after":after,"dispenseRef":ref
+                ]
+                if let rule {movement["operationalMappingID"]=rule.id;movement["operationalMappingVersion"]=rule.version}
+                if let evidence {movement["physicalEvidenceID"]=evidence.id}
+                if let index=lots.firstIndex(where:{$0["id"] as? String==before["id"] as? String}) {lots[index]=after}
+                movements.append(movement);added+=1
+                }
+                linked+=1;outcomes[itemID]="Descontado"
+                continue
+            }
             if stock.reduce(0.0,{$0+(total($1) ?? 0)})+0.00001<quantity {
                 mark("Saldo FEFO insuficiente.");continue
             }

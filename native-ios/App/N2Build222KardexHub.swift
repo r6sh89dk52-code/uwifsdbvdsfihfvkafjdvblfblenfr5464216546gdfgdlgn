@@ -37,7 +37,7 @@ struct N2Build222KardexHub:View {
 
                 HStack(spacing:10) {
                     summary(value:"98",label:"Productos del catálogo",symbol:"cross.vial")
-                    summary(value:lotCount.map(String.init) ?? "—",label:"Lotes disponibles",symbol:"shippingbox")
+                    summary(value:lotCount.map(String.init) ?? "—",label:"Lotes registrados",symbol:"shippingbox")
                 }
 
                 NavigationLink {

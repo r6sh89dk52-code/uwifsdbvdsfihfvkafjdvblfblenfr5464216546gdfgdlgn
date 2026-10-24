@@ -8,7 +8,7 @@ struct N2AuxiliaryInventoryView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.dismiss) private var dismiss
     @State private var presentation="UND"
-    @State private var capacity="1"
+    @State private var capacity=""
     @State private var sealed=""
     @State private var reference=""
     @State private var expiry=""
@@ -27,11 +27,11 @@ struct N2AuxiliaryInventoryView:View {
                     Picker("Presentación verificada",selection:$presentation) {
                         ForEach(["UND","PAR","FCO","CJA","PAQ"],id:\.self){Text($0).tag($0)}
                     }
-                    TextField("Capacidad interna verificada",text:$capacity).keyboardType(.numberPad)
+                    TextField("Capacidad interna opcional verificada",text:$capacity).keyboardType(.numberPad)
                     TextField("Envases o unidades disponibles",text:$sealed).keyboardType(.numberPad)
                     TextField("Número de lote o referencia",text:$reference)
                     N2ExpiryTextField(text:$expiry).frame(minHeight:44)
-                    Text("Vencimiento opcional. La capacidad debe usar la misma unidad física que confirmarás en la correspondencia.").font(.caption)
+                    Text("Vencimiento y volumen opcionales. El Kardex descuenta solo aperturas declaradas, nunca por capacidad o número de atenciones.").font(.caption)
                     TextField("Responsable",text:$operatorName)
                     TextField("Evidencia de producto, presentación y capacidad",text:$evidence,axis:.vertical)
                     Toggle("Confirmo el conteo y los datos físicos verificados",isOn:$consent)
@@ -39,7 +39,8 @@ struct N2AuxiliaryInventoryView:View {
                 }
                 Section("Existencias auxiliares registradas") {
                     ForEach(context.lots.filter{$0.kardexCode=="AUX:"+code}) { lot in
-                        LabeledContent(lot.reference,value:lot.total.formatted())
+                        LabeledContent(lot.reference,value:N2ContainerAccounting.isContainer(unit:lot.unit) ?
+                            "\(lot.sealed) cerrados · \(lot.openContainers) abiertos":lot.total.formatted())
                     }
                     if !accounting.isEmpty {
                         ShareLink(item:accounting) {Label("Compartir contabilidad auxiliar (JSON)",systemImage:"square.and.arrow.up")}
@@ -57,17 +58,20 @@ struct N2AuxiliaryInventoryView:View {
     }
     @MainActor private func save() async {
         guard !busy,consent,let product=context.products.clinical.first(where:{$0.code==code}),
-              let size=Int(capacity),size>0,let count=Int(sealed),count>0,
+              let size=Int(capacity.isEmpty ? "1":capacity),size>0,let count=Int(sealed),count>0,
               !reference.trimmingCharacters(in:.whitespaces).isEmpty,
               expiry.isEmpty || N2ExpiryEntry.iso(expiry) != nil else {
             message="Completa el conteo, la capacidad, el lote y un vencimiento válido si corresponde.";return
         }
         busy=true;defer {busy=false}
         let timestamp=Int64(Date().timeIntervalSince1970*1000)
-        let lot:[String:Any]=["id":UUID().uuidString,"code":"AUX:"+code,"name":product.name,
+        var lot:[String:Any]=["id":UUID().uuidString,"code":"AUX:"+code,"name":product.name,
             "catalogUnit":presentation,"lot":reference,"expires":N2ExpiryEntry.iso(expiry) ?? "",
             "container":presentation=="FCO" ? "frasco":presentation=="CJA" ? "caja":"unidad",
             "unitsPerContainer":size,"sealedContainers":count,"looseUnits":0,"openedRemaining":0,"updatedAt":timestamp]
+        if N2ContainerAccounting.isContainer(unit:presentation) {
+            lot["declaredOpenContainers"]=0;lot["volumeTrackingEnabled"] = !capacity.isEmpty
+        }
         do {
             _=try await vault.registerAuxiliaryLot(clinicalCode:code,lot:JSONSerialization.data(withJSONObject:lot),
                 operatorName:operatorName,evidence:evidence,expectedRevision:context.revision)

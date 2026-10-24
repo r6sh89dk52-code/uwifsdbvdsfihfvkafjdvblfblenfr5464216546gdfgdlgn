@@ -235,6 +235,9 @@ actor N2SyntheticTrialIOSVault {
     func confirmPendingDispensing(_ evidence:N2PendingDispensingEvidence,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().confirmPendingDispensing(evidence,approvedCatalog:resource("n2-approved-mappings"),expectedRevision:expectedRevision)
     }
+    func closeContainers(lotID:String,count:Int,disposition:String,operatorName:String,reason:String,at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().closeContainers(lotID:lotID,count:count,disposition:disposition,operatorName:operatorName,reason:reason,at:at,expectedRevision:expectedRevision)
+    }
     func auxiliaryAccounting()throws->String {try protectedStore().auxiliaryAccounting()}
     func registerAuxiliaryLot(clinicalCode:String,lot:Data,operatorName:String,evidence:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         let context=try clinicalFormContext()

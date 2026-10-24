@@ -88,9 +88,7 @@ public enum N2NursingReportBuilder {
     private static func packaged(_ l:[String:Any])->Bool {
         let unit=(l["catalogUnit"] as? String ?? "").trimmingCharacters(in:.whitespaces)
             .uppercased()
-        let size=count(l["unitsPerContainer"]) ?? 0
-        return !["UND","TBL","PAR"].contains(unit) &&
-               ((l["container"] as? String) != "unidad" || size != 1)
+        return N2ContainerAccounting.isContainer(unit:unit)
     }
     private static func balance(_ l:[String:Any])->Double {
         if packaged(l){return count(l["sealedContainers"]) ?? 0}

@@ -256,6 +256,10 @@ struct N2VisitDispensingView:View {
                     Text(line.code+" · Cantidad clínica: "+line.quantity.formatted()).font(.caption)
                     Label(line.result,systemImage:line.result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.circle")
                         .font(.footnote).foregroundStyle(line.result=="Descontado" ? Color.green : Color.orange)
+                    if let quantity=line.kardexQuantity {
+                        Text("Kardex R: \(quantity.formatted())"+(quantity==0 ? " · Uso de envase abierto":""))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
             }
             if lines.isEmpty && !failed {Text("Atención sin medicamentos o insumos.").foregroundStyle(.secondary)}

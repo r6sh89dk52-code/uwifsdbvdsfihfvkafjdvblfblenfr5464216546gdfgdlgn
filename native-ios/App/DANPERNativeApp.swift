@@ -47,7 +47,7 @@ struct DANPERNativeApp: App {
                     NativeRootView(layoutMetrics:N2DashboardMetrics.calculate(visits:[],now:Date()))
                     #endif
                 } else if onboardingFinished {
-                    if authenticated && scenePhase == .active {
+                    if authenticated {
                         NavigationStack {
                             N2ClinicalWorkspaceGateView(authenticatedLaunch:true)
                                 .id(authCycle)

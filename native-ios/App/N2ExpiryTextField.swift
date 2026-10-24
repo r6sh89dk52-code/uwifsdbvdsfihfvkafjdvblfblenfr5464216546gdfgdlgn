@@ -12,6 +12,7 @@ struct N2ExpiryTextField:UIViewRepresentable {
         field.font = .preferredFont(forTextStyle:.body)
         field.adjustsFontForContentSizeCategory=true
         field.accessibilityLabel="Fecha de vencimiento, día mes y año"
+        field.accessibilityIdentifier="inventory-expiry-text"
         field.delegate=context.coordinator
         return field
     }

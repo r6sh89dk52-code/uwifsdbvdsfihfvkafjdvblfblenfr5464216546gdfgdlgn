@@ -1,0 +1,222 @@
+import Foundation
+import XCTest
+@testable import DanperCore
+
+final class N3DeclaredContainerTests:XCTestCase {
+    private func fixture(_ name:String)throws->Data {
+        let folder=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
+        return try Data(contentsOf:URL(fileURLWithPath:folder).appendingPathComponent(name))
+    }
+    private func bytes(_ value:Any)throws->Data {try JSONSerialization.data(withJSONObject:value,options:.sortedKeys)}
+    private func object(_ data:Data)throws->[String:Any] {try XCTUnwrap(JSONSerialization.jsonObject(with:data) as? [String:Any])}
+    private func time(_ day:String)->Int64 {
+        Int64(ISO8601DateFormatter().date(from:day+"T18:00:00Z")!.timeIntervalSince1970*1000)
+    }
+    private func source(capacity:Int=1,sealed:Int=2)throws->Data {
+        var root=try object(fixture("n1e-clinical-stock.json"))
+        root["attentions"]=[[String:Any]]();root["stockMovements"]=[[String:Any]]()
+        let maps=try JSONSerialization.jsonObject(with:fixture("n2-reviewed-approved.json")) as! [[String:Any]]
+        let product=try XCTUnwrap(maps.first{$0["kardexCode"] as? String=="E-87"})
+        root["stockLots"]=[["id":"declared-bottles","code":"E-87","name":product["kardexName"]!,
+            "catalogUnit":"FCO","lot":"SYNTHETIC-DECLARATION","expires":"2027-12-31","container":"frasco",
+            "unitsPerContainer":capacity,"sealedContainers":sealed,"looseUnits":0,"openedRemaining":0,
+            "declaredOpenContainers":0,"volumeTrackingEnabled":capacity>1,"updatedAt":time("2026-11-07")]]
+        return try bytes(root)
+    }
+    private func visit(_ snapshot:Data,id:String,day:String,openings:Int=0,volume:Double=0)throws->Data {
+        let root=try object(snapshot)
+        let maps=try JSONSerialization.jsonObject(with:fixture("n2-reviewed-approved.json")) as! [[String:Any]]
+        let product=try XCTUnwrap(maps.first{$0["kardexCode"] as? String=="E-87"})
+        let original=try object(fixture("n1e-clinical-stock.json"))
+        var visit=(original["attentions"] as! [[String:Any]])[0]
+        visit["id"]=id;visit["date"]=day;visit["time"]="13:00"
+        visit["worker"]=(root["workers"] as! [[String:Any]])[0]
+        visit["items"]=[["id":id+"-item","code":product["clinicalCode"]!,"name":product["clinicalName"]!,
+            "unit":product["clinicalUnit"]!,"quantity":1,"procedure":"OBSERVACION",
+            "physicalUse":["lotId":"declared-bottles","quantity":volume,
+                "confirmNewContainer":openings>0,"newContainers":openings]]]
+        return try bytes(visit)
+    }
+    private func save(_ source:Data,id:String,day:String,openings:Int=0,volume:Double=0)throws->N2ClinicalResult {
+        try N2NativeClinicalTransaction.appendSavedVisit(snapshot:source,
+            visit:visit(source,id:id,day:day,openings:openings,volume:volume),
+            approvedCatalog:fixture("n2-reviewed-approved.json"),at:time(day))
+    }
+    private func lot(_ source:Data)throws->[String:Any] {try XCTUnwrap((object(source)["stockLots"] as? [[String:Any]])?.first)}
+    private func catalog()throws->Data {
+        try bytes(object(fixture("n2-nursing-parity.json"))["catalog"]!)
+    }
+    func testMandatoryOneZeroZeroOneZeroAcrossDaysSessionsMonthlyCutAndExcel()throws {
+        var snapshot=try source()
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-"+UUID().uuidString,isDirectory:true)
+        defer {try? FileManager.default.removeItem(at:folder)}
+        let key=Data(repeating:0x53,count:32)
+        var revision=try N2EncryptedClinicalJournal(directory:folder,secret:key).commit(snapshot,expectedRevision:0)
+        let expected=[1,0,0,1,0]
+        for index in expected.indices {
+            let journal=try N2EncryptedClinicalJournal(directory:folder,secret:key)
+            snapshot=try XCTUnwrap(journal.recover()).snapshot
+            let day=String(format:"2026-11-%02d",8+index)
+            let result=try save(snapshot,id:"declared-\(index)",day:day,openings:expected[index])
+            XCTAssertEqual(result.linked,1,result.pendingReasons.joined(separator:";"))
+            XCTAssertEqual(result.pending,0)
+            snapshot=result.snapshot
+            revision=try journal.commit(snapshot,expectedRevision:revision)
+            let report=try N2NursingReportBuilder.daily(snapshot:snapshot,catalog:catalog(),date:day)
+            XCTAssertTrue(report.exportable,report.warnings.joined(separator:";"))
+            XCTAssertEqual(report.rows.first{$0.code=="E-87"}?.consumed,Double(expected[index]))
+        }
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(snapshot).consumptionR.compactMap{$0},expected.map(Double.init))
+        XCTAssertEqual(try lot(snapshot)["sealedContainers"] as? Int,0)
+        XCTAssertEqual(try lot(snapshot)["declaredOpenContainers"] as? Int,2)
+        let period=try N2NursingReportBuilder.range(snapshot:snapshot,catalog:catalog(),start:"2026-11-08",end:"2026-11-12")
+        XCTAssertTrue(period.exportable,period.warnings.joined(separator:";"))
+        XCTAssertEqual(period.rows.first{$0.code=="E-87"}?.consumed,2)
+        XCTAssertEqual(period.rows.first{$0.code=="E-87"}?.closing,0)
+        let cutBefore=try N2AutomaticCutAccounting.calculate(snapshot:snapshot,mappings:fixture("n2-reviewed-approved.json"),through:"2026-11-08")
+        let cutAfter=try N2AutomaticCutAccounting.calculate(snapshot:snapshot,mappings:fixture("n2-reviewed-approved.json"),through:"2026-11-12")
+        XCTAssertEqual(cutBefore.rows.first{$0.code=="E-87"}?.reportedUse,1)
+        XCTAssertEqual(cutBefore.rows.first{$0.code=="E-87"}?.currentCount,1)
+        XCTAssertEqual(cutBefore.rows.first{$0.code=="E-87"}?.opening,2)
+        XCTAssertEqual(cutAfter.start,"2026-11-09")
+        XCTAssertEqual(cutAfter.rows.first{$0.code=="E-87"}?.reportedUse,1)
+        XCTAssertEqual(cutAfter.rows.first{$0.code=="E-87"}?.currentCount,0)
+        XCTAssertEqual(cutAfter.rows.first{$0.code=="E-87"}?.opening,1)
+        let workbook=try N2VerifiedNursingWorkbook.exportRange(snapshot:snapshot,catalog:catalog(),
+            template:fixture("n1s-nursing-template-store.zip"),start:"2026-11-08",end:"2026-11-12",responsible:"OPERADOR FICTICIO")
+        let entries=try N1rStoredZip.unpack(workbook.xlsx)
+        let sheet=try XCTUnwrap(entries.first{$0.name=="xl/worksheets/sheet2.xml"})
+        let xml=try XCTUnwrap(String(data:sheet.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("PERÍODO CONSOLIDADO"))
+        XCTAssertNotNil(xml.range(of:#"<c r="G93"[^>]*><v>2(?:\.0)?</v></c>"#,options:.regularExpression))
+        XCTAssertNotNil(xml.range(of:#"<c r="H93"[^>]*>.*?<v>0(?:\.0)?</v></c>"#,options:.regularExpression))
+        let products=try bytes(object(fixture("n1s-indicator-plan.json"))["catalog"]!)
+        let indicator=try N2VerifiedIndicatorWorkbook.export(snapshot:snapshot,products:products,
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-11-09",end:"2026-12-08",subdivision:"LA VENTUROSA",
+            selectedVisitIDs:Set((1...4).map{"declared-\($0)"}),allowPending:true)
+        XCTAssertEqual(indicator.pendingLines,0)
+        XCTAssertEqual(indicator.rows,4)
+        let indicatorParts=try N1rStoredZip.unpack(indicator.xlsx)
+        XCTAssertEqual(indicatorParts.filter{$0.name.hasPrefix("xl/worksheets/sheet")}.count,10)
+        let consumos=String(decoding:try XCTUnwrap(indicatorParts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,as:UTF8.self)
+        for (index,value) in [0,0,1,0].enumerated() {
+            XCTAssertNotNil(consumos.range(of:"<c r=\"R\(index+2)\"[^>]*><v>\(value)(?:\\.0)?</v></c>",options:.regularExpression))
+        }
+        let repeated=try N2NativeClinicalTransaction.retryCurrentSavedVisit(snapshot:snapshot,visitID:"declared-4",
+            approvedCatalog:fixture("n2-reviewed-approved.json"),at:time("2026-11-13"))
+        XCTAssertEqual(repeated.physicalMovementsAdded,0)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(repeated.snapshot).consumptionR.compactMap{$0},expected.map(Double.init))
+    }
+    func testVolumeCannotOpenOrExhaustContainerAndExplicitClosureDoesNotDebitAgain()throws {
+        let first=try save(source(capacity:10,sealed:3),id:"first",day:"2026-11-08",openings:1,volume:10)
+        XCTAssertEqual(first.linked,1)
+        XCTAssertEqual(try lot(first.snapshot)["openedRemaining"] as? Int,0)
+        XCTAssertEqual(try lot(first.snapshot)["declaredOpenContainers"] as? Int,1)
+        let reuse=try save(first.snapshot,id:"reuse",day:"2026-11-09")
+        XCTAssertEqual(reuse.linked,1)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(reuse.snapshot).consumptionR.compactMap{$0},[1,0])
+        let tooMuch=try save(reuse.snapshot,id:"volume-alone",day:"2026-11-10",volume:11)
+        XCTAssertEqual(tooMuch.pending,1)
+        XCTAssertEqual(tooMuch.physicalMovementsAdded,0)
+        XCTAssertEqual(try lot(tooMuch.snapshot)["sealedContainers"] as? Int,2)
+        let additional=try save(reuse.snapshot,id:"two-more",day:"2026-11-10",openings:2)
+        XCTAssertEqual(additional.linked,1)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(additional.snapshot).consumptionR.compactMap{$0},[1,0,2])
+        let closed=try N2ContainerAccounting.close(snapshot:additional.snapshot,lotID:"declared-bottles",count:3,
+            disposition:"agotado",operatorName:"OPERADOR FICTICIO",reason:"Agotamiento declarado manualmente en prueba",at:time("2026-11-11"))
+        XCTAssertEqual(try lot(closed)["declaredOpenContainers"] as? Int,0)
+        XCTAssertEqual(try lot(closed)["sealedContainers"] as? Int,0)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(closed).consumptionR.compactMap{$0},[1,0,2])
+        XCTAssertEqual(try save(closed,id:"no-open",day:"2026-11-12").pending,1)
+        let report=try N2NursingReportBuilder.daily(snapshot:closed,catalog:catalog(),date:"2026-11-11")
+        XCTAssertTrue(report.exportable,report.warnings.joined(separator:";"))
+        XCTAssertEqual(report.rows.first{$0.code=="E-87"}?.consumed,0)
+    }
+    func testNoOpeningWithoutDeclarationAndTamperingFailsAudit()throws {
+        let original=try source()
+        let pending=try save(original,id:"no-consent",day:"2026-11-08")
+        XCTAssertEqual(pending.pending,1);XCTAssertEqual(pending.physicalMovementsAdded,0)
+        XCTAssertEqual(try lot(pending.snapshot)["sealedContainers"] as? Int,2)
+        var legacy=try object(visit(original,id:"legacy-permission",day:"2026-11-08",openings:1))
+        var items=legacy["items"] as! [[String:Any]]
+        items[0]["physicalUse"]=["lotId":"declared-bottles","quantity":0,"confirmNewContainer":true]
+        legacy["items"]=items
+        let legacyResult=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:original,visit:bytes(legacy),
+            approvedCatalog:fixture("n2-reviewed-approved.json"),at:time("2026-11-08"))
+        XCTAssertEqual(legacyResult.pending,1)
+        XCTAssertEqual(legacyResult.physicalMovementsAdded,0)
+        let accepted=try save(original,id:"yes",day:"2026-11-08",openings:1)
+        for key in ["excelQuantity","declaredOpenings"] {
+            var root=try object(accepted.snapshot)
+            var movements=root["stockMovements"] as! [[String:Any]]
+            movements[0][key]=2;root["stockMovements"]=movements
+            XCTAssertThrowsError(try N1eLegacyClinicalAudit.inspect(bytes(root)))
+            movements[0][key]=true;root["stockMovements"]=movements
+            XCTAssertThrowsError(try N1eLegacyClinicalAudit.inspect(bytes(root)))
+        }
+        XCTAssertThrowsError(try N2ContainerAccounting.close(snapshot:accepted.snapshot,lotID:"declared-bottles",count:2,
+            disposition:"descartado",operatorName:"OPERADOR FICTICIO",reason:"Declaración inválida de prueba",at:time("2026-11-09")))
+    }
+    func testAllVerifiedContainerUnitsUseTheSameExplicitPlan()throws {
+        let raw=try lot(source(capacity:100))
+        for unit in ["FCO","CJA","PAQ","BLISTER","ENV"] {
+            var lot=raw;lot["catalogUnit"]=unit
+            XCTAssertTrue(N2ContainerAccounting.isContainer(unit:unit))
+            XCTAssertNil(N2ContainerAccounting.plan(lot:lot,openings:0,volume:1,at:time("2026-11-08")))
+            let opened=try XCTUnwrap(N2ContainerAccounting.plan(lot:lot,openings:1,volume:100,at:time("2026-11-08")))
+            XCTAssertEqual(opened["declaredOpenContainers"] as? Int,1)
+            XCTAssertNotNil(N2ContainerAccounting.plan(lot:opened,openings:0,volume:0,at:time("2026-11-09")))
+        }
+        for unit in ["UND","TBL","PAR","ML","LT"] {XCTAssertFalse(N2ContainerAccounting.isContainer(unit:unit))}
+    }
+    func testPendingContainerDoesNotInventOpeningInProvisionalIndicator()throws {
+        let pending=try save(source(),id:"pending-container",day:"2026-11-09")
+        XCTAssertEqual(pending.pending,1)
+        let products=try bytes(object(fixture("n1s-indicator-plan.json"))["catalog"]!)
+        XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(snapshot:pending.snapshot,products:products,
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-11-09",end:"2026-12-08",subdivision:"LA VENTUROSA",
+            selectedVisitIDs:["pending-container"],allowPending:true)) {
+            XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,.unverifiedDelivery)
+        }
+        XCTAssertEqual(pending.physicalMovementsAdded,0)
+    }
+    func testDeclaredMultipleOpeningsSplitByFEFOWithoutInventingVolumeOrSkippingEarlierLot()throws {
+        var root=try object(source(sealed:1))
+        var lots=root["stockLots"] as! [[String:Any]]
+        var later=lots[0]
+        later["id"]="later-declared-bottles";later["lot"]="SYNTHETIC-LATER"
+        later["expires"]="2028-12-31";later["sealedContainers"]=2
+        lots.append(later);root["stockLots"]=lots
+        let original=try bytes(root)
+        var attention=try object(visit(original,id:"declared-split",day:"2026-11-08",openings:2))
+        var items=attention["items"] as! [[String:Any]]
+        items[0]["physicalUse"]=["quantity":0,"confirmNewContainer":true,"newContainers":2]
+        attention["items"]=items
+        let result=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:original,visit:bytes(attention),
+            approvedCatalog:fixture("n2-reviewed-approved.json"),at:time("2026-11-08"))
+        XCTAssertEqual(result.linked,1,result.pendingReasons.joined(separator:";"))
+        XCTAssertEqual(result.physicalMovementsAdded,2)
+        let final=try object(result.snapshot)
+        let after=final["stockLots"] as! [[String:Any]]
+        XCTAssertEqual(after[0]["sealedContainers"] as? Int,0)
+        XCTAssertEqual(after[1]["sealedContainers"] as? Int,1)
+        let movements=final["stockMovements"] as! [[String:Any]]
+        XCTAssertEqual(movements.compactMap{$0["excelQuantity"] as? Int},[1,1])
+        XCTAssertTrue(movements.allSatisfy{($0["physicalChange"] as? NSNumber)?.doubleValue==0})
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(result.snapshot).consumptionR.compactMap{$0},[2])
+        let daily=try N2NursingReportBuilder.daily(snapshot:result.snapshot,catalog:catalog(),date:"2026-11-08")
+        XCTAssertTrue(daily.exportable,daily.warnings.joined(separator:";"))
+        XCTAssertEqual(daily.rows.first{$0.code=="E-87"}?.consumed,2)
+        let repeated=try N2NativeClinicalTransaction.retryCurrentSavedVisit(snapshot:result.snapshot,
+            visitID:"declared-split",approvedCatalog:fixture("n2-reviewed-approved.json"),at:time("2026-11-09"))
+        XCTAssertEqual(repeated.physicalMovementsAdded,0)
+        var corrupted=final
+        var invalid=movements
+        var ref=invalid[0]["dispenseRef"] as! [String:Any]
+        ref["declaredOpeningTotal"]=3;invalid[0]["dispenseRef"]=ref
+        corrupted["stockMovements"]=invalid
+        XCTAssertThrowsError(try N1eLegacyClinicalAudit.inspect(bytes(corrupted)))
+    }
+}

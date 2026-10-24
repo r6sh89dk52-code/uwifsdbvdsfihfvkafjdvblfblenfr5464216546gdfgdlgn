@@ -167,7 +167,8 @@ for(const label of ['private let stepTitles=["Trabajador","Evaluación","Tratami
 const allergyIndex=form.indexOf('DanperPanel("Alergias del trabajador")');
 assert(allergyIndex>form.indexOf('private func clinicalSection()'),
   'La revisión de alergias debe estar en Evaluación, como Build 222');
-must(kardex,'label:"Lotes disponibles"','contador real de lotes');
+must(kardex,'label:"Lotes registrados"','contador de lotes que conserva los agotados');
+must(kardex,'lotCount=context.lots.count','conteo real sin ocultar lotes agotados');
 must(kardex,'vault.clinicalFormContext()','lectura de lotes sin estimaciones');
 
 

@@ -20,7 +20,8 @@ const views=[
 'N2VerifiedNursingExportView.swift',
 'N2OperationalMappingView.swift',
 'N2PendingDispensingView.swift',
-'N2AuxiliaryInventoryView.swift'
+'N2AuxiliaryInventoryView.swift',
+'N2ContainerStateView.swift'
 ];
 for(const item of views) {
  const source=fs.readFileSync(path.join(app,item),'utf8');
@@ -37,7 +38,8 @@ const router=fs.readFileSync(path.join(app,'N2WorkspaceVault.swift'),'utf8');
 const clinical=fs.readFileSync(path.join(app,'N2ProtectedClinicalIOSVault.swift'),'utf8');
 const demo=fs.readFileSync(path.join(app,'N2SyntheticTrialIOSVault.swift'),'utf8');
 const calls=[...router.matchAll(/N2SyntheticTrialIOSVault\.shared\.(\w+)\(/g)].map(m=>m[1]);
-assert.equal(calls.length,34,'The bridge must expose the entire supported surface.');
+assert.equal(calls.length,35,'The bridge must expose the entire supported surface.');
+assert(calls.includes('closeContainers'));
 assert(calls.includes('confirmPendingDispensing'));
 assert(calls.includes('registerAuxiliaryLot'));
 assert(calls.includes('auxiliaryAccounting'));
@@ -53,12 +55,17 @@ const gate=fs.readFileSync(path.join(app,'N2ClinicalWorkspaceView.swift'),'utf8'
 assert(gate.includes('.environment(\\.n2WorkspaceVault,.clinical)'));
 assert(gate.includes('evaluatePolicy(.deviceOwnerAuthentication'));
 assert(gate.includes('var authenticatedLaunch=false'));
-assert(gate.includes('if authenticatedLaunch && revision != nil'));
+assert(gate.includes('guard authenticatedLaunch,summary != nil,scenePhase == .active'));
+assert(gate.includes('if phase == .active {enterVerifiedWorkspaceIfReady()}'));
 const launch=fs.readFileSync(path.join(app,'DANPERNativeApp.swift'),'utf8');
-assert(launch.includes('if authenticated && scenePhase == .active'));
+assert(launch.includes('if authenticated {'));
+assert(launch.includes('.opacity(authenticated && scenePhase == .active ? 1 : 0)'));
+assert(launch.includes('.accessibilityHidden(!authenticated || scenePhase != .active)'));
+assert(launch.includes('.allowsHitTesting(authenticated && scenePhase == .active)'));
 assert(launch.includes('N2ClinicalWorkspaceGateView(authenticatedLaunch:true)'));
 assert(launch.includes('cycle==authCycle'));
-assert(gate.includes('if phase != .active {onClose()}'));
+assert(gate.includes('if phase == .background {onClose()}'));
+assert(gate.includes('.accessibilityHidden(scenePhase != .active)'));
 const rootUI=fs.readFileSync(path.join(app,'NativeRootView.swift'),'utf8');
 assert(rootUI.includes('N2ClinicalWorkspaceGateView()'));
 assert(rootUI.includes('N2SyntheticTrialIOSVault.shared.startSyntheticDemo()'));

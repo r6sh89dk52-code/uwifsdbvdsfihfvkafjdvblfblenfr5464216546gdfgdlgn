@@ -8,6 +8,7 @@ struct N2OperationalMappingView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.dismiss) private var dismiss
     @State private var inventoryID=""
+    @State private var inventoryQuery=""
     @State private var physicalUnit="mL"
     @State private var conversion=""
     @State private var operatorName=""
@@ -23,9 +24,14 @@ struct N2OperationalMappingView:View {
                     Text(context.products.clinical.first{$0.code==code}?.name ?? code)
                     Text("No modifica las 86 asociaciones oficiales. Verifica producto, concentración y presentación antes de confirmar.")
                         .font(.footnote)
+                    TextField("Buscar presentación física",text:$inventoryQuery)
+                        .autocorrectionDisabled()
                     Picker("Presentación física",selection:$inventoryID) {
                         Text("Seleccionar").tag("")
-                        ForEach((context.products.nursing+context.auxiliaryProducts).filter{$0.unit != nil}) { item in
+                        ForEach((context.products.nursing+context.auxiliaryProducts).filter{
+                            $0.unit != nil && (inventoryQuery.isEmpty || $0.id==inventoryID ||
+                                $0.name.localizedStandardContains(inventoryQuery))
+                        }) { item in
                             Text(item.name+" · "+(item.unit ?? "")).tag(item.id)
                         }
                     }
@@ -43,7 +49,10 @@ struct N2OperationalMappingView:View {
                 Button("Guardar correspondencia operativa") {Task {await save()}}
                     .disabled(busy || !consent || inventoryID.isEmpty)
             }
-            .navigationTitle("Verificar correspondencia")
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("Vinculación operativa")
+            .navigationBarTitleDisplayMode(.inline)
+            .danperFormChrome()
             .toolbar {Button("Cancelar"){dismiss()}}
             .sheet(isPresented:$showAuxiliary) {
                 N2AuxiliaryInventoryView(code:code,context:context,onSaved:{onSaved();dismiss()})

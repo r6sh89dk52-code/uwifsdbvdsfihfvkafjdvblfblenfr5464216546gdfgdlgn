@@ -104,9 +104,19 @@ final class N2ClinicalTransactionsTests: XCTestCase {
         let posted=try N2NativeClinicalTransaction.appendSavedVisit(
             snapshot:before,visit:data(authorized),
             approvedCatalog:read("n2-reviewed-approved.json"),at:time())
-        XCTAssertEqual(posted.linked,1)
-        XCTAssertEqual(posted.physicalMovementsAdded,2)
-        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(posted.snapshot).consumptionR.last!,1)
+        XCTAssertEqual(posted.linked,0)
+        XCTAssertEqual(posted.pending,1)
+        XCTAssertEqual(posted.physicalMovementsAdded,0)
+        var declared=authorized
+        var items=declared["items"] as! [[String:Any]]
+        items[0]["physicalUse"]=["lotId":"future-sealed-box","quantity":99,
+            "confirmNewContainer":true,"newContainers":1]
+        declared["items"]=items
+        let explicit=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:before,visit:data(declared),
+            approvedCatalog:read("n2-reviewed-approved.json"),at:time())
+        XCTAssertEqual(explicit.linked,1)
+        XCTAssertEqual(explicit.physicalMovementsAdded,1)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(explicit.snapshot).consumptionR.last!,1)
     }
     func testDuplicateAndUnapprovedMappingsNeverMutateHistory() throws {
         let root=try source()

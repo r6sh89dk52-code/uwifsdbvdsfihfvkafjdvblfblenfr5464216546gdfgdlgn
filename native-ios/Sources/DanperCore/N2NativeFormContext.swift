@@ -50,8 +50,9 @@ public struct N2FormLot:Equatable,Sendable,Identifiable {
     public let opened:Double
     public var site:String=""
     public var reference:String=""
+    public var openContainers:Int=0
     public var total:Double {Double(sealed)*capacity+loose+opened}
-    public var needsOpening:Bool {opened <= 0 && loose <= 0 && sealed>0}
+    public var needsOpening:Bool {openContainers==0 && sealed>0}
 }
 public struct N2FormContext:Sendable {
     public var operationalMappings:[N2OperationalMapping]=[]
@@ -67,7 +68,7 @@ public struct N2FormContext:Sendable {
             ? products.authorizedNursingOptions(for:code).map(\.id)
             : operational.map(\.inventoryID))
         return lots.filter {
-            approved.contains($0.kardexCode) && $0.total>0 &&
+            approved.contains($0.kardexCode) && ($0.total>0 || $0.openContainers>0) &&
             ($0.expires.isEmpty || $0.expires>=date)
         }.sorted {
             let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
@@ -135,7 +136,8 @@ public enum N2NativeFormContextReader {
             return N2FormLot(id:id,kardexCode:code,name:name,unit:unit,
                              expires:expiry,capacity:capacity,sealed:sealed,
                              loose:loose,opened:opened,site:sites[id] ?? "",
-                              reference:row["lot"] as? String ?? "")
+                              reference:row["lot"] as? String ?? "",
+                              openContainers:N2ContainerAccounting.openCount(row))
         }
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
         var result=N2FormContext(revision:revision,workers:people,
@@ -158,6 +160,7 @@ public struct N2FormMedication:Equatable,Sendable,Identifiable {
     public var selectedLotID:String
     public var physicalQuantity:Double
     public var approveOpening:Bool
+    public var newContainers:Int=1
     public init(id:String=UUID().uuidString,code:String,quantity:Int=1,
                 procedure:String="",selectedLotID:String="",
                 physicalQuantity:Double=0,approveOpening:Bool=false) {
@@ -237,19 +240,19 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "procedure":med.procedure,
                 "procedureConfirmed":med.procedureConfirmed,
                 "procedureSource":med.procedureSource,
-                "confirmNewContainer":med.approveOpening
+                "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0
             ]
             if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
                 // Preserve the operator's clinical record if stock changed
                 // while editing. The transactional engine verifies identity,
                 // availability and scope and records a pending reason instead.
-                guard med.physicalQuantity>0,med.physicalQuantity.isFinite else{
+                guard med.physicalQuantity>=0,med.physicalQuantity.isFinite else{
                     throw N2FormError.invalidProduct
                 }
                 row["physicalUse"]=[
                     "lotId":med.selectedLotID,
                     "quantity":med.physicalQuantity,
-                    "confirmNewContainer":med.approveOpening
+                    "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0
                 ] as [String:Any]
             }
             lines.append(row)
@@ -296,7 +299,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "procedure":med.procedure,
                 "procedureConfirmed":med.procedureConfirmed,
                 "procedureSource":med.procedureSource,
-                "confirmNewContainer":med.approveOpening
+                "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0
             ]
             if let catalog=context.products.clinical.first(where:{$0.code==med.code}) {
                 row["name"]=catalog.name;row["unit"]=catalog.unit
@@ -304,7 +307,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
                 row["physicalUse"]=[
                     "lotId":med.selectedLotID,"quantity":med.physicalQuantity,
-                    "confirmNewContainer":med.approveOpening
+                    "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0
                 ] as [String:Any]
             }
             return row

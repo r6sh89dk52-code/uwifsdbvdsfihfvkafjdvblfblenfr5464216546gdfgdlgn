@@ -144,6 +144,8 @@ public enum N2VerifiedIndicatorWorkbook {
             return (code,p)
         })
         guard productMap.count==432 else{throw Failure.invalidCatalog}
+        let operational=try N2OperationalMappings.read(clinical)
+        let stock=source["stockLots"] as? [[String:Any]] ?? []
         let disputed=try hasIncidentInSelectedVisits(
             incidents,movements:movement,selectedVisitIDs:selectedVisitIDs)
         guard !disputed else{throw Failure.unverifiedDelivery}
@@ -163,7 +165,11 @@ public enum N2VerifiedIndicatorWorkbook {
                   let quantity=numeric(m["excelQuantity"]),quantity>=0,
                   let medical=ref["clinicalCode"] as? String,
                   let nursing=m["code"] as? String,
-                  nursing==medical || approved.contains(medical+"|"+nursing)
+                  nursing==medical || approved.contains(medical+"|"+nursing) || operational.contains(where:{
+                      $0.id==m["operationalMappingID"] as? String &&
+                      $0.version==m["operationalMappingVersion"] as? Int &&
+                      $0.clinicalCode==medical && $0.inventoryID==nursing
+                  })
             else{throw Failure.unverifiedDelivery}
             let key=aid+"\u{001F}"+item
             linesByItem[key,default:0]+=quantity
@@ -274,6 +280,13 @@ public enum N2VerifiedIndicatorWorkbook {
                         consumption[code,default:0]+=Int(value)
                         consumptionBySite[sourceSite+"|"+code,default:0]+=Int(value)
                     } else if allowPending,let declared=integer(row["quantity"]),declared>0 {
+                        let inventoryCodes=Set(mapped.filter{$0["clinicalCode"] as? String==code}.compactMap{$0["kardexCode"] as? String})
+                            .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
+                        let container=N2ContainerAccounting.isContainer(unit:type) || stock.contains {
+                            inventoryCodes.contains(string($0["code"])) &&
+                                N2ContainerAccounting.isContainer(unit:string($0["catalogUnit"]))
+                        }
+                        guard !container else{throw Failure.unverifiedDelivery}
                         physical=declared
                         consumption[code,default:0]+=declared
                         consumptionBySite[sourceSite+"|"+code,default:0]+=declared

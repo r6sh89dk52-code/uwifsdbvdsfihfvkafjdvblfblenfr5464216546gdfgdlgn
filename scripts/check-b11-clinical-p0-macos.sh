@@ -80,7 +80,7 @@ xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
     -derivedDataPath "$DEST/DerivedData" \
     -resultBundlePath "$RESULT" \
     -only-testing:DANPERNativeTests/N2PortableBackupInteropTests \
-    CODE_SIGNING_ALLOWED=NO test > "$LOG" 2>&1
+    CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test > "$LOG" 2>&1
 TEST_STATUS=$?
 set -e
 if [ "$TEST_STATUS" -ne 0 ] || ! grep -q 'TEST SUCCEEDED' "$LOG"; then

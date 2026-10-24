@@ -31,21 +31,12 @@ struct N2MedicationRowView:View {
         context.options(for:medication.code,at:visitDate,site:dispensingSite)
     }
     private var availablePhysicalUnits:Double {
-        lots.reduce(0.0) { partial,lot in partial + lot.total }
+        lots.reduce(0.0) { partial,lot in partial + (N2ContainerAccounting.isContainer(unit:lot.unit) ? Double(lot.sealed):lot.total) }
     }
     private var requiresNewContainer:Bool {
-        let rule=context.operationalMappings.first{$0.clinicalCode==medication.code}
-        var remaining=medication.physicalQuantity>0 ? medication.physicalQuantity :
-            rule.map{Double(medication.quantity)*$0.physicalUnitsPerClinicalUnit} ??
-            (["UND","TBL","PAR"].contains(productUnit.uppercased()) ? Double(medication.quantity):0)
-        guard remaining>0 else{return false}
-        for lot in lots {
-            let available=lot.loose+lot.opened
-            if remaining>available && lot.sealed>0 && (lot.capacity>1 || lot.unit != "UND") {return true}
-            remaining-=lot.total
-            if remaining<=0 {return false}
-        }
-        return false
+        let available=medication.selectedLotID.isEmpty ? lots : lots.filter{$0.id==medication.selectedLotID}
+        return available.contains{N2ContainerAccounting.isContainer(unit:$0.unit)} &&
+            !available.contains{$0.openContainers>0}
     }
     private var procedureSelection:Binding<String> {
         Binding(
@@ -62,7 +53,9 @@ struct N2MedicationRowView:View {
             set:{newValue in
                 medication.selectedLotID=newValue
                 medication.approveOpening=false
-                if ["UND","TBL","PAR"].contains(productUnit.uppercased()) {
+                medication.physicalQuantity=0
+                if !lots.contains(where:{$0.id==newValue && N2ContainerAccounting.isContainer(unit:$0.unit)}),
+                   ["UND","TBL","PAR"].contains(productUnit.uppercased()) {
                     medication.physicalQuantity=Double(medication.quantity)
                 }
             })
@@ -159,6 +152,7 @@ struct N2MedicationRowView:View {
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.center)
                     .accessibilityLabel("Cantidad clínica")
+                    .accessibilityIdentifier("clinical-quantity-"+medication.code)
                 Button {
                     medication.quantity+=1
                 } label: {
@@ -209,16 +203,29 @@ struct N2MedicationRowView:View {
         }
         if !lots.isEmpty {
             if let selected=lots.first(where:{$0.id==medication.selectedLotID}) {
-                Text("Existencia: \(selected.total.formatted()) · Capacidad por envase: \(selected.capacity.formatted())")
+                Text(N2ContainerAccounting.isContainer(unit:selected.unit) ?
+                    "Cerrados: \(selected.sealed) · Abiertos declarados: \(selected.openContainers)" : "Existencia: \(selected.total.formatted())")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            DanperField(title:"Unidades físicas usadas (mL, UND…)") {
+            DanperField(title:"Volumen interno opcional / unidades individuales usadas") {
                 TextField("Cantidad física",value:$medication.physicalQuantity,
                           format:.number).keyboardType(.decimalPad)
             }
-            if requiresNewContainer {
+            if lots.contains(where:{N2ContainerAccounting.isContainer(unit:$0.unit)}) {
+                Text(requiresNewContainer ? "Sin envase abierto: confirma la apertura para dispensar." :
+                    "Se utilizará el envase abierto. Kardex: 0, salvo nueva apertura declarada.")
+                    .font(.caption).foregroundStyle(.secondary)
                 DanperCheckRow(selected:$medication.approveOpening) {
-                    Text("Autorizo abrir un frasco o caja nuevo")
+                    Text("Abrir nuevo envase · apertura realmente realizada")
+                        .font(.subheadline)
+                }
+                if medication.approveOpening {
+                    Stepper("Envases abiertos: \(medication.newContainers)",value:$medication.newContainers,in:1...100)
+                }
+                Text("El volumen es opcional e independiente del Kardex; no determina aperturas ni agotamientos.").font(.caption)
+            } else if lots.contains(where:{$0.capacity>1 && $0.sealed>0}) {
+                DanperCheckRow(selected:$medication.approveOpening) {
+                    Text("Confirmo la apertura física para extraer unidades individuales; el Kardex conserva su unidad individual.")
                         .font(.subheadline)
                 }
             }
