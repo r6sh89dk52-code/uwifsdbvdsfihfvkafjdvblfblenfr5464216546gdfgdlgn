@@ -82,6 +82,18 @@ public enum N2ContainerAccounting {
                   integer(movement["containerAccountingVersion"])==1,
                   (after["updatedAt"] as? NSNumber)==(movement["at"] as? NSNumber),
                   N2ContainerAccounting.isContainer(unit:before["catalogUnit"] as? String ?? "") else{return false}
+            let exhausted=movement["declaredExhaustedByNewOpening"] as? Bool == true
+            if exhausted {
+                guard count==1,
+                      movement["containerDisposition"] as? String=="agotado",
+                      before["volumeTrackingEnabled"] as? Bool != true,
+                      (after["openedRemaining"] as? NSNumber)?.doubleValue==0,
+                      (after["looseUnits"] as? NSNumber)?.doubleValue==0 else{
+                    return false
+                }
+                after["openedRemaining"]=before["openedRemaining"]
+                after["looseUnits"]=before["looseUnits"]
+            }
             after["declaredOpenContainers"]=before["declaredOpenContainers"]
             after["updatedAt"]=before["updatedAt"]
             after["volumeTrackingEnabled"]=before["volumeTrackingEnabled"]
@@ -116,12 +128,14 @@ public enum N2ContainerAccounting {
               let unit=lot["catalogUnit"] as? String,isContainer(unit:unit),
               openCount(lot)==1,
               lot["volumeTrackingEnabled"] as? Bool != true,
-              ((lot["openedRemaining"] as? NSNumber)?.doubleValue ?? 0)==0,
-              ((lot["looseUnits"] as? NSNumber)?.doubleValue ?? 0)==0,
               at>=(lot["updatedAt"] as? Int64 ?? Int64.max),
               operatorName.count>=3 else{return nil}
         var after=lot
         after["declaredOpenContainers"]=0
+        // A verified exhaustion declaration is stronger than a placeholder
+        // openedRemaining used when internal volumes are not tracked.
+        after["openedRemaining"]=0
+        after["looseUnits"]=0
         after["updatedAt"]=at
         after["volumeTrackingEnabled"]=false
         let event:[String:Any]=[
@@ -130,6 +144,7 @@ public enum N2ContainerAccounting {
             "kind":"containerState","at":at,
             "containerAccountingVersion":1,"closedContainers":1,
             "containerDisposition":"agotado",
+            "declaredExhaustedByNewOpening":true,
             "operatorName":operatorName,
             "description":"Agotamiento del envase anterior confirmado al abrir uno nuevo",
             "quantity":0,"excelQuantity":0,"physicalChange":0,
