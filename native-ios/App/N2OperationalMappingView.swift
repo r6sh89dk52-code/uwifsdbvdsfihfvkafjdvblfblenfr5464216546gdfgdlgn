@@ -29,7 +29,9 @@ struct N2OperationalMappingView:View {
                     Picker("Presentación física",selection:$inventoryID) {
                         Text("Seleccionar").tag("")
                         ForEach((context.products.nursing+context.auxiliaryProducts).filter{
-                            $0.unit != nil && (inventoryQuery.isEmpty || $0.id==inventoryID ||
+                            $0.unit != nil &&
+                            !N2UserReviewedKardexLinks.unmatched.contains($0.id) &&
+                            (inventoryQuery.isEmpty || $0.id==inventoryID ||
                                 $0.name.localizedStandardContains(inventoryQuery))
                         }) { item in
                             Text(item.name+" · "+(item.unit ?? "")).tag(item.id)
