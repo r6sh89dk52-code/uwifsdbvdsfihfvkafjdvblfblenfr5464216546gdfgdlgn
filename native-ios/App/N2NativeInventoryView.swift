@@ -501,6 +501,7 @@ struct N2NativeInventoryView:View {
         if movementAt==0 {movementAt=Int64(Date().timeIntervalSince1970*1000)}
         do {
             let result:N2ProtectedStoreSummary
+            var cutOpeningEstimate:Double?
             if mode=="lot" {
                 guard let material,let expiryISO,let lotCapacity,
                       let basis else{return}
@@ -533,6 +534,7 @@ struct N2NativeInventoryView:View {
                     message="El stock inicial indicado es menor que los consumos del período. Revisa la cantidad o elige stock físico actual."
                     return
                 }
+                cutOpeningEstimate=amount.cutOpening
                 var record:[String:Any]=[
                     "id":lotID,"code":material.id,"name":material.name,
                     "catalogUnit":unit,"lot":lotNumber,
@@ -598,11 +600,19 @@ struct N2NativeInventoryView:View {
             capacityEvidence=""
             capacityConfirmed=false
             reason=""
-            message=mode=="lot" && basis == .opening
-                ? "Stock inicial del corte registrado. La cantidad disponible hoy considera los consumos anteriores; no se duplicaron descuentos."
-                : mode=="lot" && basis == .countedNow
-                ? "Stock físico actual registrado. El saldo inicial del día 9 se reconstruye sumando los consumos anteriores, sin descontarlos otra vez."
-                : "Existencias registradas correctamente en el Kardex único."
+            if mode=="lot",let basis {
+                if let opening=cutOpeningEstimate {
+                    message=(basis == .opening
+                        ? "Stock inicial declarado: "
+                        : "Stock físico actual registrado. Stock inicial estimado del día 9: ") +
+                        opening.formatted() +
+                        ". Los consumos anteriores se consideran una sola vez."
+                } else {
+                    message="Stock físico actual guardado. El saldo inicial del día 9 está pendiente de verificar aperturas o consumos históricos; no se crearon descuentos."
+                }
+            } else {
+                message="Existencias registradas correctamente en el Kardex único."
+            }
         }catch{
             failed=true
             message="No se guardó la operación. Revisa lote, cantidad y existencias sin crear registros duplicados."
