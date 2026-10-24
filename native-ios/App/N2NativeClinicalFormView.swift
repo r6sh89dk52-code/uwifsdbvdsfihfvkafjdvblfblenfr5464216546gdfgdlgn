@@ -224,7 +224,7 @@ struct N2NativeClinicalFormView:View {
                                         .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
                                     VStack(alignment:.leading,spacing:5) {
                                         Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
-                                        Text("Cantidad \(med.quantity) · "+result).font(.caption).foregroundStyle(.secondary)
+                                        Text("Cantidad \(med.quantity) · "+resolution.summary).font(.caption).foregroundStyle(.secondary)
                                         if let quantity=savedKardex[med.id] {
                                             Text("Kardex R: \(quantity.formatted())"+(quantity==0 ? " · Uso de envase abierto, sin nuevo descuento":""))
                                                 .font(.caption).foregroundStyle(.secondary)
