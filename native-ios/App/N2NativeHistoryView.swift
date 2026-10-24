@@ -383,7 +383,7 @@ struct N2VisitDispensingView:View {
                                 .accessibilityIdentifier("history-pending-chronology-"+line.id)
                                 if let context,let detail,
                                    detail.medications.contains(where:{$0.id==line.id}) &&
-                                   context.options(for:line.code,at:detail.date).contains(where:{
+                                   context.historicalOptions(for:line.code,at:detail.date).contains(where:{
                                        N2ContainerAccounting.isContainer(unit:$0.unit)
                                    }) {
                                     Text("Para un frasco o caja de una atención pasada, puedes declarar si realmente abriste uno nuevo (R=1) o reutilizaste uno abierto (R=0). Esta declaración se incluye solo en el corte reconstruido.")
