@@ -503,6 +503,32 @@ console.log('PASS: alertas 1/0 por cada envase, cierre anterior auditable sin do
 
 
 
+
+const surveillanceCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2OccupationalVigilanceWorkbook.swift'),'utf8');
+const surveillanceUI=fs.readFileSync(path.join(root,'native-ios/App/N2OccupationalVigilanceExportView.swift'),'utf8');
+const clinicalSource=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'),'utf8');
+const clinicalSourceIO=fs.readFileSync(path.join(root,'native-ios/App/N2ProtectedClinicalIOSVault.swift'),'utf8');
+const demoSourceIO=fs.readFileSync(path.join(root,'native-ios/App/N2SyntheticTrialIOSVault.swift'),'utf8');
+const surveillanceTests=fs.readFileSync(path.join(root,'native-ios/Tests/DanperCoreTests/N2OccupationalVigilanceTests.swift'),'utf8');
+for(const text of [
+  'VIGILACIA OCUPACIONAL','DSUBDIVISION','OSTEOMUSCULAR',
+  'Capacitacion y ejecucion de pausas activas',
+  'N1rStoredZip.pack(entries)','skippedMissingIdentity'
+]) must(surveillanceCore,text,'generador Excel de vigilancia de una hoja');
+for(const text of [
+  'vault.exportOccupationalVigilance(',
+  'vigilance-export-xlsx','N2VigilanceActivity(file:item.file)'
+]) must(surveillanceUI,text,'pantalla y compartir vigilancia');
+for(const component of [clinicalSource,clinicalSourceIO,demoSourceIO,vaultSource])
+  must(component,'exportOccupationalVigilance(','flujo de bóveda para tercer Excel');
+must(kardex,'N2OccupationalVigilanceExportView()','tercer enlace en Kardex');
+for(const name of [
+  'testOnlyOsteomuscularSavedVisitsAndOneSheet',
+  'testOnlySelectedDateAndNoDuplicateClinicalRows',
+  'testNoOsteomuscularVisitsHasOnlyOriginalHeader'
+]) must(surveillanceTests,name,'pruebas vigilancia');
+console.log('PASS: vigilancia ocupacional de una hoja: fuente, filtro, formato y compartir conectados.');
+
 console.log('PASS: Inventario único, atención sin doble confirmación, borrador en su paso, Kardex compacto y dos Excel.');
 console.log('PASS: estructura Build 222 (4 tabs), ingreso de trabajador, perfil, revisión de alergias y alta SwiftUI presentes.');
 console.log('PASS: inicio clínico, animaciones, grupos de tratamiento y Kardex aproximados a Build222.');
