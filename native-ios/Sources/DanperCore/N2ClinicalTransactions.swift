@@ -316,10 +316,51 @@ public enum N2NativeClinicalTransaction {
                     mark("Confirma la cantidad de envases realmente abiertos.");continue
                 }
                 let openings=Int(openingNumber)
-                guard let parts=N2ContainerAccounting.allocate(lots:stock,selected:selected,
+                // Only a save-time YES with explicit previous exhaustion
+                // triggers closure. Never infer that an existing opened
+                // container was discarded merely because more stock exists.
+                let exhaustPrevious =
+                    (explicit?["previousContainerExhausted"] as? Bool == true ||
+                     item["previousContainerExhausted"] as? Bool == true)
+                var stagedLots=lots
+                var pendingClosures=[[String:Any]]()
+                if openings>0 && exhaustPrevious {
+                    guard !historical else {
+                        mark("Revisa la apertura anterior: no puede cerrarse automáticamente durante una conciliación histórica.");continue
+                    }
+                    let active=stagedLots.indices.filter {idx in
+                        stagedLots[idx]["code"] as? String==kardex &&
+                        N2ContainerAccounting.openCount(stagedLots[idx])>0
+                    }
+                    // More than one simultaneously opened container is
+                    // ambiguous; only the operator can resolve its state.
+                    guard active.count==1,let old=active.first,
+                          let closed=N2ContainerAccounting.exhaustedByNextOpening(
+                              lot:stagedLots[old],attentionID:id,itemID:itemID,
+                              operatorName:str(new["responsible"]) ?? "ENFERMERIA DANPER",
+                              at:eventAt!) else {
+                        mark("No se pudo verificar que el envase anterior se agotó. Revisa su estado antes de abrir otro.");continue
+                    }
+                    stagedLots[old]=closed.after
+                    pendingClosures.append(closed.event)
+                }
+                // Reuse FEFO order while applying the staged closure to
+                // the lot selected for the new opening.
+                let reconciledStock=stock.compactMap {previous -> [String:Any]? in
+                    let lotID=previous["id"] as? String
+                    return stagedLots.first(where:{$0["id"] as? String==lotID})
+                }
+                guard let parts=N2ContainerAccounting.allocate(
+                    lots:reconciledStock,selected:selected,
                     openings:openings,volume:quantity,at:eventAt!) else {
-                    mark(openings==0 ? "No hay envase abierto verificable: confirma Abrir nuevo envase. No se descontó stock." :
-                        "Apertura declarada o volumen no verificable en el lote seleccionado. No se descontó stock.");continue
+                    mark(openings==0 ? "No hay envase abierto verificable: indica que abriste uno nuevo. No se descontó stock." :
+                        "Apertura declarada, cierre previo o cantidad no verificables. No se descontó stock.");continue
+                }
+                // Commit prior closure only after the new opening is valid.
+                // The event has R=0 and does not represent a second debit.
+                if !pendingClosures.isEmpty {
+                    lots=stagedLots
+                    movements.append(contentsOf:pendingClosures)
                 }
                 for (index,part) in parts.enumerated() {
                 let before=part.before,after=part.after
