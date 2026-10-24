@@ -314,7 +314,13 @@ struct N2ClinicalWorkspaceRootView:View {
                         HStack(spacing:10) {
                             homeMetric(homeCounts.map{String($0.today)} ?? "—","Hoy")
                             homeMetric(homeCounts.map{String($0.week)} ?? "—","Esta semana")
-                            homeMetric(homeCounts.map{String($0.drafts)} ?? "—","Borradores")
+                            NavigationLink {
+                                N2NativeDraftsDashboard()
+                            } label: {
+                                homeMetric(homeCounts.map{String($0.drafts)} ?? "—","Borradores")
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("clinical-home-draft-count-link")
                         }
 
                         Text("Herramientas")
@@ -325,7 +331,7 @@ struct N2ClinicalWorkspaceRootView:View {
                                   spacing:12) {
                             homeTile("Trabajadores","Registrar o buscar personal",
                                      symbol:"person.badge.plus") {
-                                N2NativeHistoryView(useProtectedVault:true)
+                                N2NativeHistoryView(useProtectedVault:true,showWorkers:true)
                             }
                             homeTile("Kardex","Inventario y movimientos",
                                      symbol:"shippingbox.fill") {
