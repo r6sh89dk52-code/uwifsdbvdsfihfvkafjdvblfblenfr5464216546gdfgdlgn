@@ -243,7 +243,9 @@ struct N2NativeClinicalFormView:View {
                                                   : resolution.summary))
                                                 .font(.caption).foregroundStyle(.secondary)
                                         if let quantity=savedKardex[med.id] {
-                                            Text("Kardex R: \(quantity.formatted())"+(quantity==0 ? " · Uso de envase abierto, sin nuevo descuento":""))
+                                            Text("Kardex R: \(quantity.formatted())"+(quantity==0
+                                                ? " · Reutilización declarada; ninguna caja nueva descontada"
+                                                : ""))
                                                 .font(.caption).foregroundStyle(.secondary)
                                         }
                                         if result != "Descontado" {
@@ -1437,7 +1439,7 @@ struct N2NativeClinicalFormView:View {
     private var containerDecisionMessage:String {
         let order=containerDecisionIndex+1
         let total=containerDecisionIDs.count
-        return "\(containerDecisionName) · \(order) de \(total). SÍ: abriste físicamente otro (Kardex 1) y confirmas agotado el anterior si existía. NO: reutilizaste un envase abierto (Kardex 0). Si no hay ninguno abierto, la salida quedará pendiente."
+        return "\(containerDecisionName) · \(order) de \(total). SÍ: abriste una caja o frasco nuevo (Kardex 1). NO: utilizaste uno abierto anteriormente (Kardex 0), sin restar una nueva caja. Si su apertura anterior no figura en el inventario, DANPER conservará tu declaración sin crear una apertura pasada ni alterar las existencias."
     }
     private func beginContainerReview(_ context:N2FormContext) {
         guard !busy,!saved else{return}
@@ -1491,11 +1493,13 @@ struct N2NativeClinicalFormView:View {
             : ((previouslySelected?.openContainers ?? 0)>0 ||
                (earlierOpened && previouslySelected != nil))
         if !matchingExisting {
-            let preferred=opened
-                ? available.first(where:{$0.sealed>0})
-                : available.first(where:{$0.openContainers>0})
-                    ?? (earlierOpened
-                        ? available.first(where:{$0.sealed>0}):nil)
+            let preferred:N2FormLot?
+            if opened {
+                preferred=available.first(where:{$0.sealed>0})
+            } else {
+                preferred=available.first(where:{$0.openContainers>0})
+                    ?? (earlierOpened ? available.first(where:{$0.sealed>0}) : nil)
+            }
             // Do not silently choose a sealed box for a declared reuse.
             form.items[idx].selectedLotID=preferred?.id ?? ""
         }
