@@ -74,7 +74,7 @@ struct N2VerifiedNursingExportView:View {
             N2Build222ExportProgress(titles:["Período","Vista previa","Compartir"])
             DanperPanel("Formato oficial de 98 productos") {
                 Label("98 productos de enfermería",systemImage:"lock.shield")
-                Text("Los saldos no acreditados se dejan en blanco. No se generan ceros ni se modifican existencias.")
+                Text("Los 98 productos conservan su fila: sin lote aparece stock 0. El corte 9–8 puede reconstruir el saldo inicial desde el conteo posterior sin cambiar existencias físicas.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             DanperPanel {
@@ -97,7 +97,7 @@ struct N2VerifiedNursingExportView:View {
                     DanperDateField(title:"Fecha final del acumulado",selection:$day)
                     Text("Corte mensual: "+selectedPeriod.start+" al "+selectedPeriod.end)
                         .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                    Text("El saldo inicial corresponde al día 9; se acumulan diariamente los ingresos y consumos registrados. Los días sin consumo computan cero, nunca una salida ficticia.")
+                    Text("Si registraste el stock después de atender, se reconstruye el saldo inicial del día 9 sumando consumos confirmados y restando ingresos y ajustes. No se descuentan de nuevo los lotes actuales. Frascos/cajas solo cuentan aperturas declaradas.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     DanperDateField(title:"Desde",selection:$rangeStart)
@@ -116,7 +116,7 @@ struct N2VerifiedNursingExportView:View {
                 Label("98 productos del catálogo oficial de Enfermería",
                       systemImage:"checkmark.shield")
                     .font(.subheadline.weight(.semibold))
-                Text("Comprueba los lotes y recuentos físicos desde Inventario y Conciliación antes de exportar. Los saldos sin acreditar permanecen sin informar.")
+                Text("El Kardex mostrará 0 cuando no existe lote. Si el corte requiere reconstrucción sin conteo o aperturas declaradas, el Excel oficial se detiene para evitar un saldo inventado.")
                     .font(.caption).foregroundStyle(.secondary)
                 NavigationLink {
                     N2NativeInventoryView()
@@ -171,7 +171,8 @@ struct N2VerifiedNursingExportView:View {
                 result=try await vault
                     .exportVerifiedRangeNursingWorkbook(
                         start:selectedPeriod.start,end:selectedPeriod.end,
-                        responsible:operatorName,site:site)
+                        responsible:operatorName,site:site,
+                        reconstructFromCount:reportMode=="cut")
             }
             cleanup()
             let dir=FileManager.default.temporaryDirectory
@@ -187,7 +188,7 @@ struct N2VerifiedNursingExportView:View {
             let output=dir.appendingPathComponent(name)
             try result.xlsx.write(to:output,
                 options:[.atomic,.completeFileProtection])
-            status="Generado: \(result.stockKnownRows) productos con historial; \(result.stockUnknownRows) sin existencias acreditadas (en blanco)."
+            status="Generado: \(result.stockKnownRows) productos con historial; \(result.stockUnknownRows) sin lotes registrados (saldo 0)."
             share=N2NursingShare(file:output)
         }catch {
             cleanup()
