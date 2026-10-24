@@ -18,8 +18,8 @@ public enum N2VerifiedNursingWorkbook {
             snapshot:snapshot,catalog:catalog,date:date,site:site)
         guard report.rows.count==98 else{throw Failure.incompleteOrUnreconciled}
         let known=report.rows.filter{$0.stockKnown}.count
-        // Build 222 permits a 98-row workbook with blank, UNKNOWN balances.
-        // Absence of inventory must never be translated into measured zeros.
+        // Export each absent-lot stock cell as recorded 0, without creating a physical lot.
+        // The stockKnown flag remains false for unverified physical counts.
         guard report.exportable else{throw Failure.incompleteOrUnreconciled}
         let manifest=try report.manifest(shift:shift,responsible:responsible)
         let book=try N1sNursingExcelWriter.export(base:template,manifest:manifest)
@@ -40,8 +40,8 @@ public enum N2VerifiedNursingWorkbook {
             throw Failure.incompleteOrUnreconciled
         }
         let known=report.rows.filter(\.stockKnown).count
-        // Build 222 permits a 98-row workbook with blank, UNKNOWN balances.
-        // Absence of inventory must never be translated into measured zeros.
+        // Export each absent-lot stock cell as recorded 0, without creating a physical lot.
+        // The stockKnown flag remains false for unverified physical counts.
         let manifest=try report.manifest(shift:"CONSOLIDADO",responsible:responsible)
         let book=try N1sNursingExcelWriter.export(base:template,manifest:manifest)
         guard book.sheetCount==1,book.writtenRows==98,book.xlsx.count>20_000,
