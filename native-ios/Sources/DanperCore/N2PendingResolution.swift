@@ -10,6 +10,18 @@ public enum N2PendingResolution:Equatable,Sendable {
     case reviewChronology
     case reviewPending
 
+    /// Short, user-facing explanation; the clinical record keeps the original reason.
+    public var summary:String {
+        switch self {
+        case .completed:return "Consumo vinculado al Kardex"
+        case .registerStock:return "No hay stock disponible para descontar"
+        case .verifyCorrespondence:return "Falta vincular el producto al inventario"
+        case .verifyPhysicalUse:return "Falta comprobar lote o apertura"
+        case .reviewChronology:return "Pendiente por revisión de fecha e historial"
+        case .reviewPending:return "Consumo pendiente de revisión"
+        }
+    }
+
     public static func forReason(_ reason:String)->Self {
         let text=reason.trimmingCharacters(in:.whitespacesAndNewlines)
         if text=="Descontado" {return .completed}
