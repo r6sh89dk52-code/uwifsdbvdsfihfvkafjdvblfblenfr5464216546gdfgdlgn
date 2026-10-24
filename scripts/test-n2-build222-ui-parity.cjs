@@ -375,7 +375,7 @@ for(const fragment of [
   'case .explainHistorical(let reason):',
   'La atención ya está guardada. Agregar existencias ahora no demuestra el saldo anterior.',
   'Contabilizado en el corte 9–8 · sin salida física verificada',
-  'Ir al Kardex · registrar stock físico actual'
+  'Ir a Kardex · registrar stock físico actual'
 ]) must(history,fragment,'historial actual distingue reconstrucción del corte y salida física auditada');
 for(const phrase of [
   'N2PendingResolution.historicalTitle(forReason:result)',
