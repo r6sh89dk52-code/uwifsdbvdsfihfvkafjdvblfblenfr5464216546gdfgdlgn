@@ -108,6 +108,73 @@ final class N3DeclaredContainerTests:XCTestCase {
         XCTAssertEqual(repeated.physicalMovementsAdded,0)
         XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(repeated.snapshot).consumptionR.compactMap{$0},expected.map(Double.init))
     }
+    func testSaveTimeExplicitNewOpeningClosesOneVerifiedPreviousWithoutSecondDebit()throws {
+        let first=try save(source(sealed:3),id:"popup-first",day:"2026-11-08",openings:1)
+        XCTAssertEqual(first.linked,1)
+        var next=try object(visit(first.snapshot,id:"popup-next",day:"2026-11-09",openings:1))
+        var items=try XCTUnwrap(next["items"] as? [[String:Any]])
+        var use=try XCTUnwrap(items[0]["physicalUse"] as? [String:Any])
+        use["previousContainerExhausted"]=true
+        items[0]["physicalUse"]=use
+        next["items"]=items
+        let saved=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:first.snapshot,
+            visit:bytes(next),approvedCatalog:fixture("n2-reviewed-approved.json"),
+            at:time("2026-11-09"))
+        XCTAssertEqual(saved.linked,1,saved.pendingReasons.joined(separator:";"))
+        XCTAssertEqual(saved.pending,0)
+        let all=try object(saved.snapshot)
+        let moves=try XCTUnwrap(all["stockMovements"] as? [[String:Any]])
+        let closings=moves.filter{$0["kind"] as? String=="containerState"}
+        XCTAssertEqual(closings.count,1)
+        XCTAssertEqual(closings[0]["containerDisposition"] as? String,"agotado")
+        XCTAssertEqual((closings[0]["excelQuantity"] as? NSNumber)?.doubleValue,0)
+        XCTAssertEqual(try lot(saved.snapshot)["declaredOpenContainers"] as? Int,1)
+        XCTAssertEqual(try lot(saved.snapshot)["sealedContainers"] as? Int,1)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(saved.snapshot)
+                        .consumptionR.compactMap{$0},[1,1])
+        let retried=try N2NativeClinicalTransaction.retryCurrentSavedVisit(
+            snapshot:saved.snapshot,visitID:"popup-next",
+            approvedCatalog:fixture("n2-reviewed-approved.json"),
+            at:time("2026-11-10"))
+        XCTAssertEqual(retried.physicalMovementsAdded,0)
+        let again=try object(retried.snapshot)
+        XCTAssertEqual((again["stockMovements"] as? [[String:Any]])?.count,moves.count)
+    }
+    func testNextOpeningCannotSilentlyExhaustTwoPreviouslyOpenedContainers()throws {
+        let first=try save(source(sealed:4),id:"two-open",day:"2026-11-08",openings:2)
+        var next=try object(visit(first.snapshot,id:"next-after-two",day:"2026-11-09",openings:1))
+        var rows=next["items"] as! [[String:Any]]
+        var use=rows[0]["physicalUse"] as! [String:Any]
+        use["previousContainerExhausted"]=true
+        rows[0]["physicalUse"]=use
+        next["items"]=rows
+        let pending=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:first.snapshot,
+            visit:bytes(next),approvedCatalog:fixture("n2-reviewed-approved.json"),
+            at:time("2026-11-09"))
+        XCTAssertEqual(pending.linked,0)
+        XCTAssertEqual(pending.pending,1)
+        XCTAssertEqual(try lot(pending.snapshot)["declaredOpenContainers"] as? Int,2)
+        XCTAssertEqual(try lot(pending.snapshot)["sealedContainers"] as? Int,2)
+        let m=try object(pending.snapshot)["stockMovements"] as! [[String:Any]]
+        XCTAssertFalse(m.contains{$0["kind"] as? String=="containerState"})
+    }
+    func testMeasuredRemainderPreventsAutomaticExhaustion()throws {
+        let first=try save(source(capacity:10,sealed:3),id:"measured-open",
+                             day:"2026-11-08",openings:1,volume:2)
+        var next=try object(visit(first.snapshot,id:"new-while-measured",
+                                  day:"2026-11-09",openings:1))
+        var items=next["items"] as! [[String:Any]]
+        var evidence=items[0]["physicalUse"] as! [String:Any]
+        evidence["previousContainerExhausted"]=true
+        items[0]["physicalUse"]=evidence
+        next["items"]=items
+        let result=try N2NativeClinicalTransaction.appendSavedVisit(
+            snapshot:first.snapshot,visit:bytes(next),
+            approvedCatalog:fixture("n2-reviewed-approved.json"),at:time("2026-11-09"))
+        XCTAssertEqual(result.pending,1)
+        XCTAssertEqual(try lot(result.snapshot)["openedRemaining"] as? Int,8)
+    }
+
     func testVolumeCannotOpenOrExhaustContainerAndExplicitClosureDoesNotDebitAgain()throws {
         let first=try save(source(capacity:10,sealed:3),id:"first",day:"2026-11-08",openings:1,volume:10)
         XCTAssertEqual(first.linked,1)
