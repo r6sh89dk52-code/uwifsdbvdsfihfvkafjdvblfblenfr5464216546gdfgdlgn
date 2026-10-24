@@ -62,6 +62,23 @@ public struct N2FormContext:Sendable {
     public let allergies:[String:N2FormAllergy]
     public let lots:[N2FormLot]
     public let products:N2NativeCatalogIndex
+    /// Historical evidence is allowed for a catalogued, now-empty lot:
+    /// the declaration records an old R=1/0 in the cut, not a new stock debit.
+    /// Never use this method for current FEFO availability.
+    public func historicalOptions(for code:String,at date:String)->[N2FormLot] {
+        let operational=operationalMappings.filter{$0.clinicalCode==code}
+        let linked=Set(operational.isEmpty
+            ? products.authorizedNursingOptions(for:code).map(\.id)
+            : operational.map(\.inventoryID))
+        return lots.filter {
+            linked.contains($0.kardexCode) &&
+            ($0.expires.isEmpty || $0.expires>=date)
+        }.sorted {
+            let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
+            let b=$1.expires.isEmpty ? "9999-12-31":$1.expires
+            return a==b ? $0.id<$1.id : a<b
+        }
+    }
     public func options(for code:String,at date:String,site:String="")->[N2FormLot] {
         let operational=operationalMappings.filter{$0.clinicalCode==code}
         let approved=Set(operational.isEmpty
