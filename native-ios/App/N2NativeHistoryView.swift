@@ -241,34 +241,226 @@ private struct N2WorkerHistoryDetail:View {
 }
 
 
+/// One contextual resolution route per pending line. This view does not
+/// change any clinical record by itself; inventory writes stay in the vault.
+private enum N2HistoryConsumptionAction:Identifiable {
+    case registerStock
+    case verifyMapping(String)
+    case verifyPhysical(String)
+
+    var id:String {
+        switch self {
+        case .registerStock:return "stock"
+        case .verifyMapping(let id):return "mapping-"+id
+        case .verifyPhysical(let id):return "physical-"+id
+        }
+    }
+}
+
 struct N2VisitDispensingView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     let visitID:String
     @State private var lines=[N2DispensingLine]()
+    @State private var context:N2FormContext?
+    @State private var detail:N2CorrectionDetail?
+    @State private var selectedAction:N2HistoryConsumptionAction?
     @State private var failed=false
+    @State private var busy=false
+    @State private var notice=""
+
+    private var pendingCount:Int {lines.filter{$0.result != "Descontado"}.count}
+
     var body:some View {
         ScrollView {
-          VStack(alignment:.leading,spacing:16) {
-            if failed {Text("No se pudo verificar el consumo. Inténtalo de nuevo.")}
-            ForEach(lines) { line in
-                VStack(alignment:.leading,spacing:7) {
-                    Text(line.name).font(.headline)
-                    Text(line.code+" · Cantidad clínica: "+line.quantity.formatted()).font(.caption)
-                    Label(line.result,systemImage:line.result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.circle")
-                        .font(.footnote).foregroundStyle(line.result=="Descontado" ? Color.green : Color.orange)
-                    if let quantity=line.kardexQuantity {
-                        Text("Kardex R: \(quantity.formatted())"+(quantity==0 ? " · Uso de envase abierto":""))
+            VStack(alignment:.leading,spacing:14) {
+                if failed {
+                    Label("No se pudieron consultar todos los datos. La atención original no se modificó.",
+                          systemImage:"exclamationmark.triangle")
+                        .font(.footnote).foregroundStyle(.orange)
+                }
+                if pendingCount>0 {
+                    DanperPanel {
+                        Label("\(pendingCount) consumo(s) por revisar",
+                              systemImage:"exclamationmark.circle")
+                            .font(.subheadline.weight(.semibold))
+                        Text("La atención clínica ya está guardada. Los pendientes no tienen salida física confirmada. Registra solo las existencias y aperturas reales.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                }.padding(14).frame(maxWidth:.infinity,alignment:.leading).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+                }
+                ForEach(lines) {line in
+                    let resolution=N2PendingResolution.forReason(line.result)
+                    VStack(alignment:.leading,spacing:9) {
+                        Text(line.name).font(.subheadline.weight(.semibold))
+                        Text("Cantidad clínica: "+line.quantity.formatted())
+                            .font(.caption).foregroundStyle(.secondary)
+                        Label(resolution.summary,systemImage:resolution == .completed
+                              ? "checkmark.circle.fill" : "exclamationmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(resolution == .completed ? Color.green : Color.orange)
+                        if let quantity=line.kardexQuantity {
+                            Text("Kardex R: \(quantity.formatted())"+
+                                 (quantity==0 ? " · Uso de envase abierto, sin nueva apertura":""))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if line.result != "Descontado" {
+                            switch resolution {
+                            case .registerStock:
+                                Text("No hay lote compatible con existencias utilizables. Si tienes stock físico, regístralo primero.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if context != nil {
+                                    Button {
+                                        selectedAction = .registerStock
+                                    } label: {
+                                        Label("Registrar existencias",systemImage:"shippingbox.fill")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier("history-pending-stock-"+line.id)
+                                }
+                            case .verifyCorrespondence:
+                                Text("El producto clínico todavía necesita una vinculación física verificada.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if context != nil {
+                                    Button {
+                                        selectedAction = .verifyMapping(line.code)
+                                    } label: {
+                                        Label("Vincular producto",systemImage:"link")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier("history-pending-mapping-"+line.id)
+                                }
+                            case .verifyPhysicalUse, .reviewPending:
+                                if context != nil && detail?.medications.contains(where:{$0.id==line.id}) == true {
+                                    Button {
+                                        selectedAction = .verifyPhysical(line.id)
+                                    } label: {
+                                        Label(resolution == .verifyPhysicalUse ?
+                                              "Revisar lote o apertura" : "Revisar datos del consumo",
+                                              systemImage:"checkmark.shield")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier("history-pending-physical-"+line.id)
+                                }
+                            case .reviewChronology:
+                                Text("Requiere revisar la fecha y los movimientos posteriores. No se hará un descuento retroactivo sin evidencia.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            case .completed:
+                                EmptyView()
+                            }
+                        }
+                    }
+                    .frame(maxWidth:.infinity,alignment:.leading)
+                    .padding(14)
+                    .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+                }
+                if lines.isEmpty && !failed {
+                    Text("Esta atención no tiene medicamentos ni insumos registrados.")
+                        .foregroundStyle(.secondary)
+                }
+                if pendingCount>0 && context != nil {
+                    Button {
+                        Task {await retryPending()}
+                    } label: {
+                        Label(busy ? "Comprobando…" : "Volver a comprobar pendientes",
+                              systemImage:"arrow.clockwise")
+                    }
+                    .buttonStyle(DanperSecondaryButton())
+                    .disabled(busy)
+                    Text("La comprobación respeta el historial y no crea otra atención.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !notice.isEmpty {
+                    Text(notice).font(.footnote).foregroundStyle(.secondary)
+                }
+            }.padding(16)
+        }
+        .navigationTitle("Consumos")
+        .navigationBarTitleDisplayMode(.inline)
+        .danperFormChrome()
+        .refreshable {await load()}
+        .task {await load()}
+        .sheet(item:$selectedAction,onDismiss:{
+            Task {await load()}
+        }) {action in
+            switch action {
+            case .registerStock:
+                NavigationStack {
+                    N2NativeInventoryView(initialOperation:"lot")
+                        .toolbar {
+                            ToolbarItem(placement:.topBarTrailing) {
+                                Button("Cerrar") {selectedAction=nil}
+                            }
+                        }
+                }
+            case .verifyMapping(let code):
+                if let context {
+                    N2OperationalMappingView(code:code,context:context,onSaved:{
+                        selectedAction=nil
+                        Task {await load()}
+                    })
+                } else {
+                    ContentUnavailableView("Inventario no disponible",
+                                           systemImage:"lock.shield")
+                }
+            case .verifyPhysical(let itemID):
+                if let context, let detail,
+                   let med=detail.medications.first(where:{$0.id==itemID}) {
+                    N2PendingDispensingView(
+                        visitID:visitID,
+                        medication:N2FormMedication(id:med.id,code:med.code,
+                                                    quantity:med.quantity,
+                                                    procedure:med.procedure),
+                        date:detail.date,context:context,
+                        onSaved:{
+                            selectedAction=nil
+                            Task {await load()}
+                        })
+                } else {
+                    ContentUnavailableView("Detalle no disponible",
+                                           systemImage:"lock.shield")
+                }
             }
-            if lines.isEmpty && !failed {Text("Atención sin medicamentos o insumos.").foregroundStyle(.secondary)}
-          }.padding(16)
         }
-        .navigationTitle("Consumos de la atención").danperFormChrome()
-        .task {
-            do {lines=try await vault.dispensingLines(visitID:visitID)}
-            catch {failed=true}
+    }
+
+    @MainActor
+    private func load() async {
+        do {
+            lines=try await vault.dispensingLines(visitID:visitID)
+            failed=false
+        } catch {
+            failed=true
+            notice="No se pudieron consultar los consumos de la atención."
+            return
         }
+        do {
+            context=try await vault.clinicalFormContext()
+        } catch {
+            context=nil
+            notice="Las acciones están temporalmente no disponibles. La atención permanece guardada."
+            return
+        }
+        do {
+            detail=try await vault.readCorrectionDetail(visitID:visitID)
+        } catch {
+            detail=nil
+            // Correspondence and stock actions still work without the
+            // correction detail. Physical reconciliation needs exact item IDs.
+        }
+    }
+
+    @MainActor
+    private func retryPending() async {
+        guard !busy else{return}
+        busy=true
+        defer {busy=false}
+        do {
+            let current=try await vault.clinicalFormContext()
+            _=try await vault.retryDispensing(visitID:visitID,
+                                            expectedRevision:current.revision)
+            notice="Se verificaron nuevamente los pendientes sin duplicar la atención."
+        } catch {
+            notice="No se pudo conciliar con los datos actuales. No se modificó la atención original."
+        }
+        await load()
     }
 }
