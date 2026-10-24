@@ -1,4 +1,6 @@
 # DANPER N2 — reconstrucción integral del corte 9–8
+
+**Stock inicial reconstruido:** se estima a partir del conteo físico posterior, los consumos confirmados del período, los ingresos y los ajustes. No representa una segunda salida FEFO.
 Fecha de implementación: 2026-10-24 · Rama: `feat/build222-native-ui-parity-20261020`
 
 ## Objetivo y regla contable
