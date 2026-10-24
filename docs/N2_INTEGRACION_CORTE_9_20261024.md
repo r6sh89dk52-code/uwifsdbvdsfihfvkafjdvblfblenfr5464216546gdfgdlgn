@@ -74,6 +74,35 @@ La app nunca estima aperturas nuevas de frascos o cajas sin declaración.
    histórica R=1/0 incluso sobre lote actualmente agotado, sin
    permitir su consumo FEFO en nuevas atenciones.
 
+## Ventana automática de apertura al finalizar la atención
+
+Al pulsar **Guardar atención** (paso Resultado), una confirmación nativa
+centrada revisa en orden cada medicamento/insumo clasificado como frasco
+o caja. No es necesario desplegar la fila de cada producto ni marcar
+una casilla oculta.
+
+- **Sí, abrí uno nuevo**: `R=1` para el envase nuevo.
+- **No, usé el abierto**: `R=0` si efectivamente existe un envase abierto;
+  si no existe, el consumo queda pendiente, no se simula apertura.
+- **Volver**: no guarda la atención hasta completar las confirmaciones.
+- Si había un solo envase abierto del mismo producto, la respuesta
+  **Sí** significa también «el anterior se agotó». Se registra
+  `containerState:agotado` para el previo, `R=0` en ese evento, y
+  solo `R=1` por el nuevo. La transición se valida y aplica
+  atómicamente con la atención.
+- Si hay **dos o más envases abiertos**, una diferencia de existencias,
+  historial posterior o una cantidad interna medida sin conciliar,
+  no se fuerza el cierre: el consumo queda pendiente de revisión.
+- «Cerrado» o «Descartado» siguen disponibles como excepciones en
+  Inventario; el cierre normal del agotado no exige entrar allí.
+
+Validaciones adicionales: un frasco se abre `1` en la primera
+atención, se reutiliza `0`, el siguiente frasco se abre `1`
+y registra el agotamiento del anterior sin consumo adicional,
+luego se reutiliza `0`. Reintentar una atención registrada no
+duplica eventos. Las aperturas/estados históricos posteriores no se
+reconstruyen sin evidencia.
+
 ## Casos de aceptación en iPhone 16 Simulator (solo datos ficticios)
 
 - **Paracetamol:** atención ficticia de 3 UND sin lote previo. Más tarde
