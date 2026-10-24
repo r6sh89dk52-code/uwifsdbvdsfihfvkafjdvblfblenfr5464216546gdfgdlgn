@@ -289,7 +289,20 @@ struct N2VisitDispensingView:View {
                     }
                 }
                 ForEach(lines) {line in
-                    let resolution=N2PendingResolution.forReason(line.result)
+                    let storedResolution=N2PendingResolution.forReason(line.result)
+                    // Saved reasons can predate a newly confirmed batch link.
+                    // The catalog is authoritative for the current UI action.
+                    let alreadyLinked=context?.products.authorizedNursingOptions(
+                        for:line.code).isEmpty == false ||
+                        context?.operationalMappings.contains(where:{
+                            $0.clinicalCode==line.code
+                        }) == true
+                    let resolvedStock=context?.options(
+                        for:line.code,at:detail?.date ?? "").isEmpty == false
+                    let resolution:N2PendingResolution =
+                        storedResolution == .verifyCorrespondence && alreadyLinked
+                        ? (resolvedStock ? .verifyPhysicalUse : .registerStock)
+                        : storedResolution
                     VStack(alignment:.leading,spacing:9) {
                         Text(line.name).font(.subheadline.weight(.semibold))
                         Text("Cantidad clínica: "+line.quantity.formatted())
@@ -305,7 +318,9 @@ struct N2VisitDispensingView:View {
                         if line.result != "Descontado" {
                             switch resolution {
                             case .registerStock:
-                                Text("No hay lote compatible con existencias utilizables. Si tienes stock físico, regístralo primero.")
+                                Text(alreadyLinked && storedResolution == .verifyCorrespondence
+                                     ? "Producto ya vinculado al Kardex. Esta atención anterior sigue pendiente: registra únicamente stock físico real y revisa la fecha antes de conciliar."
+                                     : "No hay lote compatible con existencias utilizables. Si tienes stock físico, regístralo primero.")
                                     .font(.caption).foregroundStyle(.secondary)
                                 if context != nil {
                                     Button {
@@ -317,7 +332,7 @@ struct N2VisitDispensingView:View {
                                     .accessibilityIdentifier("history-pending-stock-"+line.id)
                                 }
                             case .verifyCorrespondence:
-                                Text("El producto clínico todavía necesita una vinculación física verificada.")
+                                Text("Este código clínico no tiene correspondencia aprobada ni revisada.")
                                     .font(.caption).foregroundStyle(.secondary)
                                 if context != nil {
                                     Button {
@@ -334,7 +349,9 @@ struct N2VisitDispensingView:View {
                                         selectedAction = .verifyPhysical(line.id)
                                     } label: {
                                         Label(resolution == .verifyPhysicalUse ?
-                                              "Revisar lote o apertura" : "Revisar datos del consumo",
+                                              (alreadyLinked && storedResolution == .verifyCorrespondence
+                                                  ? "Revisar consumo anterior" : "Revisar lote o apertura")
+                                              : "Revisar datos del consumo",
                                               systemImage:"checkmark.shield")
                                     }
                                     .buttonStyle(.bordered)
