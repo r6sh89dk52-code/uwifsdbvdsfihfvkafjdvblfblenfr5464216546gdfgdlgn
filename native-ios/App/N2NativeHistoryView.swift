@@ -259,6 +259,7 @@ private enum N2HistoryConsumptionAction:Identifiable {
 
 struct N2VisitDispensingView:View {
     @Environment(\.n2WorkspaceVault) private var vault
+    @Environment(\.dismiss) private var dismiss
     let visitID:String
     @State private var lines=[N2DispensingLine]()
     @State private var context:N2FormContext?
@@ -375,6 +376,15 @@ struct N2VisitDispensingView:View {
         }
         .navigationTitle("Consumos")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement:.topBarLeading) {
+                Button {dismiss()} label: {
+                    Label("Volver",systemImage:"chevron.left")
+                }
+                .accessibilityIdentifier("history-consumption-back")
+            }
+        }
         .danperFormChrome()
         .refreshable {await load()}
         .task {await load()}
