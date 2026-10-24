@@ -413,6 +413,8 @@ struct N2ClinicalWorkspaceRootView:View {
                                        symbol:"tablecells") {N2VerifiedNursingExportView()}
                         DanperToolLink(title:"Indicador ambulatorio · Excel",
                                        symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
+                        DanperToolLink(title:"Vigilancia ocupacional · Excel",
+                                       symbol:"figure.walk.motion") {N2OccupationalVigilanceExportView()}
                         DanperToolLink(title:"Respaldo cifrado",
                                        symbol:"lock.doc") {N2NativeBackupExportView()}
                         Button("Cerrar espacio clínico",role:.cancel) {onClose()}
