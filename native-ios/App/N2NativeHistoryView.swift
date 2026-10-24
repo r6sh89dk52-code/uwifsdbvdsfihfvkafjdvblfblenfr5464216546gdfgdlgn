@@ -33,7 +33,7 @@ struct N2NativeHistoryView: View {
     var body:some View {
         Group {
             if let projection {
-                let matches=projection.findWorkers(committedQuery)
+                let matches=showWorkers ? projection.findWorkers(committedQuery) : []
                 let savedVisits=projection.visits.filter{
                     $0.status=="saved" &&
                     (committedQuery.isEmpty ||
@@ -327,6 +327,9 @@ private struct N2RecordedVisitDetailView:View {
         }
         .navigationDestination(isPresented:$editing) {
             N2ClinicalCorrectionView(visitID:visitID)
+        }
+        .onChange(of:editing) { _,isEditing in
+            if !isEditing {Task {await load()}}
         }
     }
     @MainActor private func load() async {
