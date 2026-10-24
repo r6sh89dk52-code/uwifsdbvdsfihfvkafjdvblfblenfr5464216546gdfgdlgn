@@ -426,6 +426,10 @@ must(pendingView,'Guardar declaración histórica (R=1/0)',
   'distinguir conciliación contable antigua de FEFO actual');
 must(history,'context.historicalOptions(for:line.code,at:detail.date)',
   'historial permite seleccionar apertura histórica de un lote agotado');
+must(pendingView,'return historicalAccountingOnly || date<formatter.string(from:Date())',
+  'atenciones anteriores del mismo día usan declaración histórica cuando corresponde');
+must(history,'historicalAccountingOnly:',
+  'historial selecciona conciliación contable en lugar de forzar FEFO actual');
 console.log('PASS: lotes agotados se pueden documentar retrospectivamente sin habilitar FEFO agotado.');
 
 
