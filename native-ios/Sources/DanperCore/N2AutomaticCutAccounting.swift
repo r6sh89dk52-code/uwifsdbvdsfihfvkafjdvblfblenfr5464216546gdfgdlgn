@@ -96,6 +96,7 @@ public enum N2AutomaticCutAccounting {
                         name:rule.clinicalName,unit:rule.clinicalUnit)] =
                 [(code:rule.inventoryID,name:rule.inventoryName)]
         }
+        let declaredHistory=try N2PendingDispensingEvidence.read(snapshot:snapshot)
         var totals=[String:Acc]()
         var projectedClinicalLines=Set<String>()
         var ids=Set<String>()
@@ -140,6 +141,22 @@ public enum N2AutomaticCutAccounting {
                     let debit=events.reduce(0.0){$0+(num($1["excelQuantity"]) ?? 0)}
                     line.used+=debit
                     line.daily[visitDay,default:0]+=debit
+                }else if let historical=declaredHistory.last(where:{
+                    $0.visitID==visitID && $0.itemID==itemID &&
+                    $0.at<=Int64((num([ "timestamp":NSNumber(value:1) ]["timestamp"]) ?? 1)) * Int64.max
+                }),
+                    let verifiedLot=lots.first(where:{$0["id"] as? String==historical.lotID}),
+                    verifiedLot["code"] as? String==match.code,
+                    N2ContainerAccounting.isContainer(unit:
+                        verifiedLot["catalogUnit"] as? String ?? "") {
+                    // This operator-confirmed historical R is accounting
+                    // evidence only. Do not reconstruct a physical FEFO debit.
+                    let opened=Double(historical.newContainers ??
+                        (historical.confirmNewContainer ? 1:0))
+                    line.used+=opened
+                    line.daily[visitDay,default:0]+=opened
+                    line.unlinked+=1
+                    projectedClinicalLines.insert(id)
                 }else if ["UND","TBL","PAR"].contains(unit.uppercased()) &&
                     // E-86 / E-94 / E-95 need a real declared opening, never R=n.
                     !["E-86","E-94","E-95"].contains(match.code) &&
