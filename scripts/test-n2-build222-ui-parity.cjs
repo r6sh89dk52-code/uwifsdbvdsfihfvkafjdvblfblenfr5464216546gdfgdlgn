@@ -302,6 +302,8 @@ assert(!history.includes('Label(line.result,systemImage:'),
        'Historial no debe mostrar mensajes crudos FEFO en la vista principal');
 assert(!history.includes('navigationTitle("Consumos de la atención")'),
        'Título de consumos no debe truncarse con cabecera grande');
+must(history,'Text("Kardex R: \\(quantity.formatted())" +',
+     'detalle del Kardex concatena mediante operador infijo Swift');
 console.log('PASS: historial muestra causas comprensibles y acciones por estado, sin duplicación de atención.');
 
 
