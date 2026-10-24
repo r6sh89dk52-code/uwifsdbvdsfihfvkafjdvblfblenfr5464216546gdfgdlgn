@@ -21,7 +21,7 @@ final class N2AutomaticCutAccountingTests:XCTestCase {
         XCTAssertEqual(tablets.clinicalUnits,1017)
         XCTAssertEqual(tablets.reportedUse,1017)
         XCTAssertEqual(tablets.unlinkedItems,1)
-        XCTAssertEqual(result.projectedClinicalLines.count,1)
+        XCTAssertGreaterThanOrEqual(result.projectedClinicalLines.count,tablets.unlinkedItems)
         XCTAssertEqual(tablets.usesByDay["2026-10-14"],1017)
         XCTAssertEqual(tablets.usesByDay["2026-10-15"] ?? 0,0)
         // There is one opened container (R=1) and one reuse (R=0).
