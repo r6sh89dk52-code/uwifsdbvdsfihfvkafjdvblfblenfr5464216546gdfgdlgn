@@ -14,6 +14,7 @@ public struct N2CorrectionField:Sendable,Equatable {
     public let code:String
     public let name:String
     public let quantity:Int
+    public let originalQuantity:Int
     public let procedure:String
 }
 public struct N2CorrectionDetail:Sendable {
@@ -89,7 +90,8 @@ public enum N2ClinicalCorrections {
         guard changes.count<=20,
               changes.keys.allSatisfy({
                 editableText.contains($0) || editableBools.contains($0) ||
-                $0=="standaloneProcedures" || $0=="itemProcedures"
+                $0=="standaloneProcedures" || $0=="itemProcedures" ||
+                $0=="itemClinicalQuantities"
               }) else{throw N2CorrectionError.invalidChanges}
         for (key,v) in changes {
             if editableText.contains(key) {
@@ -109,7 +111,7 @@ public enum N2ClinicalCorrections {
                 next[key]=arr
             }else if key=="itemProcedures" {
                 guard let index=v as? [String:String],index.count<=100,
-                      let items=before["items"] as? [[String:Any]] else{
+                      let items=next["items"] as? [[String:Any]] else{
                     throw N2CorrectionError.invalidChanges
                 }
                 let originalIDs=Set(items.compactMap{$0["id"] as? String})
@@ -123,6 +125,27 @@ public enum N2ClinicalCorrections {
                         item["procedure"]=p
                     }
                     return item
+                }
+            }else if key=="itemClinicalQuantities" {
+                guard let quantities=v as? [String:Int],
+                      !quantities.isEmpty,quantities.count<=100,
+                      let items=next["items"] as? [[String:Any]] else{
+                    throw N2CorrectionError.invalidChanges
+                }
+                let validIDs=Set(items.compactMap{$0["id"] as? String})
+                guard Set(quantities.keys).isSubset(of:validIDs),
+                      quantities.values.allSatisfy({(1...100_000).contains($0)}) else{
+                    throw N2CorrectionError.invalidChanges
+                }
+                // Preserve ORIGINAL quantity and FEFO dispenseRef. A
+                // corrected clinical amount is audit-only and blocks official
+                // exports until its stock discrepancy is separately resolved.
+                next["items"]=items.map{original in
+                    var row=original
+                    if let id=original["id"] as? String,let qty=quantities[id] {
+                        row["correctedClinicalQuantity"]=qty
+                    }
+                    return row
                 }
             }
         }
@@ -191,7 +214,9 @@ public enum N2ClinicalCorrections {
                 throw N2CorrectionError.brokenHistory
             }
             previousEventSHA=signed
-            if !note.isEmpty {pending.insert(visitID)}
+            if !note.isEmpty || change["itemClinicalQuantities"] != nil {
+                pending.insert(visitID)
+            }
             current[idx]=next
         }
         return(current,history,pending)
@@ -211,8 +236,10 @@ public enum N2ClinicalCorrections {
                   let name=v["name"] as? String,let quantity=v["quantity"] as? Int else{
                 throw N2CorrectionError.invalidSnapshot
             }
+            let corrected=v["correctedClinicalQuantity"] as? Int ?? quantity
             return N2CorrectionField(id:id,code:code,name:name,
-                quantity:quantity,procedure:v["procedure"] as? String ?? "")
+                quantity:corrected,originalQuantity:quantity,
+                procedure:v["procedure"] as? String ?? "")
         }
         func s(_ key:String)->String{visit[key] as? String ?? ""}
         return N2CorrectionDetail(id:visitID,workerName:worker["name"] as? String ?? "",
