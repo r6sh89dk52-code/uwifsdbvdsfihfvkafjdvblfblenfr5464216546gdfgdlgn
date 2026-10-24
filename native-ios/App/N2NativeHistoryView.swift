@@ -247,12 +247,14 @@ private enum N2HistoryConsumptionAction:Identifiable {
     case registerStock
     case verifyMapping(String)
     case verifyPhysical(String)
+    case explainHistorical(String)
 
     var id:String {
         switch self {
         case .registerStock:return "stock"
         case .verifyMapping(let id):return "mapping-"+id
         case .verifyPhysical(let id):return "physical-"+id
+        case .explainHistorical(let reason):return "historical-"+reason
         }
     }
 }
@@ -307,7 +309,9 @@ struct N2VisitDispensingView:View {
                         Text(line.name).font(.subheadline.weight(.semibold))
                         Text("Cantidad clínica: "+line.quantity.formatted())
                             .font(.caption).foregroundStyle(.secondary)
-                        Label(resolution.summary,systemImage:resolution == .completed
+                        Label(resolution == .reviewChronology
+                              ? N2PendingResolution.historicalTitle(forReason:line.result)
+                              : resolution.summary,systemImage:resolution == .completed
                               ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .font(.caption)
                             .foregroundStyle(resolution == .completed ? Color.green : Color.orange)
@@ -358,8 +362,15 @@ struct N2VisitDispensingView:View {
                                     .accessibilityIdentifier("history-pending-physical-"+line.id)
                                 }
                             case .reviewChronology:
-                                Text("Requiere revisar la fecha y los movimientos posteriores. No se hará un descuento retroactivo sin evidencia.")
+                                Text(N2PendingResolution.historicalGuidance(forReason:line.result))
                                     .font(.caption).foregroundStyle(.secondary)
+                                Button {
+                                    selectedAction = .explainHistorical(line.result)
+                                } label: {
+                                    Label("Entender este pendiente",systemImage:"info.circle")
+                                }
+                                .buttonStyle(.bordered)
+                                .accessibilityIdentifier("history-pending-chronology-"+line.id)
                             case .completed:
                                 EmptyView()
                             }
@@ -426,6 +437,29 @@ struct N2VisitDispensingView:View {
                 } else {
                     ContentUnavailableView("Inventario no disponible",
                                            systemImage:"lock.shield")
+                }
+            case .explainHistorical(let reason):
+                NavigationStack {
+                    ScrollView {
+                        VStack(alignment:.leading,spacing:16) {
+                            Label(N2PendingResolution.historicalTitle(forReason:reason),
+                                  systemImage:"clock.arrow.circlepath")
+                                .font(.headline)
+                            Text(N2PendingResolution.historicalGuidance(forReason:reason))
+                                .font(.body)
+                            Text("La atención ya está guardada. Agregar existencias ahora no demuestra el saldo anterior. Conserva este pendiente hasta disponer de una conciliación documentada; no es necesario crear otra atención.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth:.infinity,alignment:.leading)
+                        .padding(20)
+                    }
+                    .navigationTitle("Revisión histórica")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement:.topBarTrailing) {
+                            Button("Cerrar") {selectedAction=nil}
+                        }
+                    }
                 }
             case .verifyPhysical(let itemID):
                 if let context, let detail,
