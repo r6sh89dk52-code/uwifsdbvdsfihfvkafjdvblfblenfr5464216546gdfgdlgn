@@ -333,6 +333,20 @@ assert(!history.includes('navigationTitle("Consumos de la atención")'),
 must(history,'Text("Kardex R: \\(quantity.formatted())" +',
      'detalle del Kardex concatena mediante operador infijo Swift');
 console.log('PASS: historial muestra causas comprensibles y acciones por estado, sin duplicación de atención.');
+for(const fragment of [
+  'storedResolution == .verifyCorrespondence && alreadyLinked',
+  'context?.products.authorizedNursingOptions(',
+  'Producto ya vinculado al Kardex',
+  'Revisar consumo anterior'
+]) must(history,fragment,'historial no reabre vinculación ya revisada');
+for(const fragment of [
+  'storedResolution == .verifyCorrespondence && alreadyLinked',
+  'context.products.authorizedNursingOptions(',
+  'Producto ya vinculado.',
+  'Revisar consumo anterior'
+]) must(form,fragment,'resultado evita vinculación ya confirmada');
+console.log('PASS: enlaces confirmados en bloque omiten modal repetido incluso para pendientes previos.');
+
 
 
 console.log('PASS: Inventario único, atención sin doble confirmación, borrador en su paso, Kardex compacto y dos Excel.');
