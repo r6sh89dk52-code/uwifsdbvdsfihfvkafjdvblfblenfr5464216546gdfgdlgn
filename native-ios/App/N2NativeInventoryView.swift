@@ -42,6 +42,7 @@ struct N2NativeInventoryView:View {
     @State private var closingLot:N2FormLot?
     @State private var reason=""
     @State private var productSearch=""
+    @State private var zeroStockQuery=""
     @FocusState private var productSearchFocused:Bool
     @Environment(\.danperReveal) private var reveal
     @State private var revealTask:Task<Void,Never>?
@@ -66,6 +67,17 @@ struct N2NativeInventoryView:View {
         return Array(catalog.filter{
             $0.name.localizedStandardContains(q)
         }.prefix(15))
+    }
+    /// Catalog rows without any registered lot are displayed as zero stock,
+    /// not inserted into the audited stockLots ledger.
+    private var productsWithoutLots:[N2NursingCatalogProduct] {
+        guard let context else{return []}
+        let registered=Set(context.lots.map(\.kardexCode))
+        let query=zeroStockQuery.trimmingCharacters(in:.whitespacesAndNewlines)
+        return context.products.nursing.filter { product in
+            !registered.contains(product.id) &&
+            (query.isEmpty || product.name.localizedStandardContains(query))
+        }
     }
     private var material:N2NursingCatalogProduct? {
         context?.products.nursing.first{$0.id==materialCode}
@@ -128,6 +140,7 @@ struct N2NativeInventoryView:View {
                     inventorySummary
                     operationChoices
                     lotList
+                    zeroStockList
                 }else {
                     entryForm
                 }
@@ -394,6 +407,28 @@ struct N2NativeInventoryView:View {
                 if expiryISO==nil {
                     Text("Escribe seis dígitos: día, mes y año. No se abre el calendario.")
                         .font(.caption).foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+    private var zeroStockList:some View {
+        DanperPanel {
+            DisclosureGroup("Sin lotes registrados · stock 0") {
+                Text("El producto sigue en el Kardex aunque no tenga lote. Stock registrado: 0; no equivale a un conteo físico verificado.")
+                    .font(.caption).foregroundStyle(.secondary)
+                TextField("Buscar producto sin stock",text:$zeroStockQuery)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("inventory-zero-stock-search")
+                ForEach(productsWithoutLots) {product in
+                    HStack {
+                        Text(product.name).font(.caption)
+                        Spacer(minLength:8)
+                        Text("0"+(product.unit.map{" "+$0} ?? ""))
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    .accessibilityIdentifier("inventory-zero-stock-"+product.id)
                 }
             }
         }
