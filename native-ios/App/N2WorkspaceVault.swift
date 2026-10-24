@@ -205,6 +205,16 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.exportVerifiedIndicatorWorkbook(start:start,end:end,subdivision:subdivision,ids:ids,allowPending:allowPending)
     }
+    func exportOccupationalVigilance(start:String,end:String) async throws
+        ->N2OccupationalVigilanceWorkbook.Result {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared
+                .exportOccupationalVigilance(start:start,end:end)
+        }
+        return try await N2SyntheticTrialIOSVault.shared
+            .exportOccupationalVigilance(start:start,end:end)
+    }
+
     func exportVerifiedDailyNursingWorkbook(date:String,shift:String,responsible:String,site:String="") async throws -> N2VerifiedNursingWorkbook.Result {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.exportVerifiedDailyNursingWorkbook(date:date,shift:shift,responsible:responsible,site:site)
