@@ -61,7 +61,9 @@ public enum N2OperationalMappings {
                               catalog:N2NativeCatalogIndex,explicitConsent:Bool)throws->Data {
         try validate(rule)
         let inventory=catalog.nursing + (try N2AuxiliaryInventory.products(snapshot:snapshot))
+        let reviewed=N2UserReviewedKardexLinks.candidates(for:rule.clinicalCode)
         guard explicitConsent,
+              (reviewed.isEmpty || reviewed.contains(where:{$0.kardexID==rule.inventoryID})),
               !N2UserReviewedKardexLinks.unmatched.contains(rule.inventoryID),
               catalog.clinical.contains(where:{$0.code==rule.clinicalCode && $0.name==rule.clinicalName && $0.unit==rule.clinicalUnit}),
               inventory.contains(where:{$0.id==rule.inventoryID && $0.name==rule.inventoryName && $0.unit==rule.presentation}) else {
