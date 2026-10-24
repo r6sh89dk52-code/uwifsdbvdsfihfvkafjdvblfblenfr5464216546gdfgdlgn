@@ -736,3 +736,95 @@ struct N2NativeInventoryView:View {
         }
     }
 }
+
+
+/// Labels and expirations of UNUSED lots may be corrected, never their
+/// physical balances. Used-lot changes must go through auditable movements.
+private struct N2LotMetadataEditor:View {
+    let lot:N2FormLot
+    let onSaved:()->Void
+    @Environment(\.n2WorkspaceVault) private var vault
+    @Environment(\.dismiss) private var dismiss
+    @State private var reference:String
+    @State private var expiry:String
+    @State private var reason=""
+    @State private var operatorName=""
+    @State private var busy=false
+    @State private var error=""
+    @State private var confirm=false
+    init(lot:N2FormLot,onSaved:@escaping ()->Void) {
+        self.lot=lot
+        self.onSaved=onSaved
+        _reference=State(initialValue:lot.reference)
+        let p=lot.expires.split(separator:"-")
+        let ddmmyy=p.count==3
+            ? "\(p[2])/\(p[1])/\(p[0].suffix(2))":""
+        _expiry=State(initialValue:ddmmyy)
+    }
+    private var expiryISO:String? {
+        expiry.isEmpty ? "" : N2ExpiryEntry.iso(expiry)
+    }
+    private var valid:Bool {
+        !busy && !reference.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
+        expiryISO != nil &&
+        reason.trimmingCharacters(in:.whitespacesAndNewlines).count>=8 &&
+        operatorName.trimmingCharacters(in:.whitespacesAndNewlines).count>=3
+    }
+    var body:some View {
+        NavigationStack {
+            Form {
+                Section("Identificación del lote") {
+                    LabeledContent("Medicamento",value:lot.name)
+                    TextField("Número de lote",text:$reference)
+                    LabeledContent("Cantidad física (solo lectura)",
+                                   value:lot.total.formatted()+" "+lot.unit)
+                    Text("Para cambiar existencias utiliza «Actualizar conteo». No se modificará ningún consumo.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    N2ExpiryTextField(text:$expiry).frame(minHeight:44)
+                    Text("Lotes con movimientos antiguos no permiten reescribir su fecha o referencia: sus registros históricos deben permanecer intactos.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                Section("Rectificación documentada") {
+                    TextField("Motivo de la corrección",text:$reason,axis:.vertical)
+                        .lineLimit(2...4)
+                    TextField("Responsable",text:$operatorName)
+                    Button("Guardar corrección del lote") {confirm=true}
+                        .disabled(!valid)
+                        .confirmationDialog("¿Confirmar la corrección del lote?",
+                            isPresented:$confirm,titleVisibility:.visible) {
+                            Button("Sí, guardar"){Task{await save()}}
+                            Button("No",role:.cancel){}
+                        } message: {
+                            Text("Solo cambia la referencia y el vencimiento de un lote sin movimientos. Se registra el motivo y responsable.")
+                        }
+                }
+                if !error.isEmpty {
+                    Section {Text(error).foregroundStyle(.orange)}
+                }
+            }
+            .navigationTitle("Editar lote")
+            .toolbar {
+                ToolbarItem(placement:.topBarTrailing) {
+                    Button("Cerrar"){dismiss()}
+                }
+            }
+        }
+    }
+    @MainActor private func save() async {
+        guard valid,let expires=expiryISO else{return}
+        busy=true
+        defer{busy=false}
+        do {
+            let current=try await vault.clinicalFormContext()
+            _=try await vault.correctUnusedLot(lotID:lot.id,
+                reference:reference,expires:expires,reason:reason,
+                operatorName:operatorName,
+                at:Int64(Date().timeIntervalSince1970*1000),
+                expectedRevision:current.revision)
+            onSaved()
+            dismiss()
+        } catch {
+            self.error="No se pudo modificar. Si el lote ya tuvo movimientos, conserva su referencia histórica y utiliza un movimiento de ajuste para las existencias."
+        }
+    }
+}
