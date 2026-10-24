@@ -278,7 +278,12 @@ public enum N2NursingReportBuilder {
                                start:start,end:end,site:site)
         let existing=Dictionary(uniqueKeysWithValues:original.rows.map{($0.code,$0)})
         let calculated=Dictionary(uniqueKeysWithValues:projection.rows.map{($0.code,$0)})
-        var warnings=[String]()
+        // Preserve genuine audit warnings; differences from a late count
+        // are what this explicit reconstructed report is designed to resolve.
+        var warnings=original.warnings.filter {
+            $0.contains("modos de conteo incompatibles") ||
+            $0.contains("ajustes auditados")
+        }
         var rows=[N2NursingRow]()
         for product in products {
             let code=product["id"] as! String
