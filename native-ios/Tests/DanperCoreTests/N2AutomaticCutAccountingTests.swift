@@ -66,6 +66,11 @@ final class N2AutomaticCutAccountingTests:XCTestCase {
         XCTAssertEqual(tablets.total-tablets.consumed,tablets.closing,accuracy:0.001)
         let packaged=try XCTUnwrap(report.rows.first{$0.code=="E-57"})
         XCTAssertEqual(packaged.consumed,1) // One declared opening, subsequent reuse = 0.
+        let unmatched=try XCTUnwrap(report.rows.first{$0.code=="E-25"})
+        XCTAssertFalse(unmatched.stockKnown)
+        XCTAssertEqual(unmatched.initial,0)
+        XCTAssertEqual(unmatched.consumed,0)
+        XCTAssertEqual(unmatched.closing,0)
         // Repeating a read-only reconstruction must never edit source events.
         let again=try N2NursingReportBuilder.reconstructedCut(
             snapshot:snapshot,catalog:catalog,mappings:mappings,
