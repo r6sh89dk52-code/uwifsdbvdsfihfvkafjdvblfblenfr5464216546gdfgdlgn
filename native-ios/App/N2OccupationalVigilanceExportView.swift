@@ -100,7 +100,7 @@ struct N2OccupationalVigilanceExportView:View {
                     .disabled(busy || range.start>range.end)
                     .accessibilityIdentifier("vigilance-export-xlsx")
                     Text(status)
-                        .font(.caption).foregroundStyle(failed ? .red : .secondary)
+                        .font(.caption).foregroundStyle(failed ? Color.red : Color.secondary)
                     Text("El archivo contiene datos de salud ocupacional. Compártelo solo con destinatarios autorizados.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
