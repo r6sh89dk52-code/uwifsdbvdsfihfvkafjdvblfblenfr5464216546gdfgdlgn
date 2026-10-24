@@ -52,6 +52,7 @@ struct N2NativeInventoryView:View {
     @State private var lotID=UUID().uuidString
     @State private var movementID=UUID().uuidString
     @State private var movementAt:Int64=0
+    @State private var showStockBasisAlert=false
 
     /// The exceptional selector offers only official units already
     /// seen in the source catalog. It is not shown for approved matches.
@@ -157,6 +158,18 @@ struct N2NativeInventoryView:View {
         .task {if !layoutOnly {await load()}}
         .sheet(item:$closingLot) {lot in
             N2ContainerStateView(lot:lot,revision:context?.revision ?? 0) {Task {await load()}}
+        }
+        .alert("¿Qué representa esta cantidad?",
+               isPresented:$showStockBasisAlert) {
+            Button("Stock inicial del día 9") {
+                Task {await commit(basis:.opening)}
+            }
+            Button("Stock físico que tengo hoy") {
+                Task {await commit(basis:.countedNow)}
+            }
+            Button("Cancelar",role:.cancel) {}
+        } message: {
+            Text("Inicial: cantidad con la que empezaste este corte; DANPER resta los consumos anteriores para obtener el saldo actual. Actual: cantidad que cuentas hoy; se conserva y se reconstruye el saldo inicial sumando los consumos registrados. No se descuentan dos veces.")
         }
         .onChange(of:materialCode) {_,_ in
             capacityInput="";capacityEvidence="";capacityConfirmed=false
@@ -294,11 +307,16 @@ struct N2NativeInventoryView:View {
                         .accessibilityIdentifier("inventory-single-quantity")
                 }
                 if mode=="lot" {
-                    Text("Registra la cantidad que realmente tienes hoy. No se considerará automáticamente un ingreso adicional.")
+                    Text("Al guardar te preguntaremos si es tu stock inicial del corte (día 9) o la cantidad física que tienes hoy. La elección modifica el cálculo, no es solo una etiqueta.")
+
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Button {
-                    Task {await commit()}
+                    if mode=="lot" {
+                        showStockBasisAlert=true
+                    } else {
+                        Task {await commit()}
+                    }
                 } label: {
                     Label(busy ? "Guardando…" : mode=="count" ?
                           "Guardar conteo" : mode=="receipt" ?
@@ -475,7 +493,7 @@ struct N2NativeInventoryView:View {
             message="No se pudo leer el inventario. No se modificó ningún registro."
         }
     }
-    @MainActor private func commit() async {
+    @MainActor private func commit(basis:N2StockRegistrationBasis?=nil) async {
         guard valid,let current=context,let qty=enteredQuantity else{return}
         busy=true
         failed=false
@@ -484,8 +502,38 @@ struct N2NativeInventoryView:View {
         do {
             let result:N2ProtectedStoreSummary
             if mode=="lot" {
-                guard let material,let expiryISO,let lotCapacity else{return}
+                guard let material,let expiryISO,let lotCapacity,
+                      let basis else{return}
                 let isPack=packaged
+                let calendar=Calendar(identifier:.gregorian)
+                let formatter=DateFormatter()
+                formatter.locale=Locale(identifier:"en_US_POSIX")
+                formatter.timeZone=TimeZone(identifier:"America/Lima")
+                formatter.dateFormat="yyyy-MM-dd"
+                let registrationDay=formatter.string(from:
+                    Date(timeIntervalSince1970:Double(movementAt)/1000))
+                let cut=try await vault.automaticCutAccounting(through:registrationDay)
+                let period=try N2KardexCutPreview.period(for:registrationDay)
+                if basis == .opening &&
+                    current.lots.contains(where:{$0.kardexCode==material.id}) {
+                    failed=true
+                    message="Ya existen lotes de este producto. No puedes registrar otro stock inicial duplicado; usa conteo actual o ingreso adicional."
+                    return
+                }
+                let previous=cut.rows.first{$0.code==material.id}
+                let amount:N2StockRegistrationChoice.Resolution
+                do {
+                    amount=try N2StockRegistrationChoice.resolve(basis,quantity:qty,
+                        historical:previous,isContainer:isPack)
+                } catch N2StockRegistrationChoice.Failure.ambiguousHistoricalOpenings {
+                    failed=true
+                    message="Hay frascos o cajas usados sin apertura confirmada. Declara primero sus aperturas (1/0), o registra el stock físico que tienes hoy."
+                    return
+                } catch N2StockRegistrationChoice.Failure.negativeCurrentStock {
+                    failed=true
+                    message="El stock inicial indicado es menor que los consumos del período. Revisa la cantidad o elige stock físico actual."
+                    return
+                }
                 var record:[String:Any]=[
                     "id":lotID,"code":material.id,"name":material.name,
                     "catalogUnit":unit,"lot":lotNumber,
@@ -494,9 +542,13 @@ struct N2NativeInventoryView:View {
                         unit=="FCO" ? "frasco" : unit=="CJA" ? "caja" : "paquete"
                     ) : "unidad",
                     "unitsPerContainer":isPack ? lotCapacity : 1,
-                    "sealedContainers":isPack ? Int(qty) : 0,
-                    "looseUnits":isPack ? 0 : qty,
-                    "openedRemaining":0,"updatedAt":movementAt
+                    "sealedContainers":isPack ? Int(amount.todayPhysical) : 0,
+                    "looseUnits":isPack ? 0 : amount.todayPhysical,
+                    "openedRemaining":0,"updatedAt":movementAt,
+                    "stockRegistrationBasis":basis.rawValue,
+                    "stockRegistrationCutStart":period.start,
+                    "stockRegistrationEnteredQuantity":qty,
+                    "stockRegistrationCurrentQuantity":amount.todayPhysical
                 ]
                 if isPack {
                     record["declaredOpenContainers"]=0
@@ -547,7 +599,11 @@ struct N2NativeInventoryView:View {
             capacityEvidence=""
             capacityConfirmed=false
             reason=""
-            message="Existencias registradas correctamente en el Kardex único."
+            message=mode=="lot" && basis == .opening
+                ? "Stock inicial del corte registrado. La cantidad disponible hoy considera los consumos anteriores; no se duplicaron descuentos."
+                : mode=="lot" && basis == .countedNow
+                ? "Stock físico actual registrado. El saldo inicial del día 9 se reconstruye sumando los consumos anteriores, sin descontarlos otra vez."
+                : "Existencias registradas correctamente en el Kardex único."
         }catch{
             failed=true
             message="No se guardó la operación. Revisa lote, cantidad y existencias sin crear registros duplicados."
