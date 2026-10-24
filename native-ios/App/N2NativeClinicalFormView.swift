@@ -37,6 +37,7 @@ struct N2NativeClinicalFormView:View {
     @State private var context:N2FormContext?
     @State private var pendingMappingCode:String?
     @State private var pendingPhysicalItemID:String?
+    @State private var showStockRegistration=false
     @State private var form=N2NativeFormDraft()
     @State private var step=0
     @State private var busy=false
@@ -205,7 +206,7 @@ struct N2NativeClinicalFormView:View {
                             LabeledContent("Consumos vinculados al Kardex",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
                             LabeledContent("Consumos pendientes",value:String(form.items.filter{savedLines[$0.id] != "Descontado"}.count))
                             if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
-                                Label("Hay consumos sin salida física. Revisa el motivo de cada producto.",systemImage:"exclamationmark.triangle")
+                                Label("Atención guardada. Los consumos pendientes no se descontaron del inventario.",systemImage:"exclamationmark.triangle")
                                     .font(.footnote).foregroundStyle(.orange)
                             } else if !form.items.isEmpty {
                                 Label("Kardex verificado según unidades o aperturas declaradas",systemImage:"checkmark.circle.fill")
@@ -217,6 +218,7 @@ struct N2NativeClinicalFormView:View {
                             reviewValue("Diagnóstico",form.diagnosis)
                             ForEach(form.items) {med in
                                 let result=savedLines[med.id] ?? "Pendiente de conciliar"
+                                let resolution=N2PendingResolution.forReason(result)
                                 HStack(alignment:.top,spacing:10) {
                                     Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                                         .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
@@ -228,24 +230,55 @@ struct N2NativeClinicalFormView:View {
                                                 .font(.caption).foregroundStyle(.secondary)
                                         }
                                         if result != "Descontado" {
-                                            Button("Verificar cantidad y apertura pendiente") {pendingPhysicalItemID=med.id}
+                                            switch resolution {
+                                            case .registerStock:
+                                                Text("No hay existencias FEFO utilizables. Si tienes stock físico, regístralo; si no, conserva el pendiente.")
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                                Button {
+                                                    showStockRegistration=true
+                                                } label: {
+                                                    Label("Registrar existencias",systemImage:"shippingbox.fill")
+                                                }
+                                                .accessibilityIdentifier("pending-stock-"+med.code)
+                                            case .verifyCorrespondence:
+                                                Button {
+                                                    pendingMappingCode=med.code
+                                                } label: {
+                                                    Label("Vincular producto",systemImage:"link")
+                                                }
+                                                .accessibilityIdentifier("pending-mapping-"+med.code)
+                                                .sheet(isPresented:Binding(
+                                                    get:{pendingMappingCode==med.code},
+                                                    set:{if !$0 {pendingMappingCode=nil}}
+                                                )) {
+                                                    N2OperationalMappingView(code:med.code,context:context,onSaved:{
+                                                        Task {await refreshDispensing(retry:false)}
+                                                    })
+                                                }
+                                            case .verifyPhysicalUse, .reviewPending:
+                                                Button {
+                                                    pendingPhysicalItemID=med.id
+                                                } label: {
+                                                    Label(resolution == .verifyPhysicalUse
+                                                          ? "Revisar lote o apertura"
+                                                          : "Revisar datos del consumo",
+                                                          systemImage:"checkmark.shield")
+                                                }
                                                 .accessibilityIdentifier("pending-physical-"+med.code)
-                                                .sheet(isPresented:Binding(get:{pendingPhysicalItemID==med.id},set:{if !$0 {pendingPhysicalItemID=nil}})) {
+                                                .sheet(isPresented:Binding(
+                                                    get:{pendingPhysicalItemID==med.id},
+                                                    set:{if !$0 {pendingPhysicalItemID=nil}}
+                                                )) {
                                                     N2PendingDispensingView(visitID:form.id,medication:med,date:form.date,context:context,onSaved:{
                                                         Task {await refreshDispensing(retry:false)}
                                                     })
                                                 }
-                                            if context.operationalMappings.contains(where:{$0.clinicalCode==med.code}) {
-                                                Label("Correspondencia operativa verificada",systemImage:"checkmark.shield")
-                                                    .font(.caption)
-                                            } else {
-                                                Button("Resolver correspondencia") {pendingMappingCode=med.code}
-                                                    .accessibilityIdentifier("pending-mapping-"+med.code)
-                                                    .sheet(isPresented:Binding(get:{pendingMappingCode==med.code},set:{if !$0 {pendingMappingCode=nil}})) {
-                                                        N2OperationalMappingView(code:med.code,context:context,onSaved:{
-                                                            Task {await refreshDispensing(retry:false)}
-                                                        })
-                                                    }
+                                            case .reviewChronology:
+                                                Label("Requiere revisión cronológica. No se hará un descuento retroactivo sin evidencia.",
+                                                      systemImage:"calendar.badge.exclamationmark")
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                            case .completed:
+                                                EmptyView()
                                             }
                                         }
                                     }
@@ -253,7 +286,7 @@ struct N2NativeClinicalFormView:View {
                             }
                             if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
                             if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
-                                Button("Revisar consumos pendientes sin duplicar atención") {
+                                Button("Volver a comprobar pendientes") {
                                     Task {await refreshDispensing(retry:true)}
                                 }.disabled(busy)
                             }
@@ -410,6 +443,18 @@ struct N2NativeClinicalFormView:View {
                         } message: {
                             Text("Esta acción no elimina atenciones ya guardadas.")
                         }
+                    }
+                }
+                .sheet(isPresented:$showStockRegistration,onDismiss:{
+                    Task {await refreshDispensing(retry:false)}
+                }) {
+                    NavigationStack {
+                        N2NativeInventoryView(initialOperation:"lot")
+                            .toolbar {
+                                ToolbarItem(placement:.topBarTrailing) {
+                                    Button("Cerrar") {showStockRegistration=false}
+                                }
+                            }
                     }
                 }
                 .onChange(of:form.dni) {_,dni in
