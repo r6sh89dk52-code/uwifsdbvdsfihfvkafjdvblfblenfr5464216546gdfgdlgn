@@ -379,6 +379,22 @@ struct N2VisitDispensingView:View {
                                 }
                                 .buttonStyle(.bordered)
                                 .accessibilityIdentifier("history-pending-chronology-"+line.id)
+                                if let context,let detail,
+                                   detail.medications.contains(where:{$0.id==line.id}) &&
+                                   context.options(for:line.code,at:detail.date).contains(where:{
+                                       N2ContainerAccounting.isContainer(unit:$0.unit)
+                                   }) {
+                                    Text("Para un frasco o caja de una atención pasada, puedes declarar si realmente abriste uno nuevo (R=1) o reutilizaste uno abierto (R=0). Esta declaración se incluye solo en el corte reconstruido.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    Button {
+                                        selectedAction = .verifyPhysical(line.id)
+                                    } label: {
+                                        Label("Declarar apertura histórica (1/0)",
+                                              systemImage:"checkmark.shield")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier("history-declare-opening-"+line.id)
+                                }
                             case .completed:
                                 EmptyView()
                             }
