@@ -175,6 +175,18 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.addLot(lot,expectedRevision:expectedRevision)
     }
+    func correctUnusedLot(lotID:String,reference:String,expires:String,
+        reason:String,operatorName:String,at:Int64,
+        expectedRevision:Int) async throws -> N2ProtectedStoreSummary {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.correctUnusedLot(
+                lotID:lotID,reference:reference,expires:expires,reason:reason,
+                operatorName:operatorName,at:at,expectedRevision:expectedRevision)
+        }
+        return try await N2SyntheticTrialIOSVault.shared.correctUnusedLot(
+            lotID:lotID,reference:reference,expires:expires,reason:reason,
+            operatorName:operatorName,at:at,expectedRevision:expectedRevision)
+    }
     func receiveStock(movementID:String,lotID:String,at:Int64,sealedAdded:Int,looseAdded:Double,reason:String,expectedRevision:Int) async throws -> N2ProtectedStoreSummary {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.receiveStock(movementID:movementID,lotID:lotID,at:at,sealedAdded:sealedAdded,looseAdded:looseAdded,reason:reason,expectedRevision:expectedRevision)
