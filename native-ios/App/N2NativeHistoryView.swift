@@ -299,8 +299,7 @@ struct N2VisitDispensingView:View {
                             .font(.caption)
                             .foregroundStyle(resolution == .completed ? Color.green : Color.orange)
                         if let quantity=line.kardexQuantity {
-                            Text("Kardex R: \(quantity.formatted())"+
-                                 (quantity==0 ? " · Uso de envase abierto, sin nueva apertura":""))
+                            Text("Kardex R: \(quantity.formatted())" + (quantity == 0 ? " · Uso de envase abierto, sin nueva apertura" : ""))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         if line.result != "Descontado" {
