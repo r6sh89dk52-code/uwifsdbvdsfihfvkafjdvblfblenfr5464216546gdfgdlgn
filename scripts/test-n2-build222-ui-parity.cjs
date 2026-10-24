@@ -294,6 +294,8 @@ for (const key of [
   'readCorrectionDetail(visitID:visitID)',
   'retryDispensing(visitID:visitID',
   'navigationTitle("Consumos")',
+  'navigationBarBackButtonHidden(true)',
+  'Label("Volver",systemImage:"chevron.left")',
   'case .reviewChronology:'
 ]) must(history,key,'historial con resolución contextual de consumos');
 assert(!history.includes('Label(line.result,systemImage:'),
