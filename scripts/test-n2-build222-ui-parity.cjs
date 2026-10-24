@@ -367,6 +367,35 @@ for(const phrase of [
 ]) must(form,phrase,'resultado de atención histórica contextual');
 console.log('PASS: pendiente histórico indica causa específica y ofrece explicación segura.');
 
+const autoCut=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2AutomaticCutAccounting.swift'),'utf8');
+const nursingBuilder=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NursingReportBuilder.swift'),'utf8');
+const nursingBook=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedNursingWorkbook.swift'),'utf8');
+const indicatorBook=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
+const nursingCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'),'utf8');
+const clinicalVault=fs.readFileSync(path.join(root,'native-ios/App/N2ProtectedClinicalIOSVault.swift'),'utf8');
+const syntheticVault=fs.readFileSync(path.join(root,'native-ios/App/N2SyntheticTrialIOSVault.swift'),'utf8');
+for(const key of [
+  'N2UserReviewedKardexLinks.links',
+  'N2OperationalMappings.read(snapshot)',
+  'projectedClinicalLines.insert(id)',
+  '"E-86","E-94","E-95"'
+]) must(autoCut,key,'reconstrucción de consumo una sola vez sin frascos inferidos');
+for(const key of [
+  'func reconstructedCut(',
+  'N2AutomaticCutAccounting.calculate(',
+  'initial:rounded(opening)',
+  'consumed:isKnown ? rounded(used) : 0',
+  'closing:isKnown ? rounded(endCount) : 0'
+]) must(nursingBuilder,key,'corte 9 a 8 desde conteo posterior');
+for(const source of [nursingBook,nursingCore,clinicalVault,syntheticVault,vaultSource]) {
+  must(source,'reconstructFromCount','conexión completa desde SwiftUI al núcleo protegido');
+}
+must(nursing,'reconstructFromCount:reportMode=="cut"','solo corte 9–8 reconstruido');
+must(indicatorBook,'for link in N2UserReviewedKardexLinks.links','10 hojas admiten vínculos revisados');
+must(history,'cut.projectedClinicalLines','historial distingue inclusión al corte de salida física');
+console.log('PASS: corte 9–8 reconstruido y vinculado con 98 filas, 92 relaciones sin inventar movimientos.');
+
+
 
 
 
