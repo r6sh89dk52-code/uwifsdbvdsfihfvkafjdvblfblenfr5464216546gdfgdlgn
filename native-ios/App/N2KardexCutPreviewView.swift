@@ -93,7 +93,7 @@ struct N2KardexCutPreviewView:View {
         DanperPanel("Resumen estimado por producto") {
             Text(row.name).font(.headline)
             LabeledContent("Existencias registradas",
-                           value:row.currentCount?.formatted() ?? "Sin conteo")
+                           value:row.currentCount?.formatted() ?? "0 (sin lote registrado)")
             LabeledContent("Consumos del período",value:row.reportedUse.formatted())
             LabeledContent("Ingresos posteriores al corte",value:row.received.formatted())
             LabeledContent("Ajustes netos",value:row.adjusted.formatted())
@@ -101,7 +101,7 @@ struct N2KardexCutPreviewView:View {
             LabeledContent("Stock estimado al día 9",
                            value:row.opening?.formatted() ?? "Pendiente de conteo/conciliación")
             if row.unlinkedItems>0 {
-                Label("\(row.unlinkedItems) consumos clínicos confirmados aún sin movimiento FEFO asignado. Ya están incluidos una sola vez en el cálculo para unidades; no vuelvas a registrarlos.",
+                Label("\(row.unlinkedItems) consumos clínicos contabilizados una sola vez en la proyección del corte, sin generar una salida FEFO retroactiva. Puede incluir unidades y aperturas históricas declaradas.",
                       systemImage:"checkmark.shield")
                     .font(.caption).foregroundStyle(.secondary)
             }
