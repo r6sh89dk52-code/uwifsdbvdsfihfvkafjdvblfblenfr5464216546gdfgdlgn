@@ -108,6 +108,64 @@ final class N3DeclaredContainerTests:XCTestCase {
         XCTAssertEqual(repeated.physicalMovementsAdded,0)
         XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(repeated.snapshot).consumptionR.compactMap{$0},expected.map(Double.init))
     }
+    func testExplicitlyReusedPreviouslyOpenBoxReclassifiesWithoutPastR1OrPhysicalDebit()throws {
+        let original=try source(capacity:1,sealed:2)
+        var visitData=try object(visit(original,id:"reused-from-physical-stock",
+                                      day:"2026-11-08"))
+        var items=try XCTUnwrap(visitData["items"] as? [[String:Any]])
+        items[0]["reusePreviouslyOpened"]=true
+        var physical=try XCTUnwrap(items[0]["physicalUse"] as? [String:Any])
+        physical["reusePreviouslyOpened"]=true
+        items[0]["physicalUse"]=physical
+        visitData["items"]=items
+        let saved=try N2NativeClinicalTransaction.appendSavedVisit(
+            snapshot:original,visit:bytes(visitData),
+            approvedCatalog:fixture("n2-reviewed-approved.json"),
+            at:time("2026-11-08"))
+        XCTAssertEqual(saved.pending,0,saved.pendingReasons.joined(separator:";"))
+        XCTAssertEqual(saved.linked,1)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(saved.snapshot)
+                       .consumptionR.compactMap{$0},[0])
+        let all=try object(saved.snapshot)
+        let moves=try XCTUnwrap(all["stockMovements"] as? [[String:Any]])
+        XCTAssertEqual(moves.count,2)
+        XCTAssertEqual(moves[0]["kind"] as? String,"containerState")
+        XCTAssertEqual(moves[0]["containerDisposition"] as? String,"ya_abierto")
+        XCTAssertEqual(moves[0]["existingOpenAttested"] as? Bool,true)
+        XCTAssertEqual((moves[0]["physicalChange"] as? NSNumber)?.doubleValue,0)
+        XCTAssertEqual((moves[0]["excelQuantity"] as? NSNumber)?.doubleValue,0)
+        XCTAssertEqual(moves[1]["kind"] as? String,"use")
+        XCTAssertEqual((moves[1]["excelQuantity"] as? NSNumber)?.doubleValue,0)
+        XCTAssertEqual(try lot(saved.snapshot)["declaredOpenContainers"] as? Int,1)
+        XCTAssertEqual(try lot(saved.snapshot)["sealedContainers"] as? Int,1)
+        let repeated=try N2NativeClinicalTransaction.retryCurrentSavedVisit(
+            snapshot:saved.snapshot,visitID:"reused-from-physical-stock",
+            approvedCatalog:fixture("n2-reviewed-approved.json"),
+            at:time("2026-11-09"))
+        XCTAssertEqual(repeated.physicalMovementsAdded,0)
+        XCTAssertEqual((try object(repeated.snapshot)["stockMovements"] as? [[String:Any]])?.count,2)
+        var tampered=all
+        var events=moves
+        events[0]["existingOpenAttested"]=false
+        tampered["stockMovements"]=events
+        XCTAssertThrowsError(try N1eLegacyClinicalAudit.inspect(bytes(tampered)))
+    }
+    func testReuseMustNotSilentlyInventOpeningWithoutExplicitAttestation()throws {
+        XCTAssertEqual(try save(source(capacity:1,sealed:2),
+                                id:"no-attestation",day:"2026-11-08").pending,1)
+        let original=try source(capacity:100,sealed:2)
+        var proposed=try object(visit(original,id:"measured-reuse",day:"2026-11-08"))
+        var items=proposed["items"] as! [[String:Any]]
+        items[0]["reusePreviouslyOpened"]=true
+        proposed["items"]=items
+        let blocked=try N2NativeClinicalTransaction.appendSavedVisit(
+            snapshot:original,visit:bytes(proposed),
+            approvedCatalog:fixture("n2-reviewed-approved.json"),
+            at:time("2026-11-08"))
+        XCTAssertEqual(blocked.pending,1)
+        XCTAssertEqual(blocked.physicalMovementsAdded,0)
+    }
+
     func testSaveTimeExplicitNewOpeningClosesOneVerifiedPreviousWithoutSecondDebit()throws {
         let first=try save(source(sealed:3),id:"popup-first",day:"2026-11-08",openings:1)
         XCTAssertEqual(first.linked,1)
