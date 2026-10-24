@@ -124,6 +124,15 @@ struct N2VerifiedNursingExportView:View {
                     Label("Revisar inventario y lotes",systemImage:"shippingbox")
                 }
                 .buttonStyle(DanperSecondaryButton())
+                if reportMode=="cut" {
+                    NavigationLink {
+                        N2KardexCutPreviewView()
+                    } label: {
+                        Label("Ver stock inicial reconstruido del día 9",
+                              systemImage:"calendar.badge.clock")
+                    }
+                    .buttonStyle(DanperSecondaryButton())
+                }
             }
             DanperPanel {
                 N2Build222StageHeading(step:3,title:"Exportar Excel oficial")
