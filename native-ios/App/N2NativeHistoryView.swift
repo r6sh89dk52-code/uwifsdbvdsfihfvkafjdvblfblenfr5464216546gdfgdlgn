@@ -17,6 +17,7 @@ struct N2NativeHistoryView: View {
     var useProtectedVault = false
     @State private var projection:N2NativeReadModel?
     @State private var query=""
+    @State private var committedQuery=""
     @State private var selectedDNI:String?
     @State private var rosterPage=0
     private let pageSize=25
@@ -26,7 +27,7 @@ struct N2NativeHistoryView: View {
     var body:some View {
         Group {
             if let projection {
-                let matches=projection.findWorkers(query)
+                let matches=projection.findWorkers(committedQuery)
                 let totalPages=max(1,(matches.count+pageSize-1)/pageSize)
                 let safePage=min(rosterPage,totalPages-1)
                 ScrollViewReader { proxy in
@@ -98,11 +99,16 @@ struct N2NativeHistoryView: View {
                   }.padding(16)
                 }
                 .searchable(text:$query,prompt:"Buscar DNI, nombres o área")
-                .onChange(of:query) {_,_ in
+                .task(id:query) {
+                    // Do not filter and re-layout 9,648 workers on every
+                    // keystroke. A brief cancellable debounce keeps search
+                    // responsive without discarding the full roster.
+                    do {try await Task.sleep(for:.milliseconds(140))}
+                    catch{return}
+                    guard !Task.isCancelled else{return}
+                    committedQuery=query
                     rosterPage=0
-                    withAnimation(.easeOut(duration:0.18)){
-                        proxy.scrollTo("roster-page-top",anchor:.top)
-                    }
+                    proxy.scrollTo("roster-page-top",anchor:.top)
                 }
                 .navigationDestination(item:$selectedDNI) { dni in
                     N2WorkerHistoryDetail(dni:dni,model:projection,realSource:useProtectedVault)
@@ -122,9 +128,7 @@ struct N2NativeHistoryView: View {
         .navigationTitle("Personal e historial")
         .danperFormChrome()
         .task {await load()}
-        .onAppear {
-            if projection != nil {Task {await load(force:true)}}
-        }
+        .refreshable {await load(force:true)}
         .tint(.primary)
     }
 
@@ -272,7 +276,16 @@ struct N2VisitDispensingView:View {
     @State private var busy=false
     @State private var notice=""
 
-    private var pendingCount:Int {lines.filter{$0.result != "Descontado"}.count}
+    private var pendingCount:Int {
+        lines.filter{$0.result != "Descontado" &&
+            !projectedClinicalLines.contains(visitID+"\u{001F}"+$0.id)
+        }.count
+    }
+    private var reconstructedCount:Int {
+        lines.filter{$0.result != "Descontado" &&
+            projectedClinicalLines.contains(visitID+"\u{001F}"+$0.id)
+        }.count
+    }
 
     var body:some View {
         ScrollView {
@@ -282,13 +295,22 @@ struct N2VisitDispensingView:View {
                           systemImage:"exclamationmark.triangle")
                         .font(.footnote).foregroundStyle(.orange)
                 }
-                if pendingCount>0 {
+                if pendingCount>0 || reconstructedCount>0 {
                     DanperPanel {
-                        Label("\(pendingCount) consumo(s) por revisar",
-                              systemImage:"exclamationmark.circle")
-                            .font(.subheadline.weight(.semibold))
-                        Text("La atención clínica ya está guardada. Los pendientes no tienen salida física confirmada. Registra solo las existencias y aperturas reales.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        if pendingCount>0 {
+                            Label("\(pendingCount) consumo(s) sin salida física confirmada",
+                                  systemImage:"exclamationmark.circle")
+                                .font(.subheadline.weight(.semibold))
+                            Text("La atención está guardada. No se descontará stock antiguo solo por registrar un lote hoy.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if reconstructedCount>0 {
+                            Label("\(reconstructedCount) consumo(s) ya incluidos en el corte",
+                                  systemImage:"checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("Contabilizados una sola vez en la reconstrucción 9–8. Esto no equivale a verificar una salida física anterior.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 ForEach(lines) {line in
@@ -313,15 +335,17 @@ struct N2VisitDispensingView:View {
                         Text("Cantidad clínica: "+line.quantity.formatted())
                             .font(.caption).foregroundStyle(.secondary)
                         Label(projectedInCut && line.result != "Descontado"
-                              ? "Consumo incluido en saldo reconstruido · salida física pendiente"
+                              ? "Contabilizado en el corte 9–8 · sin salida física verificada"
                               : (resolution == .reviewChronology
                                   ? N2PendingResolution.historicalTitle(forReason:line.result)
-                                  : resolution.summary),systemImage:resolution == .completed
+                                  : resolution.summary),
+                              systemImage:resolution == .completed || projectedInCut
                               ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .font(.caption)
-                            .foregroundStyle(resolution == .completed ? Color.green : Color.orange)
+                            .foregroundStyle(resolution == .completed || projectedInCut
+                                             ? Color.green : Color.orange)
                         if projectedInCut && line.result != "Descontado" {
-                            Label("Incluido una sola vez en el saldo estimado del corte 9–8. La salida física sigue pendiente.",
+                            Label("Registro clínico incorporado una sola vez al cálculo del período. No se está creando un movimiento ni descontando stock actual.",
                                   systemImage:"calendar.badge.checkmark")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -372,12 +396,24 @@ struct N2VisitDispensingView:View {
                                     .accessibilityIdentifier("history-pending-physical-"+line.id)
                                 }
                             case .reviewChronology:
-                                Text(N2PendingResolution.historicalGuidance(forReason:line.result))
+                                Text(projectedInCut
+                                     ? "Este consumo ya participa del saldo reconstruido. No vuelvas a descontarlo al registrar stock actual."
+                                     : "La atención es anterior al lote o a la verificación del vínculo. No hay evidencia para descontarla retroactivamente.")
                                     .font(.caption).foregroundStyle(.secondary)
+                                if context != nil {
+                                    Button {
+                                        selectedAction = .registerStock
+                                    } label: {
+                                        Label("Ir a Kardex · registrar stock físico actual",
+                                              systemImage:"shippingbox.fill")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .accessibilityIdentifier("history-register-actual-stock-"+line.id)
+                                }
                                 Button {
                                     selectedAction = .explainHistorical(line.result)
                                 } label: {
-                                    Label("Entender este pendiente",systemImage:"info.circle")
+                                    Label("Ver detalle del historial",systemImage:"info.circle")
                                 }
                                 .buttonStyle(.bordered)
                                 .accessibilityIdentifier("history-pending-chronology-"+line.id)
