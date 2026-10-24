@@ -264,6 +264,7 @@ struct N2VisitDispensingView:View {
     @Environment(\.dismiss) private var dismiss
     let visitID:String
     @State private var lines=[N2DispensingLine]()
+    @State private var projectedClinicalLines=Set<String>()
     @State private var context:N2FormContext?
     @State private var detail:N2CorrectionDetail?
     @State private var selectedAction:N2HistoryConsumptionAction?
@@ -291,6 +292,8 @@ struct N2VisitDispensingView:View {
                     }
                 }
                 ForEach(lines) {line in
+                    let projectedInCut=projectedClinicalLines.contains(
+                        visitID+"\u{001F}"+line.id)
                     let storedResolution=N2PendingResolution.forReason(line.result)
                     // Saved reasons can predate a newly confirmed batch link.
                     // The catalog is authoritative for the current UI action.
@@ -315,6 +318,11 @@ struct N2VisitDispensingView:View {
                               ? "checkmark.circle.fill" : "exclamationmark.circle")
                             .font(.caption)
                             .foregroundStyle(resolution == .completed ? Color.green : Color.orange)
+                        if projectedInCut && line.result != "Descontado" {
+                            Label("Incluido una sola vez en el saldo estimado del corte 9–8. La salida física sigue pendiente.",
+                                  systemImage:"calendar.badge.checkmark")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         if let quantity=line.kardexQuantity {
                             Text("Kardex R: \(quantity.formatted())" + (quantity == 0 ? " · Uso de envase abierto, sin nueva apertura" : ""))
                                 .font(.caption).foregroundStyle(.secondary)
@@ -498,6 +506,19 @@ struct N2VisitDispensingView:View {
             context=nil
             notice="Las acciones están temporalmente no disponibles. La atención permanece guardada."
             return
+        }
+        // Do not turn a period projection into an actual FEFO movement.
+        // It only explains which saved clinical lines are already counted.
+        do {
+            let dateFormatter=DateFormatter()
+            dateFormatter.locale=Locale(identifier:"en_US_POSIX")
+            dateFormatter.timeZone=TimeZone(identifier:"America/Lima")
+            dateFormatter.dateFormat="yyyy-MM-dd"
+            let today=dateFormatter.string(from:Date())
+            let cut=try await vault.automaticCutAccounting(through:today)
+            projectedClinicalLines=cut.projectedClinicalLines
+        } catch {
+            projectedClinicalLines=[]
         }
         do {
             detail=try await vault.readCorrectionDetail(visitID:visitID)
