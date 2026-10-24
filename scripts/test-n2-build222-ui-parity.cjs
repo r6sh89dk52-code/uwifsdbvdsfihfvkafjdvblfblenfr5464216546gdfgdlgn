@@ -370,19 +370,13 @@ for(const fragment of [
 console.log('PASS: enlaces confirmados en bloque omiten modal repetido incluso para pendientes previos.');
 for(const fragment of [
   'N2PendingResolution.historicalTitle(forReason:line.result)',
-  'N2PendingResolution.historicalGuidance(forReason:line.result)',
-  'Label("Entender este pendiente",systemImage:"info.circle")',
+  'N2PendingResolution.historicalGuidance(forReason:reason)',
+  'Label("Ver detalle del historial",systemImage:"info.circle")',
   'case .explainHistorical(let reason):',
-  'No hay descuento retroactivo'
-]) {
-  // Screen copy must explain why a saved visit cannot debit later stock.
-  if (fragment==='No hay descuento retroactivo') {
-    must(history,'La atención ya está guardada. Agregar existencias ahora no demuestra el saldo anterior.',
-      'historial no recalcula movimientos retroactivos');
-  } else {
-    must(history,fragment,'historial de pendientes cronológicos informado');
-  }
-}
+  'La atención ya está guardada. Agregar existencias ahora no demuestra el saldo anterior.',
+  'Contabilizado en el corte 9–8 · sin salida física verificada',
+  'Ir al Kardex · registrar stock físico actual'
+]) must(history,fragment,'historial actual distingue reconstrucción del corte y salida física auditada');
 for(const phrase of [
   'N2PendingResolution.historicalTitle(forReason:result)',
   'N2PendingResolution.historicalGuidance(forReason:result)'
@@ -426,7 +420,7 @@ for(const fragment of [
 for(const fragment of [
   'Label("Declarar apertura histórica (1/0)",',
   'context.historicalOptions(for:line.code,at:detail.date)',
-  'Consumo incluido en saldo reconstruido',
+  'Registro clínico incorporado una sola vez al cálculo del período.',
   'cut.projectedClinicalLines'
 ]) must(history,fragment,'declaración histórica y estado contable separados de FEFO');
 for(const fragment of [
