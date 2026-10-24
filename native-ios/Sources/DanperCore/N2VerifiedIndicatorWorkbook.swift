@@ -461,6 +461,12 @@ public enum N2VerifiedIndicatorWorkbook {
         for entry in operational {
             clinicalToNursing[entry.clinicalCode]=[entry.inventoryID]
         }
+        // Two clinical codes referring to one physical product must never
+        // duplicate that product's opening/count in the official 432 rows.
+        var linkMultiplicity=[String:Int]()
+        for codes in clinicalToNursing.values {
+            for kardex in codes {linkMultiplicity[kardex,default:0]+=1}
+        }
         let projectedByKardex=Dictionary(uniqueKeysWithValues:
             (projectedCut?.rows ?? []).map{($0.code,$0)})
         var summary=[String:[String:Any]]()
@@ -532,19 +538,21 @@ public enum N2VerifiedIndicatorWorkbook {
             // These estimates NEVER replace official reconciliation events.
             if allowPending && subdivision=="AMBAS",
                let codes=clinicalToNursing[code],codes.count==1,
-               let kardex=codes.first,
+               let kardex=codes.first,linkMultiplicity[kardex]==1,
                let estimate=projectedByKardex[kardex],
                estimate.unknownContainerOpenings==0,
+               estimate.reportedUse==Double(used),
                let beginning=estimate.opening,
                let physicalCount=estimate.currentCount,
                beginning>=0,physicalCount>=0,
                beginning.rounded()==beginning,
                physicalCount.rounded()==physicalCount,
                row["opening"]==nil,row["count"]==nil {
+                let projectedClosing=Int(beginning)+income-used
                 row["opening"]=Int(beginning)
                 row["count"]=Int(physicalCount)
-                row["closing"]=Int(physicalCount)
-                row["difference"]=0
+                row["closing"]=projectedClosing
+                row["difference"]=projectedClosing-Int(physicalCount)
             }
             summary[code]=row
         }
