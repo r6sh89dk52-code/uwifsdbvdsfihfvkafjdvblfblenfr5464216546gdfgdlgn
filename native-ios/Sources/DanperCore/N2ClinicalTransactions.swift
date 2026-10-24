@@ -207,12 +207,24 @@ public enum N2NativeClinicalTransaction {
             if let rule, historical && rule.confirmedAt>(eventAt ?? 0) && evidence==nil {
                 mark("Correspondencia verificada después de la atención: requiere conciliación histórica.");continue
             }
+            let reviewed=N2UserReviewedKardexLinks.candidates(for:code).filter{
+                $0.clinicalName==item["name"] as? String &&
+                $0.clinicalUnit==item["unit"] as? String
+            }
             let candidates=rule.map { [Material(clinicalCode:$0.clinicalCode,clinicalName:$0.clinicalName,
                 clinicalUnit:$0.clinicalUnit,kardexCode:$0.inventoryID,kardexName:$0.inventoryName)] }
-                ?? approved.filter{$0.clinicalCode==code &&
+                ?? (approved.filter{$0.clinicalCode==code &&
                 $0.clinicalName==item["name"] as? String &&
-                $0.clinicalUnit==item["unit"] as? String}
+                $0.clinicalUnit==item["unit"] as? String} +
+                    reviewed.map {Material(clinicalCode:$0.clinicalCode,
+                        clinicalName:$0.clinicalName,clinicalUnit:$0.clinicalUnit,
+                        kardexCode:$0.kardexID,kardexName:$0.kardexName)})
             if candidates.isEmpty {mark("Sin correspondencia aprobada.");continue}
+            // User-confirmed identifiers are not authorization for retroactive
+            // changes. Already-saved visits require explicit physical evidence.
+            if rule==nil && !reviewed.isEmpty && historical && evidence==nil {
+                mark("Correspondencia vinculada después de la atención: requiere conciliación histórica.");continue
+            }
             let explicit=item["physicalUse"] as? [String:Any]
             let selectedUnit=lots.first{$0["id"] as? String==explicit?["lotId"] as? String}?["catalogUnit"] as? String
             let allowable=Set(candidates.map{$0.kardexCode})
@@ -264,6 +276,9 @@ public enum N2NativeClinicalTransaction {
             }
             if eligible.isEmpty {
                 mark("Sin existencias FEFO disponibles en el inventario único.");continue
+            }
+            if rule==nil && reviewed.contains(where:{$0.requiresPhysicalReview}) && selected==nil {
+                mark("Diferencia de presentación: verifica el lote físico antes del descuento.");continue
             }
             let chosen=eligible.first(where:{$0["id"] as? String == selected})
             if selected != nil && chosen==nil {
