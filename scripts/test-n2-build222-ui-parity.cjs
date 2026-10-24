@@ -625,7 +625,7 @@ for(const needle of [
 for(const needle of [
   'correction-item-quantity-',
   'itemQuantities',
-  'med.quantity'
+  'item.quantity'
 ]) must(correctionUI,needle,'corrección visual de dosis histórica');
 console.log('PASS: historial 15/página, borradores, lotes agrupados y edición clínica auditada sin rehacer FEFO.');
 
