@@ -555,18 +555,17 @@ struct N2VisitDispensingView:View {
                                     .accessibilityIdentifier("history-pending-mapping-"+line.id)
                                 }
                             case .verifyPhysicalUse, .reviewPending:
-                                if context != nil && detail?.medications.contains(where:{$0.id==line.id}) == true {
+                                Text("La atención ya está guardada. Si utilizaste un envase abierto, debe estar registrado como abierto en un lote válido; un lote con existencias cerradas no demuestra una apertura anterior.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if context != nil {
                                     Button {
-                                        selectedAction = .verifyPhysical(line.id)
+                                        selectedAction = .registerStock
                                     } label: {
-                                        Label(resolution == .verifyPhysicalUse ?
-                                              (alreadyLinked && storedResolution == .verifyCorrespondence
-                                                  ? "Revisar consumo anterior" : "Revisar lote o apertura")
-                                              : "Revisar datos del consumo",
-                                              systemImage:"checkmark.shield")
+                                        Label("Ir al Kardex · comprobar envase",
+                                              systemImage:"shippingbox.fill")
                                     }
                                     .buttonStyle(.bordered)
-                                    .accessibilityIdentifier("history-pending-physical-"+line.id)
+                                    .accessibilityIdentifier("history-pending-container-stock-"+line.id)
                                 }
                             case .reviewChronology:
                                 Text(projectedInCut
