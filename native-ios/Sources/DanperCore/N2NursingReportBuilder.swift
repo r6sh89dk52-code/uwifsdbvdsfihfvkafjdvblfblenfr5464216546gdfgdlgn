@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// Native daily/range nursing ledger report, one-for-one with build222
 /// dailyKardex.ts. It never converts internal mL into sealed FCO count and
-/// keeps unknown stock blank instead of inventing zero.
+/// shows zero recorded stock for products without lots, preserving stockKnown=false for audit.
 public enum N2NursingReportError:Error,Equatable {
     case invalidSource, invalidCatalog, invalidDay, unsupportedRange
     case invalidPhysicalCount, incompleteHistory
