@@ -440,6 +440,16 @@ public final class N2ProtectedClinicalVaultCore {
         }
     }
     @discardableResult
+    @discardableResult
+    public func correctUnusedLot(lotID:String,reference:String,expires:String,
+        reason:String,operatorName:String,at:Int64,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeInventoryCommands.correctUnusedLot(snapshot:$0,
+                lotID:lotID,reference:reference,expires:expires,
+                reason:reason,operatorName:operatorName,at:at)
+        }
+    }
     public func receiveStock(movementID:String,lotID:String,at:Int64,
                              sealedAdded:Int,looseAdded:Double,reason:String,
                              expectedRevision:Int)throws->N2ProtectedStoreSummary {
