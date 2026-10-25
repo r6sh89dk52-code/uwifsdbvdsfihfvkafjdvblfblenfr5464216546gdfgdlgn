@@ -150,6 +150,17 @@ for(const phrase of ['N2EmptyDemoSnapshot.make()','N2SnapshotEditor.addWorker(',
 assert(!firstWorker.includes('activateSyntheticFixture(') &&
        !firstWorker.includes('startSyntheticDemo('),
        'El alta sin Excel no puede crear registros ficticios de demostración');
+for(const fragment of [
+  'authentication.canEvaluatePolicy(',
+  'case .biometryNotEnrolled:',
+  'case .passcodeNotSet:',
+  'N2ProtectedStoreError',
+  'N2ProtectedClinicalIOSVault.Failure',
+  'message=Self.explainFailure(error,stage:stage)',
+  'Inicio → Empezar con una base vacía (DEMO)'
+]) must(firstWorker,fragment,'el alta clínica explica fallos y remite a DEMO sin omitir autenticación');
+assert(!firstWorker.includes('#if targetEnvironment(simulator)'),
+       'la autenticación de la fuente clínica nunca debe omitirse por estar en Simulator');
 
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
