@@ -33,8 +33,8 @@ for(const marker of [
   'Borrar borrador debe estar disponible y ser confirmado en el tablero: '+marker);
 assert(!draftDashboard.includes('Para borrar un borrador, ábrelo'),
   'El borrador ya no debe requerir abrir el formulario para poder eliminarlo');
-must(draftDashboard,
-  '.accessibilityLabel("Eliminar borrador de " + (draft.workerName.isEmpty ? "trabajador sin seleccionar" : draft.workerName))',
+assert(draftDashboard.includes(
+  '.accessibilityLabel("Eliminar borrador de " + (draft.workerName.isEmpty ? "trabajador sin seleccionar" : draft.workerName))'),
   'la etiqueta accesible de la papelera debe ser una expresión Swift válida');
 console.log('PASS: segmento osteomuscular seleccionable y eliminación directa/confirmada de borradores.');
 const editor=fs.readFileSync(path.join(root,'native-ios/App/N2NativeWorkerEditorView.swift'),'utf8');
