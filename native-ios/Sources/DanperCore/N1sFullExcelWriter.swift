@@ -358,8 +358,20 @@ internal enum N1sFullExcelWriter {
               Set(catalog.compactMap{string($0["code"])}).count==432,
               Set(reconciliation.keys)==Set(catalog.compactMap{string($0["code"])}),
               !(provisional && reviewed) else {throw N1sExcelError.invalidManifest}
-        let pending=selected.contains{line in line[15] as? String != "" && !(line[17] is NSNumber)}
-        guard !pending else {throw N1sExcelError.missingVerifiedQuantity}
+        let missingR=selected.filter {
+            $0[15] as? String != "" && !($0[17] is NSNumber)
+        }.count
+        if missingR>0 {
+            // A provisional line with R empty is an UNKNOWN physical
+            // delivery, not a verified R=0 or a clinical-count-as-R.
+            // Every such row requires an explicit audit note; the OFFICIAL
+            // workbook must continue rejecting all unverified R values.
+            let descriptions=root["pendingNotes"] as? [String] ?? []
+            let documented=descriptions.filter{$0.contains("R PENDIENTE")}.count
+            guard provisional,!reviewed,documented>=missingR else {
+                throw N1sExcelError.missingVerifiedQuantity
+            }
+        }
         if !reviewed {
             // Protect official filenames/claimed ready state; reconciliation
             // may still be exported as a visibly nonfinal DRAFT only.
