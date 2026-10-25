@@ -7,6 +7,29 @@ final class N2PendingDispensingEvidenceTests:XCTestCase {
         return try Data(contentsOf:URL(fileURLWithPath:directory).appendingPathComponent("n1e-clinical-stock.json"))
     }
     private var timestamp:Int64 {Int64(ISO8601DateFormatter().date(from:"2026-10-14T18:00:00Z")!.timeIntervalSince1970*1000)}
+    func testSoleClinicianIdentityAndAuditDNIRoundTrip() throws {
+        let newVisit=N2NativeFormDraft()
+        XCTAssertEqual(newVisit.responsible,N2ClinicianIdentity.name)
+        XCTAssertEqual(newVisit.responsibleDni,N2ClinicianIdentity.dni)
+        let event=N2PendingDispensingEvidence(
+            visitID:"visit-synthetic",itemID:"item-synthetic",lotID:"lot-synthetic",
+            quantity:0,confirmNewContainer:true,operatorName:N2ClinicianIdentity.name,
+            reason:"Apertura histórica verificada",at:timestamp,
+            newContainers:1,operatorDni:N2ClinicianIdentity.dni)
+        XCTAssertEqual(event.operatorDni,newVisit.responsibleDni)
+        XCTAssertEqual(try JSONDecoder().decode(N2PendingDispensingEvidence.self,
+            from:JSONEncoder().encode(event)),event)
+        // Previous encrypted journal events lacked the optional DNI field;
+        // decoding them must remain possible without rewriting old snapshots.
+        let legacy=N2PendingDispensingEvidence(
+            visitID:"old-visit",itemID:"old-item",lotID:"old-lot",
+            quantity:0,confirmNewContainer:true,operatorName:"OPERADOR ANTIGUO",
+            reason:"Apertura anterior documentada",at:timestamp)
+        XCTAssertNil(legacy.operatorDni)
+        XCTAssertEqual(try JSONDecoder().decode(N2PendingDispensingEvidence.self,
+            from:JSONEncoder().encode(legacy)),legacy)
+    }
+
     func testInvalidAmountsConsentAndTargetsAreRejected()throws {
         let source=try source()
         for quantity in [0,-1,Double.nan,Double.infinity,10_000_001] {
