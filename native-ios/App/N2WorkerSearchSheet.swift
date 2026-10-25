@@ -13,14 +13,16 @@ struct N2WorkerSearchSheet:View {
     @State private var page=0
     private let pageSize=25
 
+    // N2NativeFormContextReader delivers workers already sorted by name.
+    // Preserve that stable order, including after filtering: sorting 9,648
+    // records every time SwiftUI reevaluates the body was unnecessary.
+    // Render only the requested page of 25 results below.
     private var matches:[N2FormWorker] {
         let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard !q.isEmpty else {
-            return workers.sorted{$0.name.localizedStandardCompare($1.name) == .orderedAscending}
-        }
+        guard !q.isEmpty else {return workers}
         return workers.filter {
             $0.dni.contains(q) || $0.name.localizedStandardContains(q)
-        }.sorted{$0.name.localizedStandardCompare($1.name) == .orderedAscending}
+        }
     }
     private var pageCount:Int {max(1,(matches.count+pageSize-1)/pageSize)}
     private var visible:[N2FormWorker] {
