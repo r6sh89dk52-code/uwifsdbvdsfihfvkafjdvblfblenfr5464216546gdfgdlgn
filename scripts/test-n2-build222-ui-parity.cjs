@@ -48,6 +48,27 @@ const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWo
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
 const exportedIndicatorCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
 const indicatorWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N1sFullExcelWriter.swift'),'utf8');
+// New-attention and home counters reuse one VERIFIED clinical snapshot,
+// retaining exactly the original journal validation and immutable revision.
+const workspace=fs.readFileSync(path.join(root,'native-ios/App/N2WorkspaceVault.swift'),'utf8');
+for(const marker of [
+  'public func prepareClinicalForm(',
+  'public func readDashboard()throws',
+  'let context=try N2NativeFormContextReader.read(',
+  'let drafts=try N2NativeDraftRecovery.read(active.snapshot)'
+]) must(core,marker,'formulario e Inicio desde una sola recuperación cifrada');
+for(const adaptor of [demo,vaultSource,workspace]) {
+  for(const marker of ['prepareClinicalForm()', 'readDashboard()']) {
+    must(adaptor,marker,'adaptador de lectura clínica única');
+  }
+}
+must(form,'let prepared=try await vault.prepareClinicalForm()',
+  'una recuperación autenticada para Nueva atención');
+assert(!form.includes('            drafts=try await vault.readDrafts()'),
+  'Nueva atención no debe volver a descifrar la bóveda para los borradores');
+must(clinicalHome,'let prepared=try await vault.readDashboard()',
+  'Inicio no debe descifrar otra vez el mismo diario');
+console.log('PASS: Inicio y Nueva atención aprovechan una sola lectura cifrada, sin cachear datos clínicos.');
 for(const marker of [
   'eligibleForSharedClose(',
   'end.hasSuffix("-08")',
