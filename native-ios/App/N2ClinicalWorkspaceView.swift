@@ -457,12 +457,6 @@ struct N2ClinicalWorkspaceRootView:View {
     @MainActor private func refreshHomeCounts() async {
         guard !layoutOnly else{return}
         do {
-            let prepared=try await vault.readDashboard()
-            guard let model=prepared.history else {
-                homeCounts=nil
-                return
-            }
-            let drafts=prepared.drafts
             var calendar=Calendar(identifier:.gregorian)
             calendar.timeZone=TimeZone(identifier:"America/Lima")!
             calendar.firstWeekday=2
@@ -474,12 +468,11 @@ struct N2ClinicalWorkspaceRootView:View {
             let today=formatter.string(from:now)
             let weekStart=formatter.string(
                 from:calendar.dateInterval(of:.weekOfYear,for:now)?.start ?? now)
-            let saved=model.visits.filter{$0.status=="saved"}
-            homeCounts=(
-                today:saved.filter{$0.date==today}.count,
-                week:saved.filter{$0.date>=weekStart && $0.date<=today}.count,
-                drafts:drafts.count
-            )
+            let counters=try await vault.dashboardCounters(
+                today:today,weekStart:weekStart)
+            homeCounts=counters.map {
+                (today:$0.today,week:$0.week,drafts:$0.drafts)
+            }
         }catch {
             homeCounts=nil
         }
