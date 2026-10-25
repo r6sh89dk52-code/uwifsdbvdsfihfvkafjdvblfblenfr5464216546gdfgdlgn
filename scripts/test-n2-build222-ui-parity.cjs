@@ -79,8 +79,19 @@ assert(!initialFormLoad.includes('vault.readDrafts()') &&
   'La carga inicial no debe recuperar dos veces la misma bóveda');
 assert(form.includes('drafts=try await vault.readDrafts()'),
   'La eliminación explícita de un borrador debe actualizar el listado desde la bóveda');
-must(clinicalHome,'let prepared=try await vault.readDashboard()',
-  'Inicio no debe descifrar otra vez el mismo diario');
+// The former combined history reader remains available for other screens,
+// but Home must call the newer direct counters instead of rebuilding a full
+// roster/visit projection. Scope the guard to Home's refresh function.
+const homeRefreshStart=clinicalHome.indexOf('private func refreshHomeCounts() async {');
+const homeRefreshEnd=clinicalHome.indexOf('    private func homeMetric(',homeRefreshStart);
+assert(homeRefreshStart>=0 && homeRefreshEnd>homeRefreshStart,
+  'No se pudo delimitar la actualización de contadores de Inicio');
+const homeRefresh=clinicalHome.slice(homeRefreshStart,homeRefreshEnd);
+must(homeRefresh,'vault.dashboardCounters(',
+  'Inicio debe consultar los contadores directos y cifrados');
+assert(!homeRefresh.includes('vault.readDashboard()') &&
+       !homeRefresh.includes('vault.readHistory()'),
+  'Inicio no debe reconstruir el padrón ni el historial para mostrar las cifras');
 console.log('PASS: Inicio y Nueva atención aprovechan una sola lectura cifrada, sin cachear datos clínicos.');
 // Home counters and the 25-worker lookup should not repeatedly sort/rebuild
 // a complete 9k-person index merely to show three numbers or one small page.
