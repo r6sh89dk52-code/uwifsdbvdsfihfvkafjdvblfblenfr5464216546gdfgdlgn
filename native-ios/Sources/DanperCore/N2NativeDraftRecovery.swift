@@ -18,8 +18,16 @@ public enum N2DraftRecoveryError:Error,Equatable {
 public enum N2NativeDraftRecovery {
     public static func read(_ snapshot:Data)throws->[N2RecoverableDraft] {
         guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
-              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
-              let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
+              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil else {
+            throw N2DraftRecoveryError.invalidSnapshot
+        }
+        return try readVerified(snapshot)
+    }
+    /// Only for snapshots returned by the authenticated and fully audited
+    /// N2EncryptedClinicalJournal.recover() path; NOT for arbitrary external
+    /// backups. The public read(_:) retains the complete validation.
+    static func readVerified(_ snapshot:Data)throws->[N2RecoverableDraft] {
+        guard let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let visits=root["attentions"] as? [[String:Any]] else {
             throw N2DraftRecoveryError.invalidSnapshot
         }
