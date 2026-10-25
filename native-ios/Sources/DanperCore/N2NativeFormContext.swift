@@ -110,15 +110,26 @@ public enum N2NativeFormContextReader {
     public static func read(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)
         throws->N2FormContext {
         guard (try? N1eLegacyClinicalAudit.inspect(snapshot,allowEmptySynthetic:true)) != nil,
-              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
-              let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
+              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil else {
+            throw N2FormError.absentSnapshot
+        }
+        return try readVerified(snapshot:snapshot,revision:revision,products:products)
+    }
+
+    /// Internal only: journal.recover() has ALREADY authenticated/decrypted
+    /// AND run both complete clinical audits on the snapshot. Avoid repeating
+    /// the costly 9k-worker validation when opening a form or recovered draft.
+    /// The public read(...) retains its strict untrusted-data entry boundary.
+    static func readVerified(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)
+        throws->N2FormContext {
+        guard let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let w=root["workers"] as? [[String:Any]],
               let allergy=root["allergies"] as? [String:Any],
               let stock=root["stockLots"] as? [[String:Any]] else {
             throw N2FormError.absentSnapshot
         }
-        // The decrypted snapshot has already passed BOTH clinical audits
-        // above. Building the full read-model here just to discover searchable
+        // The caller has already run BOTH clinical audits (via read() or
+        // the encrypted journal). Building a full read-model just to discover searchable
         // workers used to re-audit/parse the whole database, apply all
         // corrections, sort the 9k+ roster and project every historical visit.
         // Keep exactly the same official/verified visibility rule as
