@@ -5,6 +5,7 @@ import DanperCore
 struct N2NativeDraftsDashboard:View {
     @Environment(\.n2WorkspaceVault) private var vault
     @State private var records=[N2RecoverableDraft]()
+    @State private var loadedRevision:Int?
     @State private var loading=true
     @State private var failed=false
     @State private var message="Leyendo borradores cifrados…"
@@ -91,31 +92,36 @@ struct N2NativeDraftsDashboard:View {
     }
 
     @MainActor private func deleteDraft(_ id:String) async {
-        guard deletingID==nil,!loading,records.contains(where:{$0.id==id}) else{return}
+        guard deletingID==nil,!loading,
+              let expectedRevision=loadedRevision,
+              records.contains(where:{$0.id==id}) else{return}
         deletingID=id
+        // Fast and reversible UI: hide the row before expensive encrypted
+        // copy-on-write. No success is claimed until commit verifies.
+        let prior=records
+        records.removeAll(where:{$0.id==id})
         defer{deletingID=nil}
         do {
-            guard let current=try await vault.inspect() else {
-                failed=true
-                message="La bóveda clínica no está disponible. No se eliminó ningún registro."
-                return
-            }
-            // The core only deletes records that STILL have draft status.
-            // Journal revision checking prevents silent concurrent overwrites.
-            _=try await vault.deleteDraft(id:id,expectedRevision:current.revision)
+            // The core checks BOTH the exact revision and status=="draft".
+            // A saved attention can never be removed by this operation.
+            let confirmed=try await vault.deleteDraft(
+                id:id,expectedRevision:expectedRevision)
+            loadedRevision=confirmed.revision
             N2DraftReminder.cancel(id:id,mode:vault.mode)
-            records.removeAll(where:{$0.id==id})
             failed=false
-            message="Borrador eliminado correctamente. Ninguna atención guardada fue modificada."
-            do {records=try await vault.readDrafts()}
-            catch {
-                failed=true
-                message="Borrador eliminado, pero no se pudo actualizar la lista. Desliza para volver a cargar."
-            }
+            message="Borrador eliminado y confirmado en la bóveda cifrada."
+            // Do not decrypt/audit the same 9k-worker database yet again;
+            // a later visit to the screen or pull-to-refresh loads changes.
         } catch {
+            // Roll back the visual change; reconcile if another screen
+            // wrote a new revision. Never report a failed commit as success.
+            records=prior
             failed=true
-            message="No se pudo eliminar el borrador. Es posible que haya cambiado; actualiza la lista antes de reintentar."
-            if let latest=try? await vault.readDrafts() {records=latest}
+            message="El borrador no se eliminó. Se restauró en la lista. Revisa los datos y vuelve a intentarlo."
+            if let latest=try? await vault.readDraftsWithRevision() {
+                records=latest.drafts
+                loadedRevision=latest.revision
+            }
         }
     }
 
@@ -125,11 +131,14 @@ struct N2NativeDraftsDashboard:View {
         loading=true
         defer {loading=false}
         do {
-            records=try await vault.readDrafts()
+            let latest=try await vault.readDraftsWithRevision()
+            records=latest.drafts
+            loadedRevision=latest.revision
             failed=false
             message="Borradores recuperables: \(records.count). Desliza para actualizar."
         }catch{
             records=[]
+            loadedRevision=nil
             failed=true
             message="No se pudieron abrir los borradores. No se eliminó ningún registro."
         }
