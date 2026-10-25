@@ -93,7 +93,15 @@ struct N2PendingDispensingView:View {
                             .font(.caption)
                     }
                     TextField("Responsable",text:$operatorName)
-                    TextField("Evidencia y motivo",text:$reason,axis:.vertical).lineLimit(2...4)
+                        .textInputAutocapitalization(.words)
+                        .accessibilityIdentifier("historical-opening-responsible")
+                    Text("Obligatorio: indica un responsable de al menos 3 caracteres.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    TextField("Evidencia y motivo",text:$reason,axis:.vertical)
+                        .lineLimit(2...4)
+                        .accessibilityIdentifier("historical-opening-evidence")
+                    Text("Obligatorio: explica qué apertura o reutilización verificaste (mínimo 10 caracteres). Esta declaración no modifica el conteo físico actual.")
+                        .font(.caption).foregroundStyle(.secondary)
                     Toggle("Confirmo la cantidad física y la evidencia",isOn:$consent)
                     Button(isHistorical ? "Guardar declaración histórica (R=1/0)" :
                                               "Verificar y conciliar sin duplicar atención") {
@@ -111,18 +119,44 @@ struct N2PendingDispensingView:View {
         }
     }
     @MainActor private func save() async {
-        guard !busy,consent,let amount=Double(quantity.isEmpty ? "0":quantity.replacingOccurrences(of:",",with:".")),amount>=0 else {
-            message="Indica la cantidad física verificada.";return
+        guard !busy else{return}
+        guard !lotID.isEmpty else {
+            message="Selecciona el lote compatible con la atención.";return
+        }
+        let responsible=operatorName.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard responsible.count>=3 else {
+            message="Falta el responsable: escribe al menos 3 caracteres.";return
+        }
+        let evidenceReason=reason.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard evidenceReason.count>=10 else {
+            message="Falta evidencia y motivo: describe la apertura o reutilización en al menos 10 caracteres.";return
+        }
+        guard consent else {
+            message="Confirma que la apertura declarada y su evidencia son correctas.";return
+        }
+        let rawQuantity=quantity.isEmpty ? "0":quantity.replacingOccurrences(of:",",with:".")
+        guard let amount=Double(rawQuantity),amount.isFinite,amount>=0,amount<=10_000_000 else {
+            message="Ingresa una cantidad física válida para la operación.";return
         }
         busy=true;defer {busy=false}
+        message=""
         do {
             let evidence=N2PendingDispensingEvidence(visitID:visitID,itemID:medication.id,lotID:lotID,
                 quantity:isHistorical && selectedLotIsContainer ? 0:amount,
-                confirmNewContainer:opening,operatorName:operatorName,reason:reason,
+                confirmNewContainer:opening,operatorName:responsible,reason:evidenceReason,
                 at:Int64(Date().timeIntervalSince1970*1000),
                 newContainers:opening ? (isHistorical && selectedLotIsContainer ? 1:newContainers):0)
             _=try await vault.confirmPendingDispensing(evidence,expectedRevision:context.revision)
             onSaved();dismiss()
-        } catch {message="No se pudo verificar la operación. La atención permanece guardada. Actualiza el inventario y revisa la evidencia."}
+        } catch N2PendingDispensingEvidence.Failure.invalidEvidence {
+            message="La declaración no cumple las validaciones de evidencia, responsable o apertura. Ningún consumo fue confirmado."
+        } catch N2PendingDispensingEvidence.Failure.invalidTarget {
+            message="La atención o el lote ya no coinciden con los datos actuales. Vuelve a Historial y abre de nuevo el consumo pendiente."
+        } catch N2ProtectedStoreError.staleRevision {
+            message="El inventario cambió desde que abriste esta pantalla. Cierra y vuelve a abrir el consumo desde Historial; no se duplicó la atención."
+        } catch {
+            let detail=error as NSError
+            message="No se pudo verificar la operación (\(detail.domain), código \(detail.code)). La atención sigue guardada y no debes registrarla otra vez."
+        }
     }
 }
