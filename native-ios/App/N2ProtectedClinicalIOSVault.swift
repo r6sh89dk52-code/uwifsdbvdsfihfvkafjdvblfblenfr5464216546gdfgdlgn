@@ -177,6 +177,15 @@ actor N2ProtectedClinicalIOSVault {
         return try protectedStore().confirmOperationalMapping(rule,catalog:context.products,
             explicitConsent:true,expectedRevision:expectedRevision)
     }
+    /// Load both form inputs from one verified snapshot/revision.
+    func prepareClinicalForm()throws
+        ->(context:N2FormContext,drafts:[N2RecoverableDraft]) {
+        let products=try resource("n2-ambulatory-products")
+        let nursing=try resource("n2-nursing-catalog")
+        let mappings=try resource("n2-approved-mappings")
+        return try protectedStore().prepareClinicalForm(
+            products:products,nursing:nursing,mappings:mappings)
+    }
     func clinicalFormContext()throws->N2FormContext {
         let products=try resource("n2-ambulatory-products")
         let nursing=try resource("n2-nursing-catalog")
