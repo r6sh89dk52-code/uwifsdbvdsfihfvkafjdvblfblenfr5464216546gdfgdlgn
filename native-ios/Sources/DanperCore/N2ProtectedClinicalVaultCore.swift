@@ -101,6 +101,23 @@ public final class N2ProtectedClinicalVaultCore {
         guard let record=try journal.recover() else{return nil}
         return try summary(record)
     }
+    /// One authenticated, fully validated encrypted journal recovery for
+    /// the whole new-attention screen. Previously the UI recovered, decrypted
+    /// and audited the exact same generation again just to list drafts.
+    /// Both values share the same immutable revision, eliminating a stale
+    /// draft/context pairing. No cache and no change to encryption or writes.
+    public func prepareClinicalForm(products:Data,nursing:Data,mappings:Data)
+        throws->(context:N2FormContext,drafts:[N2RecoverableDraft]) {
+        guard let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        let catalog=try N2NativeCatalogLoader.load(
+            products:products,nursing:nursing,approvedMappings:mappings)
+        let context=try N2NativeFormContextReader.read(
+            snapshot:active.snapshot,revision:active.revision,products:catalog)
+        let drafts=try N2NativeDraftRecovery.read(active.snapshot)
+        return (context:context,drafts:drafts)
+    }
     public func readDrafts()throws->[N2RecoverableDraft] {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
