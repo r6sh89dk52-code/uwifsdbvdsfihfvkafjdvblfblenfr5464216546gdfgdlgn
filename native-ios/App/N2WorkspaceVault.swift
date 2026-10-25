@@ -23,6 +23,13 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.readDrafts()
     }
+    func readDraftsWithRevision() async throws
+        ->(revision:Int,drafts:[N2RecoverableDraft]) {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.readDraftsWithRevision()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.readDraftsWithRevision()
+    }
     func dispensingLines(visitID:String) async throws -> [N2DispensingLine] {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.dispensingLines(visitID:visitID)
