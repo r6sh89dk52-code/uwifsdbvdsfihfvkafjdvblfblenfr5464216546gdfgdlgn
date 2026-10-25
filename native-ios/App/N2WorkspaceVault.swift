@@ -36,6 +36,17 @@ struct N2WorkspaceVault:Sendable {
         return try await N2SyntheticTrialIOSVault.shared.dispensingStatus(visitID:visitID)
     }
     /// Dashboard counters are computed from one fixed vault revision.
+    /// The home counter needs only three integers, not a 9k-worker
+    /// history read model. Preserve demo/clinical isolation.
+    func dashboardCounters(today:String,weekStart:String) async throws
+        ->(today:Int,week:Int,drafts:Int)? {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared
+                .dashboardCounters(today:today,weekStart:weekStart)
+        }
+        return try await N2SyntheticTrialIOSVault.shared
+            .dashboardCounters(today:today,weekStart:weekStart)
+    }
     func readDashboard() async throws
         ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
         if isClinical {
