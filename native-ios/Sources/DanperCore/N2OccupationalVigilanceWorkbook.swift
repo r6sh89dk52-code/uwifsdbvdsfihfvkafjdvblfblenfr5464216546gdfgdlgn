@@ -14,6 +14,9 @@ public enum N2OccupationalVigilanceWorkbook {
         public let xlsx:Data
         public let rows:Int
         public let skippedMissingIdentity:Int
+        /// Included visits whose stated organizational area has no unique
+        /// verified code for the stated Venturosa society.
+        public let unresolvedOrganizationalUnits:Int
         public let sheetName:String
     }
     private static let sheetName="VIGILACIA OCUPACIONAL"
@@ -84,9 +87,13 @@ public enum N2OccupationalVigilanceWorkbook {
             birthDate:string(worker["birthDate"]),on:date) ??
             Int(String(describing:worker["age"] ?? ""))
         let responsible=string(visit["responsible"])
+        let codes=N2VigilanceOrganizationCodes.resolve(
+            site:string(worker["site"]),unit:string(worker["area"]),
+            existingSubdivision:string(worker["subdivisionCode"]),
+            existingOrganization:string(worker["organizationCode"]))
         let fields:[String]=[
             string(worker["site"]),string(worker["area"]),
-            string(worker["subdivisionCode"]),string(worker["organizationCode"]),
+            codes.subdivision,codes.organizationalUnit,
             string(worker["labor"]),string(worker["planilla"]),"",
             string(visit["time"]),code,string(worker["name"]),"",
             string(worker["sex"]),"DISERGONOMICO","Posturas inadecuadas",
@@ -241,7 +248,17 @@ public enum N2OccupationalVigilanceWorkbook {
             .init(name:"xl/worksheets/sheet1.xml",data:Data(worksheet(selected).utf8))
         ]
         let output=try N1rStoredZip.pack(entries)
+        let unresolved=selected.reduce(0) { total,visit in
+            let worker=visit["worker"] as? [String:Any] ?? [:]
+            let resolved=N2VigilanceOrganizationCodes.resolve(
+                site:string(worker["site"]),unit:string(worker["area"]),
+                existingSubdivision:string(worker["subdivisionCode"]),
+                existingOrganization:string(worker["organizationCode"]))
+            return total + (resolved.recognizedSite && resolved.organizationalUnit.isEmpty ? 1 : 0)
+        }
         return Result(xlsx:output,rows:selected.count,
-                      skippedMissingIdentity:missing,sheetName:sheetName)
+                      skippedMissingIdentity:missing,
+                      unresolvedOrganizationalUnits:unresolved,
+                      sheetName:sheetName)
     }
 }
