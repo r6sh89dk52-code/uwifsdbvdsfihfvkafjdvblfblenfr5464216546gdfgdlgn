@@ -70,6 +70,6 @@ final class DMExcelWriterTests:XCTestCase {
         XCTAssertTrue(xml.contains("<c r=\"I2\" s=\"51\"><v>87654321</v></c>"))
         XCTAssertTrue(xml.contains("<c r=\"I3\" s=\"51\"><v>12345678</v></c>"))
         XCTAssertTrue(xml.contains("<f>IF(AND(O3&lt;&gt;\"\",P3&lt;&gt;\"\"),P3-O3+1,0)</f>"))
-        XCTAssertTrue(xml.contains("<c r=\"F3\" s=\"50\"><v>46318</v></c>") == false ? xml.contains("<c r=\"F3\" s=\"50\"><v>") : true)
+        XCTAssertTrue(xml.contains("<c r=\"F3\" s=\"50\"><v>46318</v></c>"))
     }
 }
