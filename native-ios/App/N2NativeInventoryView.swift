@@ -223,6 +223,7 @@ struct N2NativeInventoryView:View {
             Text("Inicial del día 9: requiere tener verificadas las aperturas anteriores (R=1/0). Actual: registra las existencias físicas de hoy. Para cajas y frascos, cuenta como cerrados solo los envases que realmente siguen sin abrir. No contabilices una caja abierta como cerrada.")
         }
         .onChange(of:materialCode) {_,_ in
+            blockedUnverifiedOpening=false
             capacityInput="";capacityEvidence="";capacityConfirmed=false
         }
     }
@@ -264,6 +265,7 @@ struct N2NativeInventoryView:View {
     private func action(_ kind:String,_ name:String,_ detail:String,_ symbol:String)->some View {
         Button {
             mode=kind
+            blockedUnverifiedOpening=false
             workspace="edit"
             quantity=""
             reason=""
