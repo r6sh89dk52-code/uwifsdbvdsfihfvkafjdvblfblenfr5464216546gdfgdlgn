@@ -27,7 +27,7 @@ struct N2ClinicalCorrectionView:View {
     @State private var itemQuantities=[String:String]()
     @State private var reason=""
     @State private var discrepancy=""
-    @State private var operatorName=""
+    @State private var operatorName=N2ClinicianIdentity.name
     @State private var eventID=UUID().uuidString
     @State private var draftTask:Task<Void,Never>?
     @State private var history=[N2CorrectionHistoryEntry]()
@@ -153,9 +153,8 @@ struct N2ClinicalCorrectionView:View {
                     TextField("Motivo detallado de la rectificación",text:$reason,
                               axis:.vertical).lineLimit(2...5)
                 }
-                    DanperField(title:"Responsable que rectifica") {
-                    TextField("Responsable que rectifica",text:$operatorName)
-                }
+                    LabeledContent("Responsable que rectifica",value:operatorName)
+                    LabeledContent("DNI del profesional",value:N2ClinicianIdentity.dni)
                     Button {
                         pendingConfirmation=true
                     } label: {
