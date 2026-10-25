@@ -146,6 +146,10 @@ public enum N2VerifiedIndicatorWorkbook {
         guard productMap.count==432 else{throw Failure.invalidCatalog}
         let operational=try N2OperationalMappings.read(clinical)
         let stock=source["stockLots"] as? [[String:Any]] ?? []
+        // A declaration made after an old attention is accounting evidence
+        // (R=1 or R=0), not an invented physical delivery. It is eligible
+        // only in an explicitly PROVISIONAL workbook.
+        let historicalDeclarations=try N2PendingDispensingEvidence.read(snapshot:clinical)
         let disputed=try hasIncidentInSelectedVisits(
             incidents,movements:movement,selectedVisitIDs:selectedVisitIDs)
         guard !disputed else{throw Failure.unverifiedDelivery}
@@ -285,6 +289,34 @@ public enum N2VerifiedIndicatorWorkbook {
                         physical=value
                         consumption[code,default:0]+=Int(value)
                         consumptionBySite[sourceSite+"|"+code,default:0]+=Int(value)
+                    } else if allowPending,
+                              let historical=historicalDeclarations.last(where:{
+                                  $0.visitID==aid && $0.itemID==itemID
+                              }),
+                              let lot=stock.first(where:{
+                                  string($0["id"])==historical.lotID
+                              }) {
+                        let inventoryCodes=Set(mapped.filter{
+                            $0["clinicalCode"] as? String==code
+                        }.compactMap{$0["kardexCode"] as? String})
+                            .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
+                            .union(N2UserReviewedKardexLinks.candidates(for:code).map(\.kardexID))
+                        guard inventoryCodes.contains(string(lot["code"])),
+                              N2ContainerAccounting.isContainer(
+                                  unit:string(lot["catalogUnit"])),
+                              linesByItem[key]==nil,
+                              let openings=historical.newContainers,
+                              (0...10_000).contains(openings),
+                              openings==0 || historical.confirmNewContainer else {
+                            throw Failure.unverifiedDelivery
+                        }
+                        physical=Double(openings)
+                        consumption[code,default:0]+=openings
+                        consumptionBySite[sourceSite+"|"+code,default:0]+=openings
+                        pendingLines+=1
+                        pendingNotes.append(aid+" / "+code+" / "+name+
+                            ": R histórico declarado="+String(openings)+
+                            " sin salida física ni FEFO retroactivo.")
                     } else if allowPending,let declared=integer(row["quantity"]),declared>0 {
                         let inventoryCodes=Set(mapped.filter{$0["clinicalCode"] as? String==code}.compactMap{$0["kardexCode"] as? String})
                             .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
@@ -447,7 +479,8 @@ public enum N2VerifiedIndicatorWorkbook {
                 snapshot:clinical,mappings:mappings,through:end)
             : nil
         let sharedCloseCandidate = subdivision=="AMBAS" &&
-            !allowPending && isWholePeriod && projectedCut != nil &&
+            !allowPending && isWholePeriod && end.hasSuffix("-08") &&
+            projectedCut != nil &&
             projectedCut?.hasUnresolvedHistory==false
         // Maintain compatibility with historical signed reconciliations,
         // but the new joint inventory never REQUIRES two site reviews.
