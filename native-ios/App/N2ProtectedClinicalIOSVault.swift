@@ -101,6 +101,9 @@ actor N2ProtectedClinicalIOSVault {
                                            expectedRevision:expectedRevision)
     }
 
+    func currentRevision()throws->Int {
+        try protectedStore().currentRevision()
+    }
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
     }
