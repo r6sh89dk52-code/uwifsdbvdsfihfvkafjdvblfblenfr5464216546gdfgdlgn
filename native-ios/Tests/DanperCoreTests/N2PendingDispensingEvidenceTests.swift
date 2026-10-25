@@ -7,6 +7,25 @@ final class N2PendingDispensingEvidenceTests:XCTestCase {
         return try Data(contentsOf:URL(fileURLWithPath:directory).appendingPathComponent("n1e-clinical-stock.json"))
     }
     private var timestamp:Int64 {Int64(ISO8601DateFormatter().date(from:"2026-10-14T18:00:00Z")!.timeIntervalSince1970*1000)}
+    func testAutomaticAuditDescriptionKeepsDeclaredRAndHistoricalNoDebit() {
+        let opening=N2PendingDispensingEvidence.automaticAuditDescription(
+            clinicalDate:"2026-10-24",lotReference:"QQ7777",
+            historical:true,container:true,newContainers:1,physicalQuantity:0)
+        XCTAssertTrue(opening.contains("Kardex R=1"))
+        XCTAssertTrue(opening.contains("QQ7777"))
+        XCTAssertTrue(opening.contains("2026-10-24"))
+        XCTAssertTrue(opening.contains("sin movimiento físico retroactivo"))
+        XCTAssertGreaterThanOrEqual(opening.count,10)
+        let reuse=N2PendingDispensingEvidence.automaticAuditDescription(
+            clinicalDate:"2026-10-24",lotReference:"QQ7777",
+            historical:true,container:true,newContainers:0,physicalQuantity:0)
+        XCTAssertTrue(reuse.contains("Kardex R=0"))
+        XCTAssertFalse(reuse.contains("Kardex R=1"))
+        let unit=N2PendingDispensingEvidence.automaticAuditDescription(
+            clinicalDate:"2026-10-24",lotReference:"TAB001",
+            historical:false,container:false,newContainers:0,physicalQuantity:2)
+        XCTAssertTrue(unit.contains("consumo físico declarado de"))
+    }
     func testSoleClinicianIdentityAndAuditDNIRoundTrip() throws {
         let newVisit=N2NativeFormDraft()
         XCTAssertEqual(newVisit.responsible,N2ClinicianIdentity.name)
