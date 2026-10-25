@@ -113,11 +113,16 @@ enum DMReturnNotifications {
             id(record,"before"),id(record,"on")
         ])
         guard record.state != .returned,record.state != .voided,
-              let iso=record.expectedReturn,let day=DMDate.parse(iso) else{return}
+              let iso=record.expectedReturn,DMDate.parse(iso) != nil else{return}
+        let components=iso.split(separator:"-").compactMap{Int($0)}
+        guard components.count==3 else{return}
         var cal=Calendar(identifier:.gregorian)
         cal.timeZone=TimeZone(identifier:"America/Lima")!
+        guard let localDay=cal.date(from:DateComponents(
+            year:components[0],month:components[1],day:components[2],
+            hour:12,minute:0)) else{return}
         for (suffix,offset) in [("before",-1),("on",0)] {
-            guard let d=cal.date(byAdding:.day,value:offset,to:day) else{continue}
+            guard let d=cal.date(byAdding:.day,value:offset,to:localDay) else{continue}
             var comps=cal.dateComponents([.year,.month,.day],from:d)
             comps.hour=8;comps.minute=0;comps.timeZone=cal.timeZone
             guard let actual=cal.date(from:comps),actual>Date() else{continue}
