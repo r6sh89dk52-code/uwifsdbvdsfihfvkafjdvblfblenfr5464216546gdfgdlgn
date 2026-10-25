@@ -425,7 +425,8 @@ struct NativeRootView:View {
                     Text("Oscuro").tag("dark")
                 }.pickerStyle(.segmented)
                 DanperCheckRow(selected:$haptics) {Text("Respuesta háptica")}
-                LabeledContent("Responsable",value:"Felipe Azcárate Silva")
+                LabeledContent("Responsable",value:N2ClinicianIdentity.name)
+                LabeledContent("DNI del responsable",value:N2ClinicianIdentity.dni)
             }
             DanperPanel {
                 Text("Versión beta SwiftUI · uso con información ficticia. No sustituye la build 222.")
