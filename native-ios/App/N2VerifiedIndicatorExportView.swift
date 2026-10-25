@@ -123,7 +123,8 @@ struct N2VerifiedIndicatorExportView:View {
                     .font(.caption).foregroundStyle(.secondary)
                 DanperDateField(title:"Desde",selection:$startDate)
                 DanperDateField(title:"Hasta",selection:$endDate)
-                Text("Corte mensual sugerido: día 9 al día 8 del siguiente mes. Puedes ajustar las fechas para una revisión puntual.")
+                Text("Durante un corte abierto se exporta hasta hoy como PROVISIONAL. El libro OFICIAL se certifica únicamente tras finalizar el corte 9–8 con existencias comprobables.")
+                    .font(.caption).foregroundStyle(.secondary)
                     .font(.footnote).foregroundStyle(.secondary)
                     .font(.footnote).foregroundStyle(.secondary)
             }
@@ -137,20 +138,24 @@ struct N2VerifiedIndicatorExportView:View {
                                symbol:"calendar.badge.checkmark") {
                     N2KardexCutPreviewView()
                 }
-                Text("El cierre oficial aún conserva una validación heredada por sede. No registres cierres artificiales de Fundo y Planta para forzar la exportación. Puedes evaluar un libro provisional con los consumos verificables.")
-                    .font(.caption).foregroundStyle(.orange)
+                Text("El cierre es único para Fundo y Planta. DANPER comprobará correspondencias de productos, saldos y consumos del período completo. Si faltan datos, conservará el reporte como provisional sin inventar cantidades.")
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack(spacing:9) {
                     metricValue("\(selected.count)","Seleccionadas")
                     metricValue("\(inRange.count)","En el período")
                     metricValue("\(inRange.filter{$0.pendingPhysicalLines>0}.count)","Pendientes")
                 }
-                Text("Revisa consumos y saldos del inventario único. Las líneas sin correspondencia de lote se incluyen solo como provisionales.")
+                Text("RESU solo calcula un stock consolidado desde el conteo cuando están seleccionadas TODAS las atenciones del corte, el período ya ocurrió y el producto tiene una correspondencia única con su lote. Con una selección parcial, se dejan vacíos los saldos no justificables.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Las aperturas históricas R=1/0 declaradas se admiten en el libro PROVISIONAL; no se transforman en salidas físicas retroactivas.")
+                    .font(.caption).foregroundStyle(.secondary)
                     .font(.caption).foregroundStyle(.secondary)
 
                 HStack {
                     Text("\(selected.count) elegidas de \(inRange.count) en \(site == "AMBAS" ? "ambas sedes" : "esta sede")")
                     Spacer()
                     Button("Solo confirmadas") {selectConfirmed()}
+                    Button("Todas") {selected=Set(inRange.map(\.id))}
                 }
                 if site=="AMBAS" &&
                    inRange.contains(where:{!["LA VENTUROSA","PLVENTUROSA"].contains($0.workerSite)}) {
@@ -193,7 +198,7 @@ struct N2VerifiedIndicatorExportView:View {
                 DanperCheckRow(selected:$provisional) {
                     VStack(alignment:.leading,spacing:5) {
                         Text("Modo provisional").font(.subheadline.weight(.semibold))
-                        Text("Libro de pruebas sin exigir dos cierres físicos por sede").font(.caption).foregroundStyle(.secondary)
+                        Text("Libro de prueba del inventario único sin cierre definitivo").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if provisional {
@@ -249,7 +254,10 @@ struct N2VerifiedIndicatorExportView:View {
                     (cal.date(byAdding:.month,value:-1,to:thisMonthNinth) ?? thisMonthNinth)
                 startDate=start
                 if let next=cal.date(byAdding:.month,value:1,to:start) {
-                    endDate=cal.date(byAdding:.day,value:-1,to:next) ?? start
+                    let cycleEnd=cal.date(byAdding:.day,value:-1,to:next) ?? start
+                    // The current month is a to-date draft, not a fictitious
+                    // closing count for the following eighth.
+                    endDate=min(cycleEnd,now)
                 } else {endDate=start}
             }
             guard let history=try await vault
@@ -272,6 +280,16 @@ struct N2VerifiedIndicatorExportView:View {
     @MainActor
     private func export() async {
         guard enabled else{return}
+        if !provisional && local(endDate)>local(Date()) {
+            failed=true
+            status="El corte todavía no ha terminado. Genera un libro provisional a la fecha; el cierre oficial requiere un conteo posterior al día 8."
+            return
+        }
+        if !provisional && !local(endDate).hasSuffix("-08") {
+            failed=true
+            status="El Indicador oficial consolida el corte 9–8. Para una revisión parcial del mes utiliza Modo provisional."
+            return
+        }
         working=true
         failed=false
         status="Comprobando los 30 campos, entregas y cierre del período…"
@@ -315,9 +333,9 @@ struct N2VerifiedIndicatorExportView:View {
         }
         switch failure {
         case .unreviewedPeriod:
-            return "El cierre OFICIAL está bloqueado por una validación heredada por sedes. No crees cierres ficticios. Para pruebas, usa Modo provisional y selecciona consumos verificables; falta migrar el generador a cierre único."
+            return "No se acreditó el cierre ÚNICO del período: deben estar todas las atenciones seleccionadas, el corte 9–8 terminado y los saldos físicos conciliados. No se deben crear cierres por sede."
         case .invalidReconciliation:
-            return "Falta stock inicial o recuento final verificable, o existe un evento histórico incompatible con el Kardex único. Revisa inventario consolidado sin inventar existencias por sede."
+            return "No cuadran las existencias del inventario único, el consumo declarado o las correspondencias del catálogo. No se ha inventado stock inicial ni un recuento final."
         case .unverifiedDelivery:
             return "Una atención seleccionada tiene un consumo sin entrega confirmada o una corrección pendiente. Concilia la evidencia o desmárcala. Los envases sin apertura verificable no se exportan como R, tampoco en un provisional."
         case .invalidVisit:
