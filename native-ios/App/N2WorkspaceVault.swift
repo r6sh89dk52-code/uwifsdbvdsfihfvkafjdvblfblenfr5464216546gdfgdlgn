@@ -17,6 +17,12 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.inspect()
     }
+    func currentRevision() async throws -> Int {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.currentRevision()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.currentRevision()
+    }
     func readDrafts() async throws -> [N2RecoverableDraft] {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.readDrafts()
