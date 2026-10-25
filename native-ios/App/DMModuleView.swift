@@ -388,8 +388,8 @@ private enum DMOCRService {
                   let image=CGImageSourceCreateImageAtIndex(source,0,nil) else {
                 throw DMStoreFailure.unavailable
             }
-            let properties=CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [CFString:Any]
-            let raw=(properties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
+            let properties=CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [String:Any]
+            let raw=(properties?[kCGImagePropertyOrientation as String] as? NSNumber)?.uint32Value ?? 1
             let orientation=CGImagePropertyOrientation(rawValue:raw) ?? .up
             let request=VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
