@@ -315,11 +315,14 @@ public enum N2VerifiedIndicatorWorkbook {
                         }.compactMap{$0["kardexCode"] as? String})
                             .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
                             .union(N2UserReviewedKardexLinks.candidates(for:code).map(\.kardexID))
+                        // Older audit events have no newContainers field;
+                        // preserve their explicit yes/no declaration.
+                        let openings=historical.newContainers ??
+                            (historical.confirmNewContainer ? 1 : 0)
                         guard inventoryCodes.contains(string(lot["code"])),
                               N2ContainerAccounting.isContainer(
                                   unit:string(lot["catalogUnit"])),
                               linesByItem[key]==nil,
-                              let openings=historical.newContainers,
                               (0...10_000).contains(openings),
                               openings==0 || historical.confirmNewContainer else {
                             throw Failure.unverifiedDelivery
