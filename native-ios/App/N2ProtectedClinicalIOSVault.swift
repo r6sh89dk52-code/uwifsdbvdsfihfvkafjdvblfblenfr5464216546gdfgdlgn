@@ -110,6 +110,10 @@ actor N2ProtectedClinicalIOSVault {
     func dispensingStatus(visitID:String)throws->[String:String] {
         try protectedStore().dispensingStatus(visitID:visitID)
     }
+    func readDashboard()throws
+        ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
+        try protectedStore().readDashboard()
+    }
     func readHistory()throws->N2NativeReadModel? {
         guard let secret=try deviceKey(create:false) else{return nil}
         return try N2ProtectedClinicalVaultCore(keyData:secret).readIndex()
