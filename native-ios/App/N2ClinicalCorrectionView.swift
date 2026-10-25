@@ -238,18 +238,19 @@ struct N2ClinicalCorrectionView:View {
         .onDisappear {queueDraft(immediate:true)}
     }
     private var autosaveFingerprint:String {
-        [
+        let procedureFingerprint:String=itemProcedures.keys.sorted().map { id in
+            id+"="+(itemProcedures[id] ?? "")
+        }.joined(separator:"|")
+        let quantityFingerprint:String=itemQuantities.keys.sorted().map { id in
+            id+"="+(itemQuantities[id] ?? "")
+        }.joined(separator:"|")
+        let fields:[String]=[
             category,system,segment,diagnosis,permission,permissionTime,
             responsible,responsibleDni,workStatus,blueBandage.description,
             returned.description,photoSent.description,procedures,reason,
-            discrepancy,operatorName,
-            itemProcedures.keys.sorted().map{
-                $0+"="+(itemProcedures[$0] ?? "")
-            }.joined(separator:"|"),
-            itemQuantities.keys.sorted().map{
-                $0+"="+(itemQuantities[$0] ?? "")
-            }.joined(separator:"|")
-        ].joined(separator:"\u{001F}")
+            discrepancy,operatorName,procedureFingerprint,quantityFingerprint
+        ]
+        return fields.joined(separator:"\u{001F}")
     }
     private func editPacket()->[String:Any] {
         let procedureRows=procedures.split(separator:"\n",

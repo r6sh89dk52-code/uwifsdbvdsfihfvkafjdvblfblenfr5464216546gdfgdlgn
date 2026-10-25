@@ -440,7 +440,6 @@ public final class N2ProtectedClinicalVaultCore {
         }
     }
     @discardableResult
-    @discardableResult
     public func correctUnusedLot(lotID:String,reference:String,expires:String,
         reason:String,operatorName:String,at:Int64,
         expectedRevision:Int)throws->N2ProtectedStoreSummary {

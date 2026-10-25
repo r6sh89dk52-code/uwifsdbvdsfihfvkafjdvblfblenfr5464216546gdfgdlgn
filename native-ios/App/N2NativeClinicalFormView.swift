@@ -237,10 +237,7 @@ struct N2NativeClinicalFormView:View {
                                         .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
                                     VStack(alignment:.leading,spacing:5) {
                                         Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
-                                        Text("Cantidad \(med.quantity) · " +
-                                                 (resolution == .reviewChronology
-                                                  ? N2PendingResolution.historicalTitle(forReason:result)
-                                                  : resolution.summary))
+                                        Text("Cantidad \(med.quantity) · \(resolution == .reviewChronology ? N2PendingResolution.historicalTitle(forReason:result) : resolution.summary)")
                                                 .font(.caption).foregroundStyle(.secondary)
                                         if let quantity=savedKardex[med.id] {
                                             Text("Kardex R: \(quantity.formatted())"+(quantity==0
@@ -1430,8 +1427,9 @@ struct N2NativeClinicalFormView:View {
             return "¿Abriste un envase nuevo?"
         }
         let codes=containerCodes(item,context:context)
-        let units=context.lots.filter{codes.contains($0.kardexCode)}.map(\.unit) +
-            context.products.nursing.filter{codes.contains($0.id)}.compactMap(\.unit)
+        let lotUnits=context.lots.filter{codes.contains($0.kardexCode)}.map(\.unit)
+        let catalogUnits=context.products.nursing.filter{codes.contains($0.id)}.compactMap(\.unit)
+        let units=lotUnits + catalogUnits
         let kind=units.contains(where:{$0.uppercased()=="CJA"}) ? "caja" :
             units.contains(where:{$0.uppercased()=="FCO"}) ? "frasco" : "envase"
         return "¿Abriste un \(kind) nuevo?"

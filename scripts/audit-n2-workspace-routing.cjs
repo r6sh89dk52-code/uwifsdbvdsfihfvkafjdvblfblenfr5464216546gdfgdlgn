@@ -18,6 +18,7 @@ const views=[
 'N2NativeDraftsDashboard.swift',
 'N2ReconciliationView.swift',
 'N2VerifiedNursingExportView.swift',
+'N2OccupationalVigilanceExportView.swift',
 'N2OperationalMappingView.swift',
 'N2PendingDispensingView.swift',
 'N2AuxiliaryInventoryView.swift',
@@ -37,23 +38,34 @@ for(const item of views) {
 const router=fs.readFileSync(path.join(app,'N2WorkspaceVault.swift'),'utf8');
 const clinical=fs.readFileSync(path.join(app,'N2ProtectedClinicalIOSVault.swift'),'utf8');
 const demo=fs.readFileSync(path.join(app,'N2SyntheticTrialIOSVault.swift'),'utf8');
-const calls=[...router.matchAll(/N2SyntheticTrialIOSVault\.shared\.(\w+)\(/g)].map(m=>m[1]);
-// The 36th entry is the audited edit of UNUSED lot metadata. Every
-// workspace operation must keep symmetric DEMO and CLINICAL routes.
-assert.equal(calls.length,36,'The bridge must expose the entire supported surface.');
-assert.equal(new Set(calls).size,calls.length,'The bridge must not duplicate any route.');
-assert(calls.includes('correctUnusedLot'),'Missing audited unused-lot edit routing.');
-assert(calls.includes('closeContainers'));
-assert(calls.includes('confirmPendingDispensing'));
-assert(calls.includes('registerAuxiliaryLot'));
-assert(calls.includes('auxiliaryAccounting'));
-assert(calls.includes('confirmOperationalMapping'));
-assert(calls.includes('retryDispensing'));
-for(const method of calls) {
- assert(clinical.includes('func '+method+'('),'Missing clinical method: '+method);
- assert(demo.includes('func '+method+'('),'Missing demo method: '+method);
- assert(router.includes('N2ProtectedClinicalIOSVault.shared.'+method+'('),
-        'Missing clinical implementation in router: '+method);
+// Whitespace includes line breaks on either side of both member-access dots.
+const routedCalls=(source,vault)=>[...source.matchAll(new RegExp(
+ '\\b'+vault+'\\s*\\.\\s*shared\\s*\\.\\s*(\\w+)\\s*\\(', 'g'))].map(m=>m[1]);
+const declarations=source=>[...source.matchAll(/\bfunc\s+(\w+)\s*\(/g)].map(m=>m[1]);
+const unique=(items,label)=>assert.equal(new Set(items).size,items.length,label+' contains duplicate methods');
+const sorted=items=>[...items].sort();
+const demoType='N2SyntheticTrialIOSVault',clinicalType='N2ProtectedClinicalIOSVault';
+const calls=routedCalls(router,demoType),clinicalCalls=routedCalls(router,clinicalType);
+const methods=declarations(router);
+unique(methods,'Workspace bridge');unique(calls,'DEMO routes');unique(clinicalCalls,'CLINICAL routes');
+assert.deepEqual(sorted(calls),sorted(methods),'Every bridge operation needs a DEMO route');
+assert.deepEqual(sorted(clinicalCalls),sorted(methods),'Every bridge operation needs a CLINICAL route');
+const required=[
+ 'correctUnusedLot','automaticCutAccounting','exportOccupationalVigilance',
+ 'closeContainers','confirmPendingDispensing','registerAuxiliaryLot',
+ 'auxiliaryAccounting','confirmOperationalMapping','retryDispensing'
+];
+for(const method of required)assert(calls.includes(method),'Missing required capability: '+method);
+for(const [label,source] of [['CLINICAL',clinical],['DEMO',demo]]) {
+ const implemented=declarations(source);
+ for(const method of methods)assert.equal(implemented.filter(name=>name===method).length,1,
+  label+' must implement exactly one '+method);
+}
+// Compare within each operation as well: swapped or cross-wired calls must fail.
+const blocks=[...router.matchAll(/\bfunc\s+(\w+)\s*\([\s\S]*?(?=\bfunc\s+\w+\s*\(|$)/g)];
+for(const [block,method] of blocks) {
+ assert.deepEqual(routedCalls(block,demoType),[method],'Incorrect DEMO route in '+method);
+ assert.deepEqual(routedCalls(block,clinicalType),[method],'Incorrect CLINICAL route in '+method);
 }
 const gate=fs.readFileSync(path.join(app,'N2ClinicalWorkspaceView.swift'),'utf8');
 assert(gate.includes('.environment(\\.n2WorkspaceVault,.clinical)'));

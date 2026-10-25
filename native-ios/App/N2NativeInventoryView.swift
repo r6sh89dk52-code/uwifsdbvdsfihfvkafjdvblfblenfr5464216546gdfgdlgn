@@ -116,7 +116,7 @@ struct N2NativeInventoryView:View {
                     return a==b ? $0.reference<$1.reference:a<b
                 })
         }.sorted{
-            $0.name.localizedStandardCompare($1.name)==.orderedAscending
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
         }
     }
     private var material:N2NursingCatalogProduct? {
