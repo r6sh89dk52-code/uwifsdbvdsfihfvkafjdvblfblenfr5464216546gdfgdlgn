@@ -24,7 +24,6 @@ struct N2PendingDispensingView:View {
     @State private var quantity=""
     @State private var opening=false
     @State private var newContainers=1
-    @State private var operatorName=""
     @State private var reason=""
     @State private var consent=false
     @State private var busy=false
@@ -92,10 +91,10 @@ struct N2PendingDispensingView:View {
                         Text("Con envase abierto: Kardex 0. El volumen es opcional; no se inferirán aperturas.")
                             .font(.caption)
                     }
-                    TextField("Responsable",text:$operatorName)
-                        .textInputAutocapitalization(.words)
+                    LabeledContent("Responsable",value:N2ClinicianIdentity.name)
                         .accessibilityIdentifier("historical-opening-responsible")
-                    Text("Obligatorio: indica un responsable de al menos 3 caracteres.")
+                    LabeledContent("DNI del responsable",value:N2ClinicianIdentity.dni)
+                    Text("Identificación automática del profesional configurado en DANPER. No necesitas introducirla en cada atención.")
                         .font(.caption).foregroundStyle(.secondary)
                     TextField("Evidencia y motivo",text:$reason,axis:.vertical)
                         .lineLimit(2...4)
@@ -123,10 +122,6 @@ struct N2PendingDispensingView:View {
         guard !lotID.isEmpty else {
             message="Selecciona el lote compatible con la atención.";return
         }
-        let responsible=operatorName.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard responsible.count>=3 else {
-            message="Falta el responsable: escribe al menos 3 caracteres.";return
-        }
         let evidenceReason=reason.trimmingCharacters(in:.whitespacesAndNewlines)
         guard evidenceReason.count>=10 else {
             message="Falta evidencia y motivo: describe la apertura o reutilización en al menos 10 caracteres.";return
@@ -143,9 +138,10 @@ struct N2PendingDispensingView:View {
         do {
             let evidence=N2PendingDispensingEvidence(visitID:visitID,itemID:medication.id,lotID:lotID,
                 quantity:isHistorical && selectedLotIsContainer ? 0:amount,
-                confirmNewContainer:opening,operatorName:responsible,reason:evidenceReason,
+                confirmNewContainer:opening,operatorName:N2ClinicianIdentity.name,reason:evidenceReason,
                 at:Int64(Date().timeIntervalSince1970*1000),
-                newContainers:opening ? (isHistorical && selectedLotIsContainer ? 1:newContainers):0)
+                newContainers:opening ? (isHistorical && selectedLotIsContainer ? 1:newContainers):0,
+                operatorDni:N2ClinicianIdentity.dni)
             _=try await vault.confirmPendingDispensing(evidence,expectedRevision:context.revision)
             onSaved();dismiss()
         } catch N2PendingDispensingEvidence.Failure.invalidEvidence {
