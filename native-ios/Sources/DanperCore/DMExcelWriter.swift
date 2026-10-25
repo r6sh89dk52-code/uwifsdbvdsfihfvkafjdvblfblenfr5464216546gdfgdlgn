@@ -43,7 +43,7 @@ public enum DMExcelWriter {
     }
     private static func matches(_ pattern:String,_ text:String)throws->[NSTextCheckingResult] {
         let regex=try NSRegularExpression(pattern:pattern,options:[.dotMatchesLineSeparators])
-        return regex.matches(in:text,range:NSRange(text.startIndex...,in:text))
+        return regex.matches(in:text,range:NSRange(text.startIndex..<text.endIndex,in:text))
     }
     private static func replaceCell(in row:String,column:String,number:Int,value:String?,
                                     date:Bool=false,formula:Bool=false)throws->String {
