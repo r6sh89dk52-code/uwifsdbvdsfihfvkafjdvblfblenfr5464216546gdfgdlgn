@@ -479,8 +479,9 @@ for(const text of [
   'LabeledContent("Responsable",value:N2ClinicianIdentity.name)',
   'LabeledContent("DNI del responsable",value:N2ClinicianIdentity.dni)',
   'operatorDni:N2ClinicianIdentity.dni',
-  'guard evidenceReason.count>=10 else',
-  'Falta evidencia y motivo: describe la apertura o reutilización',
+  'automaticAuditDescription(',
+  'Constancia automática: DANPER registrará el lote',
+  'No se solicita un motivo escrito.',
   'N2PendingDispensingEvidence.Failure.invalidEvidence',
   'N2PendingDispensingEvidence.Failure.invalidTarget',
   'N2ProtectedStoreError.staleRevision',
@@ -489,9 +490,17 @@ for(const text of [
 ]) must(pendingView,text,'identidad automática y evidencia de apertura histórica');
 assert(!pendingView.includes('TextField("Responsable",text:$operatorName)'),
        'no volver a pedir el responsable en cada apertura');
+assert(!pendingView.includes('TextField("Evidencia y motivo"'),
+       'la conciliación rutinaria no debe exigir motivo escrito');
+assert(!pendingView.includes('@State private var reason'),
+       'no conservar motivo editable innecesario');
+
 const identityEvidence=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2PendingDispensingEvidence.swift'),'utf8');
 must(identityEvidence,'public let operatorDni:String?',
      'DNI de auditoría opcional para compatibilidad con declaraciones antiguas');
+must(identityEvidence,'public static func automaticAuditDescription(',
+     'la constancia de apertura se genera desde hechos declarados sin motivo manual');
+
 const indicatorCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
 must(indicatorCore,'string(visit["responsibleDni"]),string(visit["responsible"])',
      'DNI en AB y nombre en AC del Excel oficial');
