@@ -49,6 +49,64 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         XCTAssertEqual(first,try fixture("n1s-indicator-template-store.zip"))
         try write("n1s-indicator-native.xlsx",result.xlsx)
     }
+    func testRESUShowsZeroVerifiedReceiptsAndCachedClosingInProvisional() throws {
+        var plan=try manifest("n1s-indicator-plan.json")
+        let selected=try XCTUnwrap((plan["plan"] as? [String:Any])?["lines"] as? [[String:Any]])
+        let clinical=try XCTUnwrap(selected.first?["cells"] as? [Any])
+        let code=try XCTUnwrap(clinical[15] as? String)
+        let catalog=try XCTUnwrap(plan["catalog"] as? [[String:Any]])
+        let row=try XCTUnwrap(catalog.firstIndex{($0["code"] as? String)==code})+3
+        var byCode=try XCTUnwrap(plan["byCode"] as? [String:[String:Any]])
+        var material=try XCTUnwrap(byCode[code])
+        let used=try XCTUnwrap(material["consumed"] as? Int)
+        XCTAssertGreaterThan(used,0)
+        material["opening"]=used+4
+        material["closing"]=4
+        material["count"]=4
+        material["difference"]=0
+        material["receipts"]=0
+        material["receiptDetails"]=[]
+        material["verifiedIncome"]=0
+        byCode[code]=material
+        plan["byCode"]=byCode
+        plan["reviewed"]=false
+        plan["provisional"]=true
+        let template=try fixture("n1s-indicator-template-store.zip")
+        func exportXML(_ value:[String:Any])throws->String {
+            let data=try JSONSerialization.data(withJSONObject:value)
+            let result=try N1sFullExcelWriter.exportIndicator(base:template,manifest:data)
+            let parts=try N1rStoredZip.unpack(result.xlsx)
+            return try XCTUnwrap(String(data:try XCTUnwrap(
+                parts.first{$0.name=="xl/worksheets/sheet4.xml"}).data,
+                encoding:.utf8))
+        }
+        func cell(_ col:String,in xml:String)throws->String {
+            let start=try XCTUnwrap(xml.range(of:"<c r=\"\\(col)\\(row)\""))
+            let suffix=xml[start.lowerBound...]
+            let end=try XCTUnwrap(suffix.range(of:"</c>"))
+            return String(suffix[..<end.upperBound])
+        }
+        let xml=try exportXML(plan)
+        let income=try cell("E",in:xml)
+        XCTAssertTrue(income.contains("IF(COUNT(INGRESOS!X\\(row))=0,0,INGRESOS!X\\(row))"))
+        XCTAssertTrue(income.contains("<v>0.0</v>"))
+        for (col,value) in [("G",4.0),("H",4.0),("I",0.0)] {
+            let formulaCell=try cell(col,in:xml)
+            XCTAssertTrue(formulaCell.contains("<f>"))
+            XCTAssertTrue(formulaCell.contains("<v>\\(value)</v>"))
+        }
+        // A missing proof must NOT make 0 appear in E or closing
+        // caches, even if the source supplies an opening/count.
+        material.removeValue(forKey:"verifiedIncome")
+        byCode[code]=material
+        plan["byCode"]=byCode
+        let unresolved=try exportXML(plan)
+        XCTAssertTrue(try cell("E",in:unresolved).contains(
+            "IF(COUNT(INGRESOS!X\\(row))=0,&quot;&quot;,INGRESOS!X\\(row))"))
+        XCTAssertFalse(try cell("G",in:unresolved).contains("<v>4.0</v>"))
+        XCTAssertFalse(try cell("H",in:unresolved).contains("<v>4.0</v>"))
+        XCTAssertFalse(try cell("I",in:unresolved).contains("<v>0.0</v>"))
+    }
     func testWriterAllowsBlankRWithNoteOnlyInProvisionalBook() throws {
         var plan=try manifest("n1s-indicator-plan.json")
         var lines=try XCTUnwrap((plan["plan"] as? [String:Any])?["lines"]
