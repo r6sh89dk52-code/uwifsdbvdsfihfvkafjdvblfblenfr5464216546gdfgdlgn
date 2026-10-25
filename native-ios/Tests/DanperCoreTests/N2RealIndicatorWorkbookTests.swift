@@ -14,6 +14,30 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             return event
         }
     }
+    func testProvisionalHistoricalROnlyWithCompatibleLotAndNoPhysicalDoubleCount() {
+        let r1=N2PendingDispensingEvidence(
+            visitID:"sample-visit",itemID:"sample-item",lotID:"lot-real",
+            quantity:0,confirmNewContainer:true,operatorName:"ENFERMERIA",
+            reason:"Apertura histórica declarada",at:1792886400000,
+            newContainers:1)
+        let r0=N2PendingDispensingEvidence(
+            visitID:"sample-visit-2",itemID:"sample-item",lotID:"lot-real",
+            quantity:0,confirmNewContainer:false,operatorName:"ENFERMERIA",
+            reason:"Reutilización histórica declarada",at:1792886400000,
+            newContainers:0)
+        let allowed:Set<String>=["E-57"]
+        func r(_ record:N2PendingDispensingEvidence,
+               lot:String="E-57",unit:String="CJA",linked:Bool=false)->Int? {
+            N2VerifiedIndicatorWorkbook.provisionalHistoricalR(
+                record,lotCode:lot,lotUnit:unit,
+                approvedCodes:allowed,alreadyLinked:linked)
+        }
+        XCTAssertEqual(r(r1),1)
+        XCTAssertEqual(r(r0),0)
+        XCTAssertNil(r(r1,lot:"E-999"))
+        XCTAssertNil(r(r1,unit:"UND"))
+        XCTAssertNil(r(r1,linked:true))
+    }
     func testSingleInventoryCutGuardDoesNotRequireTwoSiteReviews() {
         let all:Set<String>=["fundo-1","planta-1"]
         XCTAssertTrue(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
