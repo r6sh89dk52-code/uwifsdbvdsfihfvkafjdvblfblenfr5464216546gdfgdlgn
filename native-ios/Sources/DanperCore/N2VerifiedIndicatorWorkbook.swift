@@ -421,33 +421,45 @@ public enum N2VerifiedIndicatorWorkbook {
                 (numeric(receipt["at"]) ?? 0)>(numeric(r["at"]) ?? 0)
             }) {throw Failure.invalidReconciliation}
         }
-        // Consolidation is not a transfer between stock sites. A single
-        // workbook can include both locations only with independent reviews,
-        // opening/closing evidence, and per-site physical consumption.
+        // A single physical inventory supplies both care sites. Preserve
+        // legacy site-tagged reconciliation events for audit and old imports,
+        // but do not require TWO artificial inventories/reviews for new books.
         let sites=subdivision=="AMBAS"
             ? ["LA VENTUROSA","PLVENTUROSA"] : [subdivision]
         let inScope=active.filter{sites.contains(string($0["subdivision"]))}
-        guard allowPending || sites.allSatisfy({location in
-            inScope.contains(where:{string($0["kind"])=="review" &&
-                string($0["subdivision"])==location &&
-                string($0["date"])==start &&
-                string($0["periodEnd"])==end})
-        }) else {throw Failure.unreviewedPeriod}
-        // Provisional full-period preview only: one shared inventory,
-        // never an invented site-specific physical opening or count.
-        // Official export still requires the existing audited reviews.
         let allPeriodIDs=Set(visits.filter {
             string($0["status"])=="saved" &&
             string($0["date"])>=start && string($0["date"])<=end
         }.compactMap{$0["id"] as? String})
         let isWholePeriod=selectedVisitIDs==allPeriodIDs
         let periodStart=try? N2KardexCutPreview.period(for:end).start
+        let clock=DateFormatter()
+        clock.dateFormat="yyyy-MM-dd"
+        clock.timeZone=TimeZone(identifier:"America/Lima")
+        let today=clock.string(from:Date())
+        // An unfinished/future period cannot have a verified closing count.
+        // All clinical lines must be considered so omitted historic openings
+        // cannot be masked by a partial selection.
         let projectedCut:N2AutomaticCutAccounting.Result? =
-            allowPending && subdivision=="AMBAS" &&
-            isWholePeriod && periodStart==start
+            subdivision=="AMBAS" && isWholePeriod && periodStart==start &&
+            end<=today
             ? try? N2AutomaticCutAccounting.calculate(
                 snapshot:clinical,mappings:mappings,through:end)
             : nil
+        let sharedCloseCandidate = subdivision=="AMBAS" &&
+            !allowPending && isWholePeriod && projectedCut != nil &&
+            projectedCut?.hasUnresolvedHistory==false
+        // Maintain compatibility with historical signed reconciliations,
+        // but the new joint inventory never REQUIRES two site reviews.
+        let legacyReviewed=sites.allSatisfy({location in
+            inScope.contains(where:{string($0["kind"])=="review" &&
+                string($0["subdivision"])==location &&
+                string($0["date"])==start &&
+                string($0["periodEnd"])==end})
+        })
+        guard allowPending || sharedCloseCandidate || legacyReviewed else {
+            throw Failure.unreviewedPeriod
+        }
         var clinicalToNursing=[String:Set<String>]()
         for entry in mapped {
             if let clinical=entry["clinicalCode"] as? String,
@@ -486,6 +498,36 @@ public enum N2VerifiedIndicatorWorkbook {
                                   "receipts":income,"receiptDetails":receipts]
             var knownOpenings=0,knownClosings=0
             var combinedOpening=0,combinedClosing=0,combinedFinal=0
+            if sharedCloseCandidate {
+                // Reconstruct once from joint physical lot counts. Demand
+                // unique mapping, exact R and full receipt/adjustment evidence.
+                if let codes=clinicalToNursing[code],codes.count==1,
+                   let physicalCode=codes.first,
+                   linkMultiplicity[physicalCode]==1,
+                   let projection=projectedByKardex[physicalCode],
+                   projection.unknownContainerOpenings==0,
+                   projection.reportedUse==Double(used),
+                   projection.received==Double(income),
+                   projection.adjusted==0,
+                   let beginning=projection.opening,
+                   let physicalCount=projection.currentCount,
+                   beginning>=0,physicalCount>=0,
+                   beginning.rounded()==beginning,
+                   physicalCount.rounded()==physicalCount {
+                    let expected=Int(beginning)+income-used
+                    guard expected>=0,expected==Int(physicalCount) else {
+                        throw Failure.invalidReconciliation
+                    }
+                    row["opening"]=Int(beginning)
+                    row["closing"]=expected
+                    row["count"]=Int(physicalCount)
+                    row["difference"]=0
+                    openingCount+=1
+                    closingCount+=1
+                } else if used>0 {
+                    throw Failure.invalidReconciliation
+                }
+            } else {
             for location in sites {
                 let opening=inScope.filter{string($0["kind"])=="opening" &&
                     string($0["subdivision"])==location &&
@@ -531,6 +573,7 @@ public enum N2VerifiedIndicatorWorkbook {
             }
             if knownOpenings==sites.count && knownClosings==sites.count {
                 row["difference"]=combinedFinal-combinedClosing
+            }
             }
             // A computed stock balance can be shown in the explicitly
             // provisional indicator only if all visits are selected, the
