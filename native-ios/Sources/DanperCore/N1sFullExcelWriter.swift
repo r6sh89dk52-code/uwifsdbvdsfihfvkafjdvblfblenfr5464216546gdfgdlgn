@@ -110,8 +110,7 @@ internal enum N1sFullExcelWriter {
                             options:.regularExpression) != nil else {
                 throw N1sExcelError.invalidManifest
             }
-            return String(day.suffix(2))+"/"+String(day.dropFirst(5).prefix(2))
-                +"/"+String(day.prefix(4))
+            return "\(day.suffix(2))/\(day.dropFirst(5).prefix(2))/\(day.prefix(4))"
         }
         return try readable(start)+" AL "+readable(end)
     }
