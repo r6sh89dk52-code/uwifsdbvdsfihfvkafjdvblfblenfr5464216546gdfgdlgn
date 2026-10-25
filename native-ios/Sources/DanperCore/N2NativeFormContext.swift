@@ -123,6 +123,11 @@ public enum N2NativeFormContextReader {
         // corrections, sort the 9k+ roster and project every historical visit.
         // Keep exactly the same official/verified visibility rule as
         // N2NativeSnapshotReader without building that unrelated history.
+        // The previous full-index reader rejected malformed roster entries
+        // before filtering. Keep that invariant without constructing it.
+        guard w.allSatisfy({
+            ($0["dni"] as? String) != nil && ($0["name"] as? String) != nil
+        }) else {throw N2FormError.invalidWorker}
         let hasOfficialWorkers=w.contains {
             ($0["rosterStatus"] as? String)=="official"
         }
