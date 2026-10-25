@@ -1275,9 +1275,11 @@ struct N2NativeClinicalFormView:View {
     }
     @MainActor private func load() async {
         do {
-            let source=try await vault.clinicalFormContext()
-            context=source
-            drafts=try await vault.readDrafts()
+            let prepared=try await vault.prepareClinicalForm()
+            // Consistent one-revision view; avoids reopening/decrypting
+            // and validating the whole clinical database for drafts.
+            context=prepared.context
+            drafts=prepared.drafts
             if let requestedDraftID {
                 guard let recovered=drafts.first(where:{$0.id==requestedDraftID}) else {
                     fault=true
