@@ -1,5 +1,13 @@
 import Foundation
 
+/// Single-professional identity inherited from DANPER Build 222.
+/// This is the app's own preconfigured operator, not the patient's DNI.
+/// Never use this identity to rewrite immutable imported attentions.
+public enum N2ClinicianIdentity {
+    public static let name="Felipe Azcárate Silva"
+    public static let dni="74958455"
+}
+
 /// Stored birthday is the source of truth; exported age is computed on the clinical date.
 public enum N2WorkerAge {
     public static func years(birthDate:String,on clinicalDate:String)->Int? {
@@ -209,8 +217,15 @@ public struct N2NativeFormDraft:Equatable,Sendable {
     public var photoReviewed:Bool=false
     public var blueBandage:Bool=false
     public var returned:Bool=false
-    public var responsible:String="Felipe Azcárate Silva"
-    public var responsibleDni:String=""
+    public var responsible:String=N2ClinicianIdentity.name
+    public var responsibleDni:String=N2ClinicianIdentity.dni
+    /// Older draft snapshots may omit responsibleDni. Repair the new save
+    /// only when the recorded responsible is the configured sole operator.
+    private var effectiveResponsibleDni:String {
+        let saved=responsibleDni.trimmingCharacters(in:.whitespacesAndNewlines)
+        return saved.isEmpty && responsible==N2ClinicianIdentity.name
+            ? N2ClinicianIdentity.dni : saved
+    }
     public init(id:String=UUID().uuidString) {self.id=id}
 
     public func makeSavedVisit(context:N2FormContext)throws->Data {
@@ -302,7 +317,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             "permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
             "photoSent":hasWound && photoSent,
-            "responsible":responsible,"responsibleDni":responsibleDni,
+            "responsible":responsible,"responsibleDni":effectiveResponsibleDni,
             "standaloneProcedures":procedures
         ]
         return try JSONSerialization.data(withJSONObject:source)
@@ -348,7 +363,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             "permission":permission,"permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
             "photoSent":photoSent,"photoReviewed":photoReviewed,"responsible":responsible,
-            "responsibleDni":responsibleDni,
+            "responsibleDni":effectiveResponsibleDni,
             "standaloneProcedures":procedures,
             "workStatus":permission=="SI" ? "PERMISO":"LABORANDO"
         ])
