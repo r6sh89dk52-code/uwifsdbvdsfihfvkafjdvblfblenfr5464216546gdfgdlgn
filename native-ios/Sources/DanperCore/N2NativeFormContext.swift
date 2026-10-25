@@ -117,11 +117,23 @@ public enum N2NativeFormContextReader {
               let stock=root["stockLots"] as? [[String:Any]] else {
             throw N2FormError.absentSnapshot
         }
-        let roster=try N2NativeSnapshotReader.read(snapshot)
-        let allowed=Set(roster.searchableRoster.map(\.dni))
+        // The decrypted snapshot has already passed BOTH clinical audits
+        // above. Building the full read-model here just to discover searchable
+        // workers used to re-audit/parse the whole database, apply all
+        // corrections, sort the 9k+ roster and project every historical visit.
+        // Keep exactly the same official/verified visibility rule as
+        // N2NativeSnapshotReader without building that unrelated history.
+        let hasOfficialWorkers=w.contains {
+            ($0["rosterStatus"] as? String)=="official"
+        }
         let people=w.compactMap { row->N2FormWorker? in
             guard let dni=row["dni"] as? String,
-                  let name=row["name"] as? String,allowed.contains(dni) else {
+                  let name=row["name"] as? String else {
+                return nil
+            }
+            let status=row["rosterStatus"] as? String ?? ""
+            guard !hasOfficialWorkers ||
+                  status=="official" || status=="verified" else {
                 return nil
             }
             var worker=N2FormWorker(dni:dni,name:name,
