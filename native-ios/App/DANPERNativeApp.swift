@@ -35,10 +35,24 @@ struct DANPERNativeApp: App {
         #endif
     }
 
+    // Sólo DEBUG y sólo bundle N4 LAB. No autentica ni carga la bóveda N2.
+    private var dmLabProbe:Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("--danper-dm-lab")
+        #else
+        return false
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ZStack {
-                if interactionProbe {
+                if dmLabProbe {
+                    #if DEBUG
+                    NavigationStack { DMModuleView() }
+                        .environment(\.n2WorkspaceVault,.demo)
+                    #endif
+                } else if interactionProbe {
                     #if DEBUG
                     N2InteractionProbe()
                     #endif
@@ -88,7 +102,7 @@ struct DANPERNativeApp: App {
     }
 
     private func attemptAutomaticUnlock() {
-        guard !interactionProbe,!shellProbe,onboardingFinished, scenePhase == .active,
+        guard !dmLabProbe,!interactionProbe,!shellProbe,onboardingFinished, scenePhase == .active,
               access.reserveAutomatic() else { return }
         // One automatic attempt per foreground entry avoids Face ID cancellation loops.
         let cycle=authCycle
