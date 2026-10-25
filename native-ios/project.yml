@@ -37,7 +37,9 @@ targets:
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
         INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_CFBundleDisplayName: "DANPER DM LAB"
-        INFOPLIST_KEY_NSCameraUsageDescription: "Permite fotografiar certificados para reconocimiento local sin guardarlos en Fotos."\n        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Permite elegir imágenes de certificados sin copiar la foto a la app."\n        INFOPLIST_KEY_NSFaceIDUsageDescription: "DANPER Salud Móvil utiliza Face ID para restringir el acceso a la aplicación."
+        INFOPLIST_KEY_NSCameraUsageDescription: "Permite fotografiar certificados para reconocimiento local sin guardarlos en Fotos."
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Permite elegir imágenes de certificados sin copiar la foto a la app."
+        INFOPLIST_KEY_NSFaceIDUsageDescription: "DANPER Salud Móvil utiliza Face ID para restringir el acceso a la aplicación."
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
         # Use Xcode-managed development profiles for a physical iPhone.
