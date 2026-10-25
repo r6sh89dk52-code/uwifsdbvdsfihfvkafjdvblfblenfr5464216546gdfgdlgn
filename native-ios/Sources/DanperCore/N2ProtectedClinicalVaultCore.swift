@@ -101,6 +101,15 @@ public final class N2ProtectedClinicalVaultCore {
         guard let record=try journal.recover() else{return nil}
         return try summary(record)
     }
+    /// The editing screen needs a revision token for autosave, not a sorted
+    /// 9k-worker roster, full stock projection or form context.
+    /// A journal recovery still authenticates and audits the snapshot.
+    public func currentRevision()throws->Int {
+        guard let record=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return record.revision
+    }
     /// One authenticated, fully validated encrypted journal recovery for
     /// the whole new-attention screen. Previously the UI recovered, decrypted
     /// and audited the exact same generation again just to list drafts.
