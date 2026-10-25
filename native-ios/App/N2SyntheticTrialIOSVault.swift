@@ -169,6 +169,9 @@ actor N2SyntheticTrialIOSVault {
         return try N2ProtectedClinicalVaultCore(keyData:secret,namespace:.synthetic)
             .activateSyntheticFixture(fixture,confirmed:true)
     }
+    func currentRevision()throws->Int {
+        try protectedStore().currentRevision()
+    }
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
     }
