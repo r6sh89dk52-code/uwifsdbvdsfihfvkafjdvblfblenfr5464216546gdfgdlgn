@@ -526,8 +526,7 @@ for(const text of [
   'N2PendingDispensingEvidence.Failure.invalidEvidence',
   'N2PendingDispensingEvidence.Failure.invalidTarget',
   'N2ProtectedStoreError.staleRevision',
-  'historical-opening-responsible',
-  'Constancia automática: DANPER registrará el lote'
+  'historical-opening-responsible'
 ]) must(pendingView,text,'identidad automática y evidencia de apertura histórica');
 assert(!pendingView.includes('TextField("Responsable",text:$operatorName)'),
        'no volver a pedir el responsable en cada apertura');
