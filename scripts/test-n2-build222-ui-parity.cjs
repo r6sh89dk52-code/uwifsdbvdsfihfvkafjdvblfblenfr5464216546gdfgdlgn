@@ -61,7 +61,10 @@ for(const marker of [
   'PERÍODO: ',
   'KARDEX AMBULATORIO · PROVISIONAL',
   'KARDEX AMBULATORIO · OFICIAL',
-  'cachedNumber:sheet==4 && label=="F"'
+  'cachedNumber:sheet==4',
+  'verifiedIncome:sheet==4 ? reconciledValues[row]?["E"]',
+  'reconciledValues[row]=[',
+  'opening+income-consumed==closing,closing==count'
 ]) assert(indicatorWriter.includes(marker),'Excel RESU conservado: '+marker);
 assert(indicator.includes('endDate=min(cycleEnd,now)'),
   'el corte abierto debe exportarse a la fecha');
@@ -72,7 +75,9 @@ for(const marker of [
   'R PENDIENTE. Cantidad clínica declarada=',
   'R PENDIENTE; declaración histórica sin correspondencia',
   'else if linesByItem[key] != nil',
-  'if container {'
+  'if container {',
+  'estimate.received==Double(income)',
+  'row["verifiedIncome"]=income'
 ]) assert(exportedIndicatorCore.includes(marker),
   'Provisional conserva la atención y no inventa R: '+marker);
 assert(!exportedIndicatorCore.includes('guard !container else{throw Failure.unverifiedDelivery}'),
