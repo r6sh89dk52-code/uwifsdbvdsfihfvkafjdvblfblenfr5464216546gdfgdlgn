@@ -104,6 +104,15 @@ for(const key of ['visit["status"] as? String=="saved"',
   must(autoAccounting,key,'contabilización automática y única de atenciones terminadas');
 must(vaultSource,'func automaticCutAccounting(through date:String)',
      'consulta del inventario cifrado desde la fuente única');
+// An unlinked opening cannot silently turn into a fabricated stock debit.
+for(const fragment of [
+  'blockedUnverifiedOpening=true',
+  'Apertura pendiente: el stock inicial no se guardó',
+  'El stock inicial del día 9 necesita esa apertura conciliada',
+  'No contabilices una caja abierta como cerrada',
+  'No se generó un descuento retroactivo automático'
+]) must(inventory,fragment,'instrucciones de stock inicial y apertura sin lote');
+
 const vaultCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'),'utf8');
 const workspaceVault=fs.readFileSync(path.join(root,'native-ios/App/N2WorkspaceVault.swift'),'utf8');
 must(vaultCore,'public func automaticCutAccounting(mappings:Data,through date:String)',
