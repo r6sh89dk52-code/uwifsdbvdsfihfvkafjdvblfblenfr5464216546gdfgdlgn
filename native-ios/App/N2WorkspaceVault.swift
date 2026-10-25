@@ -97,6 +97,15 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.confirmOperationalMapping(rule,expectedRevision:expectedRevision)
     }
+    /// Form and drafts are always from one authenticated snapshot and
+    /// one immutable revision. Demo/clinical separation is unchanged.
+    func prepareClinicalForm() async throws
+        ->(context:N2FormContext,drafts:[N2RecoverableDraft]) {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.prepareClinicalForm()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.prepareClinicalForm()
+    }
     func clinicalFormContext() async throws -> N2FormContext {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
