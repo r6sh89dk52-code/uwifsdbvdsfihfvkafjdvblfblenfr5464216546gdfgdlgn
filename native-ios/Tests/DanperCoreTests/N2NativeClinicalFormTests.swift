@@ -84,6 +84,44 @@ final class N2NativeClinicalFormTests:XCTestCase {
         XCTAssertTrue(context.historicalOptions(for:"16000182",
                       at:"2026-10-23").isEmpty)
     }
+    func testOsteomuscularChoicesIncludeOriginalWorkbookAndSpecificAnatomy()throws {
+        XCTAssertEqual(N2OsteomuscularSegments.historical.count,10)
+        for original in [
+            "ZONA CERVICAL,DORSAL,LUMBAR Y SACRA",
+            "PARTE POSTERIOR DEL TORAX (ESPALDA)",
+            "PRIMER, SEGUNDO, TERCERO, CUARTO Y QUINTO ORTEJO DERECHO E IZQUIERDO",
+            "RODILLA","TOBILLO","MANO","CUELLO"
+        ] {
+            XCTAssertTrue(N2OsteomuscularSegments.options.contains(original))
+        }
+        for specific in ["ZONA CERVICAL","ZONA DORSAL","ZONA LUMBAR",
+                         "ZONA SACRA","PIE","PIERNA","RODILLA"] {
+            XCTAssertTrue(N2OsteomuscularSegments.isKnown(specific))
+        }
+        XCTAssertEqual(Set(N2OsteomuscularSegments.options).count,
+                       N2OsteomuscularSegments.options.count)
+        XCTAssertFalse(N2OsteomuscularSegments.isKnown("ZONA ADICIONAL DOCUMENTADA"))
+    }
+
+    func testOsteomuscularSelectionAndLegacyTextSurviveEncryptedDraftFlow()throws {
+        let (baseline,ctx)=try form()
+        let original=try source("n1e-clinical-stock.json")
+        for segment in ["ZONA LUMBAR","PIE","ZONA ANATOMICA HISTORICA LIBRE"] {
+            var draft=baseline
+            draft.segment=segment
+            draft.system="OSTEOMUSCULAR"
+            let updated=try N2SnapshotEditor.upsertDraft(
+                snapshot:original,id:draft.id,
+                changes:draft.makeDraftPatch(context:ctx,stage:1),at:at())
+            let restored=try XCTUnwrap(N2NativeDraftRecovery.read(updated).first{
+                $0.id==draft.id
+            })
+            XCTAssertEqual(restored.form.system,"OSTEOMUSCULAR")
+            XCTAssertEqual(restored.form.segment,segment)
+            XCTAssertEqual(restored.stage,1)
+        }
+    }
+
     func testDraftRecoveryRetainsMultipleProceduresAndPhysicalChoices()throws {
         var (draft,ctx)=try form()
         draft.procedures=["OBSERVACION","CURACION DE HERIDA","CONTROL"]
