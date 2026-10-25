@@ -104,6 +104,9 @@ actor N2ProtectedClinicalIOSVault {
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
     }
+    func readDraftsWithRevision()throws->(revision:Int,drafts:[N2RecoverableDraft]) {
+        try protectedStore().readDraftsWithRevision()
+    }
     func dispensingLines(visitID:String)throws->[N2DispensingLine] {
         try protectedStore().dispensingLines(visitID:visitID)
     }
