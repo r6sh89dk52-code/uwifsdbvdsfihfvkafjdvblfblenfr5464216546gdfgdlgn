@@ -292,9 +292,15 @@ struct N2NativeWorkerEditorView:View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    DanperField(title:"Ubigeo (opcional)") {
-                        TextField("Ubigeo",text:$ubigeo)
-                            .keyboardType(.numberPad)
+                    // "Ubigeo" in the official DANPER ambulatory workbook is
+                    // the name of the locality (e.g. CHEPÉN), not a numeric
+                    // 6-digit administrative UBIGEO code.
+                    DanperField(title:"Ubigeo / localidad (opcional)") {
+                        TextField("Ej.: CHEPÉN, TRUJILLO, PACASMAYO",text:$ubigeo)
+                            .keyboardType(.default)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .accessibilityIdentifier("worker-ubigeo-locality")
                     }
                 }
             }.padding(16)
