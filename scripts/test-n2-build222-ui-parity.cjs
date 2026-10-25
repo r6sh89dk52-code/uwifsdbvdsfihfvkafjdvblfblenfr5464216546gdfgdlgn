@@ -460,19 +460,42 @@ must(pendingView,'context.historicalOptions(for:medication.code,at:date)',
   'declaración anterior incluso con saldo actual 0');
 must(pendingView,'Guardar declaración histórica (R=1/0)',
   'distinguir conciliación contable antigua de FEFO actual');
-// Incomplete operator/evidence fields must be stopped before the vault write
-// and a diagnostic must be visible rather than a generic error banner.
+// The single-professional identity is already configured in Build 222.
+// Historical reconciliation must not request the same responsible again.
+// Keep evidence/reason and the encrypted audit, but no editable operator field.
+const legacyName=source.match(/const RESPONSIBLE='([^']+)'/);
+const legacyDNI=source.match(/const RESPONSIBLE_DNI='(\\d{8})'/);
+assert(legacyName && legacyDNI,'Build 222 debe definir profesional y DNI');
+must(formContext,`public static let name="${legacyName[1]}"`,
+     'nombre nativo equivalente al responsable Build 222');
+must(formContext,`public static let dni="${legacyDNI[1]}"`,
+     'DNI nativo equivalente al responsable Build 222');
 for(const text of [
-  'guard responsible.count>=3 else',
+  'public var responsible:String=N2ClinicianIdentity.name',
+  'public var responsibleDni:String=N2ClinicianIdentity.dni',
+  'effectiveResponsibleDni'
+]) must(formContext,text,'identidad en visitas y borradores, incluso recuperados');
+for(const text of [
+  'LabeledContent("Responsable",value:N2ClinicianIdentity.name)',
+  'LabeledContent("DNI del responsable",value:N2ClinicianIdentity.dni)',
+  'operatorDni:N2ClinicianIdentity.dni',
   'guard evidenceReason.count>=10 else',
-  'Falta el responsable: escribe al menos 3 caracteres.',
   'Falta evidencia y motivo: describe la apertura o reutilización',
   'N2PendingDispensingEvidence.Failure.invalidEvidence',
   'N2PendingDispensingEvidence.Failure.invalidTarget',
   'N2ProtectedStoreError.staleRevision',
   'historical-opening-responsible',
   'historical-opening-evidence'
-]) must(pendingView,text,'validación de declaración histórica con mensaje accionable');
+]) must(pendingView,text,'identidad automática y evidencia de apertura histórica');
+assert(!pendingView.includes('TextField("Responsable",text:$operatorName)'),
+       'no volver a pedir el responsable en cada apertura');
+const identityEvidence=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2PendingDispensingEvidence.swift'),'utf8');
+must(identityEvidence,'public let operatorDni:String?',
+     'DNI de auditoría opcional para compatibilidad con declaraciones antiguas');
+const indicatorCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
+must(indicatorCore,'string(visit["responsibleDni"]),string(visit["responsible"])',
+     'DNI en AB y nombre en AC del Excel oficial');
+
 
 must(history,'context.historicalOptions(for:line.code,at:detail.date)',
   'historial permite seleccionar apertura histórica de un lote agotado');
