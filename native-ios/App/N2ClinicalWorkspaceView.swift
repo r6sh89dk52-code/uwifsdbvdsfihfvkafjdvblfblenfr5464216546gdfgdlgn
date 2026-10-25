@@ -356,6 +356,10 @@ struct N2ClinicalWorkspaceRootView:View {
                                 N2NativeBackupExportView()
                             }
                         }
+                        DanperPanel("Gestión ocupacional") {
+                            DanperToolLink(title:"Descansos médicos · CITT y reincorporaciones",
+                                           symbol:"doc.text.viewfinder") { DMModuleView() }
+                        }
                         #if DEBUG
                         Label("Acceso protegido. Validar restauración, Kardex y Excel en el dispositivo antes de usar registros de pacientes reales.",
                               systemImage:"lock.shield")
