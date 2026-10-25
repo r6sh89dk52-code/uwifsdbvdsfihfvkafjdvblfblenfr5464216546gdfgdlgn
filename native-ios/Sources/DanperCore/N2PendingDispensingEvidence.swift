@@ -22,6 +22,26 @@ public struct N2PendingDispensingEvidence:Codable,Sendable,Equatable {
         self.reason=reason;self.at=at;version=1
         self.newContainers=newContainers ?? (confirmNewContainer ? 1:0)
     }
+    /// A factual, machine-generated audit description. It records the
+    /// operator's explicit declaration, not independent proof of past stock.
+    /// The user never needs to type an arbitrary motive for a routine use.
+    public static func automaticAuditDescription(
+        clinicalDate:String,lotReference:String,historical:Bool,
+        container:Bool,newContainers:Int,physicalQuantity:Double
+    )->String {
+        let operation:String
+        if container {
+            operation=newContainers>0
+                ? "apertura declarada de \(newContainers) envase(s), Kardex R=\(newContainers)"
+                : "reutilización declarada de envase abierto, Kardex R=0"
+        } else {
+            operation="consumo físico declarado de \(physicalQuantity.formatted()) unidad(es)"
+        }
+        let scope=historical
+            ? "Conciliación histórica: sin movimiento físico retroactivo ni modificación del conteo actual."
+            : "Conciliación del consumo; sujeto a verificación de stock FEFO."
+        return "Declaración explícita del profesional en DANPER: \(operation). Atención \(clinicalDate); lote \(lotReference). \(scope)"
+    }
     public enum Failure:Error {case invalidEvidence,invalidTarget}
     public static func read(snapshot:Data)throws->[Self] {
         guard let root=try JSONSerialization.jsonObject(with:snapshot) as? [String:Any] else{throw Failure.invalidTarget}
