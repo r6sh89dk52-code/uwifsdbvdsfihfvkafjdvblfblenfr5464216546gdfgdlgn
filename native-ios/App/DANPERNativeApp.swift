@@ -163,7 +163,11 @@ struct DanperAccessView:View {
                         }.buttonStyle(DanperPrimaryButton())
                     }
                     Text("Acceso protegido con Face ID o código del iPhone").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Label("Modo de prueba · datos ficticios",systemImage:"lock.shield").font(.caption2).foregroundStyle(.secondary)
+                    #if DEBUG
+                    // Only the simulator/developer build exposes the demo notice.
+                    Label("Modo de prueba · datos ficticios",systemImage:"lock.shield")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    #endif
                 }.padding(24).frame(maxWidth:.infinity)
                     .background(DanperStyle.surface,in:UnevenRoundedRectangle(topLeadingRadius:32,topTrailingRadius:32))
             }.padding(20).frame(maxWidth:540)
