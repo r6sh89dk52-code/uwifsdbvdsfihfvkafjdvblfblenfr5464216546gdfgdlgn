@@ -464,7 +464,7 @@ must(pendingView,'Guardar declaración histórica (R=1/0)',
 // Historical reconciliation must not request the same responsible again.
 // Keep evidence/reason and the encrypted audit, but no editable operator field.
 const legacyName=source.match(/const RESPONSIBLE='([^']+)'/);
-const legacyDNI=source.match(/const RESPONSIBLE_DNI='(\\d{8})'/);
+const legacyDNI=source.match(/const RESPONSIBLE_DNI='(\d{8})'/);
 assert(legacyName && legacyDNI,'Build 222 debe definir profesional y DNI');
 must(formContext,`public static let name="${legacyName[1]}"`,
      'nombre nativo equivalente al responsable Build 222');
