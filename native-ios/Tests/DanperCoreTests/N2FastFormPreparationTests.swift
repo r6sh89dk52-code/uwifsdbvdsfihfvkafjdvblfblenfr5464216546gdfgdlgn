@@ -137,6 +137,7 @@ final class N2FastFormPreparationTests:XCTestCase {
             secret:Data(repeating:0x79,count:32))
         XCTAssertEqual(try journal.commit(seed,expectedRevision:0),1)
         let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        XCTAssertEqual(try store.currentRevision(),1)
 
         let strict=try N2NativeDraftRecovery.read(seed)
         let authenticated=try N2NativeDraftRecovery.readVerified(seed)
@@ -150,6 +151,7 @@ final class N2FastFormPreparationTests:XCTestCase {
         let deleted=try store.removeDraft(
             id:"DRAFT-FAST-LIST",expectedRevision:fast.revision)
         XCTAssertEqual(deleted.revision,2)
+        XCTAssertEqual(try store.currentRevision(),2)
         let latest=try store.readDraftsWithRevision()
         XCTAssertEqual(latest.revision,2)
         XCTAssertFalse(latest.drafts.contains{$0.id=="DRAFT-FAST-LIST"})
