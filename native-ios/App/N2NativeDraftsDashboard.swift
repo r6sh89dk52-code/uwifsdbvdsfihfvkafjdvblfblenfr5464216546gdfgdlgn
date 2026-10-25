@@ -54,8 +54,7 @@ struct N2NativeDraftsDashboard:View {
                         }
                         .buttonStyle(DanperSecondaryButton())
                         .disabled(deletingID != nil)
-                        .accessibilityLabel("Eliminar borrador de "+
-                            (draft.workerName.isEmpty ? "trabajador sin seleccionar" : draft.workerName))
+                        .accessibilityLabel("Eliminar borrador de " + (draft.workerName.isEmpty ? "trabajador sin seleccionar" : draft.workerName))
                         .accessibilityIdentifier("draft-dashboard-delete-"+draft.id)
                     }
                 }
