@@ -22,7 +22,8 @@ struct N2VerifiedNursingExportView:View {
     @State private var reportMode="daily"
     @State private var rangeStart=Date()
     @State private var rangeEnd=Date()
-    @State private var site=""
+    // One shared physical inventory for Fundo and Planta; site must never gate the report.
+    @State private var site="AMBAS"
     @State private var responsible=N2ClinicianIdentity.name
     @State private var shift="CONSOLIDADO"
     @State private var busy=false
@@ -117,7 +118,7 @@ struct N2VerifiedNursingExportView:View {
                 Label("98 productos del catálogo oficial de Enfermería",
                       systemImage:"checkmark.shield")
                     .font(.subheadline.weight(.semibold))
-                Text("El Kardex mostrará 0 cuando no existe lote. Si el corte requiere reconstrucción sin conteo o aperturas declaradas, el Excel oficial se detiene para evitar un saldo inventado.")
+                Text("El Kardex reúne ambas sedes en un solo inventario. Los productos sin lote conservan su fila y muestran saldo 0; un movimiento histórico sin conciliación puede impedir certificar un corte.")
                     .font(.caption).foregroundStyle(.secondary)
                 NavigationLink {
                     N2NativeInventoryView()
@@ -144,7 +145,7 @@ struct N2VerifiedNursingExportView:View {
                           systemImage:"square.and.arrow.up")
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy || site.isEmpty ||
+                .disabled(busy ||
                     selectedPeriod.start>selectedPeriod.end ||
                     responsible.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
                 Text(status).font(.footnote)
@@ -203,8 +204,34 @@ struct N2VerifiedNursingExportView:View {
         }catch {
             cleanup()
             failed=true
-            status="Bloqueado: falta fuente, fecha válida o existe inventario sin conciliar. El stock no cambió."
+            status=exportFailureMessage(error)
+            #if DEBUG
+            print("DANPER Kardex Enfermería: "+String(reflecting:error))
+            #endif
         }
+    }
+    private func exportFailureMessage(_ error:Error)->String {
+        if let failure=error as? N2VerifiedNursingWorkbook.Failure {
+            switch failure {
+            case .noPhysicalHistory:
+                return "No hay un historial físico validado para el período. Revisa las existencias; las atenciones guardadas siguen intactas."
+            case .incompleteOrUnreconciled:
+                return "El Kardex no supera la conciliación del período, o la plantilla de 98 productos no pudo verificarse. Comprueba si hay consumos históricos sin apertura declarada. No se modificó el stock."
+            }
+        }
+        if let failure=error as? N2NursingReportError {
+            switch failure {
+            case .invalidDay, .unsupportedRange:
+                return "El período seleccionado no es válido para esta modalidad. Revisa las fechas."
+            case .invalidPhysicalCount:
+                return "Hay un recuento físico inconsistente con los movimientos. Revisa el inventario único antes de emitir el Kardex."
+            case .incompleteHistory:
+                return "El historial contiene consumos o aperturas todavía sin conciliar. No se inventaron saldos."
+            case .invalidSource, .invalidCatalog:
+                return "La fuente cifrada o el catálogo oficial de 98 productos no pudo verificarse."
+            }
+        }
+        return "No se pudo generar el archivo (\(String(reflecting:error))). No se modificaron atenciones ni existencias."
     }
     @MainActor
     private func cleanup() {
