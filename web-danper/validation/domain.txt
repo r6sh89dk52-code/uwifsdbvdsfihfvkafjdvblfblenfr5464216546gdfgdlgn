@@ -1,0 +1,32 @@
+
+> danper-salud-web@0.1.0 test
+> tsx --test tests/*.test.ts
+
+✔ Base de campaña: selección explícita sin fabricar resultado ni periodicidad (20.4092ms)
+✔ Respaldo portátil cifrado: round-trip local, contraseña errónea y manipulación rechazadas (168.2661ms)
+✔ Vigilancia osteomuscular: encabezados y estilos Swift originales, DNI texto y códigos sin inferencia (9.9015ms)
+✔ Exportación de datos explicita no interpreta texto como fórmula y conserva DNI (6.9276ms)
+✔ Catálogos completos y opciones extraídas del Swift vigente (0.2561ms)
+✔ Validador nativo: sistemas condicionales, segmento y alergias (0.9696ms)
+✔ Fixture N3DeclaredContainerTests: R=1,0,0,1,0; dos envases declarados abiertos (4.4737ms)
+✔ Apertura múltiple declarada, sin inferir cierre por volumen cero (0.2151ms)
+✔ R=0 atestado actual sin apertura registrada no inventa un movimiento físico (0.4754ms)
+✔ Cierre de envase explícito auditado conserva R=0 (0.2539ms)
+✔ FEFO multilote y stock insuficiente conservan la atención (1.336ms)
+✔ Reintento persistente no duplica la salida (0.4683ms)
+✔ Lote posterior a atención histórica no altera stock actual; corte Lima 9–8 (0.7521ms)
+✔ Ingreso y ajuste auditados no modifican el objeto de entrada (0.1825ms)
+✔ IndexedDB: atomicidad, revisiones simultáneas, recarga y cola (8.2002ms)
+✔ 10 000 trabajadores, deduplicación y corrección canónica preservada (16.7951ms)
+✔ Colinesterasa: rechaza EMO general, vincula por DNI y preserva discrepancia (1.4049ms)
+✔ Indicador: 10 hojas, 19 tablas, 432 materiales, estilos y fórmulas originales (890.4645ms)
+✔ Kardex oficial: 98 productos, R y saldo en plantilla preservada (107.4792ms)
+✔ Exportación EMO/colinesterasa solo cambia las celdas autorizadas (23.2689ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1794.798

@@ -1,0 +1,8 @@
+{
+  "browser": "Chromium",
+  "productionBuild": true,
+  "offlineReload": true,
+  "lazyModuleOffline": true,
+  "themePersistedOffline": true,
+  "errors": []
+}

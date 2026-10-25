@@ -1,0 +1,28 @@
+
+> danper-salud-web@0.1.0 build
+> npm run generate && tsc --noEmit && vite build && node scripts/build-sw.mjs
+
+
+> danper-salud-web@0.1.0 generate
+> node scripts/sync-legacy.mjs && node scripts/generate-contract.mjs && node scripts/generate-vigilance.mjs
+
+20 módulos/recursos oficiales sincronizados sin duplicar listas maestras.
+Contrato generado: 432 productos; 86 asociaciones originales + 6 adicionales; 12 procedimientos.
+Vigilancia: 17 columnas, estilos Swift y 155 códigos organizativos originales.
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 73 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                         0.60 kB │ gzip:   0.34 kB
+dist/assets/main-Cz945qis.css          11.26 kB │ gzip:   3.15 kB
+dist/assets/dataExport-CI8ktNOc.js      1.62 kB │ gzip:   0.94 kB
+dist/assets/index-CmqspBuf.js           1.92 kB │ gzip:   1.06 kB
+dist/assets/vigilance-BhVdHNcj.js       9.26 kB │ gzip:   4.22 kB
+dist/assets/tools-C36VnH5D.js          12.06 kB │ gzip:   4.49 kB
+dist/assets/occupational-G2VcQdjj.js   13.73 kB │ gzip:   4.68 kB
+dist/assets/workbooks-om7H99vj.js      42.79 kB │ gzip:  13.18 kB
+dist/assets/index.esm-DuO0hhd-.js     263.88 kB │ gzip:  82.92 kB
+dist/assets/main-Ce2AspyT.js          427.85 kB │ gzip: 177.32 kB
+✓ built in 1.33s
+Service worker: caché exclusiva de 15 recursos estáticos; sin respuestas clínicas.

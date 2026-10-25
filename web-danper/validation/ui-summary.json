@@ -1,0 +1,13 @@
+{
+  "browser": "Chromium",
+  "projects": [
+    "desktop 1440x1000",
+    "mobile iPhone 13 emulation"
+  ],
+  "passed": 7,
+  "failed": 0,
+  "skipped": 1,
+  "flaky": 0,
+  "durationMs": 34344.838,
+  "reasonSkipped": "La selección individual de 432 productos se ejecuta una vez en escritorio; móvil verifica catálogo completo y selección del recorrido clínico."
+}
