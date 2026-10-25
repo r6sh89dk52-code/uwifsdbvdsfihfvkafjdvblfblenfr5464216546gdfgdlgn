@@ -13,7 +13,7 @@ if [[ "$(git branch --show-current)" != "$BRANCH" ]]; then
   echo "ERROR: este ejecutor requiere la rama $BRANCH." >&2
   exit 2
 fi
-for tool in git xcodegen xcodebuild codesign security ditto unzip; do
+for tool in git node xcodegen xcodebuild codesign security ditto unzip; do
   command -v "$tool" >/dev/null 2>&1 || {
     echo "ERROR: falta $tool. Selecciona Xcode completo con xcode-select." >&2
     exit 2
@@ -59,6 +59,14 @@ echo "Bundle: $EXPECTED_BUNDLE (NO sustituye a Build 222)"
 echo "Destino: $OUT"
 echo "Certificados personales y claves permanecen en el Keychain de este Mac."
 echo "Conecta y desbloquea el iPhone, confía en el Mac y verifica tu cuenta Apple en Xcode."
+
+# Fail closed if baseline parity checks fail; don't sign a known-broken app.
+echo "=== VALIDANDO PARIDAD NATIVA ANTES DE FIRMAR ==="
+if ! node scripts/test-n2-build222-ui-parity.cjs >"$OUT/native-parity.log" 2>&1; then
+  tail -n 65 "$OUT/native-parity.log" >&2
+  echo "ERROR: paridad N2 fallida, no se crea IPA. Log: $OUT/native-parity.log" >&2
+  exit 1
+fi
 
 # Generate the Xcode project with the checked-in spec.
 xcodegen generate --spec native-ios/project.yml >"$OUT/xcodegen.log" 2>&1 || {
@@ -112,7 +120,7 @@ mkdir -p "$OUT/package/Payload"
 ditto "$APP" "$OUT/package/Payload/DANPERNative.app"
 (cd "$OUT/package" && ditto -c -k --keepParent Payload "$IPA")
 unzip -tq "$IPA" >"$OUT/ipa-zip-test.log"
-if ! unzip -Z -1 "$IPA" | grep -q '^Payload/DANPERNative.app/'; then
+if ! unzip -Z -1 "$IPA" | grep '^Payload/DANPERNative.app/' >/dev/null; then
   echo "ERROR: contenido de IPA inesperado." >&2
   exit 1
 fi
