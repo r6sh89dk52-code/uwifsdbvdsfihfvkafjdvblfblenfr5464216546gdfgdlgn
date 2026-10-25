@@ -509,7 +509,11 @@ for(const fragment of [
   'isWholePeriod && periodStart==start',
   'linkMultiplicity[kardex]==1',
   'estimate.reportedUse==Double(used)',
-  'row["difference"]=projectedClosing-Int(physicalCount)'
+  'estimate.received==Double(income)',
+  'estimate.adjusted==0',
+  'projectedClosing==Int(physicalCount)',
+  'row["difference"]=0',
+  'row["verifiedIncome"]=income'
 ]) must(indicatorBook,fragment,'proyección provisional de diez hojas sin duplicar stock');
 console.log('PASS: aperturas históricas y proyección provisional 10 hojas con controles de evidencia.');
 
