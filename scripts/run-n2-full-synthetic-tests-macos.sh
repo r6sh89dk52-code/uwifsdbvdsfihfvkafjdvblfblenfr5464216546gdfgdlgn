@@ -19,12 +19,17 @@ echo "Informe y fixtures: $OUT"
 echo "Rama: $(git branch --show-current)"
 echo "Commit: $(git rev-parse --short HEAD)"
 
-echo "=== DEPENDENCIAS JAVASCRIPT (fijadas por lockfile) ==="
-npm ci --no-audit --no-fund >"$OUT/npm.log" 2>&1 || {
-  tail -n 55 "$OUT/npm.log"
-  echo "Error de dependencias; log: $OUT/npm.log"
-  exit 1
-}
+echo "=== DEPENDENCIAS JAVASCRIPT ==="
+if ! node -e "require.resolve('typescript'); require.resolve('fflate')" >/dev/null 2>&1; then
+  echo "Faltan módulos de pruebas; instalando dependencias del lockfile..."
+  npm ci --no-audit --no-fund >"$OUT/npm.log" 2>&1 || {
+    tail -n 55 "$OUT/npm.log"
+    echo "Error de dependencias; log: $OUT/npm.log"
+    exit 1
+  }
+else
+  echo "Dependencias de TypeScript y Excel ya disponibles; no se reinstalan."
+fi
 
 echo "=== COMPROBACIONES JAVASCRIPT ==="
 node --check scripts/test-n2-build222-ui-parity.cjs
