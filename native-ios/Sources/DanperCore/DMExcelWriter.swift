@@ -59,7 +59,7 @@ public enum DMExcelWriter {
         let cell:String
         if formula {
             let expr="IF(AND(O\(number)<>\"\",P\(number)<>\"\"),P\(number)-O\(number)+1,0)"
-            cell="<c r=\"\(ref)\"\(style)><f>\(expr.replacingOccurrences(of:"<",with:"&lt;"))</f><v>\(value ?? "0")</v></c>"
+            cell="<c r=\"\(ref)\"\(style)><f>\(expr.replacingOccurrences(of:"<",with:"&lt;").replacingOccurrences(of:">",with:"&gt;"))</f><v>\(value ?? "0")</v></c>"
         } else if let value,!value.isEmpty {
             if date {
                 guard let d=DMDate.parse(value) else{throw DMError.invalidDate}
