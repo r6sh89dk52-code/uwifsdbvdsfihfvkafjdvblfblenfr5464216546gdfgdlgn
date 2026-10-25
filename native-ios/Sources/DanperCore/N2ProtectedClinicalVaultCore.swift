@@ -115,14 +115,25 @@ public final class N2ProtectedClinicalVaultCore {
             products:products,nursing:nursing,approvedMappings:mappings)
         let context=try N2NativeFormContextReader.read(
             snapshot:active.snapshot,revision:active.revision,products:catalog)
-        let drafts=try N2NativeDraftRecovery.read(active.snapshot)
+        let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot)
         return (context:context,drafts:drafts)
     }
     public func readDrafts()throws->[N2RecoverableDraft] {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
         }
-        return try N2NativeDraftRecovery.read(active.snapshot)
+        return try N2NativeDraftRecovery.readVerified(active.snapshot)
+    }
+    /// List and revision are recovered from the SAME authenticated generation.
+    /// Allows the UI to delete a draft with optimistic rendering, without
+    /// reopening/auditing the complete 9k-worker vault just for inspect().
+    public func readDraftsWithRevision()throws
+        ->(revision:Int,drafts:[N2RecoverableDraft]) {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return (revision:active.revision,
+                drafts:try N2NativeDraftRecovery.readVerified(active.snapshot))
     }
     public func dispensingLines(visitID:String)throws->[N2DispensingLine] {
         guard let active=try journal.recover(),
@@ -174,7 +185,7 @@ public final class N2ProtectedClinicalVaultCore {
               let visits=root["attentions"] as? [[String:Any]] else {
             throw N2ProtectedStoreError.absentSource
         }
-        let drafts=try N2NativeDraftRecovery.read(active.snapshot).count
+        let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot).count
         var todayCount=0,weekCount=0
         for visit in visits where visit["status"] as? String == "saved" {
             guard let date=visit["date"] as? String else {
@@ -192,7 +203,7 @@ public final class N2ProtectedClinicalVaultCore {
         }
         return (
             history:try N2NativeSnapshotReader.read(active.snapshot),
-            drafts:try N2NativeDraftRecovery.read(active.snapshot)
+            drafts:try N2NativeDraftRecovery.readVerified(active.snapshot)
         )
     }
     public func readIndex()throws->N2NativeReadModel? {
