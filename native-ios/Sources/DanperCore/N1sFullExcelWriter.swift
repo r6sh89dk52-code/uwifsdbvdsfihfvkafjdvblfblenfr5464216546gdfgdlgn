@@ -126,7 +126,8 @@ internal enum N1sFullExcelWriter {
               c.component(.day,from:x)==d else {throw N1sExcelError.invalidManifest}
         return Double(Int(x.timeIntervalSince1970/86400)+25569)
     }
-    private static func formula(_ sheet:Int,_ col:String,_ row:Int,reviewed:Bool) -> String? {
+    private static func formula(_ sheet:Int,_ col:String,_ row:Int,
+                                reviewed:Bool,verifiedIncome:Int?=nil) -> String? {
         let n=String(row)
         switch sheet {
         case 2:
@@ -141,7 +142,14 @@ internal enum N1sFullExcelWriter {
                 "IF(COUNTA(H\(n),L\(n),P\(n),T\(n))=0,0,SUM(H\(n),L\(n),P\(n),T\(n)))" : nil
         case 4:
             switch col {
-            case "E":return "IF(COUNT(INGRESOS!X\(n))=0,\"\",INGRESOS!X\(n))"
+            case "E":
+                if let income=verifiedIncome {
+                    // A fully reconciled ledger proves this income, including
+                    // genuine zero. Excel still uses the receipt-table total
+                    // if it contains a calculated value.
+                    return "IF(COUNT(INGRESOS!X\(n))=0,\(income),INGRESOS!X\(n))"
+                }
+                return "IF(COUNT(INGRESOS!X\(n))=0,\"\",INGRESOS!X\(n))"
             case "F":return "SUMIF(TB_CONSUMOS[CÓDIGO],A\(n),TB_CONSUMOS[CANTIDAD])"
             case "G":return "IF(OR(D\(n)=\"\",E\(n)=\"\"),\"\",SUM(D\(n):E\(n))-F\(n))"
             case "H":return "IF(COUNT(CONTEO!D\(n))=0,\"\",CONTEO!D\(n))"
@@ -168,7 +176,8 @@ internal enum N1sFullExcelWriter {
     }
     private static func sheetData(_ xml:String,headerRows:Int,rows:[[Any?]],
                                   width:Int,reviewed:Bool,sheet:Int,
-                                  dateStyle:Int,cachedConsumption:[Int:Double]=[:]) throws -> String {
+                                  dateStyle:Int,cachedConsumption:[Int:Double]=[:],
+                                  reconciledValues:[Int:[String:Double]]=[:]) throws -> String {
         var preserved=""
         for index in 1...headerRows {preserved += try existingRow(xml,index)}
         let prototype=try existingRow(xml,headerRows+1)
@@ -188,7 +197,8 @@ internal enum N1sFullExcelWriter {
                 if sheet==5 && (col==2 || col==3) {
                     formulaText=organization(col,row)
                 }else {
-                    formulaText=formula(sheet,label,row,reviewed:reviewed)
+                    formulaText=formula(sheet,label,row,reviewed:reviewed,
+                        verifiedIncome:sheet==4 ? reconciledValues[row]?["E"].map{Int($0)} : nil)
                 }
                 let input:Any?=i<rows.count ? rows[i][col] : nil
                 // Explicit numeric date style: do not depend on a template
@@ -198,7 +208,10 @@ internal enum N1sFullExcelWriter {
                 inserted += try xmlCell(reference,input,
                     template:isDate ? String(dateStyle) : style[label],
                     formula:formulaText,
-                    cachedNumber:sheet==4 && label=="F" ? cachedConsumption[row] : nil)
+                    cachedNumber:sheet==4
+                        ? (reconciledValues[row]?[label] ??
+                           (label=="F" ? cachedConsumption[row] : nil))
+                        : nil)
             }
             inserted+="</row>"
         }
@@ -456,13 +469,31 @@ internal enum N1sFullExcelWriter {
         // Excel R quantities so iOS previews can display the number without
         // changing that formula or fabricating a stock opening/count.
         var cachedConsumption=[Int:Double]()
+        var reconciledValues=[Int:[String:Double]]()
         for (index,product) in catalog.enumerated() {
             guard let code=string(product["code"]),
                   let material=reconciliation[code],
                   let consumed=int(material["consumed"]) else {
                 throw N1sExcelError.invalidMaterial
             }
-            cachedConsumption[index+3]=Double(consumed)
+            let row=index+3
+            cachedConsumption[row]=Double(consumed)
+            // Only a trusted physical snapshot from the joint cut may
+            // populate E/G/H/I. The receipt amount includes VERIFIED zero
+            // when there were no receipts. Unknown values stay blank.
+            if let income=int(material["verifiedIncome"]),
+               let receipts=int(material["receipts"]),receipts==income,
+               let opening=int(material["opening"]),
+               let closing=int(material["closing"]),
+               let count=int(material["count"]),
+               let difference=int(material["difference"]),difference==0,
+               opening+income>=consumed,
+               opening+income-consumed==closing,closing==count {
+                reconciledValues[row]=[
+                    "E":Double(income),"G":Double(closing),
+                    "H":Double(count),"I":0
+                ]
+            }
         }
         let formulasWritten=reviewed
         let plans:[Int:(Int,Int)]=[2:(2,8),3:(2,25),4:(2,13),5:(1,30)]
@@ -482,7 +513,8 @@ internal enum N1sFullExcelWriter {
                 let rebuilt=try sheetData(xml,headerRows:header,rows:sheetRows[no] ?? [],
                                           width:width,reviewed:formulasWritten,sheet:no,
                                           dateStyle:peruDateStyle,
-                                          cachedConsumption:no==4 ? cachedConsumption : [:])
+                                          cachedConsumption:no==4 ? cachedConsumption : [:],
+                                          reconciledValues:no==4 ? reconciledValues : [:])
                 let completed:String
                 if no==3 {
                     completed=try expirySemaphore(rebuilt)
