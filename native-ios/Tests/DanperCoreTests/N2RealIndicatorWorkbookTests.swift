@@ -14,6 +14,61 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             return event
         }
     }
+    func testProvisionalAllVisitsKeepsPendingContainerWithoutInventingR() throws {
+        var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        var visits=try XCTUnwrap(snapshot["attentions"] as? [[String:Any]])
+        let boxVisit=try XCTUnwrap(visits.first {
+            $0["id"] as? String=="planta-open"
+        })
+        let boxItem=try XCTUnwrap((boxVisit["items"] as? [[String:Any]])?.first)
+        let idx=try XCTUnwrap(visits.firstIndex {
+            $0["id"] as? String=="pending-stock"
+        })
+        var pendingItem=try XCTUnwrap((visits[idx]["items"] as? [[String:Any]])?.first)
+        for key in ["code","name","unit"] {pendingItem[key]=boxItem[key]}
+        pendingItem["quantity"]=1
+        pendingItem.removeValue(forKey:"physicalUse")
+        visits[idx]["items"]=[pendingItem]
+        snapshot["attentions"]=visits
+        let proof=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
+        let catalog=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
+        let selected=Set(visits.compactMap{$0["id"] as? String})
+        let source=try JSONSerialization.data(withJSONObject:snapshot)
+        let mappings=try fixture("n2-reviewed-approved.json")
+        let template=try fixture("n1s-indicator-template-store.zip")
+        let provisional=try N2VerifiedIndicatorWorkbook.export(
+            snapshot:source,products:catalog,mappings:mappings,
+            template:template,start:"2026-10-09",end:"2026-11-08",
+            subdivision:"AMBAS",selectedVisitIDs:selected,allowPending:true)
+        XCTAssertTrue(provisional.provisional)
+        XCTAssertEqual(provisional.visits,5)
+        XCTAssertEqual(provisional.rows,5)
+        XCTAssertGreaterThanOrEqual(provisional.pendingLines,1)
+        let parts=try N1rStoredZip.unpack(provisional.xlsx)
+        XCTAssertEqual(parts.filter{$0.name.hasPrefix("xl/worksheets/sheet") &&
+            $0.name.hasSuffix(".xml")}.count,10)
+        let sheet=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,
+            encoding:.utf8))
+        // Find the synthetic worker's exported row; the R column MUST
+        // be empty (unknown), not zero (reuse) or one (new opening).
+        let rows=sheet.components(separatedBy:"</row>")
+        let pendingRow=try XCTUnwrap(rows.first{$0.contains("00000005")})
+        XCTAssertNotNil(pendingRow.range(
+            of:#"<c r="R[0-9]+"[^>]*/>"#,
+            options:.regularExpression))
+        let notes=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet6.xml"}).data,
+            encoding:.utf8))
+        XCTAssertTrue(notes.contains("R PENDIENTE"))
+        // The same unknown package still blocks the official export.
+        XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
+            snapshot:source,products:catalog,mappings:mappings,
+            template:template,start:"2026-10-09",end:"2026-11-08",
+            subdivision:"AMBAS",selectedVisitIDs:selected,allowPending:false))
+    }
     func testProvisionalHistoricalROnlyWithCompatibleLotAndNoPhysicalDoubleCount() {
         let r1=N2PendingDispensingEvidence(
             visitID:"sample-visit",itemID:"sample-item",lotID:"lot-real",
