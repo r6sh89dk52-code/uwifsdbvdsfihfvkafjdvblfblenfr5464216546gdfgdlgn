@@ -460,6 +460,20 @@ must(pendingView,'context.historicalOptions(for:medication.code,at:date)',
   'declaración anterior incluso con saldo actual 0');
 must(pendingView,'Guardar declaración histórica (R=1/0)',
   'distinguir conciliación contable antigua de FEFO actual');
+// Incomplete operator/evidence fields must be stopped before the vault write
+// and a diagnostic must be visible rather than a generic error banner.
+for(const text of [
+  'guard responsible.count>=3 else',
+  'guard evidenceReason.count>=10 else',
+  'Falta el responsable: escribe al menos 3 caracteres.',
+  'Falta evidencia y motivo: describe la apertura o reutilización',
+  'N2PendingDispensingEvidence.Failure.invalidEvidence',
+  'N2PendingDispensingEvidence.Failure.invalidTarget',
+  'N2ProtectedStoreError.staleRevision',
+  'historical-opening-responsible',
+  'historical-opening-evidence'
+]) must(pendingView,text,'validación de declaración histórica con mensaje accionable');
+
 must(history,'context.historicalOptions(for:line.code,at:detail.date)',
   'historial permite seleccionar apertura histórica de un lote agotado');
 must(pendingView,'return historicalAccountingOnly || date<formatter.string(from:Date())',
