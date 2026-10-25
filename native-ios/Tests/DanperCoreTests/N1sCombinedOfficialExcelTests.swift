@@ -49,6 +49,44 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         XCTAssertEqual(first,try fixture("n1s-indicator-template-store.zip"))
         try write("n1s-indicator-native.xlsx",result.xlsx)
     }
+    func testWriterAllowsBlankRWithNoteOnlyInProvisionalBook() throws {
+        var plan=try manifest("n1s-indicator-plan.json")
+        var lines=try XCTUnwrap((plan["plan"] as? [String:Any])?["lines"]
+            as? [[String:Any]])
+        var cells=try XCTUnwrap(lines[0]["cells"] as? [Any])
+        cells[17]=""
+        lines[0]["cells"]=cells
+        plan["plan"]=["lines":lines]
+        plan["reviewed"]=false
+        plan["provisional"]=true
+        plan["pendingNotes"]=["PRUEBA FICTICIA: R PENDIENTE, envase sin apertura acreditada."]
+        let template=try fixture("n1s-indicator-template-store.zip")
+        func export(_ content:[String:Any]) throws -> N1sExcelResult {
+            try N1sFullExcelWriter.exportIndicator(
+                base:template,manifest:JSONSerialization.data(withJSONObject:content))
+        }
+        let draft=try export(plan)
+        XCTAssertEqual(draft.sheetCount,10)
+        let parts=try N1rStoredZip.unpack(draft.xlsx)
+        let consumos=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,
+            encoding:.utf8))
+        XCTAssertNotNil(consumos.range(
+            of:#"<c r="R2"[^>]*/>"#,options:.regularExpression))
+        let notes=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet6.xml"}).data,
+            encoding:.utf8))
+        XCTAssertTrue(notes.contains("R PENDIENTE"))
+        plan["pendingNotes"]=[]
+        XCTAssertThrowsError(try export(plan)) {
+            XCTAssertEqual($0 as? N1sExcelError,.missingVerifiedQuantity)
+        }
+        plan["reviewed"]=true
+        plan["provisional"]=false
+        XCTAssertThrowsError(try export(plan)) {
+            XCTAssertEqual($0 as? N1sExcelError,.missingVerifiedQuantity)
+        }
+    }
     func testIngresosExpirationSemaforoHasThreeIconColorsAndHidesNumericStatus() throws {
         let result=try N1sFullExcelWriter.exportIndicator(
             base:fixture("n1s-indicator-template-store.zip"),
