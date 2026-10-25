@@ -503,7 +503,7 @@ must(pendingView,'Guardar declaración histórica (R=1/0)',
   'distinguir conciliación contable antigua de FEFO actual');
 // The single-professional identity is already configured in Build 222.
 // Historical reconciliation must not request the same responsible again.
-// Keep evidence/reason and the encrypted audit, but no editable operator field.
+// Keep automatic audit and clinician identity, without editable operator/motive fields.
 const legacyName=source.match(/const RESPONSIBLE='([^']+)'/);
 const legacyDNI=source.match(/const RESPONSIBLE_DNI='(\d{8})'/);
 assert(legacyName && legacyDNI,'Build 222 debe definir profesional y DNI');
@@ -527,7 +527,7 @@ for(const text of [
   'N2PendingDispensingEvidence.Failure.invalidTarget',
   'N2ProtectedStoreError.staleRevision',
   'historical-opening-responsible',
-  'historical-opening-evidence'
+  'Constancia automática: DANPER registrará el lote'
 ]) must(pendingView,text,'identidad automática y evidencia de apertura histórica');
 assert(!pendingView.includes('TextField("Responsable",text:$operatorName)'),
        'no volver a pedir el responsable en cada apertura');
