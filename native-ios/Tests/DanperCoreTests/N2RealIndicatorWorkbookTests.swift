@@ -14,6 +14,29 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             return event
         }
     }
+    func testSingleInventoryCutGuardDoesNotRequireTwoSiteReviews() {
+        let all:Set<String>=["fundo-1","planta-1"]
+        XCTAssertTrue(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-11-09",selected:all,all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-10-24",selected:all,all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-10-24",
+            today:"2026-10-24",selected:all,all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-11-09",selected:["fundo-1"],all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-11-09",selected:all,all:all,
+            hasUnresolvedHistory:true))
+    }
     private func fixture(_ name:String)throws->Data {
         let dir=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
         return try Data(contentsOf:URL(fileURLWithPath:dir).appendingPathComponent(name))
