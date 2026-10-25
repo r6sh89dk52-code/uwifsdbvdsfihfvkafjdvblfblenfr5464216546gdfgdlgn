@@ -13,6 +13,28 @@ const inventory=fs.readFileSync(path.join(root,'native-ios/App/N2NativeInventory
 const catalog=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeCatalogIndex.swift'),'utf8');
 const indicator=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedIndicatorExportView.swift'),'utf8');
 const nursing=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedNursingExportView.swift'),'utf8');
+const consolidatedIndicator=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
+const indicatorWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N1sFullExcelWriter.swift'),'utf8');
+for(const marker of [
+  'eligibleForSharedClose(',
+  'end.hasSuffix("-08")',
+  'projection.reportedUse==Double(used)',
+  'projection.received==Double(income)',
+  'expected==Int(physicalCount)',
+  'N2PendingDispensingEvidence.read(snapshot:clinical)',
+  'R histórico declarado='
+]) assert(consolidatedIndicator.includes(marker),'Protección de Indicador único: '+marker);
+for(const marker of [
+  'PERÍODO: ',
+  'KARDEX AMBULATORIO · PROVISIONAL',
+  'KARDEX AMBULATORIO · OFICIAL',
+  'cachedNumber:sheet==4 && label=="F"'
+]) assert(indicatorWriter.includes(marker),'Excel RESU conservado: '+marker);
+assert(indicator.includes('endDate=min(cycleEnd,now)'),
+  'el corte abierto debe exportarse a la fecha');
+assert(indicator.includes('Button("Todas")'),
+  'la selección completa para un corte debe ser explícita');
+
 assert(nursing.includes('@State private var site="AMBAS"'),
   'El Kardex de Enfermeras exporta el inventario conjunto sin sede invisible');
 assert(!nursing.includes('site.isEmpty ||'),
@@ -514,7 +536,7 @@ must(identityEvidence,'public let operatorDni:String?',
 must(identityEvidence,'public static func automaticAuditDescription(',
      'la constancia de apertura se genera desde hechos declarados sin motivo manual');
 
-const indicatorCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
+const consolidatedIndicator=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
 must(indicatorCore,'string(visit["responsibleDni"]),string(visit["responsible"])',
      'DNI en AB y nombre en AC del Excel oficial');
 
