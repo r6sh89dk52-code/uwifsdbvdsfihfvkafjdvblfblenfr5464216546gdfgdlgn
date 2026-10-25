@@ -35,6 +35,15 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         XCTAssertEqual(parts.filter{$0.name.hasPrefix("xl/tables/table") &&
                                  $0.name.hasSuffix(".xml")}.count,19)
         XCTAssertFalse(result.canUseClinicalData)
+        let resu=try XCTUnwrap(parts.first{$0.name=="xl/worksheets/sheet4.xml"})
+        let xml=try XCTUnwrap(String(data:resu.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("PERÍODO: "))
+        XCTAssertFalse(xml.contains("PERÍODO POR SELECCIONAR"))
+        XCTAssertTrue(xml.contains("KARDEX AMBULATORIO · OFICIAL"))
+        // The F formula remains intact while Quick Look sees its numeric R.
+        XCTAssertNotNil(xml.range(
+            of:#"<c r="F3"[^>]*><f>SUMIF\([^<]+</f><v>[0-9]+(?:\.[0-9]+)?</v></c>"#,
+            options:.regularExpression))
         XCTAssertGreaterThan(result.xlsx.count,50_000)
         XCTAssertEqual(result.xlsx,try N1sFullExcelWriter.exportIndicator(base:first,manifest:plan).xlsx)
         XCTAssertEqual(first,try fixture("n1s-indicator-template-store.zip"))
