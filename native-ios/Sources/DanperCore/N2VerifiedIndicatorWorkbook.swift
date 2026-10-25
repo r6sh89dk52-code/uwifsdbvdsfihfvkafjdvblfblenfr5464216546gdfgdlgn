@@ -618,6 +618,11 @@ public enum N2VerifiedIndicatorWorkbook {
                     row["closing"]=expected
                     row["count"]=Int(physicalCount)
                     row["difference"]=0
+                    // Zero (or more) receipts are explicitly supported by
+                    // the complete, uniquely matched, audited stock ledger.
+                    // The OOXML writer may now render this verified income
+                    // instead of leaving a known-zero cell blank.
+                    row["verifiedIncome"]=income
                     openingCount+=1
                     closingCount+=1
                 } else if used>0 {
@@ -681,6 +686,8 @@ public enum N2VerifiedIndicatorWorkbook {
                let estimate=projectedByKardex[kardex],
                estimate.unknownContainerOpenings==0,
                estimate.reportedUse==Double(used),
+               estimate.received==Double(income),
+               estimate.adjusted==0,
                let beginning=estimate.opening,
                let physicalCount=estimate.currentCount,
                beginning>=0,physicalCount>=0,
@@ -688,10 +695,17 @@ public enum N2VerifiedIndicatorWorkbook {
                physicalCount.rounded()==physicalCount,
                row["opening"]==nil,row["count"]==nil {
                 let projectedClosing=Int(beginning)+income-used
-                row["opening"]=Int(beginning)
-                row["count"]=Int(physicalCount)
-                row["closing"]=projectedClosing
-                row["difference"]=projectedClosing-Int(physicalCount)
+                // A projection must reconcile to the real count. If the
+                // arithmetic does not agree, don't present a verified zero
+                // income or a trusted closing balance in RESU.
+                if projectedClosing>=0,
+                   projectedClosing==Int(physicalCount) {
+                    row["opening"]=Int(beginning)
+                    row["count"]=Int(physicalCount)
+                    row["closing"]=projectedClosing
+                    row["difference"]=0
+                    row["verifiedIncome"]=income
+                }
             }
             summary[code]=row
         }
