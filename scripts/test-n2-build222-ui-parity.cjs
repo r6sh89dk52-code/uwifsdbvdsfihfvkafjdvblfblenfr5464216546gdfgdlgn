@@ -47,6 +47,28 @@ const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift')
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
 const exportedIndicatorCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
+const vigilanceCodes=fs.readFileSync(path.join(root,
+  'native-ios/Sources/DanperCore/N2VigilanceOrganizationCodes.swift'),'utf8');
+const vigilanceExport=fs.readFileSync(path.join(root,
+  'native-ios/Sources/DanperCore/N2OccupationalVigilanceWorkbook.swift'),'utf8');
+const vigilanceView=fs.readFileSync(path.join(root,
+  'native-ios/App/N2OccupationalVigilanceExportView.swift'),'utf8');
+for(const required of [
+  '1003|SERVICIOS DE SALUD|20000136',
+  '1001|SERVICIOS DE SALUD|20000066',
+  '1003|PRODUCCION AGRICOLA PALTO|20000126',
+  '1001|ASEGURAMIENTO DE LA CALIDAD FRESCO|20000101',
+  'return ("1003","A071")',
+  'return ("1001","I031")'
+]) must(vigilanceCodes,required,
+  'Vigilancia conserva los catálogos oficiales por sociedad y sede');
+must(vigilanceExport,'N2VigilanceOrganizationCodes.resolve(',
+  'Vigilancia completa C/D por atención');
+must(vigilanceExport,'codes.subdivision,codes.organizationalUnit',
+  'Vigilancia escribe los códigos C y D en la hoja original');
+must(vigilanceView,'data.unresolvedOrganizationalUnits>0',
+  'Vigilancia muestra unidades sin equivalencia sin inventar códigos');
+console.log('PASS: vigilancia osteomuscular asigna A071/I031 y UO acreditada según sede y área.');
 const indicatorWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N1sFullExcelWriter.swift'),'utf8');
 // New-attention and home counters reuse one VERIFIED clinical snapshot,
 // retaining exactly the original journal validation and immutable revision.
