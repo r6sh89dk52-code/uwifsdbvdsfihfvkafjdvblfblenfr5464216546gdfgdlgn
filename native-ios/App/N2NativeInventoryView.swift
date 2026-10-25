@@ -54,6 +54,7 @@ struct N2NativeInventoryView:View {
     @State private var movementID=UUID().uuidString
     @State private var movementAt:Int64=0
     @State private var showStockBasisAlert=false
+    @State private var blockedUnverifiedOpening=false
     @State private var auxiliaryCode=""
     @State private var showAuxiliaryInventory=false
 
@@ -219,7 +220,7 @@ struct N2NativeInventoryView:View {
             }
             Button("Cancelar",role:.cancel) {}
         } message: {
-            Text("Inicial: cantidad con la que empezaste este corte; DANPER resta los consumos anteriores para obtener el saldo actual. Actual: cantidad que cuentas hoy; se conserva y se reconstruye el saldo inicial sumando los consumos registrados. No se descuentan dos veces.")
+            Text("Inicial del día 9: requiere tener verificadas las aperturas anteriores (R=1/0). Actual: registra las existencias físicas de hoy. Para cajas y frascos, cuenta como cerrados solo los envases que realmente siguen sin abrir. No contabilices una caja abierta como cerrada.")
         }
         .onChange(of:materialCode) {_,_ in
             capacityInput="";capacityEvidence="";capacityConfirmed=false
@@ -357,9 +358,17 @@ struct N2NativeInventoryView:View {
                         .accessibilityIdentifier("inventory-single-quantity")
                 }
                 if mode=="lot" {
-                    Text("Al guardar te preguntaremos si es tu stock inicial del corte (día 9) o la cantidad física que tienes hoy. La elección modifica el cálculo, no es solo una etiqueta.")
-
+                    Text("Si ya registraste una atención antes de crear este lote, la apertura de una caja (Kardex R=1) puede seguir pendiente. El stock inicial del día 9 necesita esa apertura conciliada; el conteo físico de hoy no debe incluir como cerradas las cajas ya abiertas.")
                         .font(.caption).foregroundStyle(.secondary)
+                    if blockedUnverifiedOpening {
+                        DanperPanel("Apertura pendiente: el stock inicial no se guardó") {
+                            Text("Registraste usos de envases sin un movimiento confirmado en un lote. Aunque hayas marcado «Sí, abrí una caja» en la atención, la apertura todavía no está vinculada físicamente a este lote.")
+                            Text("Si deseas continuar con stock físico actual, verifica primero cuántas cajas permanecen CERRADAS hoy y corrige la cantidad si es necesario. Después revisa la atención pendiente en Historial para documentar la apertura (R=1) o reutilización (R=0), comprobando que no se descuente dos veces.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                            Text("No se creó ningún lote ni movimiento con el intento bloqueado.")
+                                .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                        }
+                    }
                 }
                 Button {
                     if mode=="lot" {
@@ -644,7 +653,8 @@ struct N2NativeInventoryView:View {
                         historical:previous,isContainer:isPack)
                 } catch N2StockRegistrationChoice.Failure.ambiguousHistoricalOpenings {
                     failed=true
-                    message="Hay frascos o cajas usados sin apertura confirmada. Declara primero sus aperturas (1/0), o registra el stock físico que tienes hoy."
+                    blockedUnverifiedOpening=true
+                    message="No se guardó el stock inicial del día 9: hay aperturas de cajas o frascos sin lote verificado. Consulta la explicación del formulario y revisa tus cajas cerradas actuales antes de escoger stock físico hoy."
                     return
                 } catch N2StockRegistrationChoice.Failure.negativeCurrentStock {
                     failed=true
@@ -701,6 +711,7 @@ struct N2NativeInventoryView:View {
             }
             _ = result
             context=try await vault.clinicalFormContext()
+            blockedUnverifiedOpening=false
             movementID=UUID().uuidString
             lotID=UUID().uuidString
             movementAt=0
@@ -725,7 +736,7 @@ struct N2NativeInventoryView:View {
                         opening.formatted() +
                         ". Los consumos anteriores se consideran una sola vez."
                 } else {
-                    message="Stock físico actual guardado. El saldo inicial del día 9 está pendiente de verificar aperturas o consumos históricos; no se crearon descuentos."
+                    message="Stock físico actual guardado. El saldo del día 9 sigue pendiente de conciliar aperturas anteriores (R=1/0). No se generó un descuento retroactivo automático; revisa el consumo pendiente en Historial."
                 }
             } else {
                 message="Existencias registradas correctamente en el Kardex único."
