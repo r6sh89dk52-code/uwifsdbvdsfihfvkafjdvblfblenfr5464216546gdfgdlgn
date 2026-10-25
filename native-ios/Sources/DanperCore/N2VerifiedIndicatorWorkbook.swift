@@ -318,6 +318,11 @@ public enum N2VerifiedIndicatorWorkbook {
                         physical=value
                         consumption[code,default:0]+=Int(value)
                         consumptionBySite[sourceSite+"|"+code,default:0]+=Int(value)
+                    } else if linesByItem[key] != nil {
+                        // A real movement with mismatched R/evidence is a
+                        // contradiction, not merely an absent delivery.
+                        // Never silently reclassify such a line as pending.
+                        throw Failure.unverifiedDelivery
                     } else if allowPending,
                               let historical=historicalDeclarations.last(where:{
                                   $0.visitID==aid && $0.itemID==itemID
@@ -357,12 +362,33 @@ public enum N2VerifiedIndicatorWorkbook {
                             inventoryCodes.contains(string($0["code"])) &&
                                 N2ContainerAccounting.isContainer(unit:string($0["catalogUnit"]))
                         }
-                        guard !container else{throw Failure.unverifiedDelivery}
-                        physical=declared
-                        consumption[code,default:0]+=declared
-                        consumptionBySite[sourceSite+"|"+code,default:0]+=declared
+                        if container {
+                            // Keep the 30 clinical fields in a PROVISIONAL
+                            // workbook, but leave R truly BLANK. It must
+                            // never become 0 (reuse), 1 (new opening), or the
+                            // quantity of individually used needles.
+                            pendingLines+=1
+                            pendingNotes.append(
+                                "\(aid) / \(code) / \(name): R PENDIENTE. Cantidad clínica declarada=\(declared) \(type); apertura y lote físico sin acreditar. No se contabiliza en RESU."
+                            )
+                        } else {
+                            // Individual, non-container items preserve the
+                            // declared quantity, explicitly marked pending.
+                            physical=declared
+                            consumption[code,default:0]+=declared
+                            consumptionBySite[sourceSite+"|"+code,default:0]+=declared
+                            pendingLines+=1
+                            pendingNotes.append(
+                                "\(aid) / \(code) / \(name): R clínico declarado=\(declared) sin entrega física confirmada; PROVISIONAL."
+                            )
+                        }
+                    } else if allowPending {
+                        // Even a zero/unknown clinical quantity may be
+                        // retained as an incomplete row, with no R.
                         pendingLines+=1
-                        pendingNotes.append(aid+" / "+code+" / "+name+": R declarado, sin salida física confirmada")
+                        pendingNotes.append(
+                            "\(aid) / \(code) / \(name): R PENDIENTE; cantidad clínica o entrega física sin acreditar."
+                        )
                     } else {throw Failure.unverifiedDelivery}
                 } else {
                     procedure=procedures.joined(separator:" / ")
