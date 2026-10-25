@@ -41,7 +41,7 @@ struct N2VerifiedIndicatorExportView:View {
     @State private var ready=false
     @State private var working=false
     @State private var failed=false
-    @State private var status="Selecciona período, sede y atenciones."
+    @State private var status="Selecciona período y atenciones de ambas sedes."
     @State private var provisional=false
     @State private var confirmProvisional=false
     @State private var share:N2IndicatorShare?
@@ -118,11 +118,9 @@ struct N2VerifiedIndicatorExportView:View {
                 }
                 .buttonStyle(DanperSecondaryButton())
                 .accessibilityIdentifier("indicator-official-cut")
-                DanperChoiceField(title:"Ámbito del informe",selection:$site,
-                                  options:["AMBAS","LA VENTUROSA","PLVENTUROSA"],
-                                  labels:["AMBAS":"Ambas sedes (libro conjunto)",
-                                          "LA VENTUROSA":"Fundo La Venturosa",
-                                          "PLVENTUROSA":"Planta La Venturosa"])
+                LabeledContent("Ámbito",value:"Fundo y Planta La Venturosa")
+                Text("Un solo Indicador y un solo inventario. La sede de cada atención se conserva en su fila del Excel, sin existencias ni cierres separados.")
+                    .font(.caption).foregroundStyle(.secondary)
                 DanperDateField(title:"Desde",selection:$startDate)
                 DanperDateField(title:"Hasta",selection:$endDate)
                 Text("Corte mensual sugerido: día 9 al día 8 del siguiente mes. Puedes ajustar las fechas para una revisión puntual.")
@@ -135,10 +133,12 @@ struct N2VerifiedIndicatorExportView:View {
                 Label("Una atención terminada confirma su consumo. Las líneas históricas sin lote conciliado no deben convertirse en saldos inventados.",
                       systemImage:"checkmark.shield")
                     .font(.caption).foregroundStyle(.secondary)
-                DanperToolLink(title:"Revisar cierre del Indicador",
-                               symbol:"checkmark.shield") {
-                    N2ReconciliationView()
+                DanperToolLink(title:"Revisar inventario único y corte 9–8",
+                               symbol:"calendar.badge.checkmark") {
+                    N2KardexCutPreviewView()
                 }
+                Text("El cierre oficial aún conserva una validación heredada por sede. No registres cierres artificiales de Fundo y Planta para forzar la exportación. Puedes evaluar un libro provisional con los consumos verificables.")
+                    .font(.caption).foregroundStyle(.orange)
                 HStack(spacing:9) {
                     metricValue("\(selected.count)","Seleccionadas")
                     metricValue("\(inRange.count)","En el período")
@@ -192,8 +192,8 @@ struct N2VerifiedIndicatorExportView:View {
                     .font(.caption).foregroundStyle(.secondary)
                 DanperCheckRow(selected:$provisional) {
                     VStack(alignment:.leading,spacing:5) {
-                        Text("Incluir consumos pendientes").font(.subheadline.weight(.semibold))
-                        Text("Genera un libro provisional identificado").font(.caption).foregroundStyle(.secondary)
+                        Text("Modo provisional").font(.subheadline.weight(.semibold))
+                        Text("Libro de pruebas sin exigir dos cierres físicos por sede").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if provisional {
@@ -230,8 +230,8 @@ struct N2VerifiedIndicatorExportView:View {
         .onChange(of:endDate) {_,_ in selectConfirmed()}
         .onChange(of:site) {_,_ in selectConfirmed()}
         .onChange(of:provisional) {_,allowed in
-            if allowed {selected=Set(inRange.map(\.id))}
-            else {selectConfirmed()}
+            // Never auto-add historical pending items on switching modes.
+            if !allowed {selectConfirmed()}
         }
         .onDisappear {if share == nil {cleanup()}}
     }
@@ -315,9 +315,9 @@ struct N2VerifiedIndicatorExportView:View {
         }
         switch failure {
         case .unreviewedPeriod:
-            return "Falta revisión de cierre. Este generador aún valida pruebas históricas de cierre por sede, aunque el inventario sea único. Revísalas antes de exportar."
+            return "El cierre OFICIAL está bloqueado por una validación heredada por sedes. No crees cierres ficticios. Para pruebas, usa Modo provisional y selecciona consumos verificables; falta migrar el generador a cierre único."
         case .invalidReconciliation:
-            return "Falta stock inicial o recuento final verificable, o hay un movimiento de conciliación inconsistente. Revisa Conciliación de inventario."
+            return "Falta stock inicial o recuento final verificable, o existe un evento histórico incompatible con el Kardex único. Revisa inventario consolidado sin inventar existencias por sede."
         case .unverifiedDelivery:
             return "Una atención seleccionada tiene un consumo sin entrega confirmada o una corrección pendiente. Concilia la evidencia o desmárcala. Los envases sin apertura verificable no se exportan como R, tampoco en un provisional."
         case .invalidVisit:
