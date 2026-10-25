@@ -35,27 +35,31 @@ final class N1PortableInteropTests: XCTestCase {
         XCTAssertTrue(result.manifest.notificationsEnabled)
     }
     func testWrongPasswordFailsAuthenticatedDecryption() throws {
+        let encrypted=try archive("synthetic.danperbackup")
         XCTAssertThrowsError(try N1PortableArchiveReader.inspect(
-            archive: archive("synthetic.danperbackup"),
+            archive: encrypted,
             password: "Contraseña-Ficticia-Incorrecta-2026")) { error in
             XCTAssertEqual(error as? N1PortableArchiveError, .authenticationFailed)
         }
     }
     func testTamperedCiphertextIsRejected() throws {
+        let encrypted=try archive("tampered.danperbackup")
         XCTAssertThrowsError(try N1PortableArchiveReader.inspect(
-            archive: archive("tampered.danperbackup"), password: password)) { error in
+            archive: encrypted, password: password)) { error in
             XCTAssertEqual(error as? N1PortableArchiveError, .authenticationFailed)
         }
     }
     func testKDFDowngradeIsRejectedBeforeDecrypt() throws {
+        let encrypted=try archive("downgraded.danperbackup")
         XCTAssertThrowsError(try N1PortableArchiveReader.inspect(
-            archive: archive("downgraded.danperbackup"), password: password)) { error in
+            archive: encrypted, password: password)) { error in
             XCTAssertEqual(error as? N1PortableArchiveError, .unsupportedEnvelope)
         }
     }
     func testShortPasswordRejected() throws {
+        let encrypted=try archive("synthetic.danperbackup")
         XCTAssertThrowsError(try N1PortableArchiveReader.inspect(
-            archive: archive("synthetic.danperbackup"), password: "short")) { error in
+            archive: encrypted, password: "short")) { error in
             XCTAssertEqual(error as? N1PortableArchiveError, .invalidPassword)
         }
     }
