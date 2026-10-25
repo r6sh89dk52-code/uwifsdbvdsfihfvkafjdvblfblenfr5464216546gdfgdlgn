@@ -202,7 +202,7 @@ struct N2VerifiedIndicatorExportView:View {
                     }
                 }
                 if provisional {
-                    Text("BORRADOR: R incluye consumos de atenciones terminadas sin lote conciliado. Para frascos o cajas no se inventa una apertura. No modifica inventario ni acredita cierre.")
+                    Text("BORRADOR: se incluyen también las atenciones pendientes. Una caja o frasco sin apertura acreditada aparece con R VACÍA y una justificación; nunca como R=0 o R=1 inventado. Los materiales individuales pendientes conservan la cantidad clínica declarada. No modifica inventario.")
                         .font(.footnote).foregroundStyle(.orange)
                 }
                 Button {
@@ -229,7 +229,7 @@ struct N2VerifiedIndicatorExportView:View {
         .alert("¿Generar un libro provisional?",isPresented:$confirmProvisional) {
             Button("Generar provisional") {Task {await export()}}
             Button("Cancelar",role:.cancel) {}
-        } message: {Text("Las cantidades individuales declaradas pendientes no son movimientos físicos de Kardex. Un envase sin apertura verificable no se convierte en R, ni siquiera en un provisional: concílialo o excluye esa atención. El archivo quedará identificado como PROVISIONAL.")}
+        } message: {Text("El libro PROVISIONAL conserva todas las atenciones seleccionadas. Las cajas y frascos sin apertura declarada aparecen con R vacía y con una justificación. Las cantidades individuales pendientes son declaraciones clínicas, no movimientos FEFO. No se modifica el inventario.")}
         .task {if !layoutOnly {await load()}}
         .onChange(of:startDate) {_,_ in selectConfirmed()}
         .onChange(of:endDate) {_,_ in selectConfirmed()}
@@ -314,7 +314,7 @@ struct N2VerifiedIndicatorExportView:View {
             let url=dir.appendingPathComponent(outputName)
             try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
             let warning=result.provisional
-                ? "PROVISIONAL · \(result.pendingLines) consumos pendientes. "
+                ? "PROVISIONAL · \(result.pendingLines) líneas pendientes, con R vacía cuando no hay apertura acreditada. "
                 : ""
             status="\(warning)Generado: \(result.visits) atenciones / \(result.rows) filas. Materiales sin stock inicial: \(result.missingOpening); sin recuento final: \(result.missingClosingCount). Las celdas no conciliadas siguen vacías."
             share=N2IndicatorShare(file:url)
@@ -337,7 +337,7 @@ struct N2VerifiedIndicatorExportView:View {
         case .invalidReconciliation:
             return "No cuadran las existencias del inventario único, el consumo declarado o las correspondencias del catálogo. No se ha inventado stock inicial ni un recuento final."
         case .unverifiedDelivery:
-            return "Una atención seleccionada tiene un consumo sin entrega confirmada o una corrección pendiente. Concilia la evidencia o desmárcala. Los envases sin apertura verificable no se exportan como R, tampoco en un provisional."
+            return "Hay una entrega física contradictoria o una corrección clínica pendiente que debe verificarse antes de exportar. Un consumo simplemente sin lote sí se admite en el PROVISIONAL con R vacía si es caja o frasco; no se inventa FEFO ni movimiento físico."
         case .invalidVisit:
             return "Una atención tiene sede no verificada o datos obligatorios incompletos. Confirma la ubicación en Personal antes de exportar ambas sedes."
         case .invalidPeriod:
