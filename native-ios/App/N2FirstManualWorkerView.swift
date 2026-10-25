@@ -14,6 +14,7 @@ struct N2FirstManualWorkerView:View {
     @State private var site=""
     @State private var area=""
     @State private var labor=""
+    @State private var ubigeo=""
     @State private var confirmed=false
     @State private var busy=false
     @State private var finished=false
@@ -65,6 +66,13 @@ struct N2FirstManualWorkerView:View {
                         }
                         DanperField(title:"Labor (opcional)") {
                             TextField("Labor",text:$labor)
+                        }
+                        DanperField(title:"Ubigeo / localidad (opcional)") {
+                            TextField("Ej.: CHEPÉN, TRUJILLO, PACASMAYO",text:$ubigeo)
+                                .keyboardType(.default)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .accessibilityIdentifier("first-manual-worker-ubigeo")
                         }
                     }
                     Button {
@@ -140,7 +148,8 @@ struct N2FirstManualWorkerView:View {
             let worker:[String:String]=[
                 "dni":dni,"name":fullName.trimmingCharacters(in:.whitespacesAndNewlines),
                 "site":site,"area":area,"labor":labor,"sex":"",
-                "age":"","birthDate":"","ubigeo":""
+                "age":"","birthDate":"",
+                "ubigeo":ubigeo.trimmingCharacters(in:.whitespacesAndNewlines)
             ]
             let data=try JSONSerialization.data(withJSONObject:worker)
             let initial=try N2EmptyDemoSnapshot.make()
