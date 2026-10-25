@@ -67,6 +67,21 @@ assert(indicator.includes('endDate=min(cycleEnd,now)'),
   'el corte abierto debe exportarse a la fecha');
 assert(indicator.includes('Button("Todas")'),
   'la selección completa para un corte debe ser explícita');
+// Pending packages must remain in the provisional book without invented R.
+for(const marker of [
+  'R PENDIENTE. Cantidad clínica declarada=',
+  'R PENDIENTE; declaración histórica sin correspondencia',
+  'else if linesByItem[key] != nil',
+  'if container {'
+]) assert(exportedIndicatorCore.includes(marker),
+  'Provisional conserva la atención y no inventa R: '+marker);
+assert(!exportedIndicatorCore.includes('guard !container else{throw Failure.unverifiedDelivery}'),
+  'un envase sin apertura no puede abortar el libro provisional completo');
+for(const marker of [
+  'documented>=missingR',
+  'provisional,!reviewed'
+]) assert(indicatorWriter.includes(marker),
+  'OOXML permite R vacía solo en libros provisionales auditados: '+marker);
 
 assert(nursing.includes('@State private var site="AMBAS"'),
   'El Kardex de Enfermeras exporta el inventario conjunto sin sede invisible');
