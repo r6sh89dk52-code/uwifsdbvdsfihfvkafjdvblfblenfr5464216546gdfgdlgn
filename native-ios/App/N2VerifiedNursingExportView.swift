@@ -23,11 +23,11 @@ struct N2VerifiedNursingExportView:View {
     @State private var rangeStart=Date()
     @State private var rangeEnd=Date()
     @State private var site=""
-    @State private var responsible="Felipe Azcárate Silva"
+    @State private var responsible=N2ClinicianIdentity.name
     @State private var shift="CONSOLIDADO"
     @State private var busy=false
     @State private var failed=false
-    @State private var status="Indica fecha y responsable."
+    @State private var status="Indica las fechas del reporte."
     @State private var share:N2NursingShare?
     @State private var folder:URL?
 
@@ -103,9 +103,10 @@ struct N2VerifiedNursingExportView:View {
                     DanperDateField(title:"Desde",selection:$rangeStart)
                     DanperDateField(title:"Hasta",selection:$rangeEnd)
                 }
-                DanperField(title:"Responsable") {
-                    TextField("Nombre del responsable",text:$responsible).textInputAutocapitalization(.characters)
-                }
+                LabeledContent("Responsable",value:N2ClinicianIdentity.name)
+                LabeledContent("DNI",value:N2ClinicianIdentity.dni)
+                Text("Identidad del profesional preconfigurada; no es necesario introducirla para cada reporte.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Text(reportMode=="daily" ?
                     "Kardex diario de 98 productos." :
                     "Consolidado verificado de 98 productos; el Excel indicará claramente el intervalo y no se presentará como un solo día.")
