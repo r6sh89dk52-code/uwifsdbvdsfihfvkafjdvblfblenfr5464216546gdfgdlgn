@@ -152,10 +152,10 @@ assert(recovered.includes('static func readVerified(_ snapshot:Data)'),
   'La lectura cifrada verificada no debe repetir las auditorías completas');
 assert(core.includes('N2NativeDraftRecovery.readVerified(active.snapshot)'),
   'La bóveda debe utilizar únicamente snapshots ya autenticados');
-const formReader=fs.readFileSync(path.join(root,
+const auditedFormReader=fs.readFileSync(path.join(root,
   'native-ios/Sources/DanperCore/N2NativeFormContext.swift'),'utf8');
-assert(formReader.includes('static func readVerified(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)') &&
-       formReader.includes('public static func read(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)'),
+assert(auditedFormReader.includes('static func readVerified(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)') &&
+       auditedFormReader.includes('public static func read(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)'),
   'El formulario debe conservar la lectura estricta de datos externos y la lectura optimizada de bóveda');
 
 
