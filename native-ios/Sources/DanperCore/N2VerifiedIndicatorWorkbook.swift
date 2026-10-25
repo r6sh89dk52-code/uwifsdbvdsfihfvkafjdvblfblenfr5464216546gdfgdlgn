@@ -109,6 +109,21 @@ public enum N2VerifiedIndicatorWorkbook {
         }
     }
 
+    /// Historical R is only a user's declaration for a provisional sheet.
+    /// A recorded physical delivery takes priority and must not be counted twice.
+    static func provisionalHistoricalR(
+        _ record:N2PendingDispensingEvidence,
+        lotCode:String,lotUnit:String,
+        approvedCodes:Set<String>,alreadyLinked:Bool
+    )->Int? {
+        let r=record.newContainers ?? (record.confirmNewContainer ? 1 : 0)
+        guard !alreadyLinked,approvedCodes.contains(lotCode),
+              N2ContainerAccounting.isContainer(unit:lotUnit),
+              (0...10_000).contains(r),
+              r==0 || record.confirmNewContainer else{return nil}
+        return r
+    }
+
     /// Pure decision guard for an automatically certified inventory-wide cut.
     /// Source proof is checked separately for every stock product.
     static func eligibleForSharedClose(
@@ -315,16 +330,11 @@ public enum N2VerifiedIndicatorWorkbook {
                         }.compactMap{$0["kardexCode"] as? String})
                             .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
                             .union(N2UserReviewedKardexLinks.candidates(for:code).map(\.kardexID))
-                        // Older audit events have no newContainers field;
-                        // preserve their explicit yes/no declaration.
-                        let openings=historical.newContainers ??
-                            (historical.confirmNewContainer ? 1 : 0)
-                        guard inventoryCodes.contains(string(lot["code"])),
-                              N2ContainerAccounting.isContainer(
-                                  unit:string(lot["catalogUnit"])),
-                              linesByItem[key]==nil,
-                              (0...10_000).contains(openings),
-                              openings==0 || historical.confirmNewContainer else {
+                        guard let openings=Self.provisionalHistoricalR(
+                            historical,lotCode:string(lot["code"]),
+                            lotUnit:string(lot["catalogUnit"]),
+                            approvedCodes:inventoryCodes,
+                            alreadyLinked:linesByItem[key] != nil) else {
                             throw Failure.unverifiedDelivery
                         }
                         physical=Double(openings)
