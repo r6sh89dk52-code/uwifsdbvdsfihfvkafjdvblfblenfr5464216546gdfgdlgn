@@ -158,6 +158,33 @@ public final class N2ProtectedClinicalVaultCore {
     }
     /// Dashboard reads one authenticated snapshot for both the visit
     /// projection and draft counter; no second decrypt/validation pass.
+    /// The dashboard only needs today's, this week's and draft counts.
+    /// Recover and authenticate the original encrypted journal exactly as
+    /// before, but DO NOT sort 9k+ workers, rebuild the entire visit index
+    /// or calculate clinical frequency just to produce three integers.
+    /// Corrections cannot modify date/status; count those immutable fields.
+    /// Draft recovery still performs its strict validation on the same
+    /// authenticated snapshot. No plaintext or derived index is persisted.
+    public func dashboardCounters(today:String,weekStart:String)throws
+        ->(today:Int,week:Int,drafts:Int)? {
+        guard today.count==10,weekStart.count==10,weekStart<=today,
+              let active=try journal.recover() else{return nil}
+        guard let root=try? JSONSerialization.jsonObject(
+                  with:active.snapshot) as? [String:Any],
+              let visits=root["attentions"] as? [[String:Any]] else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        let drafts=try N2NativeDraftRecovery.read(active.snapshot).count
+        var todayCount=0,weekCount=0
+        for visit in visits where visit["status"] as? String == "saved" {
+            guard let date=visit["date"] as? String else {
+                throw N2ProtectedStoreError.unsafeSource
+            }
+            if date==today {todayCount+=1}
+            if date>=weekStart && date<=today {weekCount+=1}
+        }
+        return (today:todayCount,week:weekCount,drafts:drafts)
+    }
     public func readDashboard()throws
         ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
         guard let active=try journal.recover() else {
