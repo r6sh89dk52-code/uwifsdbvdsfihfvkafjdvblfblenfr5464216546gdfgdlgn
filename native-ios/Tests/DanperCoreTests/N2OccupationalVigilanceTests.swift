@@ -144,6 +144,21 @@ final class N2OccupationalVigilanceTests:XCTestCase {
         XCTAssertEqual(other.organizationalUnit,"")
     }
 
+    func testUnmatchedUnitIsReportedWithoutInventingACode()throws {
+        var medical=visit("ORG-UNKNOWN","OSTEOMUSCULAR")
+        var worker=try XCTUnwrap(medical["worker"] as? [String:Any])
+        worker["area"]="AREA DE EJEMPLO SIN CODIGO OFICIAL"
+        worker["organizationCode"]="20000066" // Belongs to a different society.
+        medical["worker"]=worker
+        let result=try N2OccupationalVigilanceWorkbook.export(
+            snapshot:snapshot([medical]),start:"2026-10-09",end:"2026-10-24")
+        XCTAssertEqual(result.rows,1)
+        XCTAssertEqual(result.unresolvedOrganizationalUnits,1)
+        let xml=try sheet(result)
+        XCTAssertTrue(xml.contains(">A071</t>"))
+        XCTAssertFalse(xml.contains(">20000066</t>"))
+    }
+
     func testNoOsteomuscularVisitsHasOnlyOriginalHeader()throws {
         let source=try snapshot([visit("NON","DIGESTIVO")])
         let result=try N2OccupationalVigilanceWorkbook.export(
