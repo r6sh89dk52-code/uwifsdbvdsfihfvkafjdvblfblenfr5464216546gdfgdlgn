@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env.local
+.firebase/
+playwright-report/
+test-results/
+.firebaserc
+firestore.authorized.rules

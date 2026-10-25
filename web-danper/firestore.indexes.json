@@ -1,0 +1,1 @@
+{"indexes":[],"fieldOverrides":[{"collectionGroup":"attentions","fieldPath":"data","indexes":[]},{"collectionGroup":"movements","fieldPath":"data","indexes":[]},{"collectionGroup":"clinicalItems","fieldPath":"data","indexes":[]},{"collectionGroup":"operations","fieldPath":"keys","indexes":[]},{"collectionGroup":"changes","fieldPath":"keys","indexes":[]}]}

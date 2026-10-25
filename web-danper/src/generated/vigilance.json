@@ -1,0 +1,822 @@
+{
+  "styles": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n  <numFmts count=\"2\"><numFmt numFmtId=\"164\" formatCode=\"dd/mm/yyyy\"/>\n  <numFmt numFmtId=\"165\" formatCode=\"@\"/></numFmts>\n  <fonts count=\"3\">\n    <font><sz val=\"11\"/><color rgb=\"FF000000\"/><name val=\"Calibri\"/></font>\n    <font><b/><sz val=\"8\"/><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/></font>\n    <font><sz val=\"8\"/><color rgb=\"FF000000\"/><name val=\"Calibri\"/></font>\n  </fonts>\n  <fills count=\"4\"><fill><patternFill patternType=\"none\"/></fill>\n  <fill><patternFill patternType=\"gray125\"/></fill>\n  <fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF00B050\"/><bgColor indexed=\"64\"/></patternFill></fill>\n  <fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFDDE8F3\"/><bgColor indexed=\"64\"/></patternFill></fill></fills>\n  <borders count=\"2\"><border><left/><right/><top/><bottom/><diagonal/></border>\n  <border><left style=\"thin\"/><right style=\"thin\"/><top style=\"thin\"/>\n  <bottom style=\"thin\"/><diagonal/></border></borders>\n  <cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs>\n  <cellXfs count=\"7\">\n    <xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>\n    <xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"1\" xfId=\"0\" applyAlignment=\"1\"><alignment vertical=\"center\" wrapText=\"1\"/></xf>\n    <xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\"/></xf>\n    <xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf>\n    <xf numFmtId=\"0\" fontId=\"2\" fillId=\"3\" borderId=\"1\" xfId=\"0\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf>\n    <xf numFmtId=\"164\" fontId=\"2\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf>\n    <xf numFmtId=\"165\" fontId=\"2\" fillId=\"0\" borderId=\"1\" xfId=\"0\" applyNumberFormat=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf>\n  </cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles>\n</styleSheet>",
+  "types": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n<Default Extension=\"xml\" ContentType=\"application/xml\"/>\n<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>\n<Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>\n<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>\n</Types>",
+  "relationships": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>\n</Relationships>",
+  "workbook": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"\nxmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n<bookViews><workbookView activeTab=\"0\"/></bookViews>\n<sheets><sheet name=\"VIGILACIA OCUPACIONAL\" sheetId=\"1\" r:id=\"rId1\"/></sheets>\n</workbook>",
+  "workbookRels": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>\n<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>\n</Relationships>",
+  "headers": [
+    "DSUBDIVISION",
+    "UNIDAD ORGANIZATIVA",
+    "SUBDIVISION",
+    "UNIDAD\nORGANIZATIVA",
+    "LABOR",
+    "PLANILLA",
+    "FECHA",
+    "HORA DE ATENCION",
+    "DNI",
+    "APELLIDOS Y NOMBRES",
+    "EDAD",
+    "SEXO",
+    "TIPOS DE AGENTES",
+    "RIESGOS",
+    "MEDIDAS A TOMAR",
+    "DNI DE RESPONSABLE",
+    "RESPONSABLE DE LA ATENCION"
+  ],
+  "widths": [
+    15.140625,
+    31.85546875,
+    14.140625,
+    13.42578125,
+    25,
+    12,
+    13.85546875,
+    11.85546875,
+    11.42578125,
+    43,
+    8,
+    9.5703125,
+    35,
+    30.42578125,
+    44.28515625,
+    21.28515625,
+    29.5703125
+  ],
+  "codes": [
+    {
+      "society": "1001",
+      "area": "ADMIN. Y CONTROL DE PROCESOS AGRICOLAS",
+      "code": "20000027"
+    },
+    {
+      "society": "1001",
+      "area": "ADMINISTRACION",
+      "code": "20000050"
+    },
+    {
+      "society": "1001",
+      "area": "ADMINISTRACION DE PERSONAL",
+      "code": "20000053"
+    },
+    {
+      "society": "1001",
+      "area": "ADMINISTRACION DE PERSONAL EMPLEADO",
+      "code": "20000054"
+    },
+    {
+      "society": "1001",
+      "area": "ADMINISTRACION DE PERSONAL OPERARIO",
+      "code": "20000055"
+    },
+    {
+      "society": "1001",
+      "area": "ALMACEN DE ENTRADA",
+      "code": "20000076"
+    },
+    {
+      "society": "1001",
+      "area": "ALMACEN DE ENTRADA AGRICOLA",
+      "code": "20000078"
+    },
+    {
+      "society": "1001",
+      "area": "ALMACEN DE ENTRADA INDUSTRIAL",
+      "code": "20000077"
+    },
+    {
+      "society": "1001",
+      "area": "ALMACEN DE PRODUCTO TERMINADO",
+      "code": "20000082"
+    },
+    {
+      "society": "1001",
+      "area": "ALMACEN Y DISTRIB. DE PRODUCTO TERMINADO",
+      "code": "20000081"
+    },
+    {
+      "society": "1001",
+      "area": "ALMACENAMIENTO",
+      "code": "20000084"
+    },
+    {
+      "society": "1001",
+      "area": "APLICACIONES Y SERVICIOS TI",
+      "code": "20000070"
+    },
+    {
+      "society": "1001",
+      "area": "ASEGURAMIENTO DE LA CALIDAD AGRICOLA",
+      "code": "20000103"
+    },
+    {
+      "society": "1001",
+      "area": "ASEGURAMIENTO DE LA CALIDAD CONGELADO",
+      "code": "20000099"
+    },
+    {
+      "society": "1001",
+      "area": "ASEGURAMIENTO DE LA CALIDAD CONSERVA",
+      "code": "20000097"
+    },
+    {
+      "society": "1001",
+      "area": "ASEGURAMIENTO DE LA CALIDAD FRESCO",
+      "code": "20000101"
+    },
+    {
+      "society": "1001",
+      "area": "ASEGURAMIENTO DE LA RENTABILIDAD",
+      "code": "20000044"
+    },
+    {
+      "society": "1001",
+      "area": "ASESORIA LEGAL",
+      "code": "20000049"
+    },
+    {
+      "society": "1001",
+      "area": "ASUNTOS CORPORATIVOS",
+      "code": "20000251"
+    },
+    {
+      "society": "1001",
+      "area": "ATENCION AL CLIENTE",
+      "code": "20000105"
+    },
+    {
+      "society": "1001",
+      "area": "AUDITORIA INTERNA",
+      "code": "20000114"
+    },
+    {
+      "society": "1001",
+      "area": "BIENESTAR SOCIAL Y RETENC. DE PERSONAL",
+      "code": "20000065"
+    },
+    {
+      "society": "1001",
+      "area": "CAPACITACION Y DESARROLLO HUMANO",
+      "code": "20000058"
+    },
+    {
+      "society": "1001",
+      "area": "CITE",
+      "code": "20000095"
+    },
+    {
+      "society": "1001",
+      "area": "CLIMA ORGANIZAC. Y COMUNICACION INTERNA",
+      "code": "20000059"
+    },
+    {
+      "society": "1001",
+      "area": "COMPRAS DE MATERIALES Y EMPAQUES",
+      "code": "20000080"
+    },
+    {
+      "society": "1001",
+      "area": "COMPRAS DE SUMINISTROS Y SERVICIOS",
+      "code": "20000079"
+    },
+    {
+      "society": "1001",
+      "area": "CONTABILIDAD",
+      "code": "20000040"
+    },
+    {
+      "society": "1001",
+      "area": "CONTRATOS Y ARCHIVOS",
+      "code": "20000056"
+    },
+    {
+      "society": "1001",
+      "area": "CONTROL DE PROCESOS",
+      "code": "20000110"
+    },
+    {
+      "society": "1001",
+      "area": "CONTROL INTERNO",
+      "code": "20000003"
+    },
+    {
+      "society": "1001",
+      "area": "CORPORATIVA COMERCIAL CONGELADO",
+      "code": "20000007"
+    },
+    {
+      "society": "1001",
+      "area": "CORPORATIVA COMERCIAL CONSERVA I",
+      "code": "20000005"
+    },
+    {
+      "society": "1001",
+      "area": "CORPORATIVA COMERCIAL CONSERVA II",
+      "code": "20000006"
+    },
+    {
+      "society": "1001",
+      "area": "CORPORATIVA COMERCIAL FRESCO",
+      "code": "20000008"
+    },
+    {
+      "society": "1001",
+      "area": "CORPORATIVA MARKETING Y MERC. NACIONAL",
+      "code": "20000009"
+    },
+    {
+      "society": "1001",
+      "area": "CORPORATIVA MERCADO NACIONAL",
+      "code": "20000113"
+    },
+    {
+      "society": "1001",
+      "area": "DESARROLLO DE NUEVOS PRODUCTOS",
+      "code": "20000092"
+    },
+    {
+      "society": "1001",
+      "area": "DESPACHO",
+      "code": "20000088"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CENTRAL AGRICOLA",
+      "code": "20000026"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CENTRAL COMERCIAL",
+      "code": "20000004"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CENTRAL DE ADMINISTRACION Y GCH",
+      "code": "20000048"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CENTRAL DE AUDITORIA INTERNA",
+      "code": "20000002"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CENTRAL DE FINANZAS",
+      "code": "20000039"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CENTRAL DE PLANEAMIENTO",
+      "code": "20000045"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CENTRAL INDUSTRIAL",
+      "code": "20000010"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CORP INV. DESARROLLO E INNOVACION",
+      "code": "20000091"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CORP. DE EXTENSION AGRICOLA",
+      "code": "20000035"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CORP. DE GESTION DE LA CALIDAD",
+      "code": "20000096"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CORP. DE LOGISTICA",
+      "code": "20000073"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. CORP. MARKETING",
+      "code": "20000112"
+    },
+    {
+      "society": "1001",
+      "area": "EMPAQUE",
+      "code": "20000087"
+    },
+    {
+      "society": "1001",
+      "area": "EMPAQUE Y DESPACHO",
+      "code": "20000086"
+    },
+    {
+      "society": "1001",
+      "area": "EVALUACION Y CONTROL DE INVERSIONES",
+      "code": "20000043"
+    },
+    {
+      "society": "1001",
+      "area": "FITOSANIDAD",
+      "code": "20000033"
+    },
+    {
+      "society": "1001",
+      "area": "FITOSANIDAD EA",
+      "code": "20000109"
+    },
+    {
+      "society": "1001",
+      "area": "GERENCIA GENERAL",
+      "code": "20000001"
+    },
+    {
+      "society": "1001",
+      "area": "GESTION DEL CAPITAL HUMANO",
+      "code": "50006625"
+    },
+    {
+      "society": "1001",
+      "area": "GESTION DEL CAPITAL HUMANO AGRICOLA",
+      "code": "20000061"
+    },
+    {
+      "society": "1001",
+      "area": "GESTION DEL CAPITAL HUMANO EMPLEADOS",
+      "code": "20000057"
+    },
+    {
+      "society": "1001",
+      "area": "GESTION DEL CAPITAL HUMANO INDUSTRIAL",
+      "code": "20000064"
+    },
+    {
+      "society": "1001",
+      "area": "INFRAESTRUCTURA",
+      "code": "20000071"
+    },
+    {
+      "society": "1001",
+      "area": "INVESTIGACION Y DESARROLLO AGRICOLA",
+      "code": "20000094"
+    },
+    {
+      "society": "1001",
+      "area": "INVESTIGACION Y DESARROLLO INDUSTRIAL",
+      "code": "20000093"
+    },
+    {
+      "society": "1001",
+      "area": "LABORATORIO MICROBIOLOGICO",
+      "code": "20000107"
+    },
+    {
+      "society": "1001",
+      "area": "LIMPIEZA Y PALETIZADO",
+      "code": "20000083"
+    },
+    {
+      "society": "1001",
+      "area": "LOGISTICA",
+      "code": "20000074"
+    },
+    {
+      "society": "1001",
+      "area": "LOGISTICA DE ENTRADA",
+      "code": "20000075"
+    },
+    {
+      "society": "1001",
+      "area": "MANTENIMIENTO",
+      "code": "20000020"
+    },
+    {
+      "society": "1001",
+      "area": "MANTENIMIENTO AGRICOLA",
+      "code": "20000022"
+    },
+    {
+      "society": "1001",
+      "area": "MANTENIMIENTO DE SISTEMAS DE RIEGO",
+      "code": "20000024"
+    },
+    {
+      "society": "1001",
+      "area": "MANTENIMIENTO INDUSTRIAL",
+      "code": "20000021"
+    },
+    {
+      "society": "1001",
+      "area": "MEJORA CONTINUA",
+      "code": "20000019"
+    },
+    {
+      "society": "1001",
+      "area": "MONTACARGAS",
+      "code": "20000085"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES ACOPIO CONGELADO",
+      "code": "20000014"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES ACOPIO CONSERVA",
+      "code": "20000012"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES ACOPIO FRESCO",
+      "code": "20000018"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES AGRICOLAS ALCACHOFA EA",
+      "code": "20000036"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES AGRICOLAS ARANDANO",
+      "code": "20000108"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES AGRICOLAS ESPARRAGO",
+      "code": "20000030"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES AGRICOLAS FRUTALES",
+      "code": "20000111"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES AGRICOLAS FRUTALES EA",
+      "code": "20000037"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES AGRICOLAS PIMIENTO",
+      "code": "20000029"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES CONGELADO",
+      "code": "20000013"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES CONSERVA",
+      "code": "20000011"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES ESPARRAGO I",
+      "code": "20000031"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES ESPARRAGO II",
+      "code": "20000032"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES ESPARRAGO TERCEROS EA",
+      "code": "20000038"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES FRESCO",
+      "code": "20000015"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES FRESCO FRUTALES",
+      "code": "20000017"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES FRESCO HORTALIZAS",
+      "code": "20000016"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES INTERNACIONALES",
+      "code": "20000090"
+    },
+    {
+      "society": "1001",
+      "area": "OPERACIONES POST COSECHA",
+      "code": "20000025"
+    },
+    {
+      "society": "1001",
+      "area": "PLANEAMIENTO FINANCIERO",
+      "code": "20000042"
+    },
+    {
+      "society": "1001",
+      "area": "PLANIFICACION Y CONTROL DE PRODUCCION I",
+      "code": "20000046"
+    },
+    {
+      "society": "1001",
+      "area": "PLANIFICACION Y CONTROL DE PRODUCCION II",
+      "code": "20000047"
+    },
+    {
+      "society": "1001",
+      "area": "PROYEC. Y CONTROL DE PRODUCCION AGRICOLA",
+      "code": "20000028"
+    },
+    {
+      "society": "1001",
+      "area": "PROYECTOS DE INGENIERIA",
+      "code": "20000023"
+    },
+    {
+      "society": "1001",
+      "area": "PROYECTOS Y OPERACIONES AGRICOLAS",
+      "code": "20000034"
+    },
+    {
+      "society": "1001",
+      "area": "PSICOLOGIA",
+      "code": "20000115"
+    },
+    {
+      "society": "1001",
+      "area": "RECLUTAMIENTO DE PERSONAL",
+      "code": "20000062"
+    },
+    {
+      "society": "1001",
+      "area": "RESPONSABILIDAD SOCIAL",
+      "code": "20000068"
+    },
+    {
+      "society": "1001",
+      "area": "SANEAMIENTO Y SERVICIOS CONGELADO",
+      "code": "20000100"
+    },
+    {
+      "society": "1001",
+      "area": "SANEAMIENTO Y SERVICIOS CONSERVA",
+      "code": "20000098"
+    },
+    {
+      "society": "1001",
+      "area": "SANEAMIENTO Y SERVICIOS FRESCO",
+      "code": "20000102"
+    },
+    {
+      "society": "1001",
+      "area": "SEGURIDAD PATRIMONIAL AGRICOLA",
+      "code": "20000052"
+    },
+    {
+      "society": "1001",
+      "area": "SEGURIDAD PATRIMONIAL INDUSTRIAL",
+      "code": "20000051"
+    },
+    {
+      "society": "1001",
+      "area": "SEGURIDAD Y MEDIO AMBIENTE",
+      "code": "20000106"
+    },
+    {
+      "society": "1001",
+      "area": "SELECCION DE PERSONAL",
+      "code": "20000060"
+    },
+    {
+      "society": "1001",
+      "area": "SERVICIOS DE SALUD",
+      "code": "20000066"
+    },
+    {
+      "society": "1001",
+      "area": "SISTEMAS DE INFORMACION Y PROCESOS",
+      "code": "20000072"
+    },
+    {
+      "society": "1001",
+      "area": "SISTEMAS INTEGRADOS DE GESTION",
+      "code": "20000104"
+    },
+    {
+      "society": "1001",
+      "area": "TECNOLOGIAS DE LA INFORMACION Y PROCESOS",
+      "code": "20000069"
+    },
+    {
+      "society": "1001",
+      "area": "TESORERIA",
+      "code": "20000041"
+    },
+    {
+      "society": "1001",
+      "area": "TRANSPORTE DE PERSONAL AGRICOLA",
+      "code": "20000063"
+    },
+    {
+      "society": "1001",
+      "area": "TRANSPORTE DE PERSONAL INDUSTRIAL",
+      "code": "20000067"
+    },
+    {
+      "society": "1001",
+      "area": "VENTA NACIONAL",
+      "code": "20000089"
+    },
+    {
+      "society": "1001",
+      "area": "DPTO. DE COMUNICACIONES Y SOSTENIBILIDAD",
+      "code": "20000514"
+    },
+    {
+      "society": "1001",
+      "area": "COMUNICACIONES",
+      "code": "20000512"
+    },
+    {
+      "society": "1001",
+      "area": "COMUNICACIÓN INTERNA Y SOSTENIBILIDAD",
+      "code": "20000515"
+    },
+    {
+      "society": "1001",
+      "area": "SOSTENIBILIDAD",
+      "code": "20000513"
+    },
+    {
+      "society": "1001",
+      "area": "SOSTENIBILIDAD Y RELAC. GRUPOS DE INTERÉ",
+      "code": "20000516"
+    },
+    {
+      "society": "1001",
+      "area": "CREDITOS Y ESTRUCTURACION",
+      "code": "20000510"
+    },
+    {
+      "society": "1001",
+      "area": "PRESUPUESTO",
+      "code": "20000526"
+    },
+    {
+      "society": "1003",
+      "area": "ADMIN. Y CONTROL DE PROCESOS AGRICOLAS",
+      "code": "20000124"
+    },
+    {
+      "society": "1003",
+      "area": "ADMINISTRACION DE PERSONAL OPERARIO",
+      "code": "20000130"
+    },
+    {
+      "society": "1003",
+      "area": "ALMACEN DE ENTRADA",
+      "code": "20000139"
+    },
+    {
+      "society": "1003",
+      "area": "ALMACEN DE ENTRADA AGRICOLA",
+      "code": "20000140"
+    },
+    {
+      "society": "1003",
+      "area": "ASEGURAMIENTO DE LA CALIDAD AGRICOLA",
+      "code": "20000144"
+    },
+    {
+      "society": "1003",
+      "area": "ASEGURAMIENTO DE LA CALIDAD FRESCO",
+      "code": "20000142"
+    },
+    {
+      "society": "1003",
+      "area": "BIENESTAR SOCIAL Y RETENC. DE PERSONAL",
+      "code": "20000134"
+    },
+    {
+      "society": "1003",
+      "area": "CAPACITACION Y DESARROLLO HUMANO",
+      "code": "20000132"
+    },
+    {
+      "society": "1003",
+      "area": "CONTRATOS Y ARCHIVOS",
+      "code": "20000131"
+    },
+    {
+      "society": "1003",
+      "area": "CONTROL INTERNO",
+      "code": "20000152"
+    },
+    {
+      "society": "1003",
+      "area": "DPTO. CENTRAL DE AUDITORIA INTERNA",
+      "code": "20000151"
+    },
+    {
+      "society": "1003",
+      "area": "DPTO. CORP INV. DESARROLLO E INNOVACION",
+      "code": "20000146"
+    },
+    {
+      "society": "1003",
+      "area": "DPTO. CORP. DE GESTION DE LA CALIDAD",
+      "code": "20000141"
+    },
+    {
+      "society": "1003",
+      "area": "DPTO. CORP. DE LOGISTICA",
+      "code": "20000138"
+    },
+    {
+      "society": "1003",
+      "area": "DPTO. DE OPERACIONES AGRICOLAS",
+      "code": "20000123"
+    },
+    {
+      "society": "1003",
+      "area": "FITOSANIDAD",
+      "code": "20000127"
+    },
+    {
+      "society": "1003",
+      "area": "GERENCIA GENERAL",
+      "code": "20000122"
+    },
+    {
+      "society": "1003",
+      "area": "GESTION DEL CAPITAL HUMANO AGRICOLA",
+      "code": "20000129"
+    },
+    {
+      "society": "1003",
+      "area": "INVESTIGACION Y DESARROLLO AGRICOLA",
+      "code": "20000147"
+    },
+    {
+      "society": "1003",
+      "area": "MANTENIMIENTO AGRICOLA",
+      "code": "20000149"
+    },
+    {
+      "society": "1003",
+      "area": "MANTENIMIENTO DE SISTEMAS DE RIEGO",
+      "code": "20000150"
+    },
+    {
+      "society": "1003",
+      "area": "MANTENIMIENTO Y PROYECTOS",
+      "code": "20000148"
+    },
+    {
+      "society": "1003",
+      "area": "PRODUCCION AGRICOLA PALTO",
+      "code": "20000126"
+    },
+    {
+      "society": "1003",
+      "area": "PRODUCCION AGRICOLA VID",
+      "code": "20000125"
+    },
+    {
+      "society": "1003",
+      "area": "RECLUTAMIENTO DE PERSONAL",
+      "code": "20000135"
+    },
+    {
+      "society": "1003",
+      "area": "SANEAMIENTO Y SERVICIOS FRESCO",
+      "code": "20000143"
+    },
+    {
+      "society": "1003",
+      "area": "SEGURIDAD PATRIMONIAL AGRICOLA",
+      "code": "20000128"
+    },
+    {
+      "society": "1003",
+      "area": "SEGURIDAD SALUD OCUPAC. Y MEDIO AMBIENTE",
+      "code": "20000145"
+    },
+    {
+      "society": "1003",
+      "area": "SELECCION DE PERSONAL",
+      "code": "20000133"
+    },
+    {
+      "society": "1003",
+      "area": "SERVICIOS DE SALUD",
+      "code": "20000136"
+    },
+    {
+      "society": "1003",
+      "area": "TRANSPORTE DE PERSONAL AGRICOLA",
+      "code": "20000137"
+    }
+  ]
+}

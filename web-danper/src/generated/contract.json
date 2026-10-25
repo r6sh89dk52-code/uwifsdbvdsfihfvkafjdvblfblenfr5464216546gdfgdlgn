@@ -1,0 +1,525 @@
+{
+  "sourceHead": "9bec8e01ccbb3f1a674372cf6e48df049dc4f014",
+  "categories": [
+    "ACCIDENTE COMUN",
+    "ACCIDENTE DE TRABAJO",
+    "ENFERMEDAD",
+    "TOMA DE PRESIÓN ARTERIAL",
+    "MATERNIDAD",
+    "OTROS"
+  ],
+  "systems": [
+    "CEFALEA",
+    "CIRCULATORIO",
+    "DIGESTIVO",
+    "ENDOCRINOLOGO",
+    "ENFERMEDADES CRONICAS",
+    "GENITAL Y REPRODUCTIVO",
+    "NEUROLOGICO",
+    "OSTEOMUSCULAR",
+    "PIEL Y ANEXOS",
+    "RESPIRATORIO",
+    "SENSORIAL",
+    "URINARIO/RENAL",
+    "OTROS"
+  ],
+  "diagnoses": [
+    "Cefalea",
+    "Síndrome gripal",
+    "Rinofaringitis aguda",
+    "Dolor de garganta",
+    "Faringitis aguda",
+    "Tos",
+    "Congestión nasal",
+    "Dolor abdominal",
+    "Gastralgia",
+    "Náuseas",
+    "Gastroenteritis aguda",
+    "Dispepsia",
+    "Diarrea aguda",
+    "Lumbalgia",
+    "Cervicalgia",
+    "Dorsalgia",
+    "Dolor muscular",
+    "Mialgia",
+    "Artralgia",
+    "Esguince de tobillo",
+    "Contusión de mano",
+    "Contusión de rodilla",
+    "Contusión de pierna",
+    "Contusión de brazo",
+    "Traumatismo superficial",
+    "Herida cortante",
+    "Herida contusa",
+    "Herida superficial",
+    "Picadura de insecto",
+    "Dermatitis de contacto",
+    "Irritación cutánea",
+    "Prurito",
+    "Conjuntivitis",
+    "Irritación ocular",
+    "Cuerpo extraño ocular",
+    "Ojo rojo",
+    "Dolor ocular",
+    "Mareo",
+    "Malestar general",
+    "Fatiga",
+    "Odontalgia",
+    "Otalgia",
+    "Dolor de hombro",
+    "Dolor de muñeca",
+    "Dolor de rodilla",
+    "Quemadura superficial",
+    "Calambre muscular",
+    "Rinitis alérgica",
+    "Febrícula",
+    "Tensión arterial elevada en evaluación",
+    "Dolor torácico en evaluación"
+  ],
+  "segments": [
+    "ZONA CERVICAL",
+    "ZONA DORSAL",
+    "ZONA LUMBAR",
+    "ZONA SACRA",
+    "HOMBRO",
+    "BRAZO",
+    "CODO",
+    "ANTEBRAZO",
+    "MUÑECA",
+    "MANO",
+    "DEDOS DE LA MANO",
+    "ZONA INGUINAL",
+    "CADERA",
+    "MUSLO",
+    "RODILLA",
+    "PIERNA",
+    "TOBILLO",
+    "PIE",
+    "DEDOS DEL PIE",
+    "CUELLO",
+    "CABEZA",
+    "ZONA CERVICAL,DORSAL,LUMBAR Y SACRA",
+    "PRIMERO, SEGUNDO ,TERCERO, CUARTO Y QUINTO DEDO DERECHO E IZQUIERDO",
+    "PARTE POSTERIOR DEL TORAX (ESPALDA)",
+    "PRIMER, SEGUNDO, TERCERO, CUARTO Y QUINTO ORTEJO DERECHO E IZQUIERDO"
+  ],
+  "procedures": [
+    "OBSERVACION",
+    "TRATAMIENTO ORAL",
+    "INYECTABLE",
+    "CURACION DE HERIDA",
+    "APLICACION DE CREMA",
+    "APLICACION DE GOTAS OFTALMICAS",
+    "LAVADO OCULAR",
+    "CONTROL",
+    "RETIRO DE PUNTOS DE SUTURA",
+    "SUTURAS",
+    "EXTRACCION DE CUERPO EXTRAÑO",
+    "TOMA DE PETAR"
+  ],
+  "additional": [
+    {
+      "kardexCode": "E-20",
+      "kardexName": "OMEPRAZOL TAB",
+      "clinicalCode": "16025008",
+      "clinicalName": "OMEPRAZOL CAPSULA 20MG",
+      "clinicalUnit": "UND",
+      "requiresPhysicalReview": true
+    },
+    {
+      "kardexCode": "E-68",
+      "kardexName": "NYLON AZUL 3/0",
+      "clinicalCode": "16000178",
+      "clinicalName": "NYLON AGUJA 3/0 PUNTA CORTANTE UNILENE",
+      "clinicalUnit": "UND",
+      "requiresPhysicalReview": true
+    },
+    {
+      "kardexCode": "E-86",
+      "kardexName": "ALCOHOL 1 LT",
+      "clinicalCode": "16000019",
+      "clinicalName": "ALCOHOL 96º (USO TOPICO)",
+      "clinicalUnit": "LT",
+      "requiresPhysicalReview": false
+    },
+    {
+      "kardexCode": "E-94",
+      "kardexName": "GUANTES LIMPIOS M",
+      "clinicalCode": "10000929",
+      "clinicalName": "GUANTE CRANBERRY QUIRURGICO TA M X100UN",
+      "clinicalUnit": "UND",
+      "requiresPhysicalReview": true
+    },
+    {
+      "kardexCode": "E-95",
+      "kardexName": "GUANTES LIMPIOS S",
+      "clinicalCode": "16000127",
+      "clinicalName": "GUANTE CRANBERRY QUIRURGICO TA S X100UND",
+      "clinicalUnit": "CJA",
+      "requiresPhysicalReview": true
+    },
+    {
+      "kardexCode": "E-97",
+      "kardexName": "PROTECTOR SOLAR SPF 110GR",
+      "clinicalCode": "16021493",
+      "clinicalName": "BLOQUEADOR SOLAR SPF 60 BAHIA 110GR",
+      "clinicalUnit": "UND",
+      "requiresPhysicalReview": true
+    }
+  ],
+  "pairs": [
+    {
+      "kardexCode": "E-1",
+      "clinicalCode": "16000007"
+    },
+    {
+      "kardexCode": "E-2",
+      "clinicalCode": "16000029"
+    },
+    {
+      "kardexCode": "E-3",
+      "clinicalCode": "16000037"
+    },
+    {
+      "kardexCode": "E-4",
+      "clinicalCode": "16000039"
+    },
+    {
+      "kardexCode": "E-5",
+      "clinicalCode": "16016685"
+    },
+    {
+      "kardexCode": "E-6",
+      "clinicalCode": "16000055"
+    },
+    {
+      "kardexCode": "E-7",
+      "clinicalCode": "16011903"
+    },
+    {
+      "kardexCode": "E-8",
+      "clinicalCode": "16000057"
+    },
+    {
+      "kardexCode": "E-9",
+      "clinicalCode": "16000061"
+    },
+    {
+      "kardexCode": "E-10",
+      "clinicalCode": "16015455"
+    },
+    {
+      "kardexCode": "E-11",
+      "clinicalCode": "16000065"
+    },
+    {
+      "kardexCode": "E-12",
+      "clinicalCode": "16000086"
+    },
+    {
+      "kardexCode": "E-13",
+      "clinicalCode": "16000089"
+    },
+    {
+      "kardexCode": "E-14",
+      "clinicalCode": "16000105"
+    },
+    {
+      "kardexCode": "E-15",
+      "clinicalCode": "16000132"
+    },
+    {
+      "kardexCode": "E-16",
+      "clinicalCode": "16000137"
+    },
+    {
+      "kardexCode": "E-17",
+      "clinicalCode": "16000152"
+    },
+    {
+      "kardexCode": "E-18",
+      "clinicalCode": "16000158"
+    },
+    {
+      "kardexCode": "E-19",
+      "clinicalCode": "16000174"
+    },
+    {
+      "kardexCode": "E-21",
+      "clinicalCode": "16011905"
+    },
+    {
+      "kardexCode": "E-22",
+      "clinicalCode": "16000182"
+    },
+    {
+      "kardexCode": "E-23",
+      "clinicalCode": "16000191"
+    },
+    {
+      "kardexCode": "E-24",
+      "clinicalCode": "16000196"
+    },
+    {
+      "kardexCode": "E-26",
+      "clinicalCode": "16000035"
+    },
+    {
+      "kardexCode": "E-27",
+      "clinicalCode": "16000040"
+    },
+    {
+      "kardexCode": "E-28",
+      "clinicalCode": "16000064"
+    },
+    {
+      "kardexCode": "E-29",
+      "clinicalCode": "16000080"
+    },
+    {
+      "kardexCode": "E-30",
+      "clinicalCode": "16000081"
+    },
+    {
+      "kardexCode": "E-31",
+      "clinicalCode": "16000082"
+    },
+    {
+      "kardexCode": "E-32",
+      "clinicalCode": "16000084"
+    },
+    {
+      "kardexCode": "E-33",
+      "clinicalCode": "16000088"
+    },
+    {
+      "kardexCode": "E-34",
+      "clinicalCode": "16000006"
+    },
+    {
+      "kardexCode": "E-35",
+      "clinicalCode": "16024392"
+    },
+    {
+      "kardexCode": "E-36",
+      "clinicalCode": "16000131"
+    },
+    {
+      "kardexCode": "E-37",
+      "clinicalCode": "16000150"
+    },
+    {
+      "kardexCode": "E-38",
+      "clinicalCode": "16000156"
+    },
+    {
+      "kardexCode": "E-39",
+      "clinicalCode": "16011904"
+    },
+    {
+      "kardexCode": "E-40",
+      "clinicalCode": "16019736"
+    },
+    {
+      "kardexCode": "E-41",
+      "clinicalCode": "16000148"
+    },
+    {
+      "kardexCode": "E-42",
+      "clinicalCode": "16000149"
+    },
+    {
+      "kardexCode": "E-43",
+      "clinicalCode": "16000146"
+    },
+    {
+      "kardexCode": "E-44",
+      "clinicalCode": "16000147"
+    },
+    {
+      "kardexCode": "E-45",
+      "clinicalCode": "16011898"
+    },
+    {
+      "kardexCode": "E-46",
+      "clinicalCode": "16000133"
+    },
+    {
+      "kardexCode": "E-47",
+      "clinicalCode": "16000171"
+    },
+    {
+      "kardexCode": "E-48",
+      "clinicalCode": "16000195"
+    },
+    {
+      "kardexCode": "E-49",
+      "clinicalCode": "16000213"
+    },
+    {
+      "kardexCode": "E-50",
+      "clinicalCode": "16011872"
+    },
+    {
+      "kardexCode": "E-51",
+      "clinicalCode": "16000172"
+    },
+    {
+      "kardexCode": "E-52",
+      "clinicalCode": "16017902"
+    },
+    {
+      "kardexCode": "E-53",
+      "clinicalCode": "16000207"
+    },
+    {
+      "kardexCode": "E-54",
+      "clinicalCode": "16000000"
+    },
+    {
+      "kardexCode": "E-55",
+      "clinicalCode": "16000001"
+    },
+    {
+      "kardexCode": "E-56",
+      "clinicalCode": "16000002"
+    },
+    {
+      "kardexCode": "E-57",
+      "clinicalCode": "16000013"
+    },
+    {
+      "kardexCode": "E-58",
+      "clinicalCode": "16000014"
+    },
+    {
+      "kardexCode": "E-59",
+      "clinicalCode": "16010672"
+    },
+    {
+      "kardexCode": "E-60",
+      "clinicalCode": "16000077"
+    },
+    {
+      "kardexCode": "E-61",
+      "clinicalCode": "16000094"
+    },
+    {
+      "kardexCode": "E-62",
+      "clinicalCode": "16024400"
+    },
+    {
+      "kardexCode": "E-63",
+      "clinicalCode": "16024400"
+    },
+    {
+      "kardexCode": "E-64",
+      "clinicalCode": "16000130"
+    },
+    {
+      "kardexCode": "E-65",
+      "clinicalCode": "16000128"
+    },
+    {
+      "kardexCode": "E-66",
+      "clinicalCode": "16000135"
+    },
+    {
+      "kardexCode": "E-67",
+      "clinicalCode": "16000136"
+    },
+    {
+      "kardexCode": "E-69",
+      "clinicalCode": "16000210"
+    },
+    {
+      "kardexCode": "E-70",
+      "clinicalCode": "16000209"
+    },
+    {
+      "kardexCode": "E-71",
+      "clinicalCode": "16000227"
+    },
+    {
+      "kardexCode": "E-72",
+      "clinicalCode": "16000231"
+    },
+    {
+      "kardexCode": "E-73",
+      "clinicalCode": "16000235"
+    },
+    {
+      "kardexCode": "E-74",
+      "clinicalCode": "16000236"
+    },
+    {
+      "kardexCode": "E-75",
+      "clinicalCode": "16000237"
+    },
+    {
+      "kardexCode": "E-76",
+      "clinicalCode": "16000238"
+    },
+    {
+      "kardexCode": "E-77",
+      "clinicalCode": "16000054"
+    },
+    {
+      "kardexCode": "E-78",
+      "clinicalCode": "16000165"
+    },
+    {
+      "kardexCode": "E-79",
+      "clinicalCode": "16000164"
+    },
+    {
+      "kardexCode": "E-80",
+      "clinicalCode": "10000575"
+    },
+    {
+      "kardexCode": "E-83",
+      "clinicalCode": "16013532"
+    },
+    {
+      "kardexCode": "E-87",
+      "clinicalCode": "16000025"
+    },
+    {
+      "kardexCode": "E-88",
+      "clinicalCode": "16000009"
+    },
+    {
+      "kardexCode": "E-89",
+      "clinicalCode": "16000010"
+    },
+    {
+      "kardexCode": "E-90",
+      "clinicalCode": "16000066"
+    },
+    {
+      "kardexCode": "E-91",
+      "clinicalCode": "16024399"
+    },
+    {
+      "kardexCode": "E-92",
+      "clinicalCode": "16000143"
+    },
+    {
+      "kardexCode": "E-93",
+      "clinicalCode": "16000142"
+    },
+    {
+      "kardexCode": "E-96",
+      "clinicalCode": "16019966"
+    }
+  ],
+  "hashes": {
+    "src/products.json": "7de62d97b31e90d313b9ccaa4bc811beaed31c6ab85d9bd4b9735704cebf37dd",
+    "src/kardexCatalog.ts": "5951446a4ba0031b30c86c3b401471aea207599c805cc9ef67d982662bc1f7ed",
+    "src/reviewedKardexAssociations.ts": "5b9db7bb67c6494cc51d2ca93266d6a7054f38a42d38fc1967e82ff7017dd433",
+    "native-ios/Sources/DanperCore/N2ClinicalFormOptions.swift": "80a20fa0680226f195bffa64773ea9212d8a85fc23b0e996d053af374bf840e4",
+    "native-ios/Sources/DanperCore/N2OsteomuscularSegments.swift": "7e2f6ec4c30d1e923aebb6b32ad446d4081f1a52b188d38aeaf75242474f61c0",
+    "native-ios/Sources/DanperCore/N2ProcedureRules.swift": "51549e937cde0a582abdfd461ede591a85cdb31b7279a22906d900fb6c63d356",
+    "native-ios/Sources/DanperCore/N2UserReviewedKardexLinks.swift": "46215f049828b18d000fc82615733fb28f8a6ca1b51a29e1fdfd22c8ca819330"
+  }
+}

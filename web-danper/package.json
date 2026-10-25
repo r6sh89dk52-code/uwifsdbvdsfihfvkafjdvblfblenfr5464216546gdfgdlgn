@@ -1,0 +1,42 @@
+{
+  "name": "danper-salud-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "npm run generate && tsc --noEmit && vite build && node scripts/build-sw.mjs",
+    "generate": "node scripts/sync-legacy.mjs && node scripts/generate-contract.mjs && node scripts/generate-vigilance.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "test:ui": "playwright test",
+    "preview": "vite preview --host 127.0.0.1",
+    "firebase:prepare": "node scripts/prepare-firebase.mjs",
+    "format": "prettier --write src tests scripts/*.mjs *.ts",
+    "test:pwa": "node scripts/test-pwa.mjs"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "firebase": "12.5.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.18.12",
+    "@types/react": "18.3.26",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "5.0.4",
+    "@xmldom/xmldom": "^0.9.12",
+    "fake-indexeddb": "6.2.4",
+    "prettier": "^3.6.2",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vite": "^7.3.7"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
+  }
+}
