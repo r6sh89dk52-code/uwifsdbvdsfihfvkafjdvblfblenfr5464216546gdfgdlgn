@@ -413,8 +413,8 @@ struct N2ClinicalWorkspaceRootView:View {
                                        symbol:"person.crop.rectangle.stack") {N2NativePersonalImportView()}
                         DanperToolLink(title:"Inventario y lotes",
                                        symbol:"shippingbox") {N2NativeInventoryView()}
-                        DanperToolLink(title:"Conciliación de inventario",
-                                       symbol:"checkmark.shield") {N2ReconciliationView()}
+                        DanperToolLink(title:"Corte del día 9 · inventario único",
+                                       symbol:"calendar.badge.clock") {N2KardexCutPreviewView()}
                         DanperToolLink(title:"Kardex de enfermería",
                                        symbol:"tablecells") {N2VerifiedNursingExportView()}
                         DanperToolLink(title:"Indicador ambulatorio · Excel",
