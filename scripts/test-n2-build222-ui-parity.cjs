@@ -541,8 +541,7 @@ must(identityEvidence,'public let operatorDni:String?',
 must(identityEvidence,'public static func automaticAuditDescription(',
      'la constancia de apertura se genera desde hechos declarados sin motivo manual');
 
-const consolidatedIndicator=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
-must(indicatorCore,'string(visit["responsibleDni"]),string(visit["responsible"])',
+must(indicatorBook,'string(visit["responsibleDni"]),string(visit["responsible"])',
      'DNI en AB y nombre en AC del Excel oficial');
 
 
