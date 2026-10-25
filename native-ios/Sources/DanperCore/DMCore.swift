@@ -151,7 +151,7 @@ public enum DMCITTParser {
         var c=DMCertificate()
         func extract(_ p:String)->String {
             guard let re=try? NSRegularExpression(pattern:p,options:[.dotMatchesLineSeparators]),
-                  let m=re.firstMatch(in:text,range:NSRange(text.startIndex...,in:text)),
+                  let m=re.firstMatch(in:text,range:NSRange(text.startIndex..<text.endIndex,in:text)),
                   m.numberOfRanges>1,let range=Range(m.range(at:1),in:text) else{return ""}
             return String(text[range]).trimmingCharacters(in:.whitespacesAndNewlines)
         }
