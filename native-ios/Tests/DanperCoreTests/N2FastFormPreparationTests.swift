@@ -124,6 +124,52 @@ final class N2FastFormPreparationTests:XCTestCase {
         XCTAssertNil(try journal.recover())
     }
 
+    func testDraftListOneRevisionMatchesStrictReaderAndDeleteKeepsStock()throws {
+        let original=try fixture("n1e-clinical-stock.json")
+        let patch=try JSONSerialization.data(withJSONObject:[
+            "worker":["dni":"00000001","name":"TRABAJADOR FICTICIO"],
+            "date":"2026-10-25","time":"10:00","items":[]] as [String:Any])
+        let seed=try N2SnapshotEditor.upsertDraft(
+            snapshot:original,id:"DRAFT-FAST-LIST",changes:patch,
+            at:1700000000000)
+        let folder=try directory()
+        let journal=try N2EncryptedClinicalJournal(directory:folder,
+            secret:Data(repeating:0x79,count:32))
+        XCTAssertEqual(try journal.commit(seed,expectedRevision:0),1)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+
+        let strict=try N2NativeDraftRecovery.read(seed)
+        let authenticated=try N2NativeDraftRecovery.readVerified(seed)
+        let fast=try store.readDraftsWithRevision()
+        XCTAssertEqual(fast.revision,1)
+        XCTAssertEqual(fast.drafts.map(\.id),strict.map(\.id))
+        XCTAssertEqual(fast.drafts.map(\.id),authenticated.map(\.id))
+        XCTAssertEqual(fast.drafts.map(\.form.date),strict.map(\.form.date))
+        XCTAssertTrue(fast.drafts.contains{$0.id=="DRAFT-FAST-LIST"})
+
+        let deleted=try store.removeDraft(
+            id:"DRAFT-FAST-LIST",expectedRevision:fast.revision)
+        XCTAssertEqual(deleted.revision,2)
+        let latest=try store.readDraftsWithRevision()
+        XCTAssertEqual(latest.revision,2)
+        XCTAssertFalse(latest.drafts.contains{$0.id=="DRAFT-FAST-LIST"})
+        let before=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:original) as? [String:Any])
+        let after=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:try XCTUnwrap(journal.recover()).snapshot) as? [String:Any])
+        for collection in ["workers","stockLots","stockMovements","allergies"] {
+            XCTAssertEqual(try JSONSerialization.data(
+                withJSONObject:before[collection]!,options:[.sortedKeys]),
+                try JSONSerialization.data(
+                withJSONObject:after[collection]!,options:[.sortedKeys]))
+        }
+        XCTAssertThrowsError(try store.removeDraft(
+            id:"fundo-unit",expectedRevision:latest.revision)) {
+            XCTAssertEqual($0 as? N2SnapshotEditError,.savedIsImmutable)
+        }
+        XCTAssertEqual(try journal.recover()?.revision,2)
+    }
+
     func testUnifiedReadDoesNotCreateMissingClinicalSource()throws {
         let folder=try directory()
         let journal=try N2EncryptedClinicalJournal(directory:folder,
