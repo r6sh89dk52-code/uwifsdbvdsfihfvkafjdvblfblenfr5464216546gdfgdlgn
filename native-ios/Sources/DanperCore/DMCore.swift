@@ -66,6 +66,9 @@ public struct DMCertificate:Codable,Equatable,Identifiable,Sendable {
     public var labor:String=""
     public var hospitalization:DMHospitalization = .unknown
     public var clearanceVerified:Bool=false
+    public var contactChecked:Bool=false
+    public var extensionChecked:Bool=false
+    public var occupationalReviewChecked:Bool=false
     public var returnedDate:String=""
     public var state:DMState = .onLeave
     public var createdAt:Date=Date()
@@ -108,6 +111,10 @@ public struct DMLedger:Codable,Sendable {
     public mutating func update(_ certificate:DMCertificate)throws {
         guard certificate.isValid,let index=certificates.firstIndex(where:{$0.id==certificate.id})
         else{throw DMError.invalidCertificate}
+        if certificate.state == .returned {
+            guard DMDate.parse(certificate.returnedDate) != nil else{throw DMError.invalidDate}
+            guard !certificate.needsClearance || certificate.clearanceVerified else {throw DMError.clearanceRequired}
+        }
         guard !certificates.enumerated().contains(where:{$0.offset != index && $0.element.fingerprint==certificate.fingerprint})
         else{throw DMError.duplicate}
         certificates[index]=certificate
