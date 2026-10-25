@@ -113,7 +113,7 @@ public final class N2ProtectedClinicalVaultCore {
         }
         let catalog=try N2NativeCatalogLoader.load(
             products:products,nursing:nursing,approvedMappings:mappings)
-        let context=try N2NativeFormContextReader.read(
+        let context=try N2NativeFormContextReader.readVerified(
             snapshot:active.snapshot,revision:active.revision,products:catalog)
         let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot)
         return (context:context,drafts:drafts)
@@ -217,7 +217,7 @@ public final class N2ProtectedClinicalVaultCore {
         }
         let catalog=try N2NativeCatalogLoader.load(
             products:products,nursing:nursing,approvedMappings:mappings)
-        return try N2NativeFormContextReader.read(
+        return try N2NativeFormContextReader.readVerified(
             snapshot:active.snapshot,revision:active.revision,products:catalog)
     }
 
