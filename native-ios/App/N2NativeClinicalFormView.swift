@@ -77,6 +77,27 @@ struct N2NativeClinicalFormView:View {
     @State private var chooseDraft=false
     @State private var draftToDelete:String?
     @State private var drafts=[N2RecoverableDraft]()
+    @State private var useCustomSegment=false
+    /// A legacy free-text segment stays editable and never disappears when
+    /// the user returns to a previously saved clinical draft.
+    private var segmentChoice:Binding<String> {
+        Binding(get:{
+            if useCustomSegment {return N2OsteomuscularSegments.custom}
+            if form.segment.isEmpty {return ""}
+            return N2OsteomuscularSegments.isKnown(form.segment)
+                ? form.segment : N2OsteomuscularSegments.custom
+        },set:{option in
+            if option==N2OsteomuscularSegments.custom {
+                if N2OsteomuscularSegments.isKnown(form.segment) {
+                    form.segment=""
+                }
+                useCustomSegment=true
+            } else {
+                useCustomSegment=false
+                form.segment=option
+            }
+        })
+    }
     @State private var allergyStatus="unknown"
     @State private var allergySubstances=""
     @State private var editingAllergy=false
@@ -795,9 +816,22 @@ struct N2NativeClinicalFormView:View {
                     highlighted:highlightedField=="clinical-system")
                     .id("clinical-system")
                 if form.system=="OSTEOMUSCULAR" {
-                    DanperField(title:"Segmento anatómico",highlighted:highlightedField=="clinical-segment") {
-                        TextField("Describe la zona afectada",text:$form.segment).focused($focusedField,equals:"segment")
-                    }.id("clinical-segment")
+                    DanperChoiceField(title:"Segmento osteomuscular",
+                        selection:segmentChoice,
+                        options:N2OsteomuscularSegments.options +
+                                [N2OsteomuscularSegments.custom],
+                        openRequest:highlightedField=="clinical-segment" ? choiceOpenCounter : 0,
+                        highlighted:highlightedField=="clinical-segment")
+                        .accessibilityIdentifier("clinical-osteomuscular-segment-choice")
+                        .id("clinical-segment")
+                    if segmentChoice.wrappedValue==N2OsteomuscularSegments.custom {
+                        DanperField(title:"Especificar segmento anatómico",
+                                    highlighted:highlightedField=="clinical-segment") {
+                            TextField("Describe la zona afectada",text:$form.segment)
+                                .focused($focusedField,equals:"segment")
+                                .accessibilityIdentifier("clinical-segment-other")
+                        }
+                    }
                 }
             }
             DanperField(title:"Diagnóstico presuntivo",highlighted:highlightedField=="clinical-diagnosis") {
