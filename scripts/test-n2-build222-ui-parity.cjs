@@ -13,6 +13,19 @@ const inventory=fs.readFileSync(path.join(root,'native-ios/App/N2NativeInventory
 const catalog=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeCatalogIndex.swift'),'utf8');
 const indicator=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedIndicatorExportView.swift'),'utf8');
 const nursing=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedNursingExportView.swift'),'utf8');
+assert(nursing.includes('@State private var site="AMBAS"'),
+  'El Kardex de Enfermeras exporta el inventario conjunto sin sede invisible');
+assert(!nursing.includes('site.isEmpty ||'),
+  'La exportación del Kardex no puede depender de un selector de sede eliminado');
+must(nursing,'exportFailureMessage(error)',
+  'el rechazo de Excel enfermería debe mostrar su causa');
+must(indicator,'LabeledContent("Ámbito",value:"Fundo y Planta La Venturosa")',
+  'el Indicador conserva ambas sedes sin separarlas en inventarios');
+assert(!indicator.includes('N2ReconciliationView()'),
+  'no enlazar una conciliación por sede obsoleta desde el Indicador único');
+must(indicator,'if !allowed {selectConfirmed()}',
+  'Modo provisional no debe agregar todas las atenciones pendientes sin permiso');
+
 const reportStages=fs.readFileSync(path.join(root,'native-ios/App/N2Build222ExportStages.swift'),'utf8');
 const clinicalRules=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProcedureRules.swift'),'utf8');
 const palette=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
