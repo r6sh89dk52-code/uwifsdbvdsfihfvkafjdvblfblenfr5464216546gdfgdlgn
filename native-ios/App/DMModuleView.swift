@@ -333,6 +333,9 @@ private struct DMFollowupSheet:View {
                 Section("Seguimiento") {
                     Text(record.name)
                     Text("Retorno previsto: \(record.expectedReturn ?? "Pendiente")")
+                    Toggle("Contactado / seguimiento realizado",isOn:$record.contactChecked)
+                    Toggle("Comprobada posibilidad de ampliación",isOn:$record.extensionChecked)
+                    Toggle("Revisión de salud ocupacional",isOn:$record.occupationalReviewChecked)
                     Toggle("Se verificó alta médica",isOn:$record.clearanceVerified)
                     if record.needsClearance && !record.clearanceVerified {
                         Text("No se permite confirmar retorno mientras falta el alta.")
