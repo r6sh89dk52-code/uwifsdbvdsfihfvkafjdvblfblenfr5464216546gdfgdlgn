@@ -82,6 +82,25 @@ assert(form.includes('drafts=try await vault.readDrafts()'),
 must(clinicalHome,'let prepared=try await vault.readDashboard()',
   'Inicio no debe descifrar otra vez el mismo diario');
 console.log('PASS: Inicio y Nueva atención aprovechan una sola lectura cifrada, sin cachear datos clínicos.');
+// Home counters and the 25-worker lookup should not repeatedly sort/rebuild
+// a complete 9k-person index merely to show three numbers or one small page.
+const formReader=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeFormContext.swift'),'utf8');
+const workerSearch=fs.readFileSync(path.join(root,'native-ios/App/N2WorkerSearchSheet.swift'),'utf8');
+must(formReader,'let hasOfficialWorkers=w.contains',
+  'la selección oficial del padrón se conserva');
+must(formReader,'guard w.allSatisfy({',
+  'la optimización no omite validaciones del padrón');
+assert(!formReader.includes('N2NativeSnapshotReader.read(snapshot)'),
+  'el formulario no puede reconstruir historial para filtrar trabajadores');
+must(workerSearch,'private let pageSize=25','páginas reales de 25 trabajadores');
+assert(!workerSearch.includes('.sorted{'),
+  'la búsqueda nativa no debe reordenar los 9k registros en cada render');
+for(const source of [core,workspace,vaultSource,demo]) {
+  must(source,'dashboardCounters(','contador rápido por estado validado');
+}
+must(clinicalHome,'vault.dashboardCounters(',
+  'Inicio calcula contadores sin generar el historial completo');
+console.log('PASS: padrón 9k con orden único, 25 visibles, y contadores directos del diario cifrado.');
 for(const marker of [
   'eligibleForSharedClose(',
   'end.hasSuffix("-08")',
