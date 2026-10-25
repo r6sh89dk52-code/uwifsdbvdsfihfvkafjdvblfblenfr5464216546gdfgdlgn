@@ -120,7 +120,8 @@ struct N2FirstManualWorkerView:View {
             var evaluationError:NSError?
             guard authentication.canEvaluatePolicy(
                 .deviceOwnerAuthentication,error:&evaluationError) else {
-                throw evaluationError ?? LAError(.passcodeNotSet)
+                throw evaluationError ?? NSError(
+                    domain:"DANPER.LocalAuthentication",code:1)
             }
             guard try await authentication.evaluatePolicy(
                 .deviceOwnerAuthentication,
