@@ -260,6 +260,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                   #"^([01]\d|2[0-3]):[0-5]\d$"#,
                   options:.regularExpression) != nil),
               !responsible.isEmpty,
+              effectiveResponsibleDni.range(of:#"^\d{8}$"#,
+                  options:.regularExpression) != nil,
               (!hasWound || photoReviewed) else {
             throw N2FormError.invalidVisit
         }
