@@ -61,6 +61,24 @@ final class N2FastFormPreparationTests:XCTestCase {
         XCTAssertEqual(try journal.recover()?.snapshot,source)
     }
 
+    func testUnifiedDashboardMatchesSeparateHistoryAndDraftReads()throws {
+        let source=try fixture("n1e-clinical-stock.json")
+        let folder=try directory()
+        let journal=try N2EncryptedClinicalJournal(directory:folder,
+            secret:Data(repeating:0x76,count:32))
+        _=try journal.commit(source,expectedRevision:0)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let baseline=try XCTUnwrap(store.readIndex())
+        let previousDrafts=try store.readDrafts()
+        let prepared=try store.readDashboard()
+        let history=try XCTUnwrap(prepared.history)
+        XCTAssertEqual(history.roster,baseline.roster)
+        XCTAssertEqual(history.searchableRoster,baseline.searchableRoster)
+        XCTAssertEqual(history.visits,baseline.visits)
+        XCTAssertEqual(history.pendingClinicalLines,baseline.pendingClinicalLines)
+        XCTAssertEqual(prepared.drafts.map(\.id),previousDrafts.map(\.id))
+        XCTAssertEqual(try journal.recover()?.snapshot,source)
+    }
     func testUnifiedReadDoesNotCreateMissingClinicalSource()throws {
         let folder=try directory()
         let journal=try N2EncryptedClinicalJournal(directory:folder,
