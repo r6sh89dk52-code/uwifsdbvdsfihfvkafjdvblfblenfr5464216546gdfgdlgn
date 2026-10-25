@@ -79,6 +79,51 @@ final class N2FastFormPreparationTests:XCTestCase {
         XCTAssertEqual(prepared.drafts.map(\.id),previousDrafts.map(\.id))
         XCTAssertEqual(try journal.recover()?.snapshot,source)
     }
+    func testFastDashboardCountersMatchProjectedHistoryWithoutRosterSorting()throws {
+        let source=try fixture("n1e-clinical-stock.json")
+        let folder=try directory()
+        let journal=try N2EncryptedClinicalJournal(directory:folder,
+            secret:Data(repeating:0x77,count:32))
+        _=try journal.commit(source,expectedRevision:0)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let full=try store.readDashboard()
+        let visits=try XCTUnwrap(full.history).visits
+        let date="2026-10-14",weekStart="2026-10-12"
+        let fast=try XCTUnwrap(store.dashboardCounters(today:date,weekStart:weekStart))
+        XCTAssertEqual(fast.today,visits.filter{
+            $0.status=="saved" && $0.date==date
+        }.count)
+        XCTAssertEqual(fast.week,visits.filter{
+            $0.status=="saved" && $0.date>=weekStart && $0.date<=date
+        }.count)
+        XCTAssertEqual(fast.drafts,full.drafts.count)
+        XCTAssertEqual(try journal.recover()?.snapshot,source)
+    }
+
+    func testFasterFormWorkerVisibilityMatchesOriginalIndex()throws {
+        let source=try fixture("n1e-clinical-stock.json")
+        let (products,nursing,mappings)=try catalogs()
+        let catalog=try N2NativeCatalogLoader.load(
+            products:products,nursing:nursing,approvedMappings:mappings)
+        let direct=try N2NativeFormContextReader.read(
+            snapshot:source,revision:7,products:catalog)
+        let previous=try N2NativeSnapshotReader.read(source)
+        XCTAssertEqual(direct.workers.map(\.dni),
+                       previous.searchableRoster.map(\.dni))
+        XCTAssertEqual(direct.workers.map(\.name),
+                       previous.searchableRoster.map(\.name))
+    }
+
+    func testDashboardCountDoesNotCreateMissingClinicalSource()throws {
+        let folder=try directory()
+        let journal=try N2EncryptedClinicalJournal(directory:folder,
+            secret:Data(repeating:0x78,count:32))
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        XCTAssertNil(try store.dashboardCounters(
+            today:"2026-10-25",weekStart:"2026-10-19"))
+        XCTAssertNil(try journal.recover())
+    }
+
     func testUnifiedReadDoesNotCreateMissingClinicalSource()throws {
         let folder=try directory()
         let journal=try N2EncryptedClinicalJournal(directory:folder,
