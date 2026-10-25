@@ -114,11 +114,24 @@ const nm=cells(document(nn,2)),tm=cells(document(tn,2));
 console.log('N1s nursing diagnostic nonpatient XML row7:',Buffer.from(nn['xl/worksheets/sheet2.xml']).toString('utf8').match(/<row[^>]*r="7"[^>]*>[\s\S]*?<\/row>/)?.[0]?.slice(0,2200));
 console.log('N1s nursing parsed first refs:',[...nm.keys()].filter(k=>/^[D-J]7$/.test(k)));
 
+const nursingPlan=JSON.parse(fs.readFileSync(path.join(root,'n1s-nursing-plan.json'),'utf8'));
+assert.equal(nursingPlan.rows.length,98);
 for(let row=7;row<=104;row++){
+ const stockKnown=nursingPlan.rows[row-7].stockKnown;
  for(const col of ['D','E','F','G','H','I','J']){
   const ref=col+row,source=tm.get(ref),target=nm.get(ref);
   assert.ok(target,'missing nursing '+ref);
-  assert.equal(f(nm,ref),f(tm,ref),'nurse formula '+ref);
+  // Native exports intentionally retain balance formulas even for rows with
+  // no recorded lot. Build 222 leaves those cells blank. Validate the exact
+  // formulas for all 98 rows rather than requiring that old omission.
+  const expectedFormula=col==='F'?'D'+row+'+E'+row:col==='H'?'F'+row+'-G'+row:'';
+  assert.equal(f(nm,ref),expectedFormula,'native nurse formula '+ref);
+  assert.equal(f(tm,ref),stockKnown?expectedFormula:'','Build 222 nurse formula '+ref);
+  if(!stockKnown && ['D','E','F','G','H'].includes(col)) {
+   assert.equal(get(nm,ref),'0','no-lot row must cache numeric zero at '+ref);
+   assert.ok(!['s','inlineStr','str'].includes(target.getAttribute('t')),
+     'no-lot zero must stay numeric at '+ref);
+  }
   const originalValue=value(source),renderedValue=value(target);
   if(col==='I' && /^\d{4}-\d{2}-\d{2}$/.test(String(originalValue))){
    const serial=(Date.parse(originalValue+'T00:00:00Z')-
@@ -127,7 +140,7 @@ for(let row=7;row<=104;row++){
   }else {
    // The old Build 222 fixture leaves no-lot numeric cells blank.
    // Native Kardex correctly preserves all 98 rows with explicit numeric 0.
-   if(['D','E','F','G','H'].includes(col) &&
+   if(!stockKnown && ['D','E','F','G','H'].includes(col) &&
       originalValue==='' && renderedValue==='0') {
      assert.ok(target,'numeric zero must have a physical cell at '+ref);
      assert.ok(!['s','inlineStr','str'].includes(target.getAttribute('t')),

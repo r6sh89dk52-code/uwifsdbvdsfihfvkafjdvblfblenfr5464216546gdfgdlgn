@@ -70,7 +70,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         tap(app.buttons["choice-Procedimiento"],in:app)
         tap(app.buttons["Curacion De Herida"],in:app)
     }
-    private func reconcileAlcohol(_ app:XCUIApplication) {
+    private func linkAlcohol(_ app:XCUIApplication) {
         if app.buttons["pending-mapping-16000019"].waitForExistence(timeout:2) {
         tap(app.buttons["pending-mapping-16000019"],in:app)
         enter(app.textFields["Buscar presentación física"],"ALCOHOL",in:app)
@@ -84,20 +84,22 @@ final class N3ClinicalJourneyTests:XCTestCase {
         let closed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.navigationBars["Vinculación operativa"])
         XCTAssertEqual(XCTWaiter.wait(for:[closed],timeout:10),.completed,app.debugDescription)
         }
-        XCTAssertTrue(app.buttons["pending-physical-16000019"].waitForExistence(timeout:10),app.debugDescription)
-        tap(app.buttons["pending-physical-16000019"],in:app)
-        tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Lote compatible")).firstMatch,in:app)
-        tap(app.buttons.matching(NSPredicate(format:"label CONTAINS %@","N3-ALCOHOL")).firstMatch,in:app)
-        enter(app.textFields["Cantidad física realmente utilizada"],"5",in:app)
-        tap(app.switches["Abrí un nuevo envase (declaración explícita)"],in:app)
-        enter(app.textFields["Responsable"],"OPERADOR DE PRUEBA N3",in:app)
-        enter(app.descendants(matching:.any)["Evidencia y motivo"],"Consumo ficticio de 5 mL verificado durante la atención",in:app)
-        tap(app.switches["Confirmo la cantidad física y la evidencia"],in:app)
-        capture(app,"Conciliacion-evidencia-fisica")
-        tap(app.buttons["Verificar y conciliar sin duplicar atención"],in:app)
-        let resolved=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["pending-physical-16000019"])
-        XCTAssertEqual(XCTWaiter.wait(for:[resolved],timeout:10),.completed,app.debugDescription)
-        capture(app,"Resultado-conciliado")
+        // The saved visit has no opening declaration. Linking a product
+        // must not invent one or mark that original pending use as deducted.
+        XCTAssertTrue(app.buttons["pending-container-stock-16000019"].waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertFalse(app.buttons["pending-physical-16000019"].exists)
+        capture(app,"Pendiente-original-con-ruta-directa-al-inventario")
+    }
+    private func declareContainers(_ app:XCUIApplication,opened:Bool,expectedCount:Int?=nil) {
+        var declarations=0
+        let choice=opened ? "Sí, abrí uno nuevo · Kardex 1" : "No, usé el abierto · Kardex 0"
+        while app.alerts.buttons[choice].waitForExistence(timeout:2) {
+            declarations+=1
+            XCTAssertLessThanOrEqual(declarations,2,app.debugDescription)
+            if declarations>2 {return}
+            tap(app.alerts.buttons[choice],in:app)
+        }
+        if let expectedCount {XCTAssertEqual(declarations,expectedCount,app.debugDescription)}
     }
     private func inventory(_ app:XCUIApplication) {
         tap(app.tabBars.buttons["Ajustes"],in:app)
@@ -105,7 +107,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
             tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Inventario y lotes")).firstMatch,in:app)
         }
     }
-    private func registerReuse(_ app:XCUIApplication) {
+    private func registerContainerUse(_ app:XCUIApplication,opened:Bool,expectBlocked:Bool=false) {
         tap(app.buttons["Nueva atención"],in:app)
         enter(app.textFields["attention-worker-dni"],"00000031",in:app)
         tap(app.buttons["Siguiente"],in:app)
@@ -116,7 +118,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         tap(app.buttons["Enfermedad"],in:app)
         tap(app.buttons["choice-Sistema afectado"],in:app)
         tap(app.buttons["Respiratorio"],in:app)
-        enter(app.descendants(matching:.any)["clinical-diagnosis-input"],"PRUEBA REUTILIZACION ENVASE N3",in:app)
+        enter(app.descendants(matching:.any)["clinical-diagnosis-input"],opened ? "PRUEBA APERTURA ENVASE N3" : "PRUEBA REUTILIZACION ENVASE N3",in:app)
         tap(app.buttons["Siguiente"],in:app)
         addMedication(app,query:"ALCOHOL 96",code:"16000019")
         woundProcedure(app,name:"ALCOHOL 96")
@@ -124,13 +126,26 @@ final class N3ClinicalJourneyTests:XCTestCase {
         tap(app.buttons["No se envió"],in:app)
         tap(app.buttons["Siguiente"],in:app)
         tap(app.buttons["Guardar atención"],in:app)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label BEGINSWITH %@",
-            "Kardex R: 0 · Uso de envase abierto")).firstMatch.waitForExistence(timeout:10),app.debugDescription)
+        declareContainers(app,opened:opened,expectedCount:1)
+        if expectBlocked {
+            // The fixture tracks a measured remainder. A second opening must
+            // not silently exhaust that first bottle or create another debit.
+            XCTAssertTrue(app.buttons["pending-container-stock-16000019"].waitForExistence(timeout:15),app.debugDescription)
+            XCTAssertFalse(app.staticTexts["Kardex R: 1"].exists)
+            capture(app,"Apertura-adicional-bloqueada-por-volumen-medido")
+        } else {
+            let result=opened ? "Kardex R: 1" : "Kardex R: 0 · Reutilización declarada; ninguna caja nueva descontada"
+            XCTAssertTrue(app.staticTexts[result].firstMatch.waitForExistence(timeout:15),app.debugDescription)
+            XCTAssertFalse(app.buttons["pending-container-stock-16000019"].exists)
+            capture(app,opened ? "Nueva-apertura-explicita-R1" : "Reutilizacion-explicita-R0")
+        }
         XCTAssertFalse(app.buttons["pending-physical-16000019"].exists)
-        capture(app,"Segunda-atencion-envase-abierto-R0")
     }
     @discardableResult private func addLot(_ app:XCUIApplication,code:String,query:String,reference:String,quantity:String,expiry:String,capacity:String?=nil)->Bool {
-        if app.descendants(matching:.any)["inventory-lot-"+reference].waitForExistence(timeout:2) {return false}
+        let existing=app.descendants(matching:.any)["inventory-lot-"+reference].firstMatch
+        let group=app.descendants(matching:.any)["inventory-group-"+code].firstMatch
+        if !existing.exists && group.exists {tap(group,in:app)}
+        if existing.waitForExistence(timeout:2) {return false}
         tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Registrar medicamento")).firstMatch,in:app)
         enter(app.textFields["inventory-select-product"],query,in:app)
         tap(app.buttons["inventory-result-"+code],in:app)
@@ -148,7 +163,10 @@ final class N3ClinicalJourneyTests:XCTestCase {
         }
         enter(app.textFields["inventory-single-quantity"],quantity,in:app)
         tap(app.buttons["inventory-save-lot"],in:app)
-        XCTAssertTrue(app.staticTexts["Existencias registradas correctamente en el Kardex único."].waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertTrue(app.alerts["¿Qué representa esta cantidad?"].waitForExistence(timeout:5),app.debugDescription)
+        tap(app.alerts.buttons["Stock físico que tengo hoy"],in:app)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label BEGINSWITH %@",
+            "Stock físico actual registrado. Stock inicial estimado del día 9:")).firstMatch.waitForExistence(timeout:15),app.debugDescription)
         capture(app,"Lote-"+reference)
         return true
     }
@@ -213,15 +231,20 @@ final class N3ClinicalJourneyTests:XCTestCase {
         tap(app.buttons["Siguiente"],in:app)
         capture(app,"Revision-final-real")
         tap(app.buttons["Guardar atención"],in:app)
+        declareContainers(app,opened:true)
         XCTAssertTrue(app.staticTexts["Atención registrada"].firstMatch.waitForExistence(timeout:15),app.debugDescription)
         capture(app,"Atencion-guardada-con-pendientes")
-        if app.buttons["pending-physical-16000019"].waitForExistence(timeout:2) {
-            reconcileAlcohol(app)
+        XCTAssertTrue(app.buttons["pending-mapping-16000116"].exists ||
+                      app.buttons["pending-stock-16000116"].exists,app.debugDescription)
+        var alreadyOpened=false
+        if app.buttons["pending-mapping-16000019"].waitForExistence(timeout:2) {
+            linkAlcohol(app)
         } else {
-            XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label BEGINSWITH %@",
-                "Kardex R: 0 · Uso de envase abierto")).firstMatch.exists,app.debugDescription)
+            XCTAssertTrue(app.staticTexts["Kardex R: 1"].firstMatch.exists,app.debugDescription)
+            alreadyOpened=true
         }
-        registerReuse(app)
+        registerContainerUse(app,opened:true,expectBlocked:alreadyOpened)
+        registerContainerUse(app,opened:false)
         inventory(app)
         capture(app,"Inventario-despues-de-conciliar")
         tap(app.tabBars.buttons["Historial"],in:app)
@@ -233,8 +256,12 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout:15),app.debugDescription)
         capture(app,"Persistencia-tras-relanzar")
         inventory(app)
-        XCTAssertTrue(app.staticTexts["Envases abiertos declarados: 1"].waitForExistence(timeout:10),app.debugDescription)
-        tap(app.buttons["Declarar agotado, cerrado o descartado"].firstMatch,in:app)
+        let alcoholLot=app.descendants(matching:.any)["inventory-lot-N3-ALCOHOL"].firstMatch
+        if !alcoholLot.exists {
+            tap(app.descendants(matching:.any)["inventory-group-E-86"].firstMatch,in:app)
+        }
+        XCTAssertTrue(alcoholLot.staticTexts["Abiertos: 1"].waitForExistence(timeout:10),app.debugDescription)
+        tap(alcoholLot.buttons["Declarar agotado, cerrado o descartado"].firstMatch,in:app)
         XCTAssertTrue(app.navigationBars["Estado de envases"].waitForExistence(timeout:5))
         capture(app,"Declaracion-manual-estado-envase")
         tap(app.buttons["Cancelar"],in:app)
