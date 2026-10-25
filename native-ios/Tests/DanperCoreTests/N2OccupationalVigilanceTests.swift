@@ -101,7 +101,7 @@ final class N2OccupationalVigilanceTests:XCTestCase {
             snapshot:fundo,start:"2026-10-09",end:"2026-10-24")
         let a=try sheet(first)
         XCTAssertEqual(first.unresolvedOrganizationalUnits,0)
-        XCTAssertTrue(a.contains("r=\\"C2\\" s=\\"4\\" t=\\"inlineStr\\""))
+        XCTAssertTrue(a.contains(#"r="C2" s="4" t="inlineStr""#))
         XCTAssertTrue(a.contains(">A071</t>"))
         XCTAssertTrue(a.contains(">20000126</t>"))
         let p=try XCTUnwrap(JSONSerialization.jsonObject(
