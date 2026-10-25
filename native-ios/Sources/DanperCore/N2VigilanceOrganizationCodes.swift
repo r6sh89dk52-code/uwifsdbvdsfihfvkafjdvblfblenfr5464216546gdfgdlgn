@@ -214,7 +214,7 @@ public enum N2VigilanceOrganizationCodes {
         // A documented code is retained only if it belongs to this
         // society AND the area is unknown (e.g. an old historical visit).
         // Conflicting or unverified codes are never silently presented.
-        let known=Set(official[society]?.values.map{Array($0)} ?? [])
+        let known=Set(official[society].map{Array($0.values)} ?? [])
         let previous=existingOrganization.trimmingCharacters(in:.whitespacesAndNewlines)
         let organizational=mapped ?? (key.isEmpty && known.contains(previous) ? previous : "")
         return Resolution(subdivision:subdivision,
