@@ -260,7 +260,7 @@ struct DMModuleView:View {
             draft.receiptDate=DMDate.iso(receiptDate)
             if !draft.dni.isEmpty,
                let roster=try? await clinical.readHistory(),
-               let worker=roster?.searchableRoster.first(where:{$0.dni==draft.dni}) {
+               let worker=roster.searchableRoster.first(where:{$0.dni==draft.dni}) {
                 draft.name=worker.name;draft.site=worker.site
                 draft.area=worker.area;draft.labor=worker.labor
                 nameSource="Nombre y área sugeridos desde el padrón; verifica antes de guardar."
@@ -308,9 +308,10 @@ struct DMModuleView:View {
         do {
             let target=FileManager.default.temporaryDirectory
                 .appendingPathComponent("DANPER_DM_"+UUID().uuidString+".xlsx")
-            try DMExcelWriter.export(template:template,
-                                     records:snapshot.ledger.certificates,
-                                     destination:target)
+            let data=snapshot.ledger.certificates
+            try await Task.detached(priority:.userInitiated) {
+                try DMExcelWriter.export(template:template,records:data,destination:target)
+            }.value
             exportFile=target
             message="Excel generado conservando las siete hojas y las filas históricas."
         } catch {
