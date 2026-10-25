@@ -38,7 +38,11 @@ const router=fs.readFileSync(path.join(app,'N2WorkspaceVault.swift'),'utf8');
 const clinical=fs.readFileSync(path.join(app,'N2ProtectedClinicalIOSVault.swift'),'utf8');
 const demo=fs.readFileSync(path.join(app,'N2SyntheticTrialIOSVault.swift'),'utf8');
 const calls=[...router.matchAll(/N2SyntheticTrialIOSVault\.shared\.(\w+)\(/g)].map(m=>m[1]);
-assert.equal(calls.length,35,'The bridge must expose the entire supported surface.');
+// The 36th entry is the audited edit of UNUSED lot metadata. Every
+// workspace operation must keep symmetric DEMO and CLINICAL routes.
+assert.equal(calls.length,36,'The bridge must expose the entire supported surface.');
+assert.equal(new Set(calls).size,calls.length,'The bridge must not duplicate any route.');
+assert(calls.includes('correctUnusedLot'),'Missing audited unused-lot edit routing.');
 assert(calls.includes('closeContainers'));
 assert(calls.includes('confirmPendingDispensing'));
 assert(calls.includes('registerAuxiliaryLot'));
