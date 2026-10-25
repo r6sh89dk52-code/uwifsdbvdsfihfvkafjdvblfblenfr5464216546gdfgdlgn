@@ -26,13 +26,26 @@ for(const marker of [
 for(const marker of [
   'draft-dashboard-delete-','Button(role:.destructive)',
   'selectedDeleteID=draft.id',
-  'vault.deleteDraft(id:id,expectedRevision:current.revision)',
+  'id:id,expectedRevision:expectedRevision)',
   'N2DraftReminder.cancel(id:id,mode:vault.mode)',
   'confirmationDialog("¿Eliminar este borrador?"'
 ]) assert(draftDashboard.includes(marker),
   'Borrar borrador debe estar disponible y ser confirmado en el tablero: '+marker);
 assert(!draftDashboard.includes('Para borrar un borrador, ábrelo'),
   'El borrador ya no debe requerir abrir el formulario para poder eliminarlo');
+for(const marker of [
+  'let latest=try await vault.readDraftsWithRevision()',
+  'let expectedRevision=loadedRevision',
+  'let prior=records',
+  'records.removeAll(where:{$0.id==id})',
+  'records=prior',
+  'loadedRevision=confirmed.revision'
+]) assert(draftDashboard.includes(marker),
+  'Borradores necesitan una única lectura y eliminación inmediata reversible: '+marker);
+assert(!draftDashboard.includes('vault.inspect()') &&
+       !draftDashboard.includes('vault.readDrafts()'),
+       'El listado no debe descifrar varias veces la base por eliminación');
+
 assert(draftDashboard.includes(
   '.accessibilityLabel("Eliminar borrador de " + (draft.workerName.isEmpty ? "trabajador sin seleccionar" : draft.workerName))'),
   'la etiqueta accesible de la papelera debe ser una expresión Swift válida');
@@ -123,11 +136,28 @@ const indicatorWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperC
 // New-attention and home counters reuse one VERIFIED clinical snapshot,
 // retaining exactly the original journal validation and immutable revision.
 const workspace=fs.readFileSync(path.join(root,'native-ios/App/N2WorkspaceVault.swift'),'utf8');
+for(const path of [
+  'native-ios/App/N2ProtectedClinicalIOSVault.swift',
+  'native-ios/App/N2SyntheticTrialIOSVault.swift',
+  'native-ios/App/N2WorkspaceVault.swift',
+  'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'
+]) {
+  const src=fs.readFileSync(path.join(root,path),'utf8');
+  assert(src.includes('readDraftsWithRevision()'),
+    path+' debe exponer borradores con su revisión autenticada');
+}
+const recovered=fs.readFileSync(path.join(root,
+  'native-ios/Sources/DanperCore/N2NativeDraftRecovery.swift'),'utf8');
+assert(recovered.includes('static func readVerified(_ snapshot:Data)'),
+  'La lectura cifrada verificada no debe repetir las auditorías completas');
+assert(core.includes('N2NativeDraftRecovery.readVerified(active.snapshot)'),
+  'La bóveda debe utilizar únicamente snapshots ya autenticados');
+
 for(const marker of [
   'public func prepareClinicalForm(',
   'public func readDashboard()throws',
   'let context=try N2NativeFormContextReader.read(',
-  'let drafts=try N2NativeDraftRecovery.read(active.snapshot)'
+  'let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot)'
 ]) must(core,marker,'formulario e Inicio desde una sola recuperación cifrada');
 for(const adaptor of [demo,vaultSource,workspace]) {
   for(const marker of ['prepareClinicalForm()', 'readDashboard()']) {
