@@ -136,15 +136,15 @@ const indicatorWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperC
 // New-attention and home counters reuse one VERIFIED clinical snapshot,
 // retaining exactly the original journal validation and immutable revision.
 const workspace=fs.readFileSync(path.join(root,'native-ios/App/N2WorkspaceVault.swift'),'utf8');
-for(const path of [
+for(const filePath of [
   'native-ios/App/N2ProtectedClinicalIOSVault.swift',
   'native-ios/App/N2SyntheticTrialIOSVault.swift',
   'native-ios/App/N2WorkspaceVault.swift',
   'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'
 ]) {
-  const src=fs.readFileSync(path.join(root,path),'utf8');
+  const src=fs.readFileSync(path.join(root,filePath),'utf8');
   assert(src.includes('readDraftsWithRevision()'),
-    path+' debe exponer borradores con su revisión autenticada');
+    filePath+' debe exponer borradores con su revisión autenticada');
 }
 const recovered=fs.readFileSync(path.join(root,
   'native-ios/Sources/DanperCore/N2NativeDraftRecovery.swift'),'utf8');
