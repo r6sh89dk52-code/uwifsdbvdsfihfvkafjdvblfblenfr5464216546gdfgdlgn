@@ -24,13 +24,13 @@ struct N2WorkerSearchSheet:View {
             $0.dni.contains(q) || $0.name.localizedStandardContains(q)
         }
     }
-    private var pageCount:Int {max(1,(matches.count+pageSize-1)/pageSize)}
-    private var visible:[N2FormWorker] {
-        Array(matches.dropFirst(page*pageSize).prefix(pageSize))
-    }
-
     var body:some View {
-        ScrollViewReader { proxy in
+        // Evaluate the 9k-person predicate once per render, not again
+        // for the count, pagination and ForEach. Only 25 views are made.
+        let results=matches
+        let totalPages=max(1,(results.count+pageSize-1)/pageSize)
+        let pageWorkers=Array(results.dropFirst(page*pageSize).prefix(pageSize))
+        return ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment:.leading,spacing:14) {
                     Color.clear.frame(height:1).id("worker-search-top")
@@ -53,15 +53,15 @@ struct N2WorkerSearchSheet:View {
                                     .accessibilityIdentifier("roster-global-search")
                             }
                         }
-                        if matches.isEmpty {
+                        if results.isEmpty {
                             ContentUnavailableView("No se encontraron trabajadores",
                                 systemImage:"person.crop.circle.badge.questionmark",
                                 description:Text("Revisa la búsqueda o registra a la persona manualmente."))
                         } else {
-                            Text("\(matches.count) encontrados · Página \(page+1) de \(pageCount)")
+                            Text("\(results.count) encontrados · Página \(page+1) de \(totalPages)")
                                 .font(.caption).foregroundStyle(.secondary)
                             LazyVStack(spacing:0) {
-                                ForEach(visible) { worker in
+                                ForEach(pageWorkers) { worker in
                                     Button {
                                         onSelect(worker)
                                         dismiss()
@@ -83,16 +83,16 @@ struct N2WorkerSearchSheet:View {
                                     Divider().opacity(0.35)
                                 }
                             }
-                            if pageCount>1 {
+                            if totalPages>1 {
                                 HStack(spacing:12) {
                                     Button("Anterior") {goTo(max(0,page-1),proxy:proxy)}
                                         .disabled(page==0)
                                     Spacer()
-                                    Text("\(page+1) / \(pageCount)")
+                                    Text("\(page+1) / \(totalPages)")
                                         .font(.caption).monospacedDigit()
                                     Spacer()
-                                    Button("Siguiente") {goTo(min(pageCount-1,page+1),proxy:proxy)}
-                                        .disabled(page>=pageCount-1)
+                                    Button("Siguiente") {goTo(min(totalPages-1,page+1),proxy:proxy)}
+                                        .disabled(page>=totalPages-1)
                                 }.buttonStyle(DanperSecondaryButton())
                             }
                         }
