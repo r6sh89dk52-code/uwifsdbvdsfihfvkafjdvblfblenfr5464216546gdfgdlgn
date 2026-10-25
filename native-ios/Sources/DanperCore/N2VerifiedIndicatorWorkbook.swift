@@ -341,9 +341,9 @@ public enum N2VerifiedIndicatorWorkbook {
                         consumption[code,default:0]+=openings
                         consumptionBySite[sourceSite+"|"+code,default:0]+=openings
                         pendingLines+=1
-                        pendingNotes.append(aid+" / "+code+" / "+name+
-                            ": R histórico declarado="+String(openings)+
-                            " sin salida física ni FEFO retroactivo.")
+                        pendingNotes.append(
+                            "\(aid) / \(code) / \(name): R histórico declarado=\(openings) sin salida física ni FEFO retroactivo."
+                        )
                     } else if allowPending,let declared=integer(row["quantity"]),declared>0 {
                         let inventoryCodes=Set(mapped.filter{$0["clinicalCode"] as? String==code}.compactMap{$0["kardexCode"] as? String})
                             .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
