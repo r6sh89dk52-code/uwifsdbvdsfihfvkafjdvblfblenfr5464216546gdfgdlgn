@@ -335,20 +335,26 @@ public enum N2VerifiedIndicatorWorkbook {
                         }.compactMap{$0["kardexCode"] as? String})
                             .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
                             .union(N2UserReviewedKardexLinks.candidates(for:code).map(\.kardexID))
-                        guard let openings=Self.provisionalHistoricalR(
+                        if let openings=Self.provisionalHistoricalR(
                             historical,lotCode:string(lot["code"]),
                             lotUnit:string(lot["catalogUnit"]),
                             approvedCodes:inventoryCodes,
-                            alreadyLinked:linesByItem[key] != nil) else {
-                            throw Failure.unverifiedDelivery
+                            alreadyLinked:linesByItem[key] != nil) {
+                            physical=Double(openings)
+                            consumption[code,default:0]+=openings
+                            consumptionBySite[sourceSite+"|"+code,default:0]+=openings
+                            pendingNotes.append(
+                                "\(aid) / \(code) / \(name): R histórico declarado=\(openings) sin salida física ni FEFO retroactivo."
+                            )
+                        } else {
+                            // Retain an incomplete declaration for manual
+                            // review, but never turn its unverified package
+                            // quantity into a numeric Excel R.
+                            pendingNotes.append(
+                                "\(aid) / \(code) / \(name): R PENDIENTE; declaración histórica sin correspondencia acreditada al lote físico."
+                            )
                         }
-                        physical=Double(openings)
-                        consumption[code,default:0]+=openings
-                        consumptionBySite[sourceSite+"|"+code,default:0]+=openings
                         pendingLines+=1
-                        pendingNotes.append(
-                            "\(aid) / \(code) / \(name): R histórico declarado=\(openings) sin salida física ni FEFO retroactivo."
-                        )
                     } else if allowPending,let declared=integer(row["quantity"]),declared>0 {
                         let inventoryCodes=Set(mapped.filter{$0["clinicalCode"] as? String==code}.compactMap{$0["kardexCode"] as? String})
                             .union(operational.filter{$0.clinicalCode==code}.map(\.inventoryID))
@@ -357,7 +363,10 @@ public enum N2VerifiedIndicatorWorkbook {
                         // whose opening was not explicitly declared.
                         let confirmedPackaging = !Set(["E-86","E-94","E-95"])
                             .isDisjoint(with:inventoryCodes)
-                        let container=confirmedPackaging ||
+                        let hasUnresolvedHistoricalLot=historicalDeclarations.contains {
+                            $0.visitID==aid && $0.itemID==itemID
+                        }
+                        let container=confirmedPackaging || hasUnresolvedHistoricalLot ||
                             N2ContainerAccounting.isContainer(unit:type) || stock.contains {
                             inventoryCodes.contains(string($0["code"])) &&
                                 N2ContainerAccounting.isContainer(unit:string($0["catalogUnit"]))
