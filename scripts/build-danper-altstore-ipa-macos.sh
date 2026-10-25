@@ -65,7 +65,7 @@ if ! xcodebuild \
   PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
   build >"$OUT/build.log" 2>&1; then
   echo "ERROR: falló la compilación para iPhone." >&2
-  grep -nE 'error:|\\*\\* BUILD FAILED \\*\\*' "$OUT/build.log" | tail -n 55 >&2 || true
+  grep -nE 'error:|BUILD FAILED|ARCHIVE FAILED' "$OUT/build.log" | tail -n 55 >&2 || true
   echo "Log completo: $OUT/build.log"
   exit 1
 fi
@@ -81,7 +81,7 @@ if [[ "$ACTUAL" != "$BUNDLE_ID" ]]; then
   exit 1
 fi
 
-if ! lipo -archs "$APP/DANPERNative" | tr ' ' '\\n' | grep -qx arm64; then
+if ! lipo -archs "$APP/DANPERNative" | grep -w "arm64" >/dev/null; then
   echo "ERROR: el ejecutable no contiene la arquitectura arm64 para iPhone." >&2
   exit 1
 fi
