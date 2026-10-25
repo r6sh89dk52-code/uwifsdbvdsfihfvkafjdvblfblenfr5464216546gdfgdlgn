@@ -25,11 +25,13 @@ struct N2ClinicalWorkspaceGateView:View {
                         .font(.headline)
                     Text("Puedes importar PERSONAL, restaurar una copia cifrada de Build 222 o comenzar con un primer trabajador manual. No se precargan registros.")
                         .font(.footnote).foregroundStyle(.secondary)
+                    #if DEBUG
                     Label("EN VALIDACIÓN: todavía no está aprobada para atención de pacientes reales.",
                           systemImage:"exclamationmark.triangle.fill")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal:false,vertical:true)
+                    #endif
                 }
                 DanperPanel("Verificar la fuente") {
                     if let summary {
@@ -254,7 +256,7 @@ struct N2ClinicalWorkspaceRootView:View {
                         HStack(spacing:10) {
                             Image(systemName:"lock.shield")
                                 .foregroundStyle(DanperStyle.red)
-                            Text("Fuente clínica protegida · Versión en validación")
+                            Text("Fuente clínica protegida")
                                 .font(.footnote.weight(.semibold))
                         }
                         .frame(maxWidth:.infinity,alignment:.leading)
@@ -354,9 +356,11 @@ struct N2ClinicalWorkspaceRootView:View {
                                 N2NativeBackupExportView()
                             }
                         }
+                        #if DEBUG
                         Label("Acceso protegido. Validar restauración, Kardex y Excel en el dispositivo antes de usar registros de pacientes reales.",
                               systemImage:"lock.shield")
                             .font(.caption).foregroundStyle(.secondary)
+                        #endif
                         Button("Cerrar espacio clínico",role:.cancel) {onClose()}
                             .buttonStyle(DanperSecondaryButton())
                     }
