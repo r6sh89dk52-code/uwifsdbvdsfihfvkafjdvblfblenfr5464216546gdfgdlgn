@@ -35,6 +35,8 @@ struct N2FirstManualWorkerView:View {
                         .font(.headline)
                     Text("No se cargarán registros de prueba. Se creará una fuente cifrada únicamente con los datos que introduzcas y apruebes aquí. Inicialmente habrá 0 atenciones, 0 lotes y 0 consumos.")
                         .font(.footnote).foregroundStyle(.secondary)
+                    Text("Para pruebas con empleados ficticios, regresa a Inicio → Empezar con una base vacía (DEMO). Este formulario crea una fuente CLÍNICA independiente y requiere Face ID o el código del dispositivo.")
+                        .font(.footnote.weight(.semibold)).foregroundStyle(.orange)
                     Text("Si tienes atenciones o Kardex antiguos en la Build 222, restaura su copia cifrada en lugar de crear esta fuente. No puedes fusionar posteriormente dos bases distintas.")
                         .font(.footnote.weight(.semibold)).foregroundStyle(.orange)
                 }
