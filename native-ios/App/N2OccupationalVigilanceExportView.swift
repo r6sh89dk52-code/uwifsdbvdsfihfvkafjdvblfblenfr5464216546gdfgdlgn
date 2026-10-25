@@ -85,7 +85,7 @@ struct N2OccupationalVigilanceExportView:View {
                     Label("Agente: DISERGONOMICO",systemImage:"checkmark.circle")
                     Text("Riesgo del modelo: Posturas inadecuadas")
                     Text("Medida recomendada: Capacitacion y ejecucion de pausas activas")
-                    Text("Los códigos de subdivisión, unidad organizativa y planilla solo se completan si constan en los datos del trabajador. No se inventan códigos ni actividades ya realizadas.")
+                    Text("Los códigos C/D se completan desde los catálogos oficiales @subuo/@uo según la sede y el área de cada atención. Si no hay correspondencia acreditada, se deja el código UO pendiente. Planilla conserva su valor registrado.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 DanperPanel {
@@ -138,6 +138,9 @@ struct N2OccupationalVigilanceExportView:View {
                 (data.skippedMissingIdentity>0
                  ? " \(data.skippedMissingIdentity) registros omitidos por DNI/nombre incompletos."
                  : "")
+            if data.unresolvedOrganizationalUnits>0 {
+                status+=" \(data.unresolvedOrganizationalUnits) atenciones tienen una unidad organizativa sin código acreditado; revisa el área."
+            }
             share=N2VigilanceShare(file:file)
         }catch{
             cleanup()
