@@ -96,11 +96,19 @@ struct N2NativeDraftsDashboard:View {
               let expectedRevision=loadedRevision,
               records.contains(where:{$0.id==id}) else{return}
         deletingID=id
+        #if DEBUG
+        let started=ProcessInfo.processInfo.systemUptime
+        #endif
         // Fast and reversible UI: hide the row before expensive encrypted
         // copy-on-write. No success is claimed until commit verifies.
         let prior=records
         records.removeAll(where:{$0.id==id})
-        defer{deletingID=nil}
+        defer{
+            deletingID=nil
+            #if DEBUG
+            print("[DANPER-PERF] drafts.delete_total_ms=\(Int((ProcessInfo.processInfo.systemUptime-started)*1000))")
+            #endif
+        }
         do {
             // The core checks BOTH the exact revision and status=="draft".
             // A saved attention can never be removed by this operation.
@@ -128,8 +136,16 @@ struct N2NativeDraftsDashboard:View {
     @MainActor
     private func load() async {
         guard deletingID==nil else{return}
+        #if DEBUG
+        let started=ProcessInfo.processInfo.systemUptime
+        #endif
         loading=true
-        defer {loading=false}
+        defer {
+            loading=false
+            #if DEBUG
+            print("[DANPER-PERF] drafts.list_load_ms=\(Int((ProcessInfo.processInfo.systemUptime-started)*1000))")
+            #endif
+        }
         do {
             let latest=try await vault.readDraftsWithRevision()
             records=latest.drafts
