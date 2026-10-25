@@ -156,6 +156,18 @@ public final class N2ProtectedClinicalVaultCore {
         }
         return visit["nativeDispensing"] as? [String:String] ?? [:]
     }
+    /// Dashboard reads one authenticated snapshot for both the visit
+    /// projection and draft counter; no second decrypt/validation pass.
+    public func readDashboard()throws
+        ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
+        guard let active=try journal.recover() else {
+            return (history:nil,drafts:[])
+        }
+        return (
+            history:try N2NativeSnapshotReader.read(active.snapshot),
+            drafts:try N2NativeDraftRecovery.read(active.snapshot)
+        )
+    }
     public func readIndex()throws->N2NativeReadModel? {
         guard let active=try journal.recover() else{return nil}
         return try N2NativeSnapshotReader.read(active.snapshot)
