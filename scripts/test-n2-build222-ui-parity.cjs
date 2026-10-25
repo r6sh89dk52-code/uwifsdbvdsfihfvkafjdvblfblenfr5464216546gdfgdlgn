@@ -13,41 +13,6 @@ const inventory=fs.readFileSync(path.join(root,'native-ios/App/N2NativeInventory
 const catalog=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeCatalogIndex.swift'),'utf8');
 const indicator=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedIndicatorExportView.swift'),'utf8');
 const nursing=fs.readFileSync(path.join(root,'native-ios/App/N2VerifiedNursingExportView.swift'),'utf8');
-const consolidatedIndicator=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
-const indicatorWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N1sFullExcelWriter.swift'),'utf8');
-for(const marker of [
-  'eligibleForSharedClose(',
-  'end.hasSuffix("-08")',
-  'projection.reportedUse==Double(used)',
-  'projection.received==Double(income)',
-  'expected==Int(physicalCount)',
-  'N2PendingDispensingEvidence.read(snapshot:clinical)',
-  'R histórico declarado='
-]) assert(consolidatedIndicator.includes(marker),'Protección de Indicador único: '+marker);
-for(const marker of [
-  'PERÍODO: ',
-  'KARDEX AMBULATORIO · PROVISIONAL',
-  'KARDEX AMBULATORIO · OFICIAL',
-  'cachedNumber:sheet==4 && label=="F"'
-]) assert(indicatorWriter.includes(marker),'Excel RESU conservado: '+marker);
-assert(indicator.includes('endDate=min(cycleEnd,now)'),
-  'el corte abierto debe exportarse a la fecha');
-assert(indicator.includes('Button("Todas")'),
-  'la selección completa para un corte debe ser explícita');
-
-assert(nursing.includes('@State private var site="AMBAS"'),
-  'El Kardex de Enfermeras exporta el inventario conjunto sin sede invisible');
-assert(!nursing.includes('site.isEmpty ||'),
-  'La exportación del Kardex no puede depender de un selector de sede eliminado');
-must(nursing,'exportFailureMessage(error)',
-  'el rechazo de Excel enfermería debe mostrar su causa');
-must(indicator,'LabeledContent("Ámbito",value:"Fundo y Planta La Venturosa")',
-  'el Indicador conserva ambas sedes sin separarlas en inventarios');
-assert(!indicator.includes('N2ReconciliationView()'),
-  'no enlazar una conciliación por sede obsoleta desde el Indicador único');
-must(indicator,'if !allowed {selectConfirmed()}',
-  'Modo provisional no debe agregar todas las atenciones pendientes sin permiso');
-
 const reportStages=fs.readFileSync(path.join(root,'native-ios/App/N2Build222ExportStages.swift'),'utf8');
 const clinicalRules=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ProcedureRules.swift'),'utf8');
 const palette=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
@@ -75,6 +40,41 @@ const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
+const exportedIndicatorCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
+const indicatorWriter=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N1sFullExcelWriter.swift'),'utf8');
+for(const marker of [
+  'eligibleForSharedClose(',
+  'end.hasSuffix("-08")',
+  'projection.reportedUse==Double(used)',
+  'projection.received==Double(income)',
+  'expected==Int(physicalCount)',
+  'N2PendingDispensingEvidence.read(snapshot:clinical)',
+  'R histórico declarado='
+]) assert(exportedIndicatorCore.includes(marker),'Protección de Indicador único: '+marker);
+for(const marker of [
+  'PERÍODO: ',
+  'KARDEX AMBULATORIO · PROVISIONAL',
+  'KARDEX AMBULATORIO · OFICIAL',
+  'cachedNumber:sheet==4 && label=="F"'
+]) assert(indicatorWriter.includes(marker),'Excel RESU conservado: '+marker);
+assert(indicator.includes('endDate=min(cycleEnd,now)'),
+  'el corte abierto debe exportarse a la fecha');
+assert(indicator.includes('Button("Todas")'),
+  'la selección completa para un corte debe ser explícita');
+
+assert(nursing.includes('@State private var site="AMBAS"'),
+  'El Kardex de Enfermeras exporta el inventario conjunto sin sede invisible');
+assert(!nursing.includes('site.isEmpty ||'),
+  'La exportación del Kardex no puede depender de un selector de sede eliminado');
+must(nursing,'exportFailureMessage(error)',
+  'el rechazo de Excel enfermería debe mostrar su causa');
+must(indicator,'LabeledContent("Ámbito",value:"Fundo y Planta La Venturosa")',
+  'el Indicador conserva ambas sedes sin separarlas en inventarios');
+assert(!indicator.includes('N2ReconciliationView()'),
+  'no enlazar una conciliación por sede obsoleta desde el Indicador único');
+must(indicator,'if !allowed {selectConfirmed()}',
+  'Modo provisional no debe agregar todas las atenciones pendientes sin permiso');
+
 must(app,'N2ClinicalWorkspaceGateView(authenticatedLaunch:true)','inicio cifrado tras autenticación con importación PERSONAL');
 assert(!app.includes('NativeRootView()'),'No puede abrirse el modo ficticio en inicio normal');
 must(clinicalHome,'clinical-first-run-import-personal','importar PERSONAL como acción principal');
