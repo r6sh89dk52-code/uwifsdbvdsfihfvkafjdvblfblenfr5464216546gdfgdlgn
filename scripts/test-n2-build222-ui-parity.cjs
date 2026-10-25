@@ -64,8 +64,21 @@ for(const adaptor of [demo,vaultSource,workspace]) {
 }
 must(form,'let prepared=try await vault.prepareClinicalForm()',
   'una recuperación autenticada para Nueva atención');
-assert(!form.includes('            drafts=try await vault.readDrafts()'),
-  'Nueva atención no debe volver a descifrar la bóveda para los borradores');
+// Restrict this assertion to the INITIAL form load, not the entire View.
+// Deleting an existing draft intentionally refreshes the draft list from
+// the latest encrypted revision; that explicit user action must stay intact.
+const initialFormLoadStart=form.indexOf('@MainActor private func load() async {');
+const initialFormLoadEnd=form.indexOf('    @MainActor\n    private func recordAllergy(',initialFormLoadStart);
+assert(initialFormLoadStart>=0 && initialFormLoadEnd>initialFormLoadStart,
+  'No se pudo delimitar la carga inicial de Nueva atención');
+const initialFormLoad=form.slice(initialFormLoadStart,initialFormLoadEnd);
+assert(initialFormLoad.includes('vault.prepareClinicalForm()'),
+  'La carga inicial debe compartir una única recuperación autenticada');
+assert(!initialFormLoad.includes('vault.readDrafts()') &&
+       !initialFormLoad.includes('vault.clinicalFormContext()'),
+  'La carga inicial no debe recuperar dos veces la misma bóveda');
+assert(form.includes('drafts=try await vault.readDrafts()'),
+  'La eliminación explícita de un borrador debe actualizar el listado desde la bóveda');
 must(clinicalHome,'let prepared=try await vault.readDashboard()',
   'Inicio no debe descifrar otra vez el mismo diario');
 console.log('PASS: Inicio y Nueva atención aprovechan una sola lectura cifrada, sin cachear datos clínicos.');
