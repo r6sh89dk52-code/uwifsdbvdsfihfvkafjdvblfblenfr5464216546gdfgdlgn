@@ -109,6 +109,20 @@ public enum N2VerifiedIndicatorWorkbook {
         }
     }
 
+    /// Pure decision guard for an automatically certified inventory-wide cut.
+    /// Source proof is checked separately for every stock product.
+    static func eligibleForSharedClose(
+        subdivision:String,start:String,end:String,today:String,
+        selected:Set<String>,all:Set<String>,
+        hasUnresolvedHistory:Bool
+    )->Bool {
+        guard subdivision=="AMBAS",end.hasSuffix("-08"),end<=today,
+              selected==all,!selected.isEmpty,!hasUnresolvedHistory,
+              let period=try? N2KardexCutPreview.period(for:end)
+        else{return false}
+        return period.start==start
+    }
+
     public static func export(snapshot:Data,products:Data,mappings:Data,
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
@@ -478,10 +492,11 @@ public enum N2VerifiedIndicatorWorkbook {
             ? try? N2AutomaticCutAccounting.calculate(
                 snapshot:clinical,mappings:mappings,through:end)
             : nil
-        let sharedCloseCandidate = subdivision=="AMBAS" &&
-            !allowPending && isWholePeriod && end.hasSuffix("-08") &&
-            projectedCut != nil &&
-            projectedCut?.hasUnresolvedHistory==false
+        let sharedCloseCandidate = !allowPending && projectedCut != nil &&
+            Self.eligibleForSharedClose(
+                subdivision:subdivision,start:start,end:end,today:today,
+                selected:selectedVisitIDs,all:allPeriodIDs,
+                hasUnresolvedHistory:projectedCut?.hasUnresolvedHistory ?? true)
         // Maintain compatibility with historical signed reconciliations,
         // but the new joint inventory never REQUIRES two site reviews.
         let legacyReviewed=sites.allSatisfy({location in
