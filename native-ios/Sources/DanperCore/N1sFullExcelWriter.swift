@@ -86,11 +86,15 @@ internal enum N1sFullExcelWriter {
         return attrs(String(xml[r]),name:"s")
     }
     private static func xmlCell(_ ref:String,_ value:Any?,
-                                template:String?=nil,formula:String?=nil) throws -> String {
+                                template:String?=nil,formula:String?=nil,
+                                cachedNumber:Double?=nil) throws -> String {
         let s=template.map{" s=\""+$0+"\""} ?? ""
         let head="<c r=\""+ref+"\""+s
         if let formula {
-            return head+"><f>"+(try escaped(formula))+"</f></c>"
+            // Keep the original formula and store a verified cache for
+            // Quick Look / Files preview. Excel remains free to recalculate.
+            let cached=cachedNumber.map{ "<v>"+String($0)+"</v>" } ?? ""
+            return head+"><f>"+(try escaped(formula))+"</f>"+cached+"</c>"
         }
         guard let value,!(value is NSNull) else {return head+"/>"}
         if let x=number(value) {
@@ -99,6 +103,17 @@ internal enum N1sFullExcelWriter {
         guard let t=value as? String else {throw N1sExcelError.invalidRow}
         if t.isEmpty{return head+"/>"}
         return head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + (try escaped(t)) + "</t></is></c>"
+    }
+    private static func formattedPeriod(_ start:String,_ end:String)throws -> String {
+        func readable(_ day:String)throws -> String {
+            guard day.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
+                            options:.regularExpression) != nil else {
+                throw N1sExcelError.invalidManifest
+            }
+            return String(day.suffix(2))+"/"+String(day.dropFirst(5).prefix(2))
+                +"/"+String(day.prefix(4))
+        }
+        return try readable(start)+" AL "+readable(end)
     }
     private static func numericDate(_ s:String) throws -> Double {
         guard s.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
@@ -154,7 +169,7 @@ internal enum N1sFullExcelWriter {
     }
     private static func sheetData(_ xml:String,headerRows:Int,rows:[[Any?]],
                                   width:Int,reviewed:Bool,sheet:Int,
-                                  dateStyle:Int) throws -> String {
+                                  dateStyle:Int,cachedConsumption:[Int:Double]=[:]) throws -> String {
         var preserved=""
         for index in 1...headerRows {preserved += try existingRow(xml,index)}
         let prototype=try existingRow(xml,headerRows+1)
@@ -183,7 +198,8 @@ internal enum N1sFullExcelWriter {
                     (sheet==3 && [8,9,12,13,16,17,20,21].contains(col))
                 inserted += try xmlCell(reference,input,
                     template:isDate ? String(dateStyle) : style[label],
-                    formula:formulaText)
+                    formula:formulaText,
+                    cachedNumber:sheet==4 && label=="F" ? cachedConsumption[row] : nil)
             }
             inserted+="</row>"
         }
@@ -425,6 +441,18 @@ internal enum N1sFullExcelWriter {
         }
         guard productCodes.count==432 else {throw N1sExcelError.invalidMaterial}
         sheetRows[5]=selected.map{$0.map{Optional($0)}}
+        // RESU column F is a SUMIF formula. Cache only its actual selected
+        // Excel R quantities so iOS previews can display the number without
+        // changing that formula or fabricating a stock opening/count.
+        var cachedConsumption=[Int:Double]()
+        for (index,product) in catalog.enumerated() {
+            guard let code=string(product["code"]),
+                  let material=reconciliation[code],
+                  let consumed=int(material["consumed"]) else {
+                throw N1sExcelError.invalidMaterial
+            }
+            cachedConsumption[index+3]=Double(consumed)
+        }
         let formulasWritten=reviewed
         let plans:[Int:(Int,Int)]=[2:(2,8),3:(2,25),4:(2,13),5:(1,30)]
         for i in archive.indices {
@@ -442,10 +470,26 @@ internal enum N1sFullExcelWriter {
                 }
                 let rebuilt=try sheetData(xml,headerRows:header,rows:sheetRows[no] ?? [],
                                           width:width,reviewed:formulasWritten,sheet:no,
-                                          dateStyle:peruDateStyle)
+                                          dateStyle:peruDateStyle,
+                                          cachedConsumption:no==4 ? cachedConsumption : [:])
                 let completed:String
                 if no==3 {
                     completed=try expirySemaphore(rebuilt)
+                }else if no==4 {
+                    // Preserve E1/A1 styles while replacing DEMO/placeholder
+                    // labels inherited from the original blank template.
+                    let from=try N1sFullExcelWriter.formattedPeriod(start,end)
+                    let row1=try existingRow(rebuilt,1)
+                    let title=provisional ? "KARDEX AMBULATORIO · PROVISIONAL"
+                        : "KARDEX AMBULATORIO · OFICIAL"
+                    var header=row1
+                    let a=try xmlCell("A1",title,template:cellStyle(row1,ref:"A1"))
+                    let e=try xmlCell("E1","PERÍODO: "+from,template:cellStyle(row1,ref:"E1"))
+                    header=try replaceExactly(#"<c\b[^>]*\br="A1"[^>]*>.*?</c>"#,
+                                               in:header,with:a)
+                    header=try replaceExactly(#"<c\b[^>]*\br="E1"[^>]*>.*?</c>"#,
+                                               in:header,with:e)
+                    completed=rebuilt.replacingOccurrences(of:row1,with:header)
                 }else {
                     completed=rebuilt
                 }
