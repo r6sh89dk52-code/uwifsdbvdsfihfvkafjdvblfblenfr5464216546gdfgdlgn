@@ -73,6 +73,26 @@ const history=fs.readFileSync(path.join(root,'native-ios/App/N2NativeHistoryView
 const theme=fs.readFileSync(path.join(root,'native-ios/App/DanperUITheme.swift'),'utf8');
 const firstWorker=fs.readFileSync(path.join(root,'native-ios/App/N2FirstManualWorkerView.swift'),'utf8');
 const must=(data,needle,label)=>assert(data.includes(needle),`Falta ${label}: ${needle}`);
+// In DANPER's historical ambulance workbook, "UBIGEO" contains locality
+// names (CHEPÉN/TRUJILLO), never a numeric-only entry restriction.
+for(const [label,view,identifier] of [
+  ['registro y edición de PERSONAL',editor,'worker-ubigeo-locality'],
+  ['primer trabajador de nueva bóveda',firstWorker,'first-manual-worker-ubigeo']
+]) {
+  const start=view.indexOf('DanperField(title:"Ubigeo / localidad (opcional)")');
+  assert(start>=0,label+': falta campo de localidad');
+  const section=view.slice(start,start+520);
+  assert(section.includes('.keyboardType(.default)') &&
+         !section.includes('.keyboardType(.numberPad)') &&
+         section.includes('.textInputAutocapitalization(.characters)') &&
+         section.includes(identifier),
+         label+': Ubigeo debe aceptar letras, espacios y tildes');
+}
+must(editor,'"ubigeo":ubigeo.trimmingCharacters(in:.whitespacesAndNewlines)',
+  'la edición guarda localidad completa sin normalizarla a dígitos');
+must(firstWorker,'"ubigeo":ubigeo.trimmingCharacters(in:.whitespacesAndNewlines)',
+  'el primer trabajador guarda localidad ingresada, no cadena vacía');
+console.log('PASS: Ubigeo de ciudades escrito en letras, en alta, edición e inicio sin Excel.');
 const exportedIndicatorCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift'),'utf8');
 const vigilanceCodes=fs.readFileSync(path.join(root,
   'native-ios/Sources/DanperCore/N2VigilanceOrganizationCodes.swift'),'utf8');
