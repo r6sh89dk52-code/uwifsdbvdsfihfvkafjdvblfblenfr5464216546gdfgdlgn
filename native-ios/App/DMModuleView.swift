@@ -159,8 +159,8 @@ struct DMModuleView:View {
             DMCameraSheet { images in
                 showCamera=false
                 Task {
-                    // Las imágenes sólo existen como Data en memoria durante OCR.
-                    for image in images {await recognize(image)}
+                    // Un CITT por captura: todas sus páginas se leen juntas, sin archivos.
+                    if !images.isEmpty {await recognizePages(images)}
                 }
             }
         }
@@ -252,10 +252,15 @@ struct DMModuleView:View {
         catch {message="La bóveda DM no se pudo descifrar. No se ha modificado ningún dato."}
     }
     @MainActor private func recognize(_ data:Data) async {
-        guard !busy else{return}
+        await recognizePages([data])
+    }
+    @MainActor private func recognizePages(_ pages:[Data]) async {
+        guard !busy,!pages.isEmpty,pages.count<=10 else{return}
         busy=true;defer{busy=false}
         do {
-            let text=try await DMOCRService.recognize(data)
+            var fragments=[String]()
+            for data in pages {fragments.append(try await DMOCRService.recognize(data))}
+            let text=fragments.joined(separator:"\n")
             var draft=DMCITTParser.parse(text)
             draft.receiptDate=DMDate.iso(receiptDate)
             if !draft.dni.isEmpty,
@@ -378,15 +383,19 @@ private struct DMFollowupSheet:View {
 private enum DMOCRService {
     static func recognize(_ bytes:Data) async throws -> String {
         try await Task.detached(priority:.userInitiated) {
-            guard let source=CGImageSourceCreateWithData(bytes as CFData,nil),
+            guard !bytes.isEmpty,bytes.count<=25_000_000,
+                  let source=CGImageSourceCreateWithData(bytes as CFData,nil),
                   let image=CGImageSourceCreateImageAtIndex(source,0,nil) else {
                 throw DMStoreFailure.unavailable
             }
+            let properties=CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [CFString:Any]
+            let raw=(properties?[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? 1
+            let orientation=CGImagePropertyOrientation(rawValue:raw) ?? .up
             let request=VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
             request.recognitionLanguages=["es-ES","en-US"]
-            let handler=VNImageRequestHandler(cgImage:image,options:[:])
+            let handler=VNImageRequestHandler(cgImage:image,orientation:orientation,options:[:])
             try handler.perform([request])
             return (request.results ?? []).compactMap{$0.topCandidates(1).first?.string}
                 .joined(separator:"\n")
