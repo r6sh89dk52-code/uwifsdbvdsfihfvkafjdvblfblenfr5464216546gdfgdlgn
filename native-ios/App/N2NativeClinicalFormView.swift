@@ -1402,7 +1402,7 @@ struct N2NativeClinicalFormView:View {
             }
             guard !Task.isCancelled else{return}
             do{
-                let latest=try await vault.clinicalFormContext()
+                let latestRevision=try await vault.currentRevision()
                 // A cancelled autosave must never race the final save with
                 // the same journal revision or replace its success banner.
                 guard !Task.isCancelled,!saved,!busy else{return}
@@ -1411,7 +1411,7 @@ struct N2NativeClinicalFormView:View {
                                   lastAutosaveTimestamp+1)
                 let result=try await vault.saveDraft(
                     id:version.id,changes:patch,at:timestamp,
-                    expectedRevision:latest.revision)
+                    expectedRevision:latestRevision)
                 guard !Task.isCancelled,!saved,!busy else{return}
                 lastAutosaveTimestamp=timestamp
                 await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
@@ -1607,12 +1607,14 @@ struct N2NativeClinicalFormView:View {
         busy=true
         defer {busy=false}
         do {
-            let fresh=try await vault.clinicalFormContext()
+            let freshRevision=try await vault.currentRevision()
             _=try await vault.deleteDraft(
-                id:id,expectedRevision:fresh.revision)
+                id:id,expectedRevision:freshRevision)
             N2DraftReminder.cancel(id:id,mode:vault.mode)
-            drafts=try await vault.readDrafts()
-            context=try await vault.clinicalFormContext()
+            // Load the updated context and draft list from ONE generation.
+            let prepared=try await vault.prepareClinicalForm()
+            drafts=prepared.drafts
+            context=prepared.context
             if form.id==id {
                 autosaveTask?.cancel()
                 form=N2NativeFormDraft()
