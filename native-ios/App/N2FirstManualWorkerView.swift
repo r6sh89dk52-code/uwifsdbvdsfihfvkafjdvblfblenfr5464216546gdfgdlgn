@@ -107,6 +107,7 @@ struct N2FirstManualWorkerView:View {
     @MainActor private func create() async {
         guard valid else{return}
         busy=true;failed=false
+        var stage="verificación inicial"
         defer{busy=false}
         do {
             // Check before AND after device owner authentication to avoid
@@ -114,16 +115,24 @@ struct N2FirstManualWorkerView:View {
             guard try await N2ProtectedClinicalIOSVault.shared.inspect()==nil else {
                 throw N2ProtectedStoreError.targetNotEmpty
             }
+            stage="autenticación Face ID/código"
             let authentication=LAContext()
+            var evaluationError:NSError?
+            guard authentication.canEvaluatePolicy(
+                .deviceOwnerAuthentication,error:&evaluationError) else {
+                throw evaluationError ?? LAError(.passcodeNotSet)
+            }
             guard try await authentication.evaluatePolicy(
                 .deviceOwnerAuthentication,
                 localizedReason:"Autorizar el primer registro manual de DANPER") else {
                 throw N2ProtectedStoreError.unsafeSource
             }
+            stage="segunda comprobación de la bóveda"
             guard scenePhase == .active,
                   try await N2ProtectedClinicalIOSVault.shared.inspect()==nil else {
                 throw N2ProtectedStoreError.targetNotEmpty
             }
+            stage="validación del primer trabajador"
             let timestamp=Int64(Date().timeIntervalSince1970*1000)
             let worker:[String:String]=[
                 "dni":dni,"name":fullName.trimmingCharacters(in:.whitespacesAndNewlines),
@@ -135,6 +144,7 @@ struct N2FirstManualWorkerView:View {
             let source=try N2SnapshotEditor.addWorker(
                 snapshot:initial,worker:data,at:timestamp)
             // Production snapshot validation and audit remain unchanged.
+            stage="creación cifrada de la fuente clínica"
             let result=try await N2ProtectedClinicalIOSVault.shared
                 .activateOnlyWithConsent(source,approvedByUser:true)
             guard result.workers==1,result.attentions==0,
@@ -145,7 +155,54 @@ struct N2FirstManualWorkerView:View {
             message="Base inicializada sin Excel, muestras ni datos clínicos históricos."
         }catch{
             failed=true
-            message="No se pudo crear la fuente. No se sobrescribió ningún registro. Comprueba la autenticación y el estado de la bóveda."
+            message=Self.explainFailure(error,stage:stage)
         }
+    }
+
+    /// Actionable failure without printing identifying worker data,
+    /// credentials, encryption secrets or any Keychain contents.
+    private static func explainFailure(_ error:Error,stage:String)->String {
+        if let issue=error as? LAError {
+            switch issue.code {
+            case .biometryNotEnrolled:
+                return "Face ID no está configurado. En Simulator, activa Features → Face ID → Enrolled y repite la autenticación. No se creó ninguna fuente."
+            case .biometryNotAvailable:
+                return "Este entorno no dispone de biometría. Para registrar datos ficticios utiliza Inicio → Empezar con una base vacía (DEMO)."
+            case .passcodeNotSet:
+                return "No hay código de dispositivo disponible para autenticar. En el simulador comprueba la configuración de Face ID; para datos de prueba utiliza el espacio DEMO."
+            case .userCancel, .appCancel, .systemCancel:
+                return "Autenticación cancelada. La creación clínica no se realizó."
+            case .authenticationFailed, .biometryLockout:
+                return "Autenticación rechazada o bloqueada temporalmente. Vuelve a autenticarte o utiliza el código del dispositivo."
+            default:
+                break
+            }
+        }
+        if let issue=error as? N2ProtectedStoreError {
+            switch issue {
+            case .targetNotEmpty:
+                return "La bóveda clínica ya contiene datos o archivos pendientes de recuperar. No se sobrescribieron. Usa «Comprobar bóveda clínica» y conserva los registros."
+            case .unsafeSource:
+                return "No se validó la fuente inicial como base clínica segura. Para probar trabajadores ficticios usa Inicio → Empezar con una base vacía (DEMO)."
+            case .absentSource:
+                return "No se encontró una fuente clínica verificada."
+            case .staleRevision:
+                return "La revisión de la bóveda cambió durante la creación. Comprueba su estado antes de reintentar."
+            }
+        }
+        if let issue=error as? N2ProtectedClinicalIOSVault.Failure {
+            switch issue {
+            case .missingKey:
+                return "Hay archivos cifrados anteriores sin su clave. Se conservaron: no reinstales ni borres la aplicación."
+            case .unavailableKeychain:
+                return "No se pudo acceder al Keychain clínico. Comprueba que el simulador o iPhone esté desbloqueado."
+            case .keyInvalid:
+                return "La clave del almacén clínico tiene un formato inesperado. Se conservaron los datos."
+            case .blockedMigration:
+                return "No se pudo confirmar la fuente clínica. La bóveda existente permanece intacta."
+            }
+        }
+        let issue=error as NSError
+        return "No se creó la fuente durante «\(stage)» (\(issue.domain), código \(issue.code)). No se sobrescribieron datos. Para pruebas ficticias, usa el espacio DEMO."
     }
 }
