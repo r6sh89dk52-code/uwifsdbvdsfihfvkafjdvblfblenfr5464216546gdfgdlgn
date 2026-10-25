@@ -7,6 +7,33 @@ const root=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(root,'src/main.tsx'),'utf8');
 const home=fs.readFileSync(path.join(root,'native-ios/App/NativeRootView.swift'),'utf8');
 const form=fs.readFileSync(path.join(root,'native-ios/App/N2NativeClinicalFormView.swift'),'utf8');
+const osteomuscular=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2OsteomuscularSegments.swift'),'utf8');
+const draftDashboard=fs.readFileSync(path.join(root,'native-ios/App/N2NativeDraftsDashboard.swift'),'utf8');
+for(const item of [
+  'ZONA CERVICAL,DORSAL,LUMBAR Y SACRA','ZONA CERVICAL','ZONA DORSAL',
+  'ZONA LUMBAR','ZONA SACRA','PIE','PIERNA','RODILLA','TOBILLO',
+  'PRIMERO, SEGUNDO ,TERCERO, CUARTO Y QUINTO DEDO DERECHO E IZQUIERDO'
+]) assert(osteomuscular.includes(item),
+  'Debe conservar opciones anatómicas históricas y específicas: '+item);
+for(const marker of [
+  'DanperChoiceField(title:"Segmento osteomuscular"',
+  'selection:segmentChoice',
+  'N2OsteomuscularSegments.options +',
+  'TextField("Describe la zona afectada",text:$form.segment)',
+  'clinical-osteomuscular-segment-choice'
+]) assert(form.includes(marker),
+  'El segmento osteomuscular debe poder seleccionarse o especificarse: '+marker);
+for(const marker of [
+  'draft-dashboard-delete-','Button(role:.destructive)',
+  'selectedDeleteID=draft.id',
+  'vault.deleteDraft(id:id,expectedRevision:current.revision)',
+  'N2DraftReminder.cancel(id:id,mode:vault.mode)',
+  'confirmationDialog("¿Eliminar este borrador?"'
+]) assert(draftDashboard.includes(marker),
+  'Borrar borrador debe estar disponible y ser confirmado en el tablero: '+marker);
+assert(!draftDashboard.includes('Para borrar un borrador, ábrelo'),
+  'El borrador ya no debe requerir abrir el formulario para poder eliminarlo');
+console.log('PASS: segmento osteomuscular seleccionable y eliminación directa/confirmada de borradores.');
 const editor=fs.readFileSync(path.join(root,'native-ios/App/N2NativeWorkerEditorView.swift'),'utf8');
 const kardex=fs.readFileSync(path.join(root,'native-ios/App/N2Build222KardexHub.swift'),'utf8');
 const inventory=fs.readFileSync(path.join(root,'native-ios/App/N2NativeInventoryView.swift'),'utf8');
