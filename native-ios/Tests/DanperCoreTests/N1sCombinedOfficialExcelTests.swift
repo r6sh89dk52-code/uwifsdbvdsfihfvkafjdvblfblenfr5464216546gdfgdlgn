@@ -81,19 +81,19 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
                 encoding:.utf8))
         }
         func cell(_ col:String,in xml:String)throws->String {
-            let start=try XCTUnwrap(xml.range(of:"<c r=\"\\(col)\\(row)\""))
+            let start=try XCTUnwrap(xml.range(of:"<c r=\"\(col)\(row)\""))
             let suffix=xml[start.lowerBound...]
             let end=try XCTUnwrap(suffix.range(of:"</c>"))
             return String(suffix[..<end.upperBound])
         }
         let xml=try exportXML(plan)
         let income=try cell("E",in:xml)
-        XCTAssertTrue(income.contains("IF(COUNT(INGRESOS!X\\(row))=0,0,INGRESOS!X\\(row))"))
+        XCTAssertTrue(income.contains("IF(COUNT(INGRESOS!X\(row))=0,0,INGRESOS!X\(row))"))
         XCTAssertTrue(income.contains("<v>0.0</v>"))
         for (col,value) in [("G",4.0),("H",4.0),("I",0.0)] {
             let formulaCell=try cell(col,in:xml)
             XCTAssertTrue(formulaCell.contains("<f>"))
-            XCTAssertTrue(formulaCell.contains("<v>\\(value)</v>"))
+            XCTAssertTrue(formulaCell.contains("<v>\(value)</v>"))
         }
         // A missing proof must NOT make 0 appear in E or closing
         // caches, even if the source supplies an opening/count.
@@ -102,7 +102,7 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         plan["byCode"]=byCode
         let unresolved=try exportXML(plan)
         XCTAssertTrue(try cell("E",in:unresolved).contains(
-            "IF(COUNT(INGRESOS!X\\(row))=0,&quot;&quot;,INGRESOS!X\\(row))"))
+            "IF(COUNT(INGRESOS!X\(row))=0,&quot;&quot;,INGRESOS!X\(row))"))
         XCTAssertFalse(try cell("G",in:unresolved).contains("<v>4.0</v>"))
         XCTAssertFalse(try cell("H",in:unresolved).contains("<v>4.0</v>"))
         XCTAssertFalse(try cell("I",in:unresolved).contains("<v>0.0</v>"))
