@@ -457,11 +457,12 @@ struct N2ClinicalWorkspaceRootView:View {
     @MainActor private func refreshHomeCounts() async {
         guard !layoutOnly else{return}
         do {
-            guard let model=try await vault.readHistory() else {
+            let prepared=try await vault.readDashboard()
+            guard let model=prepared.history else {
                 homeCounts=nil
                 return
             }
-            let drafts=try await vault.readDrafts()
+            let drafts=prepared.drafts
             var calendar=Calendar(identifier:.gregorian)
             calendar.timeZone=TimeZone(identifier:"America/Lima")!
             calendar.firstWeekday=2
