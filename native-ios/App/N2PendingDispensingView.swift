@@ -24,7 +24,6 @@ struct N2PendingDispensingView:View {
     @State private var quantity=""
     @State private var opening=false
     @State private var newContainers=1
-    @State private var reason=""
     @State private var consent=false
     @State private var busy=false
     @State private var message=""
@@ -96,12 +95,15 @@ struct N2PendingDispensingView:View {
                     LabeledContent("DNI del responsable",value:N2ClinicianIdentity.dni)
                     Text("Identificación automática del profesional configurado en DANPER. No necesitas introducirla en cada atención.")
                         .font(.caption).foregroundStyle(.secondary)
-                    TextField("Evidencia y motivo",text:$reason,axis:.vertical)
-                        .lineLimit(2...4)
-                        .accessibilityIdentifier("historical-opening-evidence")
-                    Text("Obligatorio: explica qué apertura o reutilización verificaste (mínimo 10 caracteres). Esta declaración no modifica el conteo físico actual.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Toggle("Confirmo la cantidad física y la evidencia",isOn:$consent)
+                    Text("Constancia automática: DANPER registrará el lote, tu identificación, la fecha de la atención y si declaraste una apertura (R=1) o reutilización (R=0). No se solicita un motivo escrito.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    if isHistorical {
+                        Text("Esta confirmación es tu declaración de una operación anterior; no demuestra por sí sola un movimiento físico antiguo ni modifica el conteo actual.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Toggle(isHistorical
+                        ? "Confirmo que la apertura o reutilización declarada es correcta"
+                        : "Confirmo el consumo y la operación realizada",isOn:$consent)
                     Button(isHistorical ? "Guardar declaración histórica (R=1/0)" :
                                               "Verificar y conciliar sin duplicar atención") {
                         Task {await save()}
@@ -122,12 +124,8 @@ struct N2PendingDispensingView:View {
         guard !lotID.isEmpty else {
             message="Selecciona el lote compatible con la atención.";return
         }
-        let evidenceReason=reason.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard evidenceReason.count>=10 else {
-            message="Falta evidencia y motivo: describe la apertura o reutilización en al menos 10 caracteres.";return
-        }
         guard consent else {
-            message="Confirma que la apertura declarada y su evidencia son correctas.";return
+            message="Confirma la operación registrada antes de guardar.";return
         }
         let rawQuantity=quantity.isEmpty ? "0":quantity.replacingOccurrences(of:",",with:".")
         guard let amount=Double(rawQuantity),amount.isFinite,amount>=0,amount<=10_000_000 else {
@@ -136,16 +134,25 @@ struct N2PendingDispensingView:View {
         busy=true;defer {busy=false}
         message=""
         do {
+            guard let selectedLot=context.lots.first(where:{$0.id==lotID}) else {
+                message="El lote seleccionado ya no está disponible. Abre nuevamente la atención desde Historial."
+                return
+            }
+            let openings=opening ? (isHistorical && selectedLotIsContainer ? 1:newContainers):0
+            let auditDescription=N2PendingDispensingEvidence.automaticAuditDescription(
+                clinicalDate:date,lotReference:selectedLot.reference,
+                historical:isHistorical,container:selectedLotIsContainer,
+                newContainers:openings,physicalQuantity:amount)
             let evidence=N2PendingDispensingEvidence(visitID:visitID,itemID:medication.id,lotID:lotID,
                 quantity:isHistorical && selectedLotIsContainer ? 0:amount,
-                confirmNewContainer:opening,operatorName:N2ClinicianIdentity.name,reason:evidenceReason,
+                confirmNewContainer:opening,operatorName:N2ClinicianIdentity.name,reason:auditDescription,
                 at:Int64(Date().timeIntervalSince1970*1000),
-                newContainers:opening ? (isHistorical && selectedLotIsContainer ? 1:newContainers):0,
+                newContainers:openings,
                 operatorDni:N2ClinicianIdentity.dni)
             _=try await vault.confirmPendingDispensing(evidence,expectedRevision:context.revision)
             onSaved();dismiss()
         } catch N2PendingDispensingEvidence.Failure.invalidEvidence {
-            message="La declaración no cumple las validaciones de evidencia, responsable o apertura. Ningún consumo fue confirmado."
+            message="No se pudo validar la declaración del lote y la apertura. No se confirmó ningún consumo adicional."
         } catch N2PendingDispensingEvidence.Failure.invalidTarget {
             message="La atención o el lote ya no coinciden con los datos actuales. Vuelve a Historial y abre de nuevo el consumo pendiente."
         } catch N2ProtectedStoreError.staleRevision {
