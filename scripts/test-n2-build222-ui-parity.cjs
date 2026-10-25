@@ -185,8 +185,24 @@ assert(initialFormLoad.includes('vault.prepareClinicalForm()'),
 assert(!initialFormLoad.includes('vault.readDrafts()') &&
        !initialFormLoad.includes('vault.clinicalFormContext()'),
   'La carga inicial no debe recuperar dos veces la misma bóveda');
-assert(form.includes('drafts=try await vault.readDrafts()'),
-  'La eliminación explícita de un borrador debe actualizar el listado desde la bóveda');
+assert(form.includes('let freshRevision=try await vault.currentRevision()') &&
+       form.includes('let prepared=try await vault.prepareClinicalForm()') &&
+       form.includes('drafts=prepared.drafts') &&
+       form.includes('context=prepared.context'),
+  'Eliminar en el formulario debe refrescar borradores y contexto en una sola lectura');
+assert(form.includes('let latestRevision=try await vault.currentRevision()') &&
+       !form.includes('let latest=try await vault.clinicalFormContext()'),
+  'Autosave debe consultar revisión cifrada sin reconstruir el padrón de trabajadores');
+for(const path of [
+  'native-ios/App/N2ProtectedClinicalIOSVault.swift',
+  'native-ios/App/N2SyntheticTrialIOSVault.swift',
+  'native-ios/App/N2WorkspaceVault.swift',
+  'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'
+]) {
+  const src=fs.readFileSync(require('node:path').join(root,path),'utf8');
+  assert(src.includes('currentRevision()'),
+    path+' debe exponer revisión autenticada ligera');
+}
 // The former combined history reader remains available for other screens,
 // but Home must call the newer direct counters instead of rebuilding a full
 // roster/visit projection. Scope the guard to Home's refresh function.
