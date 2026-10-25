@@ -110,6 +110,10 @@ actor N2ProtectedClinicalIOSVault {
     func dispensingStatus(visitID:String)throws->[String:String] {
         try protectedStore().dispensingStatus(visitID:visitID)
     }
+    func dashboardCounters(today:String,weekStart:String)throws
+        ->(today:Int,week:Int,drafts:Int)? {
+        try protectedStore().dashboardCounters(today:today,weekStart:weekStart)
+    }
     func readDashboard()throws
         ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
         try protectedStore().readDashboard()
