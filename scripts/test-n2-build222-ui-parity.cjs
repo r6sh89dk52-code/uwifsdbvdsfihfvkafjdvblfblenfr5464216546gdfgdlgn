@@ -193,15 +193,15 @@ assert(form.includes('let freshRevision=try await vault.currentRevision()') &&
 assert(form.includes('let latestRevision=try await vault.currentRevision()') &&
        !form.includes('let latest=try await vault.clinicalFormContext()'),
   'Autosave debe consultar revisión cifrada sin reconstruir el padrón de trabajadores');
-for(const path of [
+for(const filePath of [
   'native-ios/App/N2ProtectedClinicalIOSVault.swift',
   'native-ios/App/N2SyntheticTrialIOSVault.swift',
   'native-ios/App/N2WorkspaceVault.swift',
   'native-ios/Sources/DanperCore/N2ProtectedClinicalVaultCore.swift'
 ]) {
-  const src=fs.readFileSync(require('node:path').join(root,path),'utf8');
+  const src=fs.readFileSync(path.join(root,filePath),'utf8');
   assert(src.includes('currentRevision()'),
-    path+' debe exponer revisión autenticada ligera');
+    filePath+' debe exponer revisión autenticada ligera');
 }
 // The former combined history reader remains available for other screens,
 // but Home must call the newer direct counters instead of rebuilding a full
