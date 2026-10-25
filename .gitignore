@@ -12,6 +12,10 @@ outputs/
 # Generated from synthetic CI fixtures; no XLSX templates in Git history.
 native-ios/App/N1sDemoResources/
 native-ios/DANPERNative.xcodeproj/
+native-ios/.build/
+native-ios/.swiftpm/
+native-ios/NativeTests/SyntheticFixtures/
+native-ios/App/Assets.xcassets/AppIcon.appiconset/
 
 # Generated official area-only catalog, derived from the verified 10-sheet workbook.
 native-ios/App/DANPEROfficialAreas.json

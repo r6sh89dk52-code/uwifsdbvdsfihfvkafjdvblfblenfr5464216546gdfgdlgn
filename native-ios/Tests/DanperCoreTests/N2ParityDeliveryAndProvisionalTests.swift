@@ -7,7 +7,7 @@ final class N2ParityDeliveryAndProvisionalTests:XCTestCase {
         return try Data(contentsOf:URL(fileURLWithPath:root).appendingPathComponent(name))
     }
     private func bytes(_ value:Any)throws->Data {try JSONSerialization.data(withJSONObject:value)}
-    func testExplicitStockSiteCannotDebitOtherSiteOrUnknownLegacyStock()throws {
+    func testCareSiteUsesSingleInventoryAcrossLegacyAndBothLotSites()throws {
         var root=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture("n1e-clinical-stock.json")) as? [String:Any])
         let visits=try XCTUnwrap(root["attentions"] as? [[String:Any]])
         var visit=try XCTUnwrap(visits.first{$0["id"] as? String=="fundo-unit"})
@@ -22,18 +22,22 @@ final class N2ParityDeliveryAndProvisionalTests:XCTestCase {
         initial[0]["looseUnits"]=10
         root["stockLots"]=initial
         let unknown=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:bytes(root),visit:bytes(visit),approvedCatalog:fixture("n2-reviewed-approved.json"),at:timestamp)
-        XCTAssertEqual(unknown.pending,1)
-        XCTAssertEqual(unknown.physicalMovementsAdded,0)
+        XCTAssertEqual(unknown.pending,0)
+        XCTAssertEqual(unknown.linked,1)
+        XCTAssertEqual(unknown.physicalMovementsAdded,1)
         var lots=try XCTUnwrap(root["stockLots"] as? [[String:Any]])
         for i in lots.indices {lots[i]["site"]="LA VENTUROSA"}
         root["stockLots"]=lots
         let mismatch=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:bytes(root),visit:bytes(visit),approvedCatalog:fixture("n2-reviewed-approved.json"),at:timestamp)
-        XCTAssertEqual(mismatch.pending,1)
-        XCTAssertEqual(mismatch.physicalMovementsAdded,0)
+        XCTAssertEqual(mismatch.pending,0)
+        XCTAssertEqual(mismatch.linked,1)
+        XCTAssertEqual(mismatch.physicalMovementsAdded,1)
         for i in lots.indices {lots[i]["site"]="PLVENTUROSA"}
         root["stockLots"]=lots
         let matching=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:bytes(root),visit:bytes(visit),approvedCatalog:fixture("n2-reviewed-approved.json"),at:timestamp)
         XCTAssertEqual(matching.linked,1)
+        XCTAssertEqual(matching.pending,0)
+        XCTAssertEqual(matching.physicalMovementsAdded,1)
         let snapshot=try XCTUnwrap(JSONSerialization.jsonObject(with:matching.snapshot) as? [String:Any])
         let saved=try XCTUnwrap((snapshot["attentions"] as? [[String:Any]])?.first{$0["id"] as? String=="site-parity"})
         XCTAssertEqual((saved["nativeDispensing"] as? [String:String])?["site-item"],"Descontado")
@@ -60,7 +64,7 @@ final class N2ParityDeliveryAndProvisionalTests:XCTestCase {
         // Export is pure and cannot change a single physical movement.
         XCTAssertEqual(snapshot,try fixture("n1e-clinical-stock.json"))
     }
-    func testScopedNursingReportDoesNotMergeOtherOrUnknownSiteStocks()throws {
+    func testBothNursingReportsIncludeTheSingleSharedInventory()throws {
         let plan=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture("n2-nursing-parity.json")) as? [String:Any])
         let catalog=try XCTUnwrap(plan["catalog"] as? [[String:Any]])
         let lot:[String:Any]=["id":"SITE-TEST","code":"E-1","name":catalog[0]["name"]!,
@@ -72,8 +76,8 @@ final class N2ParityDeliveryAndProvisionalTests:XCTestCase {
             lot:bytes(lot),catalogData:bytes(catalog))
         let fundo=try N2NursingReportBuilder.daily(snapshot:snapshot,catalog:bytes(catalog),date:"2026-10-14",site:"LA VENTUROSA")
         let planta=try N2NursingReportBuilder.daily(snapshot:snapshot,catalog:bytes(catalog),date:"2026-10-14",site:"PLVENTUROSA")
-        XCTAssertEqual(fundo.rows.filter(\.stockKnown).count,1)
-        XCTAssertEqual(planta.rows.filter(\.stockKnown).count,0)
+        XCTAssertEqual(fundo.rows.filter(\.stockKnown).count,3)
+        XCTAssertEqual(planta.rows.filter(\.stockKnown).count,3)
     }
     func testFrequencyPreservesEarlierVisitWhenExportingOnlyLaterSelection()throws {
         var root=try XCTUnwrap(JSONSerialization.jsonObject(with:fixture("n1e-clinical-stock.json")) as? [String:Any])

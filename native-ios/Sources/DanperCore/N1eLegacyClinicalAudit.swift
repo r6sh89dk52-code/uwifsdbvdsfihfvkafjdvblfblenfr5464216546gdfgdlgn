@@ -89,6 +89,12 @@ public enum N1eLegacyClinicalAudit {
             else { throw N1eParityError.invalidLot }
         }
         let total = three(Double(sealed) * Double(size) + loose + opened)
+        if l["declaredOpenContainers"] != nil {
+            guard let count=integer(l["declaredOpenContainers"]),count<=10_000_000,
+                  N2ContainerAccounting.isContainer(unit:l["catalogUnit"] as? String ?? "") else {
+                throw N1eParityError.invalidLot
+            }
+        }
         guard total.isFinite, total >= 0 && total <= 10_000_000_000 else {
             throw N1eParityError.invalidLot
         }
@@ -97,7 +103,8 @@ public enum N1eLegacyClinicalAudit {
 
     /// A successful audit never grants restore authorization; the caller must
     /// still authenticate, stage both encrypted domains, and obtain consent.
-    public static func inspect(_ data: Data) throws -> N1eClinicalParityReport {
+    public static func inspect(_ data: Data,allowEmptySynthetic:Bool=false)
+        throws -> N1eClinicalParityReport {
         guard data.count <= 30 * 1024 * 1024,
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let workers = root["workers"] as? [[String: Any]],
@@ -106,7 +113,8 @@ public enum N1eLegacyClinicalAudit {
               let rawMoves = root["stockMovements"] as? [[String: Any]]
         else { throw N1eParityError.invalidSnapshot }
         // Enforce the exact nine collections from the actual build222 format.
-        guard (try? N1BackupAdmission.preview(data: data)) != nil else {
+        guard (try? N1BackupAdmission.preview(data:data)) != nil ||
+              (allowEmptySynthetic && N2EmptyDemoSnapshot.matches(data)) else {
             throw N1eParityError.invalidSnapshot
         }
         var workerIDs = Set<String>()
@@ -162,7 +170,7 @@ public enum N1eLegacyClinicalAudit {
                   let product = str(m["code"]),
                   let lot = lots[lotID], lot.code == product,
                   let kind = m["kind"] as? String,
-                  ["use","extraordinary","adjustment"].contains(kind),
+                  ["use","extraordinary","adjustment","containerState"].contains(kind),
                   let at = integer(m["at"]), at > 0,
                   let before = try? parseLot(m["before"]),
                   let after = try? parseLot(m["after"]),
@@ -175,8 +183,13 @@ public enum N1eLegacyClinicalAudit {
             else { throw N1eParityError.invalidMovement }
             guard three(after.physical - before.physical) == three(delta)
             else { throw N1eParityError.invalidPhysicalDelta }
+            let declaredContainer=m["containerAccountingVersion"] != nil
+            if kind=="containerState" && !declaredContainer {throw N1eParityError.invalidMovement}
+            if declaredContainer && !N2ContainerAccounting.validMovement(m) {
+                throw N1eParityError.invalidMovement
+            }
             if kind == "use" {
-                guard quantity > 0, three(delta) == -three(quantity) else {
+                guard (declaredContainer ? quantity>=0 : quantity>0), three(delta) == -three(quantity) else {
                     throw N1eParityError.invalidPhysicalDelta
                 }
             }
@@ -187,6 +200,7 @@ public enum N1eLegacyClinicalAudit {
             if let refValue = m["dispenseRef"] {
                 guard kind == "use",
                       let ref = refValue as? [String: Any],
+                      (ref["containerAccountingVersion"] as? Int == 1)==declaredContainer,
                       let aid = str(ref["attentionId"]), let iid = str(ref["itemId"]),
                       let item = clinical[aid + "\u{001F}" + iid],
                       let refCode = str(ref["clinicalCode"]),
@@ -198,8 +212,9 @@ public enum N1eLegacyClinicalAudit {
                       refUnit == item.unit, refQty == item.quantity else {
                     throw N1eParityError.invalidClinicalLink
                 }
-                let perUnit = ["UND","TBL","PAR"].contains(refUnit.uppercased())
-                let actualR = perUnit ? quantity : ((m["openedNewContainer"] as? Bool) == true ? 1.0 : 0.0)
+                let perUnit = !declaredContainer && ["UND","TBL","PAR"].contains(refUnit.uppercased())
+                let actualR = declaredContainer ? (num(m["declaredOpenings"]) ?? -1) :
+                    (perUnit ? quantity : ((m["openedNewContainer"] as? Bool) == true ? 1.0 : 0.0))
                 guard three(actualR) == three(excel) else {
                     throw N1eParityError.incorrectExcelR
                 }
@@ -222,9 +237,11 @@ public enum N1eLegacyClinicalAudit {
             let split = first.ref["partCount"] != nil || first.ref["partIndex"] != nil
             let row = clinical[key]!
             if split {
+                let declared=first.ref["containerAccountingVersion"] as? Int==1
                 guard let expected = integer(first.ref["partCount"]),
                       (2...500).contains(expected), parts.count == expected,
-                      let target = positive(first.ref["physicalTotal"]) else {
+                      let target = num(first.ref["physicalTotal"]),target<=10_000_000,
+                      (declared ? target>=0 : target>0) else {
                     throw N1eParityError.incompleteFEFOGroup
                 }
                 var indices = Set<Int>()
@@ -232,7 +249,8 @@ public enum N1eLegacyClinicalAudit {
                     guard let idx = integer(p.ref["partIndex"]),
                           (1...expected).contains(idx), indices.insert(idx).inserted,
                           integer(p.ref["partCount"]) == expected,
-                          positive(p.ref["physicalTotal"]) == target,
+                          num(p.ref["physicalTotal"]) == target,
+                          (p.ref["containerAccountingVersion"] as? Int==1)==declared,
                           p.id == "ATT:" + String(key.split(separator: "\u{001F}")[0]) +
                             ":ITEM:" + String(key.split(separator: "\u{001F}")[1]) +
                             ":PART:" + String(idx),
@@ -246,7 +264,14 @@ public enum N1eLegacyClinicalAudit {
                 guard indices.count == expected,
                       three(parts.reduce(0.0) { $0 + $1.quantity }) == three(target)
                 else { throw N1eParityError.incompleteFEFOGroup }
-                if ["UND","TBL","PAR"].contains(row.unit.uppercased()) {
+                if declared {
+                    guard let openings=integer(first.ref["declaredOpeningTotal"]),openings>0,
+                          parts.allSatisfy({integer($0.ref["declaredOpeningTotal"])==openings}),
+                          parts.reduce(0.0,{$0+$1.r})==Double(openings) else {
+                        throw N1eParityError.incompleteFEFOGroup
+                    }
+                }
+                if first.ref["containerAccountingVersion"] as? Int != 1 && ["UND","TBL","PAR"].contains(row.unit.uppercased()) {
                     guard target == Double(row.quantity) else {
                         throw N1eParityError.mismatchClinicalItem
                     }
@@ -261,7 +286,7 @@ public enum N1eLegacyClinicalAudit {
                       first.id == "ATT:" + aid + ":ITEM:" + iid else {
                     throw N1eParityError.invalidClinicalLink
                 }
-                if ["UND","TBL","PAR"].contains(row.unit.uppercased()) {
+                if first.ref["containerAccountingVersion"] as? Int != 1 && ["UND","TBL","PAR"].contains(row.unit.uppercased()) {
                     guard parts[0].quantity == Double(row.quantity) else {
                         throw N1eParityError.mismatchClinicalItem
                     }

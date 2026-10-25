@@ -9,6 +9,7 @@ public struct N2DispensingLine:Identifiable,Sendable {
     public let code:String
     public let quantity:Double
     public let result:String
+    public var kardexQuantity:Double?=nil
 }
 public struct N2ProtectedStoreSummary: Sendable {
     public let revision:Int
@@ -46,7 +47,9 @@ public final class N2ProtectedClinicalVaultCore {
     }
     private func summary(_ record:N2EncryptedClinicalJournal.Recovered) throws
         -> N2ProtectedStoreSummary {
-        let a=try N1eLegacyClinicalAudit.inspect(record.snapshot)
+        let a=try N1eLegacyClinicalAudit.inspect(
+            record.snapshot,
+            allowEmptySynthetic:directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT")
         let b=try N1fLosslessFieldGate.inspect(record.snapshot)
         return N2ProtectedStoreSummary(revision:record.revision,
             workers:a.workers,attentions:a.attentions,
@@ -54,15 +57,92 @@ public final class N2ProtectedClinicalVaultCore {
             physicalMovements:a.physicalMovements,
             pendingClinicalLines:a.pendingClinicalItems)
     }
+    public func confirmPendingDispensing(_ evidence:N2PendingDispensingEvidence,approvedCatalog:Data,
+                                         expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            let verified=try evidence.append(snapshot:$0,explicitConsent:true)
+            return try N2NativeClinicalTransaction.retryCurrentSavedVisit(snapshot:verified,
+                visitID:evidence.visitID,approvedCatalog:approvedCatalog,at:evidence.at).snapshot
+        }
+    }
+    public func closeContainers(lotID:String,count:Int,disposition:String,operatorName:String,
+                                reason:String,at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2ContainerAccounting.close(snapshot:$0,lotID:lotID,count:count,disposition:disposition,
+                operatorName:operatorName,reason:reason,at:at)
+        }
+    }
+    public func auxiliaryAccounting()throws->String {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        return try N2AuxiliaryInventory.accounting(snapshot:active.snapshot)
+    }
+    public func registerAuxiliaryLot(clinicalCode:String,lot:Data,catalog:N2NativeCatalogIndex,
+                                     operatorName:String,evidence:String,at:Int64,
+                                     expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2AuxiliaryInventory.register(snapshot:$0,clinicalCode:clinicalCode,lot:lot,
+                catalog:catalog,operatorName:operatorName,evidence:evidence,at:at,explicitConsent:true)
+        }
+    }
+    public func retryDispensing(visitID:String,approvedCatalog:Data,at:Int64,
+                               expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeClinicalTransaction.retryCurrentSavedVisit(snapshot:$0,visitID:visitID,
+                approvedCatalog:approvedCatalog,at:at).snapshot
+        }
+    }
+    public func confirmOperationalMapping(_ rule:N2OperationalMapping,catalog:N2NativeCatalogIndex,
+                                         explicitConsent:Bool,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2OperationalMappings.append(snapshot:$0,rule:rule,catalog:catalog,explicitConsent:explicitConsent)
+        }
+    }
     public func inspect()throws->N2ProtectedStoreSummary? {
         guard let record=try journal.recover() else{return nil}
         return try summary(record)
+    }
+    /// The editing screen needs a revision token for autosave, not a sorted
+    /// 9k-worker roster, full stock projection or form context.
+    /// A journal recovery still authenticates and audits the snapshot.
+    public func currentRevision()throws->Int {
+        guard let record=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return record.revision
+    }
+    /// One authenticated, fully validated encrypted journal recovery for
+    /// the whole new-attention screen. Previously the UI recovered, decrypted
+    /// and audited the exact same generation again just to list drafts.
+    /// Both values share the same immutable revision, eliminating a stale
+    /// draft/context pairing. No cache and no change to encryption or writes.
+    public func prepareClinicalForm(products:Data,nursing:Data,mappings:Data)
+        throws->(context:N2FormContext,drafts:[N2RecoverableDraft]) {
+        guard let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        let catalog=try N2NativeCatalogLoader.load(
+            products:products,nursing:nursing,approvedMappings:mappings)
+        let context=try N2NativeFormContextReader.readVerified(
+            snapshot:active.snapshot,revision:active.revision,products:catalog)
+        let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot)
+        return (context:context,drafts:drafts)
     }
     public func readDrafts()throws->[N2RecoverableDraft] {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
         }
-        return try N2NativeDraftRecovery.read(active.snapshot)
+        return try N2NativeDraftRecovery.readVerified(active.snapshot)
+    }
+    /// List and revision are recovered from the SAME authenticated generation.
+    /// Allows the UI to delete a draft with optimistic rendering, without
+    /// reopening/auditing the complete 9k-worker vault just for inspect().
+    public func readDraftsWithRevision()throws
+        ->(revision:Int,drafts:[N2RecoverableDraft]) {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return (revision:active.revision,
+                drafts:try N2NativeDraftRecovery.readVerified(active.snapshot))
     }
     public func dispensingLines(visitID:String)throws->[N2DispensingLine] {
         guard let active=try journal.recover(),
@@ -76,13 +156,15 @@ public final class N2ProtectedClinicalVaultCore {
         let outcomes=visit["nativeDispensing"] as? [String:String] ?? [:]
         return items.map { item in
             let id=item["id"] as? String ?? ""
-            let linked=movements.contains { m in
+            let linkedMovements=movements.filter { m in
                 guard let ref=m["dispenseRef"] as? [String:Any] else{return false}
                 return ref["attentionId"] as? String==visitID && ref["itemId"] as? String==id
             }
+            let linked = !linkedMovements.isEmpty
+            let kardex=linked ? linkedMovements.reduce(0.0){$0+(($1["excelQuantity"] as? NSNumber)?.doubleValue ?? 0)} : nil
             return N2DispensingLine(id:id,name:item["name"] as? String ?? "",
                 code:item["code"] as? String ?? "",quantity:(item["quantity"] as? NSNumber)?.doubleValue ?? 0,
-                result:linked ? "Descontado" : (outcomes[id] ?? "Pendiente de conciliar: registro histórico sin salida verificada"))
+                result:linked ? "Descontado" : (outcomes[id] ?? "Pendiente de conciliar: registro histórico sin salida verificada"),kardexQuantity:kardex)
         }
     }
     public func dispensingStatus(visitID:String)throws->[String:String] {
@@ -93,6 +175,45 @@ public final class N2ProtectedClinicalVaultCore {
             throw N2ProtectedStoreError.absentSource
         }
         return visit["nativeDispensing"] as? [String:String] ?? [:]
+    }
+    /// Dashboard reads one authenticated snapshot for both the visit
+    /// projection and draft counter; no second decrypt/validation pass.
+    /// The dashboard only needs today's, this week's and draft counts.
+    /// Recover and authenticate the original encrypted journal exactly as
+    /// before, but DO NOT sort 9k+ workers, rebuild the entire visit index
+    /// or calculate clinical frequency just to produce three integers.
+    /// Corrections cannot modify date/status; count those immutable fields.
+    /// Draft recovery still performs its strict validation on the same
+    /// authenticated snapshot. No plaintext or derived index is persisted.
+    public func dashboardCounters(today:String,weekStart:String)throws
+        ->(today:Int,week:Int,drafts:Int)? {
+        guard today.count==10,weekStart.count==10,weekStart<=today,
+              let active=try journal.recover() else{return nil}
+        guard let root=try? JSONSerialization.jsonObject(
+                  with:active.snapshot) as? [String:Any],
+              let visits=root["attentions"] as? [[String:Any]] else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot).count
+        var todayCount=0,weekCount=0
+        for visit in visits where visit["status"] as? String == "saved" {
+            guard let date=visit["date"] as? String else {
+                throw N2ProtectedStoreError.unsafeSource
+            }
+            if date==today {todayCount+=1}
+            if date>=weekStart && date<=today {weekCount+=1}
+        }
+        return (today:todayCount,week:weekCount,drafts:drafts)
+    }
+    public func readDashboard()throws
+        ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
+        guard let active=try journal.recover() else {
+            return (history:nil,drafts:[])
+        }
+        return (
+            history:try N2NativeSnapshotReader.read(active.snapshot),
+            drafts:try N2NativeDraftRecovery.readVerified(active.snapshot)
+        )
     }
     public func readIndex()throws->N2NativeReadModel? {
         guard let active=try journal.recover() else{return nil}
@@ -105,7 +226,7 @@ public final class N2ProtectedClinicalVaultCore {
         }
         let catalog=try N2NativeCatalogLoader.load(
             products:products,nursing:nursing,approvedMappings:mappings)
-        return try N2NativeFormContextReader.read(
+        return try N2NativeFormContextReader.readVerified(
             snapshot:active.snapshot,revision:active.revision,products:catalog)
     }
 
@@ -138,6 +259,15 @@ public final class N2ProtectedClinicalVaultCore {
             selectedVisitIDs:ids,allowPending:allowPending)
     }
 
+    public func exportOccupationalVigilance(start:String,end:String) throws
+        ->N2OccupationalVigilanceWorkbook.Result {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2OccupationalVigilanceWorkbook.export(
+            snapshot:active.snapshot,start:start,end:end)
+    }
+
     public func exportVerifiedDailyNursingWorkbook(
         catalog:Data,template:Data,date:String,shift:String,
         responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
@@ -150,13 +280,26 @@ public final class N2ProtectedClinicalVaultCore {
     }
     public func exportVerifiedRangeNursingWorkbook(
         catalog:Data,template:Data,start:String,end:String,
-        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
+        responsible:String,site:String="",mappings:Data?=nil,
+        reconstructFromCount:Bool=false)throws->N2VerifiedNursingWorkbook.Result {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
         }
         return try N2VerifiedNursingWorkbook.exportRange(
             snapshot:active.snapshot,catalog:catalog,template:template,
-            start:start,end:end,responsible:responsible,site:site)
+            start:start,end:end,responsible:responsible,site:site,
+            mappings:mappings,reconstructFromCount:reconstructFromCount)
+    }
+    /// Read-only 9th-day reconciliation against the encrypted single-source
+    /// journal. Never writes a stock movement or returns raw clinical records
+    /// to the SwiftUI screen.
+    public func automaticCutAccounting(mappings:Data,through date:String)
+        throws->N2AutomaticCutAccounting.Result {
+        guard let active=try journal.recover() else {
+            throw N2ProtectedStoreError.absentSource
+        }
+        return try N2AutomaticCutAccounting.calculate(
+            snapshot:active.snapshot,mappings:mappings,through:date)
     }
     public func sourceForEncryptedBackup()throws->Data {
         guard let active=try journal.recover() else{
@@ -165,6 +308,33 @@ public final class N2ProtectedClinicalVaultCore {
         _=try N1eLegacyClinicalAudit.inspect(active.snapshot)
         return active.snapshot
     }
+    /// Starts a genuinely EMPTY encrypted practice vault. Unlike the bundled
+    /// synthetic fixture it contains ZERO visits, workers, stock or movements.
+    /// No prior files or encrypted generations may be overwritten.
+    @discardableResult
+    public func activateEmptySynthetic(confirmed:Bool)throws
+        ->N2ProtectedStoreSummary {
+        guard confirmed,
+              directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT",
+              try journal.recover()==nil,
+              try FileManager.default.contentsOfDirectory(
+                  at:directory,includingPropertiesForKeys:nil).isEmpty else {
+            throw N2ProtectedStoreError.targetNotEmpty
+        }
+        let source=try N2EmptyDemoSnapshot.make()
+        let n=try journal.commit(source,expectedRevision:0)
+        guard let active=try journal.recover(),active.revision==n,
+              active.snapshot==source else {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        let result=try summary(active)
+        guard result.workers==0,result.attentions==0,result.drafts==0,
+              result.physicalMovements==0 else {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        return result
+    }
+
     /// Explicitly start an isolated sandbox containing ONLY the five documented
     /// fictional employees. This path cannot restore or mix actual patient
     /// records, and is physically separate from the clinical vault.
@@ -346,6 +516,15 @@ public final class N2ProtectedClinicalVaultCore {
         }
     }
     @discardableResult
+    public func correctUnusedLot(lotID:String,reference:String,expires:String,
+        reason:String,operatorName:String,at:Int64,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2NativeInventoryCommands.correctUnusedLot(snapshot:$0,
+                lotID:lotID,reference:reference,expires:expires,
+                reason:reason,operatorName:operatorName,at:at)
+        }
+    }
     public func receiveStock(movementID:String,lotID:String,at:Int64,
                              sealedAdded:Int,looseAdded:Double,reason:String,
                              expectedRevision:Int)throws->N2ProtectedStoreSummary {

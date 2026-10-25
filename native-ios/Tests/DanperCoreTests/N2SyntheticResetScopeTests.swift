@@ -26,8 +26,8 @@ final class N2SyntheticResetScopeTests:XCTestCase {
     func testSimilarNamesAndOtherAppSupportNeverPass() {
         let a=URL(fileURLWithPath:"/tmp/appOne",isDirectory:true)
         let b=URL(fileURLWithPath:"/tmp/appTwo",isDirectory:true)
-        let aDemo=a.appendingPathComponent(N2SyntheticResetScope.directoryName)
-        let bDemo=b.appendingPathComponent(N2SyntheticResetScope.directoryName)
+        let aDemo=a.appendingPathComponent(N2SyntheticResetScope.directoryName,isDirectory:true)
+        let bDemo=b.appendingPathComponent(N2SyntheticResetScope.directoryName,isDirectory:true)
         XCTAssertTrue(N2SyntheticResetScope.canErase(support:a,target:aDemo))
         XCTAssertFalse(N2SyntheticResetScope.canErase(support:a,target:bDemo))
     }

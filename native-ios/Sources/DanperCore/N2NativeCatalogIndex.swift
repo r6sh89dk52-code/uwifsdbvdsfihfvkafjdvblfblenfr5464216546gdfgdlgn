@@ -7,9 +7,15 @@ public struct N2ClinicalCatalogProduct:Equatable,Sendable,Identifiable {
     public let unit:String
 }
 public struct N2NursingCatalogProduct:Equatable,Sendable,Identifiable {
+    /// Internal Kardex reference; never a user-facing product code.
     public let id:String
     public let name:String
     public let group:String
+    /// Official U.M. from an approved mapping, if verified.
+    public let unit:String?
+    public init(id:String,name:String,group:String,unit:String?=nil) {
+        self.id=id;self.name=name;self.group=group;self.unit=unit
+    }
 }
 public struct N2ApprovedProductLink:Equatable,Sendable {
     public let clinicalCode:String
@@ -32,13 +38,13 @@ public struct N2NativeCatalogIndex:Sendable {
     public func nursingMatches(_ query:String)->[N2NursingCatalogProduct] {
         let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !q.isEmpty else{return nursing}
-        return nursing.filter{$0.id.localizedStandardContains(q) ||
-                              $0.name.localizedStandardContains(q) ||
+        return nursing.filter{$0.name.localizedStandardContains(q) ||
                               $0.group.localizedStandardContains(q)}
     }
     public func authorizedNursingOptions(for clinicalCode:String)->[N2NursingCatalogProduct] {
         let codes=Set(approvals.filter{$0.clinicalCode==clinicalCode}.map{$0.kardexID})
-        return nursing.filter{codes.contains($0.id)}
+        let reviewed=Set(N2UserReviewedKardexLinks.candidates(for:clinicalCode).map(\.kardexID))
+        return nursing.filter{codes.contains($0.id) || reviewed.contains($0.id)}
     }
 }
 public enum N2NativeCatalogLoader {
@@ -90,6 +96,45 @@ public enum N2NativeCatalogLoader {
         guard unique.count==86,!unique.contains("E-68"),
               links.filter{$0.clinicalCode=="16024400"}.count==2 else{
             throw N2CatalogError.invalidApprovals
+        }
+        // New user-reviewed identities remain separate from official approvals.
+        // Validate each code and exact label before offering the association.
+        try N2UserReviewedKardexLinks.validate(clinical:clinical,nursing:supplies,approvals:links)
+        // The 86 approved correspondences carry the authoritative unit.
+        // Unknown nursing units remain nil, never silently default to UND.
+        let byCode=Dictionary(uniqueKeysWithValues:clinical.map{($0.code,$0.unit)})
+        var units=Dictionary(uniqueKeysWithValues:links.compactMap{link -> (String,String)? in
+            guard let unit=byCode[link.clinicalCode] else{return nil}
+            return (link.kardexID,unit)
+        })
+        // All products in the original TABLETAS nursing group are physically
+        // counted as UND, including rows without a clinical correspondence.
+        // This leaves every clinical code and its source unit unchanged.
+        for product in supplies where product.group=="TABLETAS" {
+            units[product.id]="UND"
+        }
+        // Presentation exceptions explicitly confirmed by the operator.
+        // They apply ONLY to the nursing Kardex, never to the source
+        // clinical catalog or its approved cross-catalog identities.
+        // Tablets are dispensed as individual UND, not as TBL packages;
+        // clean examination gloves are tracked as CJA, not surgical PAR.
+        let verifiedExceptions:[(id:String,name:String,unit:String)]=[
+            ("E-18","LOPERAMIDA TAB","UND"),
+            ("E-94","GUANTES LIMPIOS M","CJA"),
+            ("E-95","GUANTES LIMPIOS S","CJA")
+        ]
+        for entry in verifiedExceptions {
+            guard supplies.contains(where:{$0.id==entry.id && $0.name==entry.name})
+            else {throw N2CatalogError.invalidNursingCatalog}
+            units[entry.id]=entry.unit
+        }
+        supplies=supplies.map { product in
+            // Explicitly confirmed by operator: "ALCOHOL 1 LT" is a bottle,
+            // not litres as a Kardex accounting unit.
+            let confirmed=units[product.id] ??
+                (product.id=="E-86" && product.name=="ALCOHOL 1 LT" ? "FCO" : nil)
+            return N2NursingCatalogProduct(id:product.id,name:product.name,
+                                           group:product.group,unit:confirmed)
         }
         return N2NativeCatalogIndex(clinical:clinical,nursing:supplies,
                                     approvals:links)

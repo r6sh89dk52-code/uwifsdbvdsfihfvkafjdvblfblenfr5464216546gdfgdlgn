@@ -24,9 +24,10 @@ struct N2ClinicalCorrectionView:View {
     @State private var photoSent=false
     @State private var procedures=""
     @State private var itemProcedures=[String:String]()
+    @State private var itemQuantities=[String:String]()
     @State private var reason=""
     @State private var discrepancy=""
-    @State private var operatorName=""
+    @State private var operatorName=N2ClinicianIdentity.name
     @State private var eventID=UUID().uuidString
     @State private var draftTask:Task<Void,Never>?
     @State private var history=[N2CorrectionHistoryEntry]()
@@ -48,7 +49,11 @@ struct N2ClinicalCorrectionView:View {
         operatorName.trimmingCharacters(in:.whitespacesAndNewlines).count>=3 &&
         !diagnosis.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty &&
         !category.isEmpty && !system.isEmpty &&
-        (permission=="NO" || permissionTime.count==5)
+        (permission=="NO" || permissionTime.count==5) &&
+        itemQuantities.values.allSatisfy{
+            if let q=Int($0) {return (1...100_000).contains(q)}
+            return false
+        }
     }
 
     var body:some View {
@@ -115,13 +120,19 @@ struct N2ClinicalCorrectionView:View {
                 }
                 if let detail {
                     DanperPanel("Medicamentos y consumos originales") {
-                        Text("El código, la cantidad administrada y las salidas FEFO son inmutables. Solo puedes corregir la descripción del procedimiento clínico, sin volver a descontar inventario.")
+                        Text("Puedes corregir la cantidad documentada en la ficha clínica y el procedimiento. Los movimientos FEFO y Kardex R originales permanecen intactos; cualquier diferencia entre cantidad clínica y cantidad dispensada exige revisión antes del Excel oficial.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(detail.medications,id:\.id){ item in
                             VStack(alignment:.leading,spacing:4) {
                                 Text(item.name).font(.headline)
-                                Text(item.code+" · Cantidad original: "+String(item.quantity))
+                                Text(item.code+" · Cantidad físicamente registrada: "+String(item.originalQuantity))
                                     .font(.caption).foregroundStyle(.secondary)
+                                TextField("Cantidad clínica corregida",text:Binding(
+                                    get:{itemQuantities[item.id] ?? String(item.quantity)},
+                                    set:{itemQuantities[item.id]=$0}
+                                ))
+                                .keyboardType(.numberPad)
+                                .accessibilityIdentifier("correction-item-quantity-"+item.id)
                                 TextField("Procedimiento del ítem",text:Binding(
                                     get:{itemProcedures[item.id] ?? item.procedure},
                                     set:{itemProcedures[item.id]=$0}
@@ -133,7 +144,7 @@ struct N2ClinicalCorrectionView:View {
                                   text:$discrepancy,axis:.vertical)
                             .lineLimit(2...5)
                 }
-                        Text("Si documentas una discrepancia de medicamento o cantidad, quedará en el historial pero se bloqueará su inclusión en el Excel oficial hasta revisión de inventario. No se simula una devolución ni nueva entrega.")
+                        Text("Una corrección de cantidad no equivale a ajustar físicamente el Kardex. Se conserva el movimiento original y el Excel oficial bloqueará esta atención hasta resolver la discrepancia. Los cambios de producto o nuevas entregas requieren revisión por separado.")
                             .font(.caption).foregroundStyle(.orange)
                     }
                 }
@@ -142,9 +153,8 @@ struct N2ClinicalCorrectionView:View {
                     TextField("Motivo detallado de la rectificación",text:$reason,
                               axis:.vertical).lineLimit(2...5)
                 }
-                    DanperField(title:"Responsable que rectifica") {
-                    TextField("Responsable que rectifica",text:$operatorName)
-                }
+                    LabeledContent("Responsable que rectifica",value:operatorName)
+                    LabeledContent("DNI del profesional",value:N2ClinicianIdentity.dni)
                     Button {
                         pendingConfirmation=true
                     } label: {
@@ -161,7 +171,7 @@ struct N2ClinicalCorrectionView:View {
                         }
                         Button("Cancelar",role:.cancel){}
                     } message: {
-                        Text("La atención original, la fecha, los productos y todas las salidas de stock permanecen intactos.")
+                        Text("La atención original y sus salidas físicas quedan intactas. Las cantidades clínicas rectificadas tendrán trazabilidad y requerirán revisar cualquier diferencia contable.")
                     }
                     Button(role:.destructive) {
                         confirmDiscard=true
@@ -227,22 +237,26 @@ struct N2ClinicalCorrectionView:View {
         .onDisappear {queueDraft(immediate:true)}
     }
     private var autosaveFingerprint:String {
-        [
+        let procedureFingerprint:String=itemProcedures.keys.sorted().map { id in
+            id+"="+(itemProcedures[id] ?? "")
+        }.joined(separator:"|")
+        let quantityFingerprint:String=itemQuantities.keys.sorted().map { id in
+            id+"="+(itemQuantities[id] ?? "")
+        }.joined(separator:"|")
+        let fields:[String]=[
             category,system,segment,diagnosis,permission,permissionTime,
             responsible,responsibleDni,workStatus,blueBandage.description,
             returned.description,photoSent.description,procedures,reason,
-            discrepancy,operatorName,
-            itemProcedures.keys.sorted().map{
-                $0+"="+(itemProcedures[$0] ?? "")
-            }.joined(separator:"|")
-        ].joined(separator:"\u{001F}")
+            discrepancy,operatorName,procedureFingerprint,quantityFingerprint
+        ]
+        return fields.joined(separator:"\u{001F}")
     }
     private func editPacket()->[String:Any] {
         let procedureRows=procedures.split(separator:"\n",
             omittingEmptySubsequences:true).map{
             $0.trimmingCharacters(in:.whitespacesAndNewlines)
         }.filter{!$0.isEmpty}
-        return [
+        var packet:[String:Any]=[
             "category":category,"system":system,"segment":segment,
             "diagnosis":diagnosis,"permission":permission,
             "permissionTime":permissionTime,"responsible":responsible,
@@ -252,6 +266,16 @@ struct N2ClinicalCorrectionView:View {
             "photoSent":photoSent,"standaloneProcedures":procedureRows,
             "itemProcedures":itemProcedures
         ]
+        if let detail {
+            let corrected=Dictionary(uniqueKeysWithValues:detail.medications.compactMap {
+                item -> (String,Int)? in
+                guard let typed=itemQuantities[item.id],let q=Int(typed),
+                      q != item.quantity else{return nil}
+                return (item.id,q)
+            })
+            if !corrected.isEmpty {packet["itemClinicalQuantities"]=corrected}
+        }
+        return packet
     }
     private func queueDraft(immediate:Bool=false) {
         guard detail != nil,!recovering,!saving,!saved,!failed,
@@ -314,6 +338,8 @@ struct N2ClinicalCorrectionView:View {
             procedures=d.procedures.joined(separator:"\n")
             itemProcedures=Dictionary(uniqueKeysWithValues:
                 d.medications.map{($0.id,$0.procedure)})
+            itemQuantities=Dictionary(uniqueKeysWithValues:
+                d.medications.map{($0.id,String($0.quantity))})
             if let pending=try await vault
                    .readPendingClinicalCorrection(visitID:visitID),
                let changes=try? JSONSerialization.jsonObject(
@@ -334,6 +360,11 @@ struct N2ClinicalCorrectionView:View {
                     .joined(separator:"\n")
                 itemProcedures=changes["itemProcedures"] as? [String:String]
                     ?? itemProcedures
+                if let quantities=changes["itemClinicalQuantities"] as? [String:Int] {
+                    for (id,q) in quantities {
+                        itemQuantities[id]=String(q)
+                    }
+                }
                 reason=pending.reason
                 operatorName=pending.operatorName
                 discrepancy=pending.medicationDiscrepancy

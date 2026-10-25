@@ -39,19 +39,20 @@ final class N2SiteVerificationAndPreviewTests:XCTestCase {
         XCTAssertThrowsError(try N2NativeInventoryCommands.verifyOriginalSite(snapshot:result,eventID:"VERIFY-1",lotID:id,
             site:"PLVENTUROSA",reason:"Otro contenido para mismo identificador",operatorName:"OPERADOR FICTICIO",at:at))
     }
-    func testUnverifiedSiteDoesNotDebitButExplicitVerificationEnablesAutomaticUse()throws {
-        let (source,visitData)=try sourceAndVisit()
-        var visit=try dict(visitData);visit["dispensingSite"]="LA VENTUROSA"
-        let data=try bytes(visit),catalog=try fixture("n2-reviewed-approved.json")
-        let blocked=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:source,visit:data,approvedCatalog:catalog,at:at)
-        XCTAssertEqual(blocked.pending,1);XCTAssertEqual(blocked.physicalMovementsAdded,0)
-        var verified=source
-        for (index,lot) in (try dict(source)["stockLots"] as! [[String:Any]]).enumerated() {
-            verified=try N2NativeInventoryCommands.verifyOriginalSite(snapshot:verified,eventID:"V-\(index)",lotID:lot["id"] as! String,
-                site:"LA VENTUROSA",reason:"Sede original confirmada con información ficticia",operatorName:"OPERADOR FICTICIO",at:at)
-        }
-        let result=try N2NativeClinicalTransaction.appendSavedVisit(snapshot:verified,visit:data,approvedCatalog:catalog,at:at)
-        XCTAssertEqual(result.pending,0);XCTAssertEqual(result.linked,1);XCTAssertGreaterThan(result.physicalMovementsAdded,0)
+    func testStockSharedBetweenCareSitesWithoutAdditionalSiteVerification()throws {
+        let (source,original)=try sourceAndVisit()
+        var visit=try dict(original)
+        visit["dispensingSite"]="PLVENTUROSA"
+        let catalog=try fixture("n2-reviewed-approved.json")
+        let result=try N2NativeClinicalTransaction.appendSavedVisit(
+            snapshot:source,visit:bytes(visit),approvedCatalog:catalog,at:at)
+        XCTAssertEqual(result.pending,0)
+        XCTAssertEqual(result.linked,1)
+        XCTAssertGreaterThan(result.physicalMovementsAdded,0)
+        let root=try dict(result.snapshot)
+        let saved=try XCTUnwrap((root["attentions"] as? [[String:Any]])?
+            .first{$0["id"] as? String=="PREVIEW-FICTICIO"})
+        XCTAssertEqual(saved["dispensingSite"] as? String,"PLVENTUROSA")
     }
     func testPreviewNeverWritesAndPredictsActualAutomaticMovementExactly()throws {
         let (source,visit)=try sourceAndVisit(),catalog=try fixture("n2-reviewed-approved.json")

@@ -112,6 +112,53 @@ final class N2ClinicalCorrectionsTests:XCTestCase {
             XCTAssertEqual($0 as? N2CorrectionError,.duplicateCorrection)
         }
     }
+    func testCorrectedClinicalQuantityIsAuditedWithoutChangingPhysicalKardex()throws {
+        let source=try fixture()
+        let before=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")
+        let stocks=try originalStocks(source)
+        let original=try XCTUnwrap(before.medications.first)
+        let revised=original.quantity+2
+        let updated=try N2ClinicalCorrections.append(
+            snapshot:source,eventID:"71fa90f5-60d7-4bb4-9361-48ea4564d2a3",
+            visitID:"fundo-unit",
+            changes:amendment([
+                "itemClinicalQuantities":["unit-5":revised]
+            ]),
+            reason:"Rectificación documentada de cantidad clínica administrada",
+            operatorName:"RESPONSABLE DE ENFERMERIA",
+            medicationDiscrepancy:"",
+            expectedEffectiveSHA:before.effectiveSHA256,
+            at:1792053000000)
+        let detail=try N2ClinicalCorrections.detail(snapshot:updated,visitID:"fundo-unit")
+        XCTAssertEqual(detail.medications[0].quantity,revised)
+        XCTAssertEqual(detail.medications[0].originalQuantity,original.quantity)
+        XCTAssertTrue(detail.pendingMedicationDiscrepancy)
+        XCTAssertTrue(try N2ClinicalCorrections.pendingDiscrepancies(updated)
+                      .contains("fundo-unit"))
+        let physical=try originalStocks(updated)
+        XCTAssertEqual(physical.0,stocks.0)
+        XCTAssertEqual(physical.1,stocks.1)
+        XCTAssertEqual(physical.2,stocks.2)
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(updated).consumptionR,
+                       try N1eLegacyClinicalAudit.inspect(source).consumptionR)
+        let effective=try N2ClinicalCorrections.effectiveSnapshot(updated)
+        let root=try XCTUnwrap(JSONSerialization.jsonObject(with:effective) as? [String:Any])
+        let visit=try XCTUnwrap((root["attentions"] as? [[String:Any]])?
+            .first(where:{$0["id"] as? String=="fundo-unit"}))
+        let item=try XCTUnwrap((visit["items"] as? [[String:Any]])?.first)
+        XCTAssertEqual(item["quantity"] as? Int,original.quantity)
+        XCTAssertEqual(item["correctedClinicalQuantity"] as? Int,revised)
+        XCTAssertThrowsError(try N2ClinicalCorrections.append(
+            snapshot:source,eventID:"71fa90f5-60d7-4bb4-9361-48ea4564d2a4",
+            visitID:"fundo-unit",
+            changes:amendment(["itemClinicalQuantities":["fake-item":8]]),
+            reason:"Rectificación imposible de cantidad",
+            operatorName:"RESPONSABLE DE ENFERMERIA",
+            medicationDiscrepancy:"",
+            expectedEffectiveSHA:before.effectiveSHA256,
+            at:1792053000001))
+    }
+
     func testMedicationDiscrepancyRemainsPendingNoPhysicalCompensation()throws {
         let source=try fixture()
         let initial=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")

@@ -198,6 +198,173 @@ internal enum N1sNursingExcelWriter {
             at:end.lowerBound)
         return(xml,count)
     }
+    /// Build 222 parity: the nursing export contains ONLY "KARDEX ENFERMERAS".
+    /// Remove donor worksheet and all direct OOXML references (never change
+    /// the original template on disk). Retain printerSettings2.bin and styles.
+    private static func stripDonorWorksheet(_ entries:inout [N1rStoredEntry])throws {
+        func get(_ name:String)throws->String {
+            guard let entry=entries.first(where:{$0.name==name}),
+                  let value=String(data:entry.data,encoding:.utf8) else {
+                throw N1sExcelError.invalidTemplate
+            }
+            return value
+        }
+        func set(_ name:String,_ value:String)throws {
+            guard let i=entries.firstIndex(where:{$0.name==name}) else {
+                throw N1sExcelError.invalidTemplate
+            }
+            entries[i]=N1rStoredEntry(name:name,data:Data(value.utf8))
+        }
+        func removeTag(_ source:String,_ pattern:String)throws->String {
+            let matches=try match(pattern,in:source)
+            guard matches.count==1,
+                  let range=Range(matches[0].range,in:source) else {
+                throw N1sExcelError.invalidTemplate
+            }
+            var result=source
+            result.removeSubrange(range)
+            return result
+        }
+        var book=try get("xl/workbook.xml")
+        // The October template may already contain only KARDEX ENFERMERAS.
+        // Build 222 treats the Hoja1 donor sheet as optional; never require it.
+        let officialSheet=#"<sheet\b(?=[^>]*\bname="KARDEX ENFERMERAS")[^>]*/>"#
+        let donorSheet=#"<sheet\b(?=[^>]*\bname="Hoja1")[^>]*/>"#
+        guard (try match(officialSheet,in:book)).count==1,
+              (try match(#"<sheet\b"#,in:book)).count <= 2 else {
+            throw N1sExcelError.invalidTemplate
+        }
+        let donorCount=try match(donorSheet,in:book).count
+        guard donorCount <= 1 else {throw N1sExcelError.invalidTemplate}
+        if donorCount==1 {
+            book=try removeTag(book,donorSheet)
+        }
+        guard (try match(#"<sheet\b"#,in:book)).count==1 else {
+            throw N1sExcelError.invalidTemplate
+        }
+        // Leave the remaining worksheet's relationship ID unchanged.
+        if let tag=try firstRange(#"<workbookView\b[^>]*/>"#,in:book) {
+            let old=String(book[tag])
+            let updated:String
+            if old.contains("activeTab=") {
+                updated=old.replacingOccurrences(
+                    of:#"activeTab="\d+""#,with:"activeTab=\"0\"",
+                    options:.regularExpression)
+            }else {
+                updated=old.replacingOccurrences(of:"/>",with:" activeTab=\"0\"/>")
+            }
+            book.replaceSubrange(tag,with:updated)
+        }
+        if let tag=try firstRange(#"<calcPr\b[^>]*/>"#,in:book) {
+            var text=String(book[tag])
+            for key in ["fullCalcOnLoad","forceFullCalc"] {
+                if text.contains(key+"=") {
+                    text=text.replacingOccurrences(of:key+#"="\d+""#,
+                                                    with:key+"=\"1\"",
+                                                    options:.regularExpression)
+                }else{
+                    text=text.replacingOccurrences(of:"/>",with:" "+key+"=\"1\"/>")
+                }
+            }
+            book.replaceSubrange(tag,with:text)
+        }
+        try set("xl/workbook.xml",book)
+
+        var rels=try get("xl/_rels/workbook.xml.rels")
+        let donorRelation=#"<Relationship\b(?=[^>]*\bId="rId1")[^>]*/>"#
+        if (try match(donorRelation,in:rels)).count==1 {
+            rels=try removeTag(rels,donorRelation)
+            try set("xl/_rels/workbook.xml.rels",rels)
+        }
+
+        var types=try get("[Content_Types].xml")
+        let donorType=#"<Override\b(?=[^>]*\bPartName="/xl/worksheets/sheet1.xml")[^>]*/>"#
+        if (try match(donorType,in:types)).count==1 {
+            types=try removeTag(types,donorType)
+        }
+        // The old workbook's app.xml exposes the removed donor sheet in metadata.
+        if types.contains("/docProps/app.xml") {
+            types=try removeTag(types,#"<Override\b(?=[^>]*\bPartName="/docProps/app.xml")[^>]*/>"#)
+        }
+        try set("[Content_Types].xml",types)
+
+        // Compact shared strings and renumber only the preserved nursing sheet.
+        var strings=try get("xl/sharedStrings.xml")
+        var sheet=try get("xl/worksheets/sheet2.xml")
+        let tokenMatches=try match(#"<si(?:\s[^>]*)?>.*?</si>"#,in:strings)
+        let originalTokens=tokenMatches.compactMap{match -> String? in
+            guard let r=Range(match.range,in:strings) else{return nil}
+            return String(strings[r])
+        }
+        let cellMatches=try match(#"<c\b[^>]*>.*?</c>"#,in:sheet)
+        var used=Set<Int>()
+        for cell in cellMatches {
+            guard let range=Range(cell.range,in:sheet) else{continue}
+            let fragment=String(sheet[range])
+            guard fragment.contains(#"t="s""#) else{continue}
+            guard let numberRange=try firstRange(#"<v>\d+</v>"#,in:fragment),
+                  let index=Int(fragment[numberRange].dropFirst(3).dropLast(4)),
+                  originalTokens.indices.contains(index) else {
+                throw N1sExcelError.invalidTemplate
+            }
+            used.insert(index)
+        }
+        let indices=used.sorted()
+        let remap=Dictionary(uniqueKeysWithValues:indices.enumerated().map{($0.element,$0.offset)})
+        for cell in cellMatches.reversed() {
+            guard let range=Range(cell.range,in:sheet) else{continue}
+            var fragment=String(sheet[range])
+            guard fragment.contains(#"t="s""#) else{continue}
+            guard let valueRange=try firstRange(#"<v>\d+</v>"#,in:fragment),
+                  let old=Int(fragment[valueRange].dropFirst(3).dropLast(4)),
+                  let new=remap[old] else {
+                throw N1sExcelError.invalidTemplate
+            }
+            fragment.replaceSubrange(valueRange,with:"<v>"+String(new)+"</v>")
+            sheet.replaceSubrange(range,with:fragment)
+        }
+        guard let rootOpen=try firstRange(#"<sst\b[^>]*>"#,in:strings),
+              let closing=strings.range(of:"</sst>",options:.backwards),
+              rootOpen.upperBound<=closing.lowerBound else {
+            throw N1sExcelError.invalidTemplate
+        }
+        var openTag=String(strings[rootOpen])
+        for attr in ["count","uniqueCount"] {
+            if openTag.contains(attr+"=") {
+                openTag=openTag.replacingOccurrences(of:attr+#"="\d+""#,
+                    with:attr+"=\""+String(indices.count)+"\"",
+                    options:.regularExpression)
+            }else{
+                openTag=openTag.replacingOccurrences(of:">",
+                    with:" "+attr+"=\""+String(indices.count)+"\">")
+            }
+        }
+        let retainedStrings=indices.map { originalTokens[$0] }.joined()
+        let prefix=String(strings[..<rootOpen.lowerBound])
+        let suffix=String(strings[closing.lowerBound...])
+        strings=prefix + openTag + retainedStrings + suffix
+        try set("xl/sharedStrings.xml",strings)
+        try set("xl/worksheets/sheet2.xml",sheet)
+
+        var rootRelations=try get("_rels/.rels")
+        if rootRelations.contains("extended-properties") {
+            rootRelations=try removeTag(rootRelations,
+                #"<Relationship\b(?=[^>]*\bType="[^"]*/extended-properties")[^>]*/>"#)
+            try set("_rels/.rels",rootRelations)
+        }
+        let omitted:Set<String>=[
+            "xl/worksheets/sheet1.xml",
+            "xl/worksheets/_rels/sheet1.xml.rels",
+            "xl/printerSettings/printerSettings1.bin",
+            "docProps/app.xml"
+        ]
+        entries.removeAll{omitted.contains($0.name)}
+        guard entries.contains(where:{$0.name=="xl/printerSettings/printerSettings2.bin"}),
+              !entries.contains(where:{$0.name=="xl/worksheets/sheet1.xml"}) else {
+            throw N1sExcelError.invalidTemplate
+        }
+    }
+
     private static func dateLabel(_ date:String) throws -> String {
         let dateFormat=#"^\d{4}-\d{2}-\d{2}$"#
         guard date.range(of:dateFormat,options:.regularExpression) != nil
@@ -256,6 +423,10 @@ internal enum N1sNursingExcelWriter {
         let rangeLabel=periodEnd.isEmpty ? "FECHA: "+dateName :
             "PERÍODO CONSOLIDADO: "+dateName+" AL "+(try dateLabel(periodEnd))
         sheet=try patch(sheet,address:"I3",value:rangeLabel)
+        // F6 is the TOTAL STOCK column heading of the official nursing sheet.
+        // Replace this one visible cell instead of searching rich shared-string
+        // runs. patch() keeps the original cell style and merged layout.
+        sheet=try patch(sheet,address:"F6",value:"TOTAL STOCK")
         guard let styleEntry=entries.firstIndex(where:{$0.name=="xl/styles.xml"}),
               let styles=String(data:entries[styleEntry].data,encoding:.utf8)
         else{throw N1sExcelError.invalidTemplate}
@@ -264,14 +435,17 @@ internal enum N1sNursingExcelWriter {
             name:entries[styleEntry].name,data:Data(updatedStyles.utf8))
         for (i,row) in rows.enumerated() {
             let n=String(i+7)
-            let known=(row["stockKnown"] as? Bool)==true
-            sheet=try patch(sheet,address:"D"+n,value:known ? row["initial"] : nil)
-            sheet=try patch(sheet,address:"E"+n,value:known ? row["extraordinary"] : nil)
-            sheet=try patch(sheet,address:"F"+n,value:known ? row["total"] : nil,
-                            formula:known ? "D"+n+"+E"+n : nil)
-            sheet=try patch(sheet,address:"G"+n,value:known ? row["consumed"] : nil)
-            sheet=try patch(sheet,address:"H"+n,value:known ? row["final"] : nil,
-                            formula:known ? "F"+n+"-G"+n : nil)
+            // Explicit zero-valued balance for every official Kardex row.
+            // A missing lot means 0 recorded stock, not a fabricated lot.
+            // stockKnown is preserved in the manifest for audit provenance;
+            // showing 0 never authorizes a physical use or an opening.
+            sheet=try patch(sheet,address:"D"+n,value:row["initial"])
+            sheet=try patch(sheet,address:"E"+n,value:row["extraordinary"])
+            sheet=try patch(sheet,address:"F"+n,value:row["total"],
+                            formula:"D"+n+"+E"+n)
+            sheet=try patch(sheet,address:"G"+n,value:row["consumed"])
+            sheet=try patch(sheet,address:"H"+n,value:row["final"],
+                            formula:"F"+n+"-G"+n)
             let expiry=(row["expiry"] as? String) ?? ""
             let numericExpiry:Double?
             if expiry.isEmpty {
@@ -286,8 +460,16 @@ internal enum N1sNursingExcelWriter {
             sheet=try patch(sheet,address:"J"+n,value:row["fs"])
         }
         entries[offset]=N1rStoredEntry(name:entries[offset].name,data:Data(sheet.utf8))
+        try stripDonorWorksheet(&entries)
         let output=try N1rStoredZip.pack(entries)
-        _=try N1rStoredZip.unpack(output)
+        let checked=try N1rStoredZip.unpack(output)
+        guard let book=checked.first(where:{$0.name=="xl/workbook.xml"}),
+              let xml=String(data:book.data,encoding:.utf8),
+              (try match(#"<sheet\b"#,in:xml)).count==1,
+              xml.contains("KARDEX ENFERMERAS"),
+              !checked.contains(where:{$0.name=="xl/worksheets/sheet1.xml"}) else {
+            throw N1sExcelError.invalidTemplate
+        }
         return N1sExcelResult(xlsx:output,sheetCount:1,writtenRows:98)
     }
 }

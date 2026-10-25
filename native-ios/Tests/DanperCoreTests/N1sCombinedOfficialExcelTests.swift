@@ -23,18 +23,167 @@ final class N1sCombinedOfficialExcelTests:XCTestCase {
         let result=try N1sFullExcelWriter.exportIndicator(base:first,manifest:plan)
         XCTAssertEqual(result.sheetCount,10)
         XCTAssertEqual(result.writtenRows,2)
+        let parts=try N1rStoredZip.unpack(result.xlsx)
+        let workbook=try XCTUnwrap(parts.first{$0.name=="xl/workbook.xml"})
+        let bookXML=try XCTUnwrap(String(data:workbook.data,encoding:.utf8))
+        let names=["BD MATERIALES","CONTEO","INGRESOS","RESU","CONSUMOS",
+                   "JUSTIFICACIONES","GUIA","@subuo","BASE TRU","@uo"]
+        for name in names {XCTAssertTrue(bookXML.contains("name=\""+name+"\""))}
+        XCTAssertEqual((1...10).filter{n in
+            parts.contains{$0.name=="xl/worksheets/sheet\(n).xml"}
+        }.count,10)
+        XCTAssertEqual(parts.filter{$0.name.hasPrefix("xl/tables/table") &&
+                                 $0.name.hasSuffix(".xml")}.count,19)
         XCTAssertFalse(result.canUseClinicalData)
+        let resu=try XCTUnwrap(parts.first{$0.name=="xl/worksheets/sheet4.xml"})
+        let xml=try XCTUnwrap(String(data:resu.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("PERÍODO: "))
+        XCTAssertFalse(xml.contains("PERÍODO POR SELECCIONAR"))
+        XCTAssertTrue(xml.contains("KARDEX AMBULATORIO · OFICIAL"))
+        // The F formula remains intact while Quick Look sees its numeric R.
+        XCTAssertNotNil(xml.range(
+            of:#"<c r="F3"[^>]*><f>SUMIF\([^<]+</f><v>[0-9]+(?:\.[0-9]+)?</v></c>"#,
+            options:.regularExpression))
         XCTAssertGreaterThan(result.xlsx.count,50_000)
         XCTAssertEqual(result.xlsx,try N1sFullExcelWriter.exportIndicator(base:first,manifest:plan).xlsx)
         XCTAssertEqual(first,try fixture("n1s-indicator-template-store.zip"))
         try write("n1s-indicator-native.xlsx",result.xlsx)
     }
+    func testRESUShowsZeroVerifiedReceiptsAndCachedClosingInProvisional() throws {
+        var plan=try manifest("n1s-indicator-plan.json")
+        let selected=try XCTUnwrap((plan["plan"] as? [String:Any])?["lines"] as? [[String:Any]])
+        let clinical=try XCTUnwrap(selected.first?["cells"] as? [Any])
+        let code=try XCTUnwrap(clinical[15] as? String)
+        let catalog=try XCTUnwrap(plan["catalog"] as? [[String:Any]])
+        let row=try XCTUnwrap(catalog.firstIndex{($0["code"] as? String)==code})+3
+        var byCode=try XCTUnwrap(plan["byCode"] as? [String:[String:Any]])
+        var material=try XCTUnwrap(byCode[code])
+        let used=try XCTUnwrap(material["consumed"] as? Int)
+        XCTAssertGreaterThan(used,0)
+        material["opening"]=used+4
+        material["closing"]=4
+        material["count"]=4
+        material["difference"]=0
+        material["receipts"]=0
+        material["receiptDetails"]=[]
+        material["verifiedIncome"]=0
+        byCode[code]=material
+        plan["byCode"]=byCode
+        plan["reviewed"]=false
+        plan["provisional"]=true
+        let template=try fixture("n1s-indicator-template-store.zip")
+        func exportXML(_ value:[String:Any])throws->String {
+            let data=try JSONSerialization.data(withJSONObject:value)
+            let result=try N1sFullExcelWriter.exportIndicator(base:template,manifest:data)
+            let parts=try N1rStoredZip.unpack(result.xlsx)
+            return try XCTUnwrap(String(data:try XCTUnwrap(
+                parts.first{$0.name=="xl/worksheets/sheet4.xml"}).data,
+                encoding:.utf8))
+        }
+        func cell(_ col:String,in xml:String)throws->String {
+            let start=try XCTUnwrap(xml.range(of:"<c r=\"\(col)\(row)\""))
+            let suffix=xml[start.lowerBound...]
+            let end=try XCTUnwrap(suffix.range(of:"</c>"))
+            return String(suffix[..<end.upperBound])
+        }
+        let xml=try exportXML(plan)
+        let income=try cell("E",in:xml)
+        XCTAssertTrue(income.contains("IF(COUNT(INGRESOS!X\(row))=0,0,INGRESOS!X\(row))"))
+        XCTAssertTrue(income.contains("<v>0.0</v>"))
+        for (col,value) in [("G",4.0),("H",4.0),("I",0.0)] {
+            let formulaCell=try cell(col,in:xml)
+            XCTAssertTrue(formulaCell.contains("<f>"))
+            XCTAssertTrue(formulaCell.contains("<v>\(value)</v>"))
+        }
+        // A missing proof must NOT make 0 appear in E or closing
+        // caches, even if the source supplies an opening/count.
+        material.removeValue(forKey:"verifiedIncome")
+        byCode[code]=material
+        plan["byCode"]=byCode
+        let unresolved=try exportXML(plan)
+        XCTAssertTrue(try cell("E",in:unresolved).contains(
+            "IF(COUNT(INGRESOS!X\(row))=0,&quot;&quot;,INGRESOS!X\(row))"))
+        XCTAssertFalse(try cell("G",in:unresolved).contains("<v>4.0</v>"))
+        XCTAssertFalse(try cell("H",in:unresolved).contains("<v>4.0</v>"))
+        XCTAssertFalse(try cell("I",in:unresolved).contains("<v>0.0</v>"))
+    }
+    func testWriterAllowsBlankRWithNoteOnlyInProvisionalBook() throws {
+        var plan=try manifest("n1s-indicator-plan.json")
+        var lines=try XCTUnwrap((plan["plan"] as? [String:Any])?["lines"]
+            as? [[String:Any]])
+        var cells=try XCTUnwrap(lines[0]["cells"] as? [Any])
+        cells[17]=""
+        lines[0]["cells"]=cells
+        plan["plan"]=["lines":lines]
+        plan["reviewed"]=false
+        plan["provisional"]=true
+        plan["pendingNotes"]=["PRUEBA FICTICIA: R PENDIENTE, envase sin apertura acreditada."]
+        let template=try fixture("n1s-indicator-template-store.zip")
+        func export(_ content:[String:Any]) throws -> N1sExcelResult {
+            try N1sFullExcelWriter.exportIndicator(
+                base:template,manifest:JSONSerialization.data(withJSONObject:content))
+        }
+        let draft=try export(plan)
+        XCTAssertEqual(draft.sheetCount,10)
+        let parts=try N1rStoredZip.unpack(draft.xlsx)
+        let consumos=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,
+            encoding:.utf8))
+        XCTAssertNotNil(consumos.range(
+            of:#"<c r="R2"[^>]*/>"#,options:.regularExpression))
+        let notes=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet6.xml"}).data,
+            encoding:.utf8))
+        XCTAssertTrue(notes.contains("R PENDIENTE"))
+        plan["pendingNotes"]=[]
+        XCTAssertThrowsError(try export(plan)) {
+            XCTAssertEqual($0 as? N1sExcelError,.missingVerifiedQuantity)
+        }
+        plan["reviewed"]=true
+        plan["provisional"]=false
+        XCTAssertThrowsError(try export(plan)) {
+            XCTAssertEqual($0 as? N1sExcelError,.missingVerifiedQuantity)
+        }
+    }
+    func testIngresosExpirationSemaforoHasThreeIconColorsAndHidesNumericStatus() throws {
+        let result=try N1sFullExcelWriter.exportIndicator(
+            base:fixture("n1s-indicator-template-store.zip"),
+            manifest:fixture("n1s-indicator-plan.json"))
+        let archive=try N1rStoredZip.unpack(result.xlsx)
+        let xml=try XCTUnwrap(String(data:try XCTUnwrap(
+            archive.first{$0.name=="xl/worksheets/sheet3.xml"}).data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("sqref=\"D3:G434\""))
+        XCTAssertTrue(xml.contains("iconSet=\"3TrafficLights1\""))
+        XCTAssertTrue(xml.contains("showValue=\"0\""))
+        XCTAssertTrue(xml.contains("reverse=\"1\""))
+        for status in 0...2 {
+            XCTAssertTrue(xml.contains("type=\"num\" val=\"\(status)\""))
+        }
+        XCTAssertTrue(xml.contains("J3&lt;TODAY(),2"))
+        XCTAssertTrue(xml.contains("J3-TODAY()&lt;=90,1,0"))
+        XCTAssertFalse(xml.contains("<xm:sqref>D3:G439</xm:sqref>"))
+    }
+
     func testNursingOriginalWorkbook98RowsPlusPrintSettings() throws {
         let result=try N1sNursingExcelWriter.export(
             base:fixture("n1s-nursing-template-store.zip"),
             manifest:fixture("n1s-nursing-plan.json"))
         XCTAssertEqual(result.sheetCount,1)
         XCTAssertEqual(result.writtenRows,98)
+        let package=try N1rStoredZip.unpack(result.xlsx)
+        XCTAssertFalse(package.contains{$0.name=="xl/worksheets/sheet1.xml"})
+        let book=try XCTUnwrap(package.first{$0.name=="xl/workbook.xml"})
+        let xml=try XCTUnwrap(String(data:book.data,encoding:.utf8))
+        XCTAssertTrue(xml.contains("name=\"KARDEX ENFERMERAS\""))
+        XCTAssertFalse(xml.contains("name=\"Hoja1\""))
+        XCTAssertFalse(package.contains{$0.name=="docProps/app.xml"})
+        let stockSheet=try XCTUnwrap(package.first{
+            $0.name=="xl/worksheets/sheet2.xml"
+        })
+        let stockXML=try XCTUnwrap(String(data:stockSheet.data,encoding:.utf8))
+        let headingPattern=#"<c\b[^>]*\br="F6"[^>]*>\s*<is><t(?:\s[^>]*)?>TOTAL STOCK</t></is></c>"#
+        XCTAssertNotNil(stockXML.range(of:headingPattern,options:.regularExpression),
+                        "F6 debe presentar TOTAL STOCK sin cambiar las fórmulas")
         XCTAssertFalse(result.canUseClinicalData)
         XCTAssertTrue(try N1rStoredZip.unpack(result.xlsx).contains{
             $0.name=="xl/printerSettings/printerSettings2.bin"

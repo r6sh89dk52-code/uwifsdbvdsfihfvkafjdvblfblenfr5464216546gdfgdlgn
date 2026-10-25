@@ -1,4 +1,8 @@
 name: DANPERNative
+settings:
+  base:
+    CODE_SIGN_IDENTITY[sdk=iphonesimulator*]: "-"
+    CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]: YES
 options:
   bundleIdPrefix: pe.danper.saludmovil.native
   deploymentTarget:
@@ -23,6 +27,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview
         PRODUCT_NAME: DANPERNative
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.9"
         MARKETING_VERSION: "0.4.1"
         CURRENT_PROJECT_VERSION: "11"
@@ -35,7 +40,10 @@ targets:
         INFOPLIST_KEY_NSFaceIDUsageDescription: "DANPER Salud Móvil utiliza Face ID para restringir el acceso a la aplicación."
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
-        CODE_SIGN_STYLE: Manual
+        # Use Xcode-managed development profiles for a physical iPhone.
+        # The developer selects their own Team locally; never commit a
+        # personal Team ID, signing identity or provisioning profile.
+        CODE_SIGN_STYLE: Automatic
     scheme:
       testTargets:
         - DANPERNativeTests
@@ -46,11 +54,16 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: NativeTests
+        excludes:
+          - SyntheticFixtures/**
+      - path: NativeTests/SyntheticFixtures
+        type: folder
     dependencies:
       - target: DANPERNative
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview.tests
+        CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.9"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/DANPERNative.app/DANPERNative"
@@ -67,6 +80,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview.interactiontests
+        CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.9"
         TEST_TARGET_NAME: DANPERNative

@@ -74,6 +74,45 @@ final class N2SnapshotEditorTests:XCTestCase {
             XCTAssertEqual($0 as? N2SnapshotEditError,.invalidAllergy)
         }
     }
+    func testUbigeoLocalityNamesPersistThroughNewAndEditedWorker()throws {
+        let initial=try source()
+        let before=try root(initial)
+        let worker:[String:String]=[
+            "dni":"00000008","name":"PERSONA FICTICIA UBIGEO",
+            "site":"LA VENTUROSA","area":"SERVICIOS DE SALUD",
+            "labor":"PERSONAL","sex":"F","age":"",
+            "birthDate":"","ubigeo":"CHEPÉN"
+        ]
+        let registered=try N2SnapshotEditor.addWorker(
+            snapshot:initial,worker:json(worker),at:1700000000000)
+        var listed=try XCTUnwrap(root(registered)["workers"] as? [[String:Any]])
+        let created=try XCTUnwrap(listed.first(where:{$0["dni"] as? String=="00000008"}))
+        XCTAssertEqual(created["ubigeo"] as? String,"CHEPÉN")
+        var modified=worker
+        modified["ubigeo"]="TRUJILLO"
+        let corrected=try N2SnapshotEditor.correctWorker(
+            snapshot:registered,dni:"00000008",
+            worker:json(modified),at:1700000000001)
+        listed=try XCTUnwrap(root(corrected)["workers"] as? [[String:Any]])
+        let edited=try XCTUnwrap(listed.first(where:{$0["dni"] as? String=="00000008"}))
+        XCTAssertEqual(edited["ubigeo"] as? String,"TRUJILLO")
+        let after=try root(corrected)
+        for collection in ["attentions","stockLots","stockMovements",
+                           "allergies","ambulatoryReconciliation"] {
+            XCTAssertEqual(try json(before[collection]!),
+                           try json(after[collection]!),
+                           "Se modificó la colección clínica: \(collection)")
+        }
+        let history=try XCTUnwrap(after["nativeWorkerCorrections"] as? [[String:Any]])
+        XCTAssertTrue(history.contains(where:{row in
+            guard let changes=row["changes"] as? [[String:String]] else{return false}
+            return changes.contains {
+                $0["field"]=="ubigeo" && $0["before"]=="CHEPÉN" &&
+                $0["after"]=="TRUJILLO"
+            }
+        }))
+    }
+
     func testCannotRewriteSavedAttentionOrKeepDuplicateDraftIDs()throws {
         let before=try source()
         XCTAssertThrowsError(try N2SnapshotEditor.upsertDraft(

@@ -3,7 +3,7 @@ import CoreFoundation
 
 /// Native daily/range nursing ledger report, one-for-one with build222
 /// dailyKardex.ts. It never converts internal mL into sealed FCO count and
-/// keeps unknown stock blank instead of inventing zero.
+/// shows zero recorded stock for products without lots, preserving stockKnown=false for audit.
 public enum N2NursingReportError:Error,Equatable {
     case invalidSource, invalidCatalog, invalidDay, unsupportedRange
     case invalidPhysicalCount, incompleteHistory
@@ -88,9 +88,7 @@ public enum N2NursingReportBuilder {
     private static func packaged(_ l:[String:Any])->Bool {
         let unit=(l["catalogUnit"] as? String ?? "").trimmingCharacters(in:.whitespaces)
             .uppercased()
-        let size=count(l["unitsPerContainer"]) ?? 0
-        return !["UND","TBL","PAR"].contains(unit) &&
-               ((l["container"] as? String) != "unidad" || size != 1)
+        return N2ContainerAccounting.isContainer(unit:unit)
     }
     private static func balance(_ l:[String:Any])->Double {
         if packaged(l){return count(l["sealedContainers"]) ?? 0}
@@ -116,14 +114,10 @@ public enum N2NursingReportBuilder {
                 throw N2NursingReportError.invalidCatalog
             }
         }
-        guard site.isEmpty || ["LA VENTUROSA","PLVENTUROSA"].contains(site) else {
-            throw N2NursingReportError.invalidSource
-        }
-        guard !site.isEmpty else{return(lots,movements,products)}
-        let sites=try N2StockSiteEvidence.resolve(data)
-        let scoped=lots.filter{sites[$0["id"] as? String ?? ""]==site}
-        let ids=Set(scoped.compactMap{$0["id"] as? String})
-        return(scoped,movements.filter{ids.contains($0["lotId"] as? String ?? "")},products)
+        // The care-site belongs to each ATTENTION, never to its stock.
+        // Legacy lot-site annotations remain preserved but cannot split
+        // the single Kardex or omit stock from nursing exports.
+        return(lots,movements,products)
     }
     private static func day(lots:[[String:Any]],moves:[[String:Any]],
                             catalog:[[String:Any]],date:String,
@@ -134,6 +128,11 @@ public enum N2NursingReportBuilder {
             let code=p["id"] as! String,name=p["name"] as! String
             let historic=lots.filter{$0["code"] as? String==code}
             let all=moves.filter{$0["code"] as? String==code}
+                .sorted { a,b in
+                    let ta=count(a["at"]) ?? 0,tb=count(b["at"]) ?? 0
+                    if ta != tb {return ta<tb}
+                    return (a["id"] as? String ?? "")<(b["id"] as? String ?? "")
+                }
             let relevant=historic.filter{l in
                 let lotEvents=all.filter{$0["lotId"] as? String==l["id"] as? String}
                   .sorted{(count($0["at"]) ?? 0)<(count($1["at"]) ?? 0)}
@@ -162,6 +161,8 @@ public enum N2NursingReportBuilder {
                         ? (count(m["sealedAdded"]) ?? 0)
                         : (count(m["physicalChange"]) ?? 0))
                 })
+            // A day without saved consumption movements has 0 consumption.
+            // Never infer another debit from a restored attention already linked.
             let consumed=rounded(daily.filter{$0["kind"] as? String=="use"}
                 .reduce(0.0){sum,m in
                     let before=m["before"] as? [String:Any] ?? [:]
@@ -260,5 +261,64 @@ public enum N2NursingReportBuilder {
         return N2NursingReport(date:start,periodEnd:end,
                                rows:resulting,warnings:unique)
     }
+    /// Builds the 9-to-8 period as a non-mutating reconciliation against a
+    /// later physical count. Saved unit usages are counted once, even when
+    /// the lot was first entered after an earlier clinical attention.
+    /// This must NEVER be used to create FEFO movements or debit current stock.
+    public static func reconstructedCut(snapshot:Data,catalog:Data,mappings:Data,
+                                        start:String,end:String,site:String="")throws->N2NursingReport {
+        let period=try N2KardexCutPreview.period(for:end)
+        guard period.start==start,iso(end) else {
+            throw N2NursingReportError.invalidDay
+        }
+        let projection=try N2AutomaticCutAccounting.calculate(
+            snapshot:snapshot,mappings:mappings,through:end)
+        let (_,_,products)=try decoded(snapshot,catalog,site:site)
+        let original=try range(snapshot:snapshot,catalog:catalog,
+                               start:start,end:end,site:site)
+        let existing=Dictionary(uniqueKeysWithValues:original.rows.map{($0.code,$0)})
+        let calculated=Dictionary(uniqueKeysWithValues:projection.rows.map{($0.code,$0)})
+        // Preserve genuine audit warnings; differences from a late count
+        // are what this explicit reconstructed report is designed to resolve.
+        var warnings=original.warnings.filter {
+            $0.contains("modos de conteo incompatibles") ||
+            $0.contains("ajustes auditados")
+        }
+        var rows=[N2NursingRow]()
+        for product in products {
+            let code=product["id"] as! String
+            let name=product["name"] as! String
+            let baseline=existing[code]
+            let estimate=calculated[code]
+            let isKnown=estimate?.currentCount != nil
+            if let estimate,estimate.unknownContainerOpenings>0 {
+                warnings.append(name+": existen aperturas sin declarar; no se infiere R.")
+            }
+            if let estimate,estimate.reportedUse>0 && estimate.currentCount==nil {
+                warnings.append(name+": consumos anteriores sin conteo de cierre verificable.")
+            }
+            if let estimate,estimate.currentCount != nil && estimate.opening==nil {
+                warnings.append(name+": el saldo inicial requiere conciliación documental.")
+            }
+            let opening=estimate?.opening ?? 0
+            let used=estimate?.reportedUse ?? 0
+            let changes=rounded((estimate?.received ?? 0)+(estimate?.adjusted ?? 0))
+            let endCount=estimate?.currentCount ?? 0
+            // Missing lots show numeric zero while stockKnown remains false.
+            // A count entered after an old attention is the end-of-period
+            // physical balance; the historic consumption is added back to S/I.
+            rows.append(N2NursingRow(code:code,name:name,donated:false,
+                stockKnown:isKnown,initial:rounded(opening),
+                extraordinary:isKnown ? changes : 0,
+                total:isKnown ? rounded(opening+changes) : 0,
+                consumed:isKnown ? rounded(used) : 0,
+                closing:isKnown ? rounded(endCount) : 0,
+                expiry:baseline?.expiry ?? "",fs:nil))
+        }
+        // No old stock movements are re-issued, even for an unlinked saved
+        // tablet. Unknown bottles remain marked pending, not manufactured R=1.
+        return N2NursingReport(date:start,periodEnd:end,rows:rows,warnings:warnings)
+    }
+
 }
 

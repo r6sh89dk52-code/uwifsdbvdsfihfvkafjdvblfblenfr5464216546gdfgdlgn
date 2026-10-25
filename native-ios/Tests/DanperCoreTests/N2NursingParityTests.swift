@@ -13,6 +13,44 @@ final class N2NursingParityTests:XCTestCase {
             with:bytes("n2-nursing-parity.json")) as? [String:Any])
         return (file,try JSONSerialization.data(withJSONObject:file["catalog"]!))
     }
+    func testKardexFromNinthAccumulatesDailyMovementsOnceAndZerosEmptyDays() throws {
+        let snapshot=try bytes("n1e-clinical-stock.json")
+        let (_,catalog)=try fixture()
+        let accumulated=try N2NursingReportBuilder.range(
+            snapshot:snapshot,catalog:catalog,
+            start:"2026-10-09",end:"2026-10-22")
+        XCTAssertEqual(accumulated.date,"2026-10-09")
+        XCTAssertEqual(accumulated.periodEnd,"2026-10-22")
+        XCTAssertEqual(accumulated.rows.count,98)
+        let days=(9...22).map{String(format:"2026-10-%02d",$0)}
+        let daily=try days.map{date in
+            try N2NursingReportBuilder.daily(
+                snapshot:snapshot,catalog:catalog,date:date)
+        }
+        for (index,row) in accumulated.rows.enumerated() {
+            let actual=daily.reduce(0.0){$0+$1.rows[index].consumed}
+            XCTAssertEqual(row.consumed,actual,accuracy:0.001,
+                           "Consumo duplicado en "+row.code)
+        }
+        let emptyDay=try N2NursingReportBuilder.daily(
+            snapshot:snapshot,catalog:catalog,date:"2026-10-19")
+        XCTAssertTrue(emptyDay.rows.allSatisfy{$0.consumed==0})
+        XCTAssertTrue(emptyDay.rows.filter{$0.stockKnown}.allSatisfy{$0.consumed==0})
+    }
+
+    func testNursingKardexUsesIdenticalUnifiedStockForBothCareSites()throws {
+        let source=try bytes("n1e-clinical-stock.json")
+        let (_,catalog)=try fixture()
+        let shared=try N2NursingReportBuilder.daily(
+            snapshot:source,catalog:catalog,date:"2026-10-14")
+        for location in ["LA VENTUROSA","PLVENTUROSA"] {
+            let result=try N2NursingReportBuilder.daily(
+                snapshot:source,catalog:catalog,date:"2026-10-14",
+                site:location)
+            XCTAssertEqual(result.rows,shared.rows)
+            XCTAssertEqual(result.warnings,shared.warnings)
+        }
+    }
     func testNursingDailyAndRangeMatchBuild222TypeScriptByAll98Rows()throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (reference,catalog)=try fixture()
@@ -91,6 +129,40 @@ final class N2NursingParityTests:XCTestCase {
             date:"2026-02-30",shift:"CONSOLIDADO",
             responsible:"OPERADOR FICTICIO"))
     }
+    func testRosterOnlySourceExportsZeroRecordedStockWithoutCreatingLots()throws {
+        let original=try bytes("n1e-clinical-stock.json")
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        let people=try XCTUnwrap(root["workers"] as? [[String:Any]])
+        root["workers"]=Array(people.prefix(1))
+        root["attentions"]=[[String:Any]]()
+        root["allergies"]=[String:Any]()
+        for key in ["stockLots","stockMovements","catalogMappings",
+                    "deliveryIncidents","ambulatoryReconciliation"] {
+            root[key]=[[String:Any]]()
+        }
+        let fresh=try JSONSerialization.data(withJSONObject:root,options:[.sortedKeys])
+        let (_,catalog)=try fixture()
+        let book=try N2VerifiedNursingWorkbook.export(
+            snapshot:fresh,catalog:catalog,
+            template:bytes("n1s-nursing-template-store.zip"),
+            date:"2026-10-14",shift:"CONSOLIDADO",
+            responsible:"OPERADOR DE PRUEBA")
+        XCTAssertEqual(book.stockKnownRows,0)
+        XCTAssertEqual(book.stockUnknownRows,98)
+        let archive=try N1rStoredZip.unpack(book.xlsx)
+        XCTAssertFalse(archive.contains{$0.name=="xl/worksheets/sheet1.xml"})
+        let excel=try XCTUnwrap(archive.first{$0.name=="xl/worksheets/sheet2.xml"})
+        let xml=try XCTUnwrap(String(data:excel.data,encoding:.utf8))
+        // Unregistered items appear as numeric zero, never a blank cell.
+        // stockKnown remains false: no physical count or fictitious lot exists.
+        for cell in ["D7","E7","G7"] {
+            // The official template may retain a style attribute on a cell.
+            let regex="<c r=\""+cell+"\"[^>]*><v>0</v></c>"
+            XCTAssertNotNil(xml.range(of:regex,options:.regularExpression),cell)
+        }
+        XCTAssertEqual((root["stockLots"] as? [[String:Any]])?.count,0)
+    }
+
     func testRangeIsAlwaysLabeledAsConsolidatedPeriod() throws {
         let source=try bytes("n1e-clinical-stock.json")
         let (_,catalog)=try fixture()

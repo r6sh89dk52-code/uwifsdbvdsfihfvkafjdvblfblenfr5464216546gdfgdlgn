@@ -28,6 +28,7 @@ struct N2NativeWorkerEditorView:View {
     @State private var area=""
     @FocusState private var areaFocused:Bool
     @State private var areaSuggestionsVisible=true
+    @State private var areaSelectedByTap=false
     @State private var areaRevealTask:Task<Void,Never>?
     @Environment(\.danperReveal) private var reveal
     private let areaAnchor="worker-area-suggestions"
@@ -93,6 +94,18 @@ struct N2NativeWorkerEditorView:View {
     var body:some View {
         DanperScrollView {
             VStack(alignment:.leading,spacing:16) {
+                VStack(alignment:.leading,spacing:5) {
+                    Text("PADRÓN DE TRABAJADORES")
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.2)
+                        .foregroundStyle(DanperStyle.red)
+                    Text(editingDNI == nil
+                         ? "Registrar nuevo trabajador" : "Completar ficha")
+                        .font(.system(.title2,design:.rounded,weight:.bold))
+                    Text("Identificación, sede y datos laborales · registro local protegido")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth:.infinity,alignment:.leading)
                 if failed || !savedDNI.isEmpty {
                     DanperPanel {
                         Label(status,systemImage:failed ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
@@ -110,7 +123,7 @@ struct N2NativeWorkerEditorView:View {
                     }
                     .accessibilityIdentifier("worker-registration-validation")
                 }
-                DanperPanel("Identificación") {
+                DanperPanel("Datos del trabajador") {
                     DanperField(title:"DNI") {
                         TextField("DNI de 8 dígitos",text:$dni)
                             .keyboardType(.numberPad)
@@ -130,7 +143,7 @@ struct N2NativeWorkerEditorView:View {
                         Label("Este DNI ya está registrado.",systemImage:"person.crop.circle.badge.exclamationmark")
                             .font(.footnote).foregroundStyle(.orange)
                     }
-                    DanperField(title:"Nombres y apellidos") {
+                    DanperField(title:"Nombre completo") {
                         TextField("Ej. Mariana Torres Salazar",text:$names)
                             .textInputAutocapitalization(.words)
                             .textContentType(.name)
@@ -150,6 +163,10 @@ struct N2NativeWorkerEditorView:View {
                         TextField("Escribe o selecciona un área",text:$area)
                             .textInputAutocapitalization(.words)
                             .focused($areaFocused)
+                            .onTapGesture {
+                                areaSelectedByTap=false
+                                areaSuggestionsVisible=true
+                            }
                             .accessibilityIdentifier("worker-area-search")
                     }
                     if areaCatalogIncomplete {
@@ -173,9 +190,14 @@ struct N2NativeWorkerEditorView:View {
                             LazyVStack(spacing:6) {
                                 ForEach(areaSuggestions,id:\.self) { suggestion in
                                     Button {
-                                        area=suggestion
-                                        areaFocused=false
+                                        // Dismiss before changing the bound TextField.
+                                        // Prevent its onChange callback from reopening
+                                        // the same list after a one-tap selection.
+                                        areaRevealTask?.cancel()
+                                        areaSelectedByTap=true
                                         areaSuggestionsVisible=false
+                                        areaFocused=false
+                                        area=suggestion
                                     } label: {
                                         HStack(spacing:10) {
                                             Image(systemName:"building.2")
@@ -270,9 +292,15 @@ struct N2NativeWorkerEditorView:View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    DanperField(title:"Ubigeo (opcional)") {
-                        TextField("Ubigeo",text:$ubigeo)
-                            .keyboardType(.numberPad)
+                    // "Ubigeo" in the official DANPER ambulatory workbook is
+                    // the name of the locality (e.g. CHEPÉN), not a numeric
+                    // 6-digit administrative UBIGEO code.
+                    DanperField(title:"Ubigeo / localidad (opcional)") {
+                        TextField("Ej.: CHEPÉN, TRUJILLO, PACASMAYO",text:$ubigeo)
+                            .keyboardType(.default)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .accessibilityIdentifier("worker-ubigeo-locality")
                     }
                 }
             }.padding(16)
@@ -342,13 +370,18 @@ struct N2NativeWorkerEditorView:View {
         .onChange(of:birthDateText) {_,_ in revalidateAfterEdit()}
         .onChange(of:manualAgeText) {_,_ in revalidateAfterEdit()}
         .onChange(of:area) {_,_ in
-            if areaFocused {areaSuggestionsVisible=true}
-            requestAreaReveal()
+            if !areaSelectedByTap {
+                if areaFocused {areaSuggestionsVisible=true}
+                requestAreaReveal()
+            }
         }
         .onChange(of:areaFocused) {_,active in
-            if active {
+            if active && !areaSelectedByTap {
                 areaSuggestionsVisible=true
                 requestAreaReveal()
+            }
+            if !active && areaSelectedByTap {
+                areaSuggestionsVisible=false
             }
         }
         .onDisappear {areaRevealTask?.cancel()}

@@ -22,12 +22,13 @@ struct N2VerifiedNursingExportView:View {
     @State private var reportMode="daily"
     @State private var rangeStart=Date()
     @State private var rangeEnd=Date()
-    @State private var site=""
-    @State private var responsible="Felipe Azcárate Silva"
+    // One shared physical inventory for Fundo and Planta; site must never gate the report.
+    @State private var site="AMBAS"
+    @State private var responsible=N2ClinicianIdentity.name
     @State private var shift="CONSOLIDADO"
     @State private var busy=false
     @State private var failed=false
-    @State private var status="Indica fecha y responsable."
+    @State private var status="Indica las fechas del reporte."
     @State private var share:N2NursingShare?
     @State private var folder:URL?
 
@@ -40,6 +41,11 @@ struct N2VerifiedNursingExportView:View {
 
     private var selectedPeriod:(start:String,end:String) {
         if reportMode=="daily" {return (selectedDay,selectedDay)}
+        if reportMode=="cut" {
+            let start=(try? N2KardexCutPreview.period(for:selectedDay).start) ?? selectedDay
+            // "Desde el 9" means month-cut-to-date, never a future period.
+            return (start,selectedDay)
+        }
         if reportMode=="custom" {
             return (formatDay(rangeStart),formatDay(rangeEnd))
         }
@@ -48,7 +54,7 @@ struct N2VerifiedNursingExportView:View {
         cal.firstWeekday=2
         let monday=cal.dateInterval(of:.weekOfYear,for:day)?.start ?? day
         let sunday=cal.date(byAdding:.day,value:6,to:monday) ?? monday
-        return (formatDay(monday),formatDay(sunday))
+        return (formatDay(monday),formatDay(min(sunday,Date())))
     }
     private func formatDay(_ date:Date)->String {
         let formatter=DateFormatter()
@@ -59,17 +65,27 @@ struct N2VerifiedNursingExportView:View {
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
-            DanperPanel("Kardex de enfermería") {
+            VStack(alignment:.leading,spacing:5) {
+                Text("REPORTES DE ENFERMERÍA")
+                    .font(.caption2.weight(.bold)).tracking(1.1)
+                    .foregroundStyle(DanperStyle.red)
+                Text("Kardex · Excel oficial")
+                    .font(.system(.title2,design:.rounded,weight:.bold))
+            }
+            N2Build222ExportProgress(titles:["Período","Vista previa","Compartir"])
+            DanperPanel("Formato oficial de 98 productos") {
                 Label("98 productos de enfermería",systemImage:"lock.shield")
-                Text("Los saldos no acreditados se dejan en blanco. No se generan ceros ni se modifican existencias.")
+                Text("Los 98 productos conservan su fila: sin lote aparece stock 0. El corte 9–8 puede reconstruir el saldo inicial desde el conteo posterior sin cambiar existencias físicas.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
-            DanperPanel("Datos del corte diario") {
+            DanperPanel {
+                N2Build222StageHeading(step:1,title:"Elegir fechas y modalidad")
+                Text("Kardex único de ambas sedes. Las atenciones conservan su sede, pero los medicamentos se descuentan del mismo inventario.")
+                    .font(.caption).foregroundStyle(.secondary)
                 DanperChoiceField(title:"Modalidad",selection:$reportMode,
-                    options:["daily","weekly","custom"],
-                    labels:["daily":"Diario","weekly":"Semanal","custom":"Rango personalizado"])
-                DanperChoiceField(title:"Sede del inventario",selection:$site,options:["LA VENTUROSA","PLVENTUROSA"],
-                                  labels:["LA VENTUROSA":"Fundo La Venturosa","PLVENTUROSA":"Planta La Venturosa"])
+                    options:["daily","weekly","cut","custom"],
+                    labels:["daily":"Diario","weekly":"Semanal",
+                            "cut":"Desde el 9 hasta la fecha","custom":"Rango personalizado"])
                 if reportMode=="daily" {
                     DanperDateField(title:"Fecha de corte",selection:$day)
                     DanperChoiceField(title:"Turno",selection:$shift,
@@ -78,19 +94,50 @@ struct N2VerifiedNursingExportView:View {
                     DanperDateField(title:"Semana de referencia",selection:$day)
                     Text("Consolidado semanal: "+selectedPeriod.start+" al "+selectedPeriod.end)
                         .font(.footnote).foregroundStyle(.secondary)
+                } else if reportMode=="cut" {
+                    DanperDateField(title:"Fecha final del acumulado",selection:$day)
+                    Text("Corte mensual: "+selectedPeriod.start+" al "+selectedPeriod.end)
+                        .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("Si registraste el stock después de atender, se reconstruye el saldo inicial del día 9 sumando consumos confirmados y restando ingresos y ajustes. No se descuentan de nuevo los lotes actuales. Frascos/cajas solo cuentan aperturas declaradas.")
+                        .font(.caption).foregroundStyle(.secondary)
                 } else {
                     DanperDateField(title:"Desde",selection:$rangeStart)
                     DanperDateField(title:"Hasta",selection:$rangeEnd)
                 }
-                DanperField(title:"Responsable") {
-                    TextField("Nombre del responsable",text:$responsible).textInputAutocapitalization(.characters)
-                }
+                LabeledContent("Responsable",value:N2ClinicianIdentity.name)
+                LabeledContent("DNI",value:N2ClinicianIdentity.dni)
+                Text("Identidad del profesional preconfigurada; no es necesario introducirla para cada reporte.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Text(reportMode=="daily" ?
                     "Kardex diario de 98 productos." :
                     "Consolidado verificado de 98 productos; el Excel indicará claramente el intervalo y no se presentará como un solo día.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            DanperPanel("Generar") {
+            DanperPanel {
+                N2Build222StageHeading(step:2,title:"Revisar el Kardex y recuentos")
+                Label("98 productos del catálogo oficial de Enfermería",
+                      systemImage:"checkmark.shield")
+                    .font(.subheadline.weight(.semibold))
+                Text("El Kardex reúne ambas sedes en un solo inventario. Los productos sin lote conservan su fila y muestran saldo 0; un movimiento histórico sin conciliación puede impedir certificar un corte.")
+                    .font(.caption).foregroundStyle(.secondary)
+                NavigationLink {
+                    N2NativeInventoryView()
+                } label: {
+                    Label("Revisar inventario y lotes",systemImage:"shippingbox")
+                }
+                .buttonStyle(DanperSecondaryButton())
+                if reportMode=="cut" {
+                    NavigationLink {
+                        N2KardexCutPreviewView()
+                    } label: {
+                        Label("Ver stock inicial reconstruido del día 9",
+                              systemImage:"calendar.badge.clock")
+                    }
+                    .buttonStyle(DanperSecondaryButton())
+                }
+            }
+            DanperPanel {
+                N2Build222StageHeading(step:3,title:"Exportar Excel oficial")
                 Button {
                     Task {await export()}
                 } label: {
@@ -98,7 +145,7 @@ struct N2VerifiedNursingExportView:View {
                           systemImage:"square.and.arrow.up")
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(busy || site.isEmpty ||
+                .disabled(busy ||
                     selectedPeriod.start>selectedPeriod.end ||
                     responsible.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
                 Text(status).font(.footnote)
@@ -135,7 +182,8 @@ struct N2VerifiedNursingExportView:View {
                 result=try await vault
                     .exportVerifiedRangeNursingWorkbook(
                         start:selectedPeriod.start,end:selectedPeriod.end,
-                        responsible:operatorName,site:site)
+                        responsible:operatorName,site:site,
+                        reconstructFromCount:reportMode=="cut")
             }
             cleanup()
             let dir=FileManager.default.temporaryDirectory
@@ -151,13 +199,39 @@ struct N2VerifiedNursingExportView:View {
             let output=dir.appendingPathComponent(name)
             try result.xlsx.write(to:output,
                 options:[.atomic,.completeFileProtection])
-            status="Generado: \(result.stockKnownRows) productos con historial; \(result.stockUnknownRows) sin existencias acreditadas (en blanco)."
+            status="Generado: \(result.stockKnownRows) productos con historial; \(result.stockUnknownRows) sin lotes registrados (saldo 0)."
             share=N2NursingShare(file:output)
         }catch {
             cleanup()
             failed=true
-            status="Bloqueado: falta fuente, fecha válida o existe inventario sin conciliar. El stock no cambió."
+            status=exportFailureMessage(error)
+            #if DEBUG
+            print("DANPER Kardex Enfermería: "+String(reflecting:error))
+            #endif
         }
+    }
+    private func exportFailureMessage(_ error:Error)->String {
+        if let failure=error as? N2VerifiedNursingWorkbook.Failure {
+            switch failure {
+            case .noPhysicalHistory:
+                return "No hay un historial físico validado para el período. Revisa las existencias; las atenciones guardadas siguen intactas."
+            case .incompleteOrUnreconciled:
+                return "El Kardex no supera la conciliación del período, o la plantilla de 98 productos no pudo verificarse. Comprueba si hay consumos históricos sin apertura declarada. No se modificó el stock."
+            }
+        }
+        if let failure=error as? N2NursingReportError {
+            switch failure {
+            case .invalidDay, .unsupportedRange:
+                return "El período seleccionado no es válido para esta modalidad. Revisa las fechas."
+            case .invalidPhysicalCount:
+                return "Hay un recuento físico inconsistente con los movimientos. Revisa el inventario único antes de emitir el Kardex."
+            case .incompleteHistory:
+                return "El historial contiene consumos o aperturas todavía sin conciliar. No se inventaron saldos."
+            case .invalidSource, .invalidCatalog:
+                return "La fuente cifrada o el catálogo oficial de 98 productos no pudo verificarse."
+            }
+        }
+        return "No se pudo generar el archivo (\(String(reflecting:error))). No se modificaron atenciones ni existencias."
     }
     @MainActor
     private func cleanup() {

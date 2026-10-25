@@ -28,7 +28,8 @@ final class N1nInactiveSourceTests:XCTestCase {
         return try JSONSerialization.data(withJSONObject:root,options:[.sortedKeys])
     }
     private func changed(_ edit:(inout [String:Any])->Void) throws -> Data {
-        var r=try XCTUnwrap(JSONSerialization.jsonObject(with:source()) as? [String:Any])
+        let raw=try source()
+        var r=try XCTUnwrap(JSONSerialization.jsonObject(with:raw) as? [String:Any])
         edit(&r)
         return try JSONSerialization.data(withJSONObject:r,options:[.sortedKeys])
     }
@@ -43,12 +44,15 @@ final class N1nInactiveSourceTests:XCTestCase {
         XCTAssertFalse(result.canActivate)
     }
     func testRejectsEachMissingConsent() throws {
+        // Retrieve fixture outside XCTAssertThrowsError so XCTSkip cannot
+        // be misclassified as a domain-level consent rejection.
+        let raw=try source()
         for missing in 0...2 {
             let flags=(0...2).map{$0 != missing}
             let consent=N1nAcknowledgment(originalBuild222:flags[0],
                 reviewedForDemo:flags[1],understandsNoRestore:flags[2])
             XCTAssertThrowsError(try N1nInactiveSourceGate.authorize(
-                source(),acknowledgment:consent)) {
+                raw,acknowledgment:consent)) {
                 XCTAssertEqual($0 as? N1nGateError,.missingAcknowledgment)
             }
         }

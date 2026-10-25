@@ -86,11 +86,15 @@ internal enum N1sFullExcelWriter {
         return attrs(String(xml[r]),name:"s")
     }
     private static func xmlCell(_ ref:String,_ value:Any?,
-                                template:String?=nil,formula:String?=nil) throws -> String {
+                                template:String?=nil,formula:String?=nil,
+                                cachedNumber:Double?=nil) throws -> String {
         let s=template.map{" s=\""+$0+"\""} ?? ""
         let head="<c r=\""+ref+"\""+s
         if let formula {
-            return head+"><f>"+(try escaped(formula))+"</f></c>"
+            // Keep the original formula and store a verified cache for
+            // Quick Look / Files preview. Excel remains free to recalculate.
+            let cached=cachedNumber.map{ "<v>"+String($0)+"</v>" } ?? ""
+            return head+"><f>"+(try escaped(formula))+"</f>"+cached+"</c>"
         }
         guard let value,!(value is NSNull) else {return head+"/>"}
         if let x=number(value) {
@@ -99,6 +103,16 @@ internal enum N1sFullExcelWriter {
         guard let t=value as? String else {throw N1sExcelError.invalidRow}
         if t.isEmpty{return head+"/>"}
         return head+" t=\"inlineStr\"><is><t xml:space=\"preserve\">" + (try escaped(t)) + "</t></is></c>"
+    }
+    private static func formattedPeriod(_ start:String,_ end:String)throws -> String {
+        func readable(_ day:String)throws -> String {
+            guard day.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
+                            options:.regularExpression) != nil else {
+                throw N1sExcelError.invalidManifest
+            }
+            return "\(day.suffix(2))/\(day.dropFirst(5).prefix(2))/\(day.prefix(4))"
+        }
+        return try readable(start)+" AL "+readable(end)
     }
     private static func numericDate(_ s:String) throws -> Double {
         guard s.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
@@ -112,7 +126,8 @@ internal enum N1sFullExcelWriter {
               c.component(.day,from:x)==d else {throw N1sExcelError.invalidManifest}
         return Double(Int(x.timeIntervalSince1970/86400)+25569)
     }
-    private static func formula(_ sheet:Int,_ col:String,_ row:Int,reviewed:Bool) -> String? {
+    private static func formula(_ sheet:Int,_ col:String,_ row:Int,
+                                reviewed:Bool,verifiedIncome:Int?=nil) -> String? {
         let n=String(row)
         switch sheet {
         case 2:
@@ -120,13 +135,21 @@ internal enum N1sFullExcelWriter {
         case 3:
             let expiry=["D":"J","E":"N","F":"R","G":"V"]
             if let source=expiry[col] {
-                return "IF(\(source)\(n)=\"\",\"\",IF(\(source)\(n)-TODAY()<=90,1,0))"
+                // 0 = green, 1 = yellow (<=90 days), 2 = red (expired).
+                return "IF(\(source)\(n)=\"\",\"\",IF(\(source)\(n)<TODAY(),2,IF(\(source)\(n)-TODAY()<=90,1,0)))"
             }
             return col=="X" && reviewed ?
                 "IF(COUNTA(H\(n),L\(n),P\(n),T\(n))=0,0,SUM(H\(n),L\(n),P\(n),T\(n)))" : nil
         case 4:
             switch col {
-            case "E":return "IF(COUNT(INGRESOS!X\(n))=0,\"\",INGRESOS!X\(n))"
+            case "E":
+                if let income=verifiedIncome {
+                    // A fully reconciled ledger proves this income, including
+                    // genuine zero. Excel still uses the receipt-table total
+                    // if it contains a calculated value.
+                    return "IF(COUNT(INGRESOS!X\(n))=0,\(income),INGRESOS!X\(n))"
+                }
+                return "IF(COUNT(INGRESOS!X\(n))=0,\"\",INGRESOS!X\(n))"
             case "F":return "SUMIF(TB_CONSUMOS[CÓDIGO],A\(n),TB_CONSUMOS[CANTIDAD])"
             case "G":return "IF(OR(D\(n)=\"\",E\(n)=\"\"),\"\",SUM(D\(n):E\(n))-F\(n))"
             case "H":return "IF(COUNT(CONTEO!D\(n))=0,\"\",CONTEO!D\(n))"
@@ -153,7 +176,8 @@ internal enum N1sFullExcelWriter {
     }
     private static func sheetData(_ xml:String,headerRows:Int,rows:[[Any?]],
                                   width:Int,reviewed:Bool,sheet:Int,
-                                  dateStyle:Int) throws -> String {
+                                  dateStyle:Int,cachedConsumption:[Int:Double]=[:],
+                                  reconciledValues:[Int:[String:Double]]=[:]) throws -> String {
         var preserved=""
         for index in 1...headerRows {preserved += try existingRow(xml,index)}
         let prototype=try existingRow(xml,headerRows+1)
@@ -173,7 +197,8 @@ internal enum N1sFullExcelWriter {
                 if sheet==5 && (col==2 || col==3) {
                     formulaText=organization(col,row)
                 }else {
-                    formulaText=formula(sheet,label,row,reviewed:reviewed)
+                    formulaText=formula(sheet,label,row,reviewed:reviewed,
+                        verifiedIncome:sheet==4 ? reconciledValues[row]?["E"].map{Int($0)} : nil)
                 }
                 let input:Any?=i<rows.count ? rows[i][col] : nil
                 // Explicit numeric date style: do not depend on a template
@@ -182,7 +207,11 @@ internal enum N1sFullExcelWriter {
                     (sheet==3 && [8,9,12,13,16,17,20,21].contains(col))
                 inserted += try xmlCell(reference,input,
                     template:isDate ? String(dateStyle) : style[label],
-                    formula:formulaText)
+                    formula:formulaText,
+                    cachedNumber:sheet==4
+                        ? (reconciledValues[row]?[label] ??
+                           (label=="F" ? cachedConsumption[row] : nil))
+                        : nil)
             }
             inserted+="</row>"
         }
@@ -193,6 +222,73 @@ internal enum N1sFullExcelWriter {
                                     with:"<dimension ref=\""+dim+"\"/>")
         return replaced
     }
+    /// Excel-compatible, visible traffic-light circles in INGRESOS D3:G434.
+    /// The helper cells remain numeric; icon formatting hides their values.
+    private static func expirySemaphore(_ xml:String)throws->String {
+        var sheet=xml
+        // Remove only obsolete custom icon sets for the same four columns.
+        let extended=try matches(#"<x14:conditionalFormatting\b[^>]*>.*?</x14:conditionalFormatting>"#,in:sheet)
+        for match in extended.reversed() {
+            guard let range=Range(match.range,in:sheet) else{
+                throw N1sExcelError.invalidTemplate
+            }
+            let block=String(sheet[range])
+            if (block.contains("<xm:sqref>D3:G439</xm:sqref>") ||
+                block.contains("<xm:sqref>D3:G434</xm:sqref>")) &&
+                block.contains("iconSet") {
+                sheet.removeSubrange(range)
+            }
+        }
+        // The legacy x14 wrapper can be empty after removing that rule.
+        for pattern in [
+            #"<x14:conditionalFormattings\b[^>]*>\s*</x14:conditionalFormattings>"#,
+            #"<ext\b[^>]*>\s*</ext>"#,
+            #"<extLst\b[^>]*>\s*</extLst>"#
+        ] {
+            sheet=sheet.replacingOccurrences(of:pattern,with:"",
+                        options:.regularExpression)
+        }
+        let standard=try matches(#"<conditionalFormatting\b[^>]*>.*?</conditionalFormatting>"#,in:sheet)
+        for match in standard.reversed() {
+            guard let range=Range(match.range,in:sheet) else{
+                throw N1sExcelError.invalidTemplate
+            }
+            let block=String(sheet[range])
+            if block.contains("iconSet") &&
+               (block.contains("D3:G439") || block.contains("D3:G434")) {
+                sheet.removeSubrange(range)
+            }
+        }
+        let priorities=try matches(#"\bpriority="(\d+)""#,in:sheet)
+        let largest=priorities.compactMap { result -> Int? in
+            guard let value=Range(result.range(at:1),in:sheet) else{return nil}
+            return Int(sheet[value])
+        }.max() ?? 0
+        guard largest<10000 else{throw N1sExcelError.invalidTemplate}
+        // Reversed standard 3TrafficLights1 icons map 0→green, 1→yellow, 2→red.
+        let traffic="<conditionalFormatting sqref=\"D3:G434\"><cfRule type=\"iconSet\" priority=\"\(largest+1)\"><iconSet iconSet=\"3TrafficLights1\" showValue=\"0\" reverse=\"1\"><cfvo type=\"num\" val=\"0\"/><cfvo type=\"num\" val=\"1\"/><cfvo type=\"num\" val=\"2\"/></iconSet></cfRule></conditionalFormatting>"
+        let existing=try matches(#"</conditionalFormatting>"#,in:sheet)
+        if let last=existing.last,let after=Range(last.range,in:sheet)?.upperBound {
+            sheet.insert(contentsOf:traffic,at:after)
+        }else{
+            guard let data=sheet.range(of:"</sheetData>") else{
+                throw N1sExcelError.invalidTemplate
+            }
+            let rest=sheet[data.upperBound...]
+            let later=["<dataValidations","<hyperlinks","<printOptions",
+                       "<pageMargins","<pageSetup","<headerFooter","<drawing",
+                       "<legacyDrawing","<tableParts","<extLst","</worksheet>"]
+            guard let at=later.compactMap({rest.range(of:$0)?.lowerBound}).min() else{
+                throw N1sExcelError.invalidTemplate
+            }
+            sheet.insert(contentsOf:traffic,at:at)
+        }
+        guard (try matches(#"<iconSet\b[^>]*iconSet="3TrafficLights1""#,in:sheet)).count==1 else{
+            throw N1sExcelError.invalidTemplate
+        }
+        return sheet
+    }
+
     private static func rows(_ json:[String:Any]) throws -> [[Any]] {
         guard let plan=json["plan"] as? [String:Any],
               let elements=plan["lines"] as? [[String:Any]],elements.count<=10000
@@ -275,8 +371,20 @@ internal enum N1sFullExcelWriter {
               Set(catalog.compactMap{string($0["code"])}).count==432,
               Set(reconciliation.keys)==Set(catalog.compactMap{string($0["code"])}),
               !(provisional && reviewed) else {throw N1sExcelError.invalidManifest}
-        let pending=selected.contains{line in line[15] as? String != "" && !(line[17] is NSNumber)}
-        guard !pending else {throw N1sExcelError.missingVerifiedQuantity}
+        let missingR=selected.filter {
+            $0[15] as? String != "" && !($0[17] is NSNumber)
+        }.count
+        if missingR>0 {
+            // A provisional line with R empty is an UNKNOWN physical
+            // delivery, not a verified R=0 or a clinical-count-as-R.
+            // Every such row requires an explicit audit note; the OFFICIAL
+            // workbook must continue rejecting all unverified R values.
+            let descriptions=root["pendingNotes"] as? [String] ?? []
+            let documented=descriptions.filter{$0.contains("R PENDIENTE")}.count
+            guard provisional,!reviewed,documented>=missingR else {
+                throw N1sExcelError.missingVerifiedQuantity
+            }
+        }
         if !reviewed {
             // Protect official filenames/claimed ready state; reconciliation
             // may still be exported as a visibly nonfinal DRAFT only.
@@ -357,6 +465,36 @@ internal enum N1sFullExcelWriter {
         }
         guard productCodes.count==432 else {throw N1sExcelError.invalidMaterial}
         sheetRows[5]=selected.map{$0.map{Optional($0)}}
+        // RESU column F is a SUMIF formula. Cache only its actual selected
+        // Excel R quantities so iOS previews can display the number without
+        // changing that formula or fabricating a stock opening/count.
+        var cachedConsumption=[Int:Double]()
+        var reconciledValues=[Int:[String:Double]]()
+        for (index,product) in catalog.enumerated() {
+            guard let code=string(product["code"]),
+                  let material=reconciliation[code],
+                  let consumed=int(material["consumed"]) else {
+                throw N1sExcelError.invalidMaterial
+            }
+            let row=index+3
+            cachedConsumption[row]=Double(consumed)
+            // Only a trusted physical snapshot from the joint cut may
+            // populate E/G/H/I. The receipt amount includes VERIFIED zero
+            // when there were no receipts. Unknown values stay blank.
+            if let income=int(material["verifiedIncome"]),
+               let receipts=int(material["receipts"]),receipts==income,
+               let opening=int(material["opening"]),
+               let closing=int(material["closing"]),
+               let count=int(material["count"]),
+               let difference=int(material["difference"]),difference==0,
+               opening+income>=consumed,
+               opening+income-consumed==closing,closing==count {
+                reconciledValues[row]=[
+                    "E":Double(income),"G":Double(closing),
+                    "H":Double(count),"I":0
+                ]
+            }
+        }
         let formulasWritten=reviewed
         let plans:[Int:(Int,Int)]=[2:(2,8),3:(2,25),4:(2,13),5:(1,30)]
         for i in archive.indices {
@@ -374,8 +512,31 @@ internal enum N1sFullExcelWriter {
                 }
                 let rebuilt=try sheetData(xml,headerRows:header,rows:sheetRows[no] ?? [],
                                           width:width,reviewed:formulasWritten,sheet:no,
-                                          dateStyle:peruDateStyle)
-                archive[i]=N1rStoredEntry(name:path,data:Data(rebuilt.utf8))
+                                          dateStyle:peruDateStyle,
+                                          cachedConsumption:no==4 ? cachedConsumption : [:],
+                                          reconciledValues:no==4 ? reconciledValues : [:])
+                let completed:String
+                if no==3 {
+                    completed=try expirySemaphore(rebuilt)
+                }else if no==4 {
+                    // Preserve E1/A1 styles while replacing DEMO/placeholder
+                    // labels inherited from the original blank template.
+                    let from=try N1sFullExcelWriter.formattedPeriod(start,end)
+                    let row1=try existingRow(rebuilt,1)
+                    let title=provisional ? "KARDEX AMBULATORIO · PROVISIONAL"
+                        : "KARDEX AMBULATORIO · OFICIAL"
+                    var header=row1
+                    let a=try xmlCell("A1",title,template:cellStyle(row1,ref:"A1"))
+                    let e=try xmlCell("E1","PERÍODO: "+from,template:cellStyle(row1,ref:"E1"))
+                    header=try replaceExactly(#"<c\b[^>]*\br="A1"[^>]*>.*?</c>"#,
+                                               in:header,with:a)
+                    header=try replaceExactly(#"<c\b[^>]*\br="E1"[^>]*>.*?</c>"#,
+                                               in:header,with:e)
+                    completed=rebuilt.replacingOccurrences(of:row1,with:header)
+                }else {
+                    completed=rebuilt
+                }
+                archive[i]=N1rStoredEntry(name:path,data:Data(completed.utf8))
                 continue
             }
             if path.hasPrefix("xl/tables/table"),path.hasSuffix(".xml"),

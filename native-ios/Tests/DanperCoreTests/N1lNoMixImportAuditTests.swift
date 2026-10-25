@@ -12,8 +12,11 @@ final class N1lNoMixImportAuditTests: XCTestCase {
             .appendingPathComponent("n1f-source.json"))
     }
     private func changed(_ edit:(inout [String:Any])->Void) throws -> Data {
+        // Load before XCTAssert's autoclosure so an absent synthetic fixture
+        // propagates XCTSkip rather than being misreported as a failed unwrap.
+        let source=try file()
         var payload=try XCTUnwrap(
-            JSONSerialization.jsonObject(with:file()) as? [String:Any])
+            JSONSerialization.jsonObject(with:source) as? [String:Any])
         edit(&payload)
         return try JSONSerialization.data(withJSONObject:payload)
     }

@@ -156,7 +156,11 @@ internal final class N2EncryptedClinicalJournal {
     }
     private func validate(_ data:Data)throws {
         guard data.count>0,data.count<=30*1024*1024,
-              (try? N1eLegacyClinicalAudit.inspect(data)) != nil,
+              // The only zero-record exception is the exact canonical empty
+              // snapshot. No partially empty, corrupted or imported source
+              // can bypass the existing production audit.
+              (try? N1eLegacyClinicalAudit.inspect(
+                  data,allowEmptySynthetic:N2EmptyDemoSnapshot.matches(data))) != nil,
               (try? N1fLosslessFieldGate.inspect(data)) != nil else {
             throw Failure.invalidSnapshot
         }

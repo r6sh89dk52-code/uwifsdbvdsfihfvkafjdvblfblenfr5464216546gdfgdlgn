@@ -1,19 +1,109 @@
 import SwiftUI
 import UIKit
+import CoreImage
 
 /// Reusable visual language for the entire native preview. Respect Dynamic Type,
 /// Dark/Light Mode, Reduce Motion and the iPhone's safe areas.
 enum DanperStyle {
-    static let red=Color(red:0.89,green:0.094,blue:0.176)
-    static let deepRed=Color(red:0.57,green:0.035,blue:0.12)
-    static let canvas=Color(uiColor:UIColor { $0.userInterfaceStyle == .dark ? UIColor(red:0.09,green:0.09,blue:0.105,alpha:1) : UIColor(red:0.965,green:0.965,blue:0.974,alpha:1) })
-    static let surface=Color(uiColor:UIColor { $0.userInterfaceStyle == .dark ? UIColor(red:0.145,green:0.145,blue:0.16,alpha:1) : .white })
+    /// User-facing alternative: the blue / cyan health campaign identity.
+    /// Legacy symbol name "red" stays for existing SwiftUI callers.
+    static var healthPalette:Bool {
+        UserDefaults.standard.string(forKey:"danper.visual.palette") == "salud"
+    }
+    static var red:Color {
+        healthPalette ? Color(red:0.04,green:0.43,blue:0.80) :
+                        Color(red:0.89,green:0.094,blue:0.176)
+    }
+    static var deepRed:Color {
+        healthPalette ? Color(red:0.01,green:0.73,blue:0.93) :
+                        Color(red:0.57,green:0.035,blue:0.12)
+    }
+    static var canvas:Color {
+        Color(uiColor:UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return healthPalette
+                    ? UIColor(red:0.055,green:0.095,blue:0.155,alpha:1)
+                    : UIColor(red:0.09,green:0.09,blue:0.105,alpha:1)
+            }
+            return healthPalette
+                ? UIColor(red:0.942,green:0.979,blue:0.995,alpha:1)
+                : UIColor(red:0.965,green:0.965,blue:0.974,alpha:1)
+        })
+    }
+    static var surface:Color {
+        Color(uiColor:UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return healthPalette
+                    ? UIColor(red:0.095,green:0.15,blue:0.21,alpha:1)
+                    : UIColor(red:0.145,green:0.145,blue:0.16,alpha:1)
+            }
+            return .white
+        })
+    }
     static let animation=Animation.easeInOut(duration:0.22)
-    static let gradient=LinearGradient(colors:[red,deepRed],
-                                      startPoint:.topLeading,endPoint:.bottomTrailing)
+    static var gradient:LinearGradient {
+        LinearGradient(colors:[red,deepRed],
+                       startPoint:.topLeading,endPoint:.bottomTrailing)
+    }
+}
+
+
+/// Shared red top banner for Build 222 native screens. The real Danper
+/// wordmark is a bundled asset, never recreated with a system font.
+struct DanperBrandHeader:View {
+    let onSettings:()->Void
+    // The bundled 316px square includes a pure-red background. Derive alpha
+    // from the green channel: zero for that red and full for white lettering.
+    // This reuses the authentic brand lettering without exporting/editing PNGs.
+    private static let wordmark:UIImage? = {
+        guard let original=UIImage(named:"BrandLogo"),
+              let image=CIImage(image:original),
+              let filter=CIFilter(name:"CIColorMatrix") else{return UIImage(named:"BrandLogo")}
+        filter.setValue(image,forKey:kCIInputImageKey)
+        filter.setValue(CIVector(x:0,y:1,z:0,w:0),forKey:"inputAVector")
+        guard let rendered=filter.outputImage,
+              let cg=CIContext().createCGImage(rendered,from:rendered.extent) else{return original}
+        return UIImage(cgImage:cg)
+    }()
+    var body:some View {
+        HStack(spacing:9) {
+            Image(uiImage:Self.wordmark ?? UIImage())
+                .resizable()
+                .scaledToFill()
+                .frame(width:160,height:54)
+                .clipped()
+                .accessibilityLabel("Danper")
+            Text("SALUD MÓVIL")
+                .font(.system(size:10,weight:.bold,design:.rounded))
+                .tracking(1.5)
+                .foregroundStyle(.white)
+                .fixedSize(horizontal:true,vertical:false)
+            Spacer(minLength:3)
+            Button(action:onSettings) {
+                Image(systemName:"gearshape")
+                    .font(.system(size:22,weight:.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width:45,height:45)
+                    .background(.white.opacity(0.13),
+                                in:RoundedRectangle(cornerRadius:14))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ajustes")
+            .accessibilityIdentifier("brand-header-settings")
+        }
+        .padding(.horizontal,18)
+        .frame(maxWidth:.infinity)
+        .frame(height:65)
+        .background(
+            Color(red:0.90,green:0.07,blue:0.16)
+                .ignoresSafeArea(edges:.top))
+        .accessibilityElement(children:.contain)
+        .accessibilityIdentifier("danper-brand-header")
+    }
 }
 
 struct DanperPrimaryButton:ButtonStyle {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration:Configuration)->some View {
         configuration.label
@@ -31,6 +121,7 @@ struct DanperPrimaryButton:ButtonStyle {
     }
 }
 struct DanperSecondaryButton:ButtonStyle {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration:Configuration)->some View {
         configuration.label
@@ -46,8 +137,18 @@ struct DanperSecondaryButton:ButtonStyle {
     }
 }
 struct DanperFormChrome:ViewModifier {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     func body(content:Content)->some View {
         content
+            .toolbar {
+                ToolbarItemGroup(placement:.keyboard) {
+                    Spacer()
+                    Button("Ocultar teclado") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to:nil,from:nil,for:nil)
+                    }
+                    .accessibilityIdentifier("danper-dismiss-keyboard")
+                }
+            }
             .scrollContentBackground(.hidden)
             .background(DanperStyle.canvas)
             .tint(DanperStyle.red)
@@ -132,6 +233,7 @@ struct DanperStatusBanner:View {
 /// Build 222 panels: separate content surfaces, outlined fields and neutral text.
 /// Action color belongs to the primary CTA and selected marks, not entire rows.
 struct DanperPanel<Content:View>:View {
+    @AppStorage("danper.visual.palette") private var visualPalette="danper"
     private let title:String?
     private let content:Content
     init(_ title:String?=nil,@ViewBuilder content:()->Content) {
@@ -150,13 +252,18 @@ struct DanperPanel<Content:View>:View {
 }
 struct DanperField<Content:View>:View {
     let title:String
+    var highlighted:Bool=false
     @ViewBuilder let content:Content
     var body:some View {
         VStack(alignment:.leading,spacing:8) {
-            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+            Text(title).font(.subheadline.weight(.semibold))
+                .foregroundStyle(highlighted ? DanperStyle.red : Color.secondary)
             content.padding(12).frame(maxWidth:.infinity,alignment:.leading)
                 .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
-                .overlay(RoundedRectangle(cornerRadius:13).strokeBorder(Color.secondary.opacity(0.15)).allowsHitTesting(false))
+                .overlay(RoundedRectangle(cornerRadius:13)
+                    .strokeBorder(highlighted ? DanperStyle.red : Color.secondary.opacity(0.15),
+                                  lineWidth:highlighted ? 2 : 1)
+                    .allowsHitTesting(false))
         }
     }
 }
@@ -166,6 +273,9 @@ struct DanperChoiceField:View {
     @Binding var selection:String
     let options:[String]
     var labels:[String:String]=[:]
+    var openRequest:Int=0
+    var highlighted:Bool=false
+    @State private var showRequestedOptions=false
     private func label(_ value:String)->String {labels[value] ?? value.capitalized(with:Locale(identifier:"es_PE"))}
     var body:some View {
         Menu {
@@ -174,7 +284,7 @@ struct DanperChoiceField:View {
                 ForEach(options,id:\.self) {value in Text(label(value)).tag(value)}
             }
         } label: {
-            DanperField(title:title) {
+            DanperField(title:title,highlighted:highlighted) {
                 HStack(spacing:12) {
                     Text(selection.isEmpty ? (labels[""] ?? "Seleccionar") : label(selection))
                         .foregroundStyle(selection.isEmpty ? .secondary : .primary)
@@ -183,7 +293,25 @@ struct DanperChoiceField:View {
                     Image(systemName:"chevron.up.chevron.down").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 }.frame(minHeight:24)
             }
-        }.buttonStyle(.plain).accessibilityIdentifier("choice-"+title)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("choice-"+title)
+        // SwiftUI's Menu cannot be opened programmatically. When a
+        // validation error asks to open a picker, present the same options
+        // in a native confirmation dialog, without changing the normal Menu.
+        .confirmationDialog(title,isPresented:$showRequestedOptions,
+                            titleVisibility:.visible) {
+            ForEach(options,id:\.self) { option in
+                Button(label(option)){selection=option}
+            }
+            Button("Cancelar",role:.cancel){}
+        }
+        .onChange(of:openRequest) {old,new in
+            if new>0 && new != old {showRequestedOptions=true}
+        }
+        .onAppear {
+            if openRequest>0 {showRequestedOptions=true}
+        }
     }
 }
 
@@ -194,16 +322,35 @@ extension EnvironmentValues {
         set{self[DanperRevealKey.self]=newValue}
     }
 }
-/// Scrolls suggestions above the keyboard, rather than revealing only the input.
+/// A route request is unique even when the same field fails twice.
+struct DanperScrollRequest:Equatable {
+    let fieldID:String
+    let token=UUID()
+}
+/// Scrolls both keyboard suggestions and specific validation fields.
 struct DanperScrollView<Content:View>:View {
-    @ViewBuilder let content:Content
+    let jumpRequest:DanperScrollRequest?
+    let content:Content
+    init(jumpRequest:DanperScrollRequest?=nil,@ViewBuilder content:()->Content){
+        self.jumpRequest=jumpRequest
+        self.content=content()
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
         ScrollViewReader {proxy in
             ScrollView {content}
+                .scrollDismissesKeyboard(.interactively)
                 .environment(\.danperReveal,{id in
-                    withAnimation(reduceMotion ? nil : DanperStyle.animation){proxy.scrollTo(id,anchor:.top)}
+                    withAnimation(reduceMotion ? nil : DanperStyle.animation){
+                        proxy.scrollTo(id,anchor:.center)
+                    }
                 })
+                .onChange(of:jumpRequest) {_,request in
+                    guard let request else{return}
+                    withAnimation(reduceMotion ? nil : DanperStyle.animation){
+                        proxy.scrollTo(request.fieldID,anchor:.center)
+                    }
+                }
         }
     }
 }
@@ -225,11 +372,11 @@ struct DanperInlineSearch:View {
     @State private var revealTask:Task<Void,Never>?
     @State private var searchAnchor="inline-"+UUID().uuidString
     @Environment(\.danperReveal) private var reveal
-    private func revealResults() {
+    private func revealResults(initial:Bool=false) {
         revealTask?.cancel()
         revealTask=Task { @MainActor in
             do {try await Task.sleep(for:.milliseconds(220))} catch{return}
-            if focused {reveal(searchAnchor)}
+            if focused || initial {reveal(searchAnchor)}
         }
     }
     private var matches:[DanperSearchOption] {
@@ -271,6 +418,7 @@ struct DanperInlineSearch:View {
             }
         }
         .id(searchAnchor)
+        .onAppear {revealResults(initial:true)}
         .onChange(of:query){_,_ in revealResults()}
         .onChange(of:focused){_,isFocused in if isFocused {revealResults()}}
         .onDisappear{revealTask?.cancel()}

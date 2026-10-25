@@ -80,4 +80,42 @@ final class N2InventoryCommandsTests:XCTestCase {
             XCTAssertEqual($0 as? N2InventoryError,.duplicateLot)
         }
     }
+
+    func testMetadataCorrectionOnlyOnUnusedLotAndDoesNotRewriteMovements()throws {
+        let source=try fixture("n1e-clinical-stock.json")
+        let sourceRoot=try dictionary(source)
+        let parity=try dictionary(fixture("n2-nursing-parity.json"))
+        let catalog=try canonical(parity["catalog"]!)
+        var candidate=try XCTUnwrap((sourceRoot["stockLots"] as? [[String:Any]])?.first)
+        candidate["id"]="N2-UNUSED-METADATA-LOT"
+        candidate["lot"]="ANTES-123"
+        candidate["expires"]="2027-11-02"
+        candidate["sealedContainers"]=0
+        candidate["looseUnits"]=2
+        candidate["openedRemaining"]=0
+        let registered=try N2NativeInventoryCommands.registerLot(
+            snapshot:source,lot:canonical(candidate),catalogData:catalog)
+        let before=try dictionary(registered)
+        let result=try N2NativeInventoryCommands.correctUnusedLot(
+            snapshot:registered,lotID:"N2-UNUSED-METADATA-LOT",
+            reference:"DESPUES-456",expires:"2027-12-03",
+            reason:"Número de lote corregido con etiqueta física",
+            operatorName:"ENFERMERIA RESPONSABLE",at:1793000000000)
+        let updated=try dictionary(result)
+        XCTAssertEqual(try canonical(updated["stockMovements"]!),
+                       try canonical(before["stockMovements"]!))
+        let changed=try XCTUnwrap((updated["stockLots"] as? [[String:Any]])?
+            .first(where:{$0["id"] as? String=="N2-UNUSED-METADATA-LOT"}))
+        XCTAssertEqual(changed["lot"] as? String,"DESPUES-456")
+        XCTAssertEqual(changed["expires"] as? String,"2027-12-03")
+        XCTAssertEqual(changed["looseUnits"] as? Int,2)
+        XCTAssertEqual((updated["nativeLotMetadataCorrections"] as? [[String:Any]])?.count,1)
+        XCTAssertThrowsError(try N2NativeInventoryCommands.correctUnusedLot(
+            snapshot:registered,lotID:"early-unit",reference:"NO-ALTERAR",
+            expires:"2027-12-03",reason:"Cambio prohibido de lote ya usado",
+            operatorName:"ENFERMERIA RESPONSABLE",at:1793000000001)){
+            XCTAssertEqual($0 as? N2InventoryError,.invalidLot)
+        }
+    }
+
 }

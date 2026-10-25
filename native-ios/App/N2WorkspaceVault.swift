@@ -17,11 +17,24 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.inspect()
     }
+    func currentRevision() async throws -> Int {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.currentRevision()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.currentRevision()
+    }
     func readDrafts() async throws -> [N2RecoverableDraft] {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.readDrafts()
         }
         return try await N2SyntheticTrialIOSVault.shared.readDrafts()
+    }
+    func readDraftsWithRevision() async throws
+        ->(revision:Int,drafts:[N2RecoverableDraft]) {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.readDraftsWithRevision()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.readDraftsWithRevision()
     }
     func dispensingLines(visitID:String) async throws -> [N2DispensingLine] {
         if isClinical {
@@ -34,6 +47,25 @@ struct N2WorkspaceVault:Sendable {
             return try await N2ProtectedClinicalIOSVault.shared.dispensingStatus(visitID:visitID)
         }
         return try await N2SyntheticTrialIOSVault.shared.dispensingStatus(visitID:visitID)
+    }
+    /// Dashboard counters are computed from one fixed vault revision.
+    /// The home counter needs only three integers, not a 9k-worker
+    /// history read model. Preserve demo/clinical isolation.
+    func dashboardCounters(today:String,weekStart:String) async throws
+        ->(today:Int,week:Int,drafts:Int)? {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared
+                .dashboardCounters(today:today,weekStart:weekStart)
+        }
+        return try await N2SyntheticTrialIOSVault.shared
+            .dashboardCounters(today:today,weekStart:weekStart)
+    }
+    func readDashboard() async throws
+        ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.readDashboard()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.readDashboard()
     }
     func readHistory() async throws -> N2NativeReadModel? {
         if isClinical {
@@ -71,12 +103,59 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.deleteDraft(id:id,expectedRevision:expectedRevision)
     }
+    func confirmPendingDispensing(_ evidence:N2PendingDispensingEvidence,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.confirmPendingDispensing(evidence,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.confirmPendingDispensing(evidence,expectedRevision:expectedRevision)
+    }
+    func closeContainers(lotID:String,count:Int,disposition:String,operatorName:String,reason:String,at:Int64,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.closeContainers(lotID:lotID,count:count,disposition:disposition,operatorName:operatorName,reason:reason,at:at,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.closeContainers(lotID:lotID,count:count,disposition:disposition,operatorName:operatorName,reason:reason,at:at,expectedRevision:expectedRevision)
+    }
+    func auxiliaryAccounting() async throws->String {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.auxiliaryAccounting()}
+        return try await N2SyntheticTrialIOSVault.shared.auxiliaryAccounting()
+    }
+    func registerAuxiliaryLot(clinicalCode:String,lot:Data,operatorName:String,evidence:String,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,operatorName:operatorName,evidence:evidence,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,operatorName:operatorName,evidence:evidence,expectedRevision:expectedRevision)
+    }
+    func retryDispensing(visitID:String,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.retryDispensing(visitID:visitID,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.retryDispensing(visitID:visitID,expectedRevision:expectedRevision)
+    }
+    func confirmOperationalMapping(_ rule:N2OperationalMapping,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.confirmOperationalMapping(rule,expectedRevision:expectedRevision)
+        }
+        return try await N2SyntheticTrialIOSVault.shared.confirmOperationalMapping(rule,expectedRevision:expectedRevision)
+    }
+    /// Form and drafts are always from one authenticated snapshot and
+    /// one immutable revision. Demo/clinical separation is unchanged.
+    func prepareClinicalForm() async throws
+        ->(context:N2FormContext,drafts:[N2RecoverableDraft]) {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.prepareClinicalForm()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.prepareClinicalForm()
+    }
     func clinicalFormContext() async throws -> N2FormContext {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.clinicalFormContext()
         }
         return try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
     }
+    /// Read-only accounting from the selected vault only.
+    /// Do not switch silently between demo and clinical data.
+    func automaticCutAccounting(through date:String) async throws
+        ->N2AutomaticCutAccounting.Result {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared
+                .automaticCutAccounting(through:date)
+        }
+        return try await N2SyntheticTrialIOSVault.shared
+            .automaticCutAccounting(through:date)
+    }
+
     func readPendingClinicalCorrection(visitID:String) async throws -> N2PendingClinicalCorrection? {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.readPendingClinicalCorrection(visitID:visitID)
@@ -137,6 +216,18 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.addLot(lot,expectedRevision:expectedRevision)
     }
+    func correctUnusedLot(lotID:String,reference:String,expires:String,
+        reason:String,operatorName:String,at:Int64,
+        expectedRevision:Int) async throws -> N2ProtectedStoreSummary {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.correctUnusedLot(
+                lotID:lotID,reference:reference,expires:expires,reason:reason,
+                operatorName:operatorName,at:at,expectedRevision:expectedRevision)
+        }
+        return try await N2SyntheticTrialIOSVault.shared.correctUnusedLot(
+            lotID:lotID,reference:reference,expires:expires,reason:reason,
+            operatorName:operatorName,at:at,expectedRevision:expectedRevision)
+    }
     func receiveStock(movementID:String,lotID:String,at:Int64,sealedAdded:Int,looseAdded:Double,reason:String,expectedRevision:Int) async throws -> N2ProtectedStoreSummary {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.receiveStock(movementID:movementID,lotID:lotID,at:at,sealedAdded:sealedAdded,looseAdded:looseAdded,reason:reason,expectedRevision:expectedRevision)
@@ -167,17 +258,27 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.exportVerifiedIndicatorWorkbook(start:start,end:end,subdivision:subdivision,ids:ids,allowPending:allowPending)
     }
+    func exportOccupationalVigilance(start:String,end:String) async throws
+        ->N2OccupationalVigilanceWorkbook.Result {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared
+                .exportOccupationalVigilance(start:start,end:end)
+        }
+        return try await N2SyntheticTrialIOSVault.shared
+            .exportOccupationalVigilance(start:start,end:end)
+    }
+
     func exportVerifiedDailyNursingWorkbook(date:String,shift:String,responsible:String,site:String="") async throws -> N2VerifiedNursingWorkbook.Result {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.exportVerifiedDailyNursingWorkbook(date:date,shift:shift,responsible:responsible,site:site)
         }
         return try await N2SyntheticTrialIOSVault.shared.exportVerifiedDailyNursingWorkbook(date:date,shift:shift,responsible:responsible,site:site)
     }
-    func exportVerifiedRangeNursingWorkbook(start:String,end:String,responsible:String,site:String="") async throws -> N2VerifiedNursingWorkbook.Result {
+    func exportVerifiedRangeNursingWorkbook(start:String,end:String,responsible:String,site:String="",reconstructFromCount:Bool=false) async throws -> N2VerifiedNursingWorkbook.Result {
         if isClinical {
-            return try await N2ProtectedClinicalIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site)
+            return try await N2ProtectedClinicalIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site,reconstructFromCount:reconstructFromCount)
         }
-        return try await N2SyntheticTrialIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site)
+        return try await N2SyntheticTrialIOSVault.shared.exportVerifiedRangeNursingWorkbook(start:start,end:end,responsible:responsible,site:site,reconstructFromCount:reconstructFromCount)
     }
     func exportPortableEncryptedBackup(password:String) async throws -> Data {
         if isClinical {

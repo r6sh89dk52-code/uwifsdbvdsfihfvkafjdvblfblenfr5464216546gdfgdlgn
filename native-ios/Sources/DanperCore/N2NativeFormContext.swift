@@ -1,5 +1,13 @@
 import Foundation
 
+/// Single-professional identity inherited from DANPER Build 222.
+/// This is the app's own preconfigured operator, not the patient's DNI.
+/// Never use this identity to rewrite immutable imported attentions.
+public enum N2ClinicianIdentity {
+    public static let name="Felipe Azcárate Silva"
+    public static let dni="74958455"
+}
+
 /// Stored birthday is the source of truth; exported age is computed on the clinical date.
 public enum N2WorkerAge {
     public static func years(birthDate:String,on clinicalDate:String)->Int? {
@@ -49,20 +57,43 @@ public struct N2FormLot:Equatable,Sendable,Identifiable {
     public let loose:Double
     public let opened:Double
     public var site:String=""
+    public var reference:String=""
+    public var openContainers:Int=0
     public var total:Double {Double(sealed)*capacity+loose+opened}
-    public var needsOpening:Bool {opened <= 0 && loose <= 0 && sealed>0}
+    public var needsOpening:Bool {openContainers==0 && sealed>0}
 }
 public struct N2FormContext:Sendable {
+    public var operationalMappings:[N2OperationalMapping]=[]
+    public var auxiliaryProducts:[N2NursingCatalogProduct]=[]
     public let revision:Int
     public let workers:[N2FormWorker]
     public let allergies:[String:N2FormAllergy]
     public let lots:[N2FormLot]
     public let products:N2NativeCatalogIndex
-    public func options(for code:String,at date:String,site:String="")->[N2FormLot] {
-        let approved=Set(products.authorizedNursingOptions(for:code).map(\.id))
+    /// Historical evidence is allowed for a catalogued, now-empty lot:
+    /// the declaration records an old R=1/0 in the cut, not a new stock debit.
+    /// Never use this method for current FEFO availability.
+    public func historicalOptions(for code:String,at date:String)->[N2FormLot] {
+        let operational=operationalMappings.filter{$0.clinicalCode==code}
+        let linked=Set(operational.isEmpty
+            ? products.authorizedNursingOptions(for:code).map(\.id)
+            : operational.map(\.inventoryID))
         return lots.filter {
-            approved.contains($0.kardexCode) && $0.total>0 &&
-            (site.isEmpty || $0.site==site) &&
+            linked.contains($0.kardexCode) &&
+            ($0.expires.isEmpty || $0.expires>=date)
+        }.sorted {
+            let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
+            let b=$1.expires.isEmpty ? "9999-12-31":$1.expires
+            return a==b ? $0.id<$1.id : a<b
+        }
+    }
+    public func options(for code:String,at date:String,site:String="")->[N2FormLot] {
+        let operational=operationalMappings.filter{$0.clinicalCode==code}
+        let approved=Set(operational.isEmpty
+            ? products.authorizedNursingOptions(for:code).map(\.id)
+            : operational.map(\.inventoryID))
+        return lots.filter {
+            approved.contains($0.kardexCode) && ($0.total>0 || $0.openContainers>0) &&
             ($0.expires.isEmpty || $0.expires>=date)
         }.sorted {
             let a=$0.expires.isEmpty ? "9999-12-31":$0.expires
@@ -78,19 +109,47 @@ public enum N2FormError:Error,Equatable {
 public enum N2NativeFormContextReader {
     public static func read(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)
         throws->N2FormContext {
-        guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
-              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
-              let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
+        guard (try? N1eLegacyClinicalAudit.inspect(snapshot,allowEmptySynthetic:true)) != nil,
+              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil else {
+            throw N2FormError.absentSnapshot
+        }
+        return try readVerified(snapshot:snapshot,revision:revision,products:products)
+    }
+
+    /// Internal only: journal.recover() has ALREADY authenticated/decrypted
+    /// AND run both complete clinical audits on the snapshot. Avoid repeating
+    /// the costly 9k-worker validation when opening a form or recovered draft.
+    /// The public read(...) retains its strict untrusted-data entry boundary.
+    static func readVerified(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)
+        throws->N2FormContext {
+        guard let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let w=root["workers"] as? [[String:Any]],
               let allergy=root["allergies"] as? [String:Any],
               let stock=root["stockLots"] as? [[String:Any]] else {
             throw N2FormError.absentSnapshot
         }
-        let roster=try N2NativeSnapshotReader.read(snapshot)
-        let allowed=Set(roster.searchableRoster.map(\.dni))
+        // The caller has already run BOTH clinical audits (via read() or
+        // the encrypted journal). Building a full read-model just to discover searchable
+        // workers used to re-audit/parse the whole database, apply all
+        // corrections, sort the 9k+ roster and project every historical visit.
+        // Keep exactly the same official/verified visibility rule as
+        // N2NativeSnapshotReader without building that unrelated history.
+        // The previous full-index reader rejected malformed roster entries
+        // before filtering. Keep that invariant without constructing it.
+        guard w.allSatisfy({
+            ($0["dni"] as? String) != nil && ($0["name"] as? String) != nil
+        }) else {throw N2FormError.invalidWorker}
+        let hasOfficialWorkers=w.contains {
+            ($0["rosterStatus"] as? String)=="official"
+        }
         let people=w.compactMap { row->N2FormWorker? in
             guard let dni=row["dni"] as? String,
-                  let name=row["name"] as? String,allowed.contains(dni) else {
+                  let name=row["name"] as? String else {
+                return nil
+            }
+            let status=row["rosterStatus"] as? String ?? ""
+            guard !hasOfficialWorkers ||
+                  status=="official" || status=="verified" else {
                 return nil
             }
             var worker=N2FormWorker(dni:dni,name:name,
@@ -129,11 +188,16 @@ public enum N2NativeFormContextReader {
             }
             return N2FormLot(id:id,kardexCode:code,name:name,unit:unit,
                              expires:expiry,capacity:capacity,sealed:sealed,
-                             loose:loose,opened:opened,site:sites[id] ?? "")
+                             loose:loose,opened:opened,site:sites[id] ?? "",
+                              reference:row["lot"] as? String ?? "",
+                              openContainers:N2ContainerAccounting.openCount(row))
         }
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
-        return N2FormContext(revision:revision,workers:people,
+        var result=N2FormContext(revision:revision,workers:people,
                              allergies:records,lots:all,products:products)
+        result.operationalMappings=try N2OperationalMappings.read(snapshot)
+        result.auxiliaryProducts=try N2AuxiliaryInventory.products(snapshot:snapshot)
+        return result
     }
 }
 
@@ -149,6 +213,10 @@ public struct N2FormMedication:Equatable,Sendable,Identifiable {
     public var selectedLotID:String
     public var physicalQuantity:Double
     public var approveOpening:Bool
+    /// User explicitly confirmed the previously open container was exhausted.
+    public var closePriorContainer:Bool=false
+    public var reusePreviouslyOpened:Bool=false
+    public var newContainers:Int=1
     public init(id:String=UUID().uuidString,code:String,quantity:Int=1,
                 procedure:String="",selectedLotID:String="",
                 physicalQuantity:Double=0,approveOpening:Bool=false) {
@@ -177,8 +245,15 @@ public struct N2NativeFormDraft:Equatable,Sendable {
     public var photoReviewed:Bool=false
     public var blueBandage:Bool=false
     public var returned:Bool=false
-    public var responsible:String="Felipe Azcárate Silva"
-    public var responsibleDni:String=""
+    public var responsible:String=N2ClinicianIdentity.name
+    public var responsibleDni:String=N2ClinicianIdentity.dni
+    /// Older draft snapshots may omit responsibleDni. Repair the new save
+    /// only when the recorded responsible is the configured sole operator.
+    private var effectiveResponsibleDni:String {
+        let saved=responsibleDni.trimmingCharacters(in:.whitespacesAndNewlines)
+        return saved.isEmpty && responsible==N2ClinicianIdentity.name
+            ? N2ClinicianIdentity.dni : saved
+    }
     public init(id:String=UUID().uuidString) {self.id=id}
 
     public func makeSavedVisit(context:N2FormContext)throws->Data {
@@ -213,6 +288,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                   #"^([01]\d|2[0-3]):[0-5]\d$"#,
                   options:.regularExpression) != nil),
               !responsible.isEmpty,
+              effectiveResponsibleDni.range(of:#"^\d{8}$"#,
+                  options:.regularExpression) != nil,
               (!hasWound || photoReviewed) else {
             throw N2FormError.invalidVisit
         }
@@ -227,19 +304,24 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "unit":product.unit,"quantity":med.quantity,
                 "procedure":med.procedure,
                 "procedureConfirmed":med.procedureConfirmed,
-                "procedureSource":med.procedureSource
+                "procedureSource":med.procedureSource,
+                "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
             ]
-            if !med.selectedLotID.isEmpty {
+            if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
                 // Preserve the operator's clinical record if stock changed
                 // while editing. The transactional engine verifies identity,
                 // availability and scope and records a pending reason instead.
-                guard med.physicalQuantity>0,med.physicalQuantity.isFinite else{
+                guard med.physicalQuantity>=0,med.physicalQuantity.isFinite else{
                     throw N2FormError.invalidProduct
                 }
                 row["physicalUse"]=[
                     "lotId":med.selectedLotID,
                     "quantity":med.physicalQuantity,
-                    "confirmNewContainer":med.approveOpening
+                    "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
                 ] as [String:Any]
             }
             lines.append(row)
@@ -265,12 +347,12 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             "permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
             "photoSent":hasWound && photoSent,
-            "responsible":responsible,"responsibleDni":responsibleDni,
+            "responsible":responsible,"responsibleDni":effectiveResponsibleDni,
             "standaloneProcedures":procedures
         ]
         return try JSONSerialization.data(withJSONObject:source)
     }
-    public func makeDraftPatch(context:N2FormContext)throws->Data {
+    public func makeDraftPatch(context:N2FormContext,stage:Int=0)throws->Data {
         let worker=context.workers.first(where:{$0.dni==dni})
         let workerRaw:[String:Any]=worker.map {
             ["dni":$0.dni,"name":$0.name,"area":$0.area,
@@ -285,28 +367,33 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "id":med.id,"code":med.code,"quantity":med.quantity,
                 "procedure":med.procedure,
                 "procedureConfirmed":med.procedureConfirmed,
-                "procedureSource":med.procedureSource
+                "procedureSource":med.procedureSource,
+                "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
             ]
             if let catalog=context.products.clinical.first(where:{$0.code==med.code}) {
                 row["name"]=catalog.name;row["unit"]=catalog.unit
             }
-            if !med.selectedLotID.isEmpty {
+            if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
                 row["physicalUse"]=[
                     "lotId":med.selectedLotID,"quantity":med.physicalQuantity,
-                    "confirmNewContainer":med.approveOpening
+                    "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
+                "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
+                "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
                 ] as [String:Any]
             }
             return row
         }
         return try JSONSerialization.data(withJSONObject:[
-            "worker":workerRaw,"items":itemRows,
+            "worker":workerRaw,"items":itemRows,"nativeDraftStep":max(0,min(3,stage)),
             "date":date,"time":time,"category":category,
             "dispensingSite":dispensingSite,
             "system":system,"segment":segment,"diagnosis":diagnosis,
             "permission":permission,"permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
             "photoSent":photoSent,"photoReviewed":photoReviewed,"responsible":responsible,
-            "responsibleDni":responsibleDni,
+            "responsibleDni":effectiveResponsibleDni,
             "standaloneProcedures":procedures,
             "workStatus":permission=="SI" ? "PERMISO":"LABORANDO"
         ])

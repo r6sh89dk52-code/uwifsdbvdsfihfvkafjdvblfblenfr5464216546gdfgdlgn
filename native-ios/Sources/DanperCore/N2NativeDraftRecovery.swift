@@ -8,6 +8,7 @@ public struct N2RecoverableDraft:Identifiable,Sendable {
     public let updatedAt:Int64
     public let workerName:String
     public let form:N2NativeFormDraft
+    public let stage:Int
 }
 
 public enum N2DraftRecoveryError:Error,Equatable {
@@ -17,8 +18,16 @@ public enum N2DraftRecoveryError:Error,Equatable {
 public enum N2NativeDraftRecovery {
     public static func read(_ snapshot:Data)throws->[N2RecoverableDraft] {
         guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
-              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
-              let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
+              (try? N1fLosslessFieldGate.inspect(snapshot)) != nil else {
+            throw N2DraftRecoveryError.invalidSnapshot
+        }
+        return try readVerified(snapshot)
+    }
+    /// Only for snapshots returned by the authenticated and fully audited
+    /// N2EncryptedClinicalJournal.recover() path; NOT for arbitrary external
+    /// backups. The public read(_:) retains the complete validation.
+    static func readVerified(_ snapshot:Data)throws->[N2RecoverableDraft] {
+        guard let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let visits=root["attentions"] as? [[String:Any]] else {
             throw N2DraftRecoveryError.invalidSnapshot
         }
@@ -63,6 +72,8 @@ public enum N2NativeDraftRecovery {
                                          procedure:procedureName)
                 med.procedureConfirmed=row["procedureConfirmed"] as? Bool ?? !procedureName.isEmpty
                 med.procedureSource=row["procedureSource"] as? String ?? "manual"
+                med.approveOpening=row["confirmNewContainer"] as? Bool == true && (row["newContainers"] as? Int ?? 0)>0
+                med.newContainers=row["newContainers"] as? Int ?? 1
                 if let physical=row["physicalUse"] {
                     guard let info=physical as? [String:Any],
                           let lotID=info["lotId"] as? String,
@@ -73,14 +84,15 @@ public enum N2NativeDraftRecovery {
                     }
                     med.selectedLotID=lotID
                     med.physicalQuantity=quantity
-                    med.approveOpening=consent
+                    med.approveOpening=consent && (info["newContainers"] as? Int ?? 0)>0
+                    med.newContainers=info["newContainers"] as? Int ?? med.newContainers
                 }
                 medications.append(med)
             }
             draft.items=medications
             result.append(N2RecoverableDraft(id:id,updatedAt:timestamp.int64Value,
                     workerName:worker["name"] as? String ?? "",
-                    form:draft))
+                    form:draft,stage:max(0,min(3,(record["nativeDraftStep"] as? Int) ?? 0))))
         }
         return result.sorted {
             $0.updatedAt == $1.updatedAt ? $0.id<$1.id : $0.updatedAt>$1.updatedAt

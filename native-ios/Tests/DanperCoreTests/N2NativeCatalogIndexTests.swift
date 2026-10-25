@@ -27,8 +27,38 @@ final class N2NativeCatalogIndexTests:XCTestCase {
         XCTAssertEqual(index.authorizedNursingOptions(for:"16024400").count,2)
         XCTAssertTrue(index.authorizedNursingOptions(for:"99999999").isEmpty)
         XCTAssertEqual(index.clinicalMatches("16000182").first?.code,"16000182")
-        XCTAssertEqual(index.nursingMatches("E-68").first?.id,"E-68")
+        XCTAssertEqual(index.nursingMatches("NYLON AZUL 3/0").first?.id,"E-68")
+        XCTAssertTrue(index.nursingMatches("E-68").isEmpty) // IDs stay internal.
         XCTAssertFalse(index.approvals.contains{$0.kardexID=="E-68"})
+        // ALGODON is an approved source product, but NOT a row in
+        // the frozen 98-product nursing worksheet. It needs AUX stock.
+        XCTAssertEqual(index.clinical.first(where:{$0.code=="16000028"})?.name,
+                       "ALGODON 500 GR")
+        XCTAssertEqual(index.clinical.first(where:{$0.code=="16000028"})?.unit,"PAQ")
+        XCTAssertFalse(index.nursing.contains(where:{
+            $0.name.localizedStandardContains("ALGODON")
+        }))
+        XCTAssertTrue(index.authorizedNursingOptions(for:"16000028").isEmpty)
+    }
+    func testOperatorConfirmedPresentationsAreLimitedToNursingKardex()throws {
+        let (clinical,nursing,mappings)=try sources()
+        let index=try N2NativeCatalogLoader.load(products:clinical,nursing:nursing,
+                                                   approvedMappings:mappings)
+        func unit(_ id:String)->String? {
+            index.nursing.first(where:{$0.id==id})?.unit
+        }
+        XCTAssertEqual(unit("E-18"),"UND") // Loperamida TAB: physically counted per unit.
+        XCTAssertEqual(unit("E-94"),"CJA") // Non-sterile gloves M are boxes.
+        XCTAssertEqual(unit("E-95"),"CJA") // Non-sterile gloves S are boxes.
+        XCTAssertEqual(unit("E-86"),"FCO") // Alcohol 1 LT is a bottle.
+        XCTAssertEqual(unit("E-64"),"PAR") // Surgical gloves remain pairs.
+        XCTAssertEqual(unit("E-65"),"PAR")
+        XCTAssertEqual(unit("E-20"),"UND") // Unmatched tablet still uses UND.
+        XCTAssertEqual(unit("E-25"),"UND") // Unmatched tablet still uses UND.
+        XCTAssertTrue(index.nursing.filter{$0.group=="TABLETAS"}.allSatisfy{$0.unit=="UND"})
+        XCTAssertNil(unit("E-68"))         // Never fabricate unknown non-tablet units.
+        XCTAssertEqual(index.clinical.first(where:{$0.code=="16000158"})?.unit,"TBL")
+        XCTAssertEqual(index.approvals.count,86)
     }
     func testModifiedMappingOrClinicalCatalogIsRejected()throws {
         let (clinical,nursing,mappings)=try sources()

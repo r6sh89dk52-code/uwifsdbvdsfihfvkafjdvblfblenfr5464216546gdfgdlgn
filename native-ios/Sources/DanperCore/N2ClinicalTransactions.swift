@@ -48,6 +48,25 @@ public enum N2NativeClinicalTransaction {
         let parts=calendar.dateComponents([.year,.month,.day],from:date)
         return String(format:"%04d-%02d-%02d",parts.year!,parts.month!,parts.day!)
     }
+    /// Historical encounters use their clinical time, never restoration time.
+    /// Backdating is safe only if the stock lot's own ledger has no later event.
+    private static func historicalAt(day:String,time:String,now:Int64)->Int64? {
+        let d=day.split(separator:"-").compactMap{Int($0)}
+        let t=time.split(separator:":").compactMap{Int($0)}
+        guard day.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
+                        options:.regularExpression) != nil,
+              d.count==3,t.count==2,(0...23).contains(t[0]),
+              (0...59).contains(t[1]) else{return nil}
+        var calendar=Calendar(identifier:.gregorian)
+        calendar.timeZone=TimeZone(identifier:"America/Lima")!
+        let expected=DateComponents(year:d[0],month:d[1],day:d[2],
+                                    hour:t[0],minute:t[1])
+        guard let moment=calendar.date(from:expected),
+              calendar.dateComponents([.year,.month,.day,.hour,.minute],
+                                      from:moment)==expected else{return nil}
+        let millis=Int64(moment.timeIntervalSince1970*1000)
+        return millis<=now ? millis:nil
+    }
     private static func mappings(_ data:Data) throws -> [Material] {
         guard let raw=try? JSONSerialization.jsonObject(with:data) as? [[String:Any]],
               raw.count==86 else {throw N2ClinicalError.invalidApprovedCatalog}
@@ -99,6 +118,8 @@ public enum N2NativeClinicalTransaction {
         _=try N1eLegacyClinicalAudit.inspect(snapshot)
         _=try N1fLosslessFieldGate.inspect(snapshot)
         let approved=try mappings(approvedCatalog)
+        let operational=try N2OperationalMappings.read(snapshot)
+        let physicalEvidence=try N2PendingDispensingEvidence.read(snapshot:snapshot)
         guard var root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               var visits=root["attentions"] as? [[String:Any]],
               var lots=root["stockLots"] as? [[String:Any]],
@@ -150,13 +171,23 @@ public enum N2NativeClinicalTransaction {
                 throw N2ClinicalError.invalidVisit
             }
         }
-        let verifiedSites=try N2StockSiteEvidence.resolve(root)
         let today=limaDay(at)
+        let historical=date != today || !append
+        let eventAt: Int64? = historical
+            ? historicalAt(day:date,time:new["time"] as? String ?? "",now:at)
+            : at
         var linked=0,pending=0,already=0,reasons:[String]=[],added=0
         var lineID=""
         var outcomes:[String:String]=[:]
         func mark(_ reason:String) {pending+=1;reasons.append(reason);outcomes[lineID]=reason}
-        for item in items {
+        for originalItem in items {
+            var item=originalItem
+            let evidence=physicalEvidence.last{$0.visitID==id && $0.itemID==item["id"] as? String && $0.at<=at}
+            if let evidence {
+                item["physicalUse"]=["lotId":evidence.lotID,"quantity":evidence.quantity,
+                                     "confirmNewContainer":evidence.confirmNewContainer,
+                                     "newContainers":evidence.newContainers ?? 0]
+            }
             let itemID=item["id"] as! String,code=item["code"] as! String
             lineID=itemID
             let existing=movements.filter{
@@ -168,42 +199,78 @@ public enum N2NativeClinicalTransaction {
                 outcomes[itemID]="Descontado"
                 already+=1;continue
             }
-            if date != today {
-                mark("Fecha clínica histórica: no se reconstruye consumo físico.")
+            if eventAt==nil {
+                mark("Fecha clínica futura o inválida: el consumo queda registrado sin modificar el inventario.")
                 continue
             }
-            let candidates=approved.filter{$0.clinicalCode==code &&
+            let rule=operational.first{$0.clinicalCode==code && $0.clinicalName==item["name"] as? String && $0.clinicalUnit==item["unit"] as? String}
+            if let rule, historical && rule.confirmedAt>(eventAt ?? 0) && evidence==nil {
+                mark("Correspondencia verificada después de la atención: requiere conciliación histórica.");continue
+            }
+            let reviewed=N2UserReviewedKardexLinks.candidates(for:code).filter{
                 $0.clinicalName==item["name"] as? String &&
-                $0.clinicalUnit==item["unit"] as? String}
+                $0.clinicalUnit==item["unit"] as? String
+            }
+            let candidates=rule.map { [Material(clinicalCode:$0.clinicalCode,clinicalName:$0.clinicalName,
+                clinicalUnit:$0.clinicalUnit,kardexCode:$0.inventoryID,kardexName:$0.inventoryName)] }
+                ?? (approved.filter{$0.clinicalCode==code &&
+                $0.clinicalName==item["name"] as? String &&
+                $0.clinicalUnit==item["unit"] as? String} +
+                    reviewed.map {Material(clinicalCode:$0.clinicalCode,
+                        clinicalName:$0.clinicalName,clinicalUnit:$0.clinicalUnit,
+                        kardexCode:$0.kardexID,kardexName:$0.kardexName)})
             if candidates.isEmpty {mark("Sin correspondencia aprobada.");continue}
-            let individual=["UND","TBL","PAR"].contains((item["unit"] as! String).uppercased())
+            // User-confirmed identifiers are not authorization for retroactive
+            // changes. Already-saved visits require explicit physical evidence.
+            if rule==nil && !reviewed.isEmpty && historical && evidence==nil {
+                mark("Correspondencia vinculada después de la atención: requiere conciliación histórica.");continue
+            }
             let explicit=item["physicalUse"] as? [String:Any]
+            let selectedUnit=lots.first{$0["id"] as? String==explicit?["lotId"] as? String}?["catalogUnit"] as? String
+            let allowable=Set(candidates.map{$0.kardexCode})
+            // With no physical Kardex lot, the answer is stock 0, not
+            // "missing conversion", and definitely not an invented debit.
+            if !lots.contains(where:{l in
+                allowable.contains(l["code"] as? String ?? "") &&
+                ((total(l) ?? 0)>0 || N2ContainerAccounting.openCount(l)>0)
+            }) {
+                mark("Sin existencias FEFO disponibles en el inventario único.");continue
+            }
+            let presentationUnits=Set(lots.filter{allowable.contains($0["code"] as? String ?? "")}
+                .compactMap{$0["catalogUnit"] as? String})
+            if presentationUnits.count>1 && selectedUnit==nil {
+                mark("Presentaciones de stock incompatibles: selecciona y verifica el lote físico.");continue
+            }
+            let containerProduct=selectedUnit.map{N2ContainerAccounting.isContainer(unit:$0)} ?? lots.contains {
+                allowable.contains($0["code"] as? String ?? "") && N2ContainerAccounting.isContainer(unit:$0["catalogUnit"] as? String ?? "") }
+            let individual = !containerProduct && ["UND","TBL","PAR"].contains((item["unit"] as! String).uppercased())
             if candidates.count>1 && explicit==nil {
                 mark("Presentación Kardex ambigua: exige lote seleccionado.");continue
             }
-            if !individual && explicit==nil {
-                mark("Envase: falta cantidad interna verificada.");continue
-            }
             let selected=explicit.flatMap{str($0["lotId"])}
-            let useQuantity=explicit.flatMap{number($0["quantity"])} ??
+            let useQuantity=explicit.flatMap{number($0["quantity"])} ?? (containerProduct ? 0 : nil) ??
+                rule.flatMap { mapping in number(item["quantity"]).map{$0*mapping.physicalUnitsPerClinicalUnit} } ??
                 (individual ? number(item["quantity"]) : nil)
-            guard let quantity=useQuantity,quantity>0,quantity<=10_000_000,
+            guard let quantity=useQuantity,quantity>=0,(containerProduct || quantity>0),quantity<=10_000_000,
                   (!individual || quantity==number(item["quantity"])) else {
                 mark("Cantidad física no verificada.");continue
             }
-            let allowable=Set(candidates.map{$0.kardexCode})
-            let scope=new["dispensingSite"] as? String ?? ""
-            if !scope.isEmpty && !["LA VENTUROSA","PLVENTUROSA"].contains(scope) {
-                mark("Tópico de dispensación no verificado.");continue
-            }
             let eligible=lots.filter {l in
-                if !scope.isEmpty && verifiedSites[l["id"] as? String ?? ""] != scope {return false}
                 guard let lc=str(l["code"]),let ln=str(l["name"]),
                       allowable.contains(lc),
                       candidates.contains(where:{$0.kardexCode==lc && $0.kardexName==ln}),
-                      let t=total(l),t>0,
+                      let t=total(l),(t>0 || (containerProduct && N2ContainerAccounting.openCount(l)>0)),
                       let expiry=l["expires"] as? String,
-                      expiry.isEmpty || expiry>=today else{return false}
+                      expiry.isEmpty || expiry>=date else{return false}
+                if historical {
+                    guard let when=eventAt,
+                          let updated=number(l["updatedAt"]),updated<=Double(when),
+                          !movements.contains(where:{movement in
+                              movement["lotId"] as? String == l["id"] as? String &&
+                              (number(movement["at"]) ?? Double.greatestFiniteMagnitude)
+                                  > Double(when)
+                          }) else{return false}
+                }
                 if individual {
                     let stock=(l["catalogUnit"] as? String ?? "").uppercased()
                     return (item["unit"] as? String)?.uppercased()=="PAR" ?
@@ -211,18 +278,25 @@ public enum N2NativeClinicalTransaction {
                 }
                 return true
             }
-            if eligible.isEmpty && !scope.isEmpty {
-                mark("Sin stock vigente con sede verificada en el tópico elegido. No se usa stock ajeno ni de sede desconocida.");continue
+            if eligible.isEmpty && historical {
+                mark("El lote fue registrado después de la atención o posee movimientos posteriores: reconstruir el saldo del corte sin restarlo otra vez del conteo actual.")
+                continue
+            }
+            if eligible.isEmpty {
+                mark("Sin existencias FEFO disponibles en el inventario único.");continue
+            }
+            if rule==nil && reviewed.contains(where:{$0.requiresPhysicalReview}) && selected==nil {
+                mark("Diferencia de presentación: verifica el lote físico antes del descuento.");continue
             }
             let chosen=eligible.first(where:{$0["id"] as? String == selected})
-            if explicit != nil && (selected==nil || chosen==nil) {
+            if selected != nil && chosen==nil {
                 mark("Existencia seleccionada no verificable.");continue
             }
             guard let kardex=chosen?["code"] as? String ?? (candidates.count==1 ?
                          candidates[0].kardexCode : nil) else {
                 mark("Presentación no seleccionada.");continue
             }
-            if !individual && eligible.contains(where:{$0["code"] as? String == kardex &&
+            if !containerProduct && !individual && eligible.contains(where:{$0["code"] as? String == kardex &&
                 (($0["container"] as? String)=="unidad" ||
                  (number($0["unitsPerContainer"]) ?? 0)<=1)}) {
                 mark("Capacidad del envase no verificada.");continue
@@ -233,6 +307,124 @@ public enum N2NativeClinicalTransaction {
                     let db=(b["expires"] as? String).flatMap{$0.isEmpty ? nil:$0} ?? "9999-12-31"
                     return da==db ? (a["id"] as! String)<(b["id"] as! String) : da<db
                 }
+            if containerProduct {
+                let declared=explicit?["newContainers"] ?? item["newContainers"]
+                let consent=explicit?["confirmNewContainer"] as? Bool == true || item["confirmNewContainer"] as? Bool == true
+                let openingNumber=declared.flatMap{number($0)} ?? 0
+                guard openingNumber>=0,openingNumber<=10_000,openingNumber.rounded()==openingNumber,
+                      openingNumber==0 || consent else {
+                    mark("Confirma la cantidad de envases realmente abiertos.");continue
+                }
+                let openings=Int(openingNumber)
+                // Only a save-time YES with explicit previous exhaustion
+                // triggers closure. Never infer that an existing opened
+                // container was discarded merely because more stock exists.
+                let exhaustPrevious =
+                    (explicit?["previousContainerExhausted"] as? Bool == true ||
+                     item["previousContainerExhausted"] as? Bool == true)
+                var stagedLots=lots
+                var pendingClosures=[[String:Any]]()
+                let declaredReuse =
+                    (explicit?["reusePreviouslyOpened"] as? Bool == true ||
+                     item["reusePreviouslyOpened"] as? Bool == true)
+                if openings>0 && exhaustPrevious {
+                    guard !historical else {
+                        mark("Revisa la apertura anterior: no puede cerrarse automáticamente durante una conciliación histórica.");continue
+                    }
+                    let active=stagedLots.indices.filter {idx in
+                        stagedLots[idx]["code"] as? String==kardex &&
+                        N2ContainerAccounting.openCount(stagedLots[idx])>0
+                    }
+                    // More than one simultaneously opened container is
+                    // ambiguous; only the operator can resolve its state.
+                    guard active.count==1,let old=active.first,
+                          let closed=N2ContainerAccounting.exhaustedByNextOpening(
+                              lot:stagedLots[old],attentionID:id,itemID:itemID,
+                              operatorName:str(new["responsible"]) ?? "ENFERMERIA DANPER",
+                              at:eventAt!) else {
+                        mark("No se pudo verificar que el envase anterior se agotó. Revisa su estado antes de abrir otro.");continue
+                    }
+                    stagedLots[old]=closed.after
+                    pendingClosures.append(closed.event)
+                }
+                // Reuse FEFO order while applying the staged closure to
+                // the lot selected for the new opening.
+                let reconciledStock=stock.compactMap {previous -> [String:Any]? in
+                    let lotID=previous["id"] as? String
+                    return stagedLots.first(where:{$0["id"] as? String==lotID})
+                }
+                let selectedForAccounting:String? = openings==0 && declaredReuse
+                    ? reconciledStock.first(where:{
+                        N2ContainerAccounting.openCount($0)>0
+                      })?["id"] as? String
+                    : selected
+                // A current, explicit NO (reuse) can document today's
+                // R=0 even if the earlier opening is absent from the
+                // imported stock history. This is an attested zero-change
+                // USE, not a fabricated older opening or lot reclassification.
+                let noRecordedOpening=openings==0 && declaredReuse && !historical &&
+                    !reconciledStock.contains(where:{
+                        N2ContainerAccounting.openCount($0)>0
+                    })
+                var recordedReuseWithoutOpen=false
+                var planned:[N2ContainerAccounting.Part]?
+                if noRecordedOpening,
+                   let before=reconciledStock.first(where:{
+                       ($0["sealedContainers"] as? Int ?? 0)>0
+                   }),
+                   let after=N2ContainerAccounting.attestedReuse(
+                       lot:before,at:eventAt!) {
+                    recordedReuseWithoutOpen=true
+                    planned=[N2ContainerAccounting.Part(
+                        before:before,after:after,openings:0,volume:0)]
+                }else {
+                    planned=N2ContainerAccounting.allocate(
+                        lots:reconciledStock,selected:selectedForAccounting,
+                        openings:openings,volume:quantity,at:eventAt!)
+                }
+                guard let parts=planned else {
+                    mark(openings==0 ? "No hay envase abierto verificable: indica que abriste uno nuevo. No se descontó stock." :
+                        "Apertura declarada, cierre previo o cantidad no verificables. No se descontó stock.");continue
+                }
+                // Commit prior closure only after the new opening is valid.
+                // The event has R=0 and does not represent a second debit.
+                if !pendingClosures.isEmpty {
+                    lots=stagedLots
+                    movements.append(contentsOf:pendingClosures)
+                }
+                for (index,part) in parts.enumerated() {
+                let before=part.before,after=part.after
+                var ref:[String:Any]=["attentionId":id,"itemId":itemID,"clinicalCode":code,
+                    "clinicalName":item["name"]!,"clinicalUnit":item["unit"]!,
+                    "clinicalQuantity":item["quantity"]!,"confirmedAt":eventAt!,"containerAccountingVersion":1]
+                if recordedReuseWithoutOpen {
+                    ref["reusePreviouslyOpened"]=true
+                }
+                let suffix=parts.count>1 ? ":PART:\(index+1)":""
+                if parts.count>1 {
+                    ref["partIndex"]=index+1;ref["partCount"]=parts.count
+                    ref["physicalTotal"]=quantity;ref["declaredOpeningTotal"]=openings
+                }
+                var movement:[String:Any]=[
+                    "id":"ATT:\(id):ITEM:\(itemID)\(suffix)","lotId":before["id"]!,
+                    "code":before["code"]!,"name":before["name"]!,"unit":before["catalogUnit"]!,
+                    "at":eventAt!,"kind":"use","description":"Apertura declarada / uso de envase abierto",
+                    "containerAccountingVersion":1,"declaredOpenings":part.openings,
+                    "quantity":part.volume,"sealedAdded":0,"looseAdded":0,
+                    "openedNewContainer":part.openings>0,"excelQuantity":part.openings,
+                    "physicalChange":-part.volume,"before":before,"after":after,"dispenseRef":ref
+                ]
+                if recordedReuseWithoutOpen {
+                    movement["reuseWithoutRecordedOpening"]=true
+                }
+                if let rule {movement["operationalMappingID"]=rule.id;movement["operationalMappingVersion"]=rule.version}
+                if let evidence {movement["physicalEvidenceID"]=evidence.id}
+                if let index=lots.firstIndex(where:{$0["id"] as? String==before["id"] as? String}) {lots[index]=after}
+                movements.append(movement);added+=1
+                }
+                linked+=1;outcomes[itemID]="Descontado"
+                continue
+            }
             if stock.reduce(0.0,{$0+(total($1) ?? 0)})+0.00001<quantity {
                 mark("Saldo FEFO insuficiente.");continue
             }
@@ -276,7 +468,7 @@ public enum N2NativeClinicalTransaction {
                     open=true
                     if !individual {r=1}
                 }else {canPlan=false;break}
-                after["updatedAt"]=at
+                after["updatedAt"]=eventAt!
                 guard (total(after) ?? -1)>=0,
                       triple((total(after) ?? 0)-(total(before) ?? 0)) == (0.0 - take) else {
                     canPlan=false;break
@@ -291,13 +483,14 @@ public enum N2NativeClinicalTransaction {
                 mark("Plan FEFO incompleto. No se descontó stock.");continue
             }
             if parts.contains(where:{$0.3}) &&
-               explicit?["confirmNewContainer"] as? Bool != true {
+               explicit?["confirmNewContainer"] as? Bool != true &&
+               item["confirmNewContainer"] as? Bool != true {
                 mark("Falta autorizar apertura del nuevo envase.");continue
             }
             let refCommon:[String:Any]=[
                 "attentionId":id,"itemId":itemID,"clinicalCode":code,
                 "clinicalName":item["name"]!,"clinicalUnit":item["unit"]!,
-                "clinicalQuantity":item["quantity"]!,"confirmedAt":at
+                "clinicalQuantity":item["quantity"]!,"confirmedAt":eventAt!
             ]
             let beforeCount=movements.count
             for (i,part) in parts.enumerated() {
@@ -313,14 +506,20 @@ public enum N2NativeClinicalTransaction {
                     "id":"ATT:\(id):ITEM:\(itemID)\(suffix)",
                     "lotId":before["id"]!,
                     "code":before["code"]!,"name":before["name"]!,
-                    "unit":before["catalogUnit"]!,"at":at,
+                    "unit":before["catalogUnit"]!,"at":eventAt!,
                     "kind":"use","description":"Consumo FEFO vinculado a atención",
                     "quantity":qty,"sealedAdded":0,"looseAdded":0,
                     "openedNewContainer":part.3,"excelQuantity":part.4,
                     "physicalChange":-qty,"before":before,"after":after,
                     "dispenseRef":ref
                 ]
-                movements.append(movement)
+                var auditedMovement=movement
+                if let rule {
+                    auditedMovement["operationalMappingID"]=rule.id
+                    auditedMovement["operationalMappingVersion"]=rule.version
+                }
+                if let evidence {auditedMovement["physicalEvidenceID"]=evidence.id}
+                movements.append(auditedMovement)
             }
             lots=probe
             added+=movements.count-beforeCount

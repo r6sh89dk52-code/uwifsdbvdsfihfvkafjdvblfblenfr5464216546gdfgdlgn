@@ -25,7 +25,13 @@ for(let i=1;i<=10;i++){
    const found=ac.get(ref);
    assert.ok(found,'missing '+i+'!'+ref);
    const original=f(bc,ref),ours=f(ac,ref);
-   if(original) assert.equal(ours,original,'formula '+i+'!'+ref);
+   if(original && i===3 && /^[DEFG]\d+$/.test(ref)) {
+     const row=Number(ref.match(/\d+/)[0]);
+     const expiry={D:'J',E:'N',F:'R',G:'V'}[ref[0]]+row;
+     const semaphore='IF('+expiry+'="","",IF('+expiry+'<TODAY(),2,IF('+expiry+'-TODAY()<=90,1,0)))';
+     assert.equal(ours,semaphore,'semaforo vencimiento '+ref);
+     // Legacy 0/1 formula is superseded; Build 222 remains unchanged.
+   } else if(original) assert.equal(ours,original,'formula '+i+'!'+ref);
    else if(value(expected)!=='') {
     const a=value(found),b=value(expected);
     // XLSX stores IEEE754 numbers; Swift and JS can serialize equivalent
@@ -40,6 +46,17 @@ for(let i=1;i<=10;i++){
   }
  }
 }
+const incomeXML=Buffer.from(actual['xl/worksheets/sheet3.xml']).toString('utf8');
+const semaphoreRule=all(document(actual,3),'conditionalFormatting')
+ .find(cf=>cf.getAttribute('sqref')==='D3:G434'&&all(cf,'iconSet').length>0);
+assert.ok(semaphoreRule,'INGRESOS must have expiration icon set on D3:G434');
+const icons=all(semaphoreRule,'iconSet')[0];
+assert.equal(icons.getAttribute('iconSet'),'3TrafficLights1');
+assert.equal(icons.getAttribute('reverse'),'1');
+assert.equal(icons.getAttribute('showValue'),'0','circles must hide numeric status');
+assert.deepEqual(all(icons,'cfvo').map(x=>x.getAttribute('val')),['0','1','2']);
+assert.ok(!incomeXML.includes('<xm:sqref>D3:G439</xm:sqref>'),
+ 'old x14 icon rule must not mask the standard green/yellow/red icons');
 const count=cells(document(actual,2)),income=cells(document(actual,3)),
       resu=cells(document(actual,4)),consumos=cells(document(actual,5));
 assert.equal(get(count,'D3'),get(cells(document(ts,2)),'D3'));
@@ -64,26 +81,73 @@ const styles=Buffer.from(actual['xl/styles.xml']).toString('utf8');
 assert.match(styles,/formatCode="dd\/mm\/yyyy"/,'indicator must use Peru date display');
 assert.match(Buffer.from(actual['xl/worksheets/sheet5.xml']).toString('utf8'),
   /<c r="F2" s="\d+">/,'CONSUMOS date cells must have a numeric date style');
+console.log('PASS INGRESOS: green >90d, yellow 0-90d, red expired, icons hide helper numbers');
 console.log('PASS N1s complete native indicator: 10 sheets, 19 tables, 432 material rows, original cell formulas and exact all verified materials/consumptions');
 // Nursing compare main daily 98 products with TS reference, styles/print.
 const nn=open('n1s-nursing-native.xlsx'),tn=open('n1s-nursing-reference.xlsx');
+// The nursing header is F6. Inspect its rendered cell value; shared and
+// rich-string XML may split one visible label across several <t> nodes.
+const nursingCellF6=cells(document(nn,2)).get('F6');
+assert.ok(nursingCellF6,'Kardex must contain stock-total header at F6');
+const nursingHeaderText=all(nursingCellF6,'t').map(x=>x.textContent||'').join('').trim();
+assert.equal(nursingHeaderText,'TOTAL STOCK',
+ 'Visible nursing Kardex header F6 must say TOTAL STOCK, not TOTAL ESTOCK');
+const nurseNames=all(parse(Buffer.from(nn['xl/workbook.xml']).toString('utf8')),'sheet')
+  .map(x=>x.getAttribute('name'));
+assert.deepEqual(nurseNames,['KARDEX ENFERMERAS'],
+  'Swift export must match Build 222 single visible Kardex worksheet');
+for(const removed of ['xl/worksheets/sheet1.xml',
+                      'xl/worksheets/_rels/sheet1.xml.rels',
+                      'xl/printerSettings/printerSettings1.bin',
+                      'docProps/app.xml']) {
+  assert.ok(!nn[removed],'donor-only ZIP part leaked: '+removed);
+}
+assert.ok(!Buffer.from(nn['[Content_Types].xml']).toString('utf8')
+  .includes('/xl/worksheets/sheet1.xml'));
+assert.ok(!Buffer.from(nn['xl/_rels/workbook.xml.rels']).toString('utf8')
+  .includes('Id="rId1"'));
+assert.ok(!Buffer.from(nn['xl/workbook.xml']).toString('utf8')
+  .includes('name="Hoja1"'));
+
 assert.ok(nn['xl/printerSettings/printerSettings2.bin']);
 const nm=cells(document(nn,2)),tm=cells(document(tn,2));
 console.log('N1s nursing diagnostic nonpatient XML row7:',Buffer.from(nn['xl/worksheets/sheet2.xml']).toString('utf8').match(/<row[^>]*r="7"[^>]*>[\s\S]*?<\/row>/)?.[0]?.slice(0,2200));
 console.log('N1s nursing parsed first refs:',[...nm.keys()].filter(k=>/^[D-J]7$/.test(k)));
 
+const nursingPlan=JSON.parse(fs.readFileSync(path.join(root,'n1s-nursing-plan.json'),'utf8'));
+assert.equal(nursingPlan.rows.length,98);
 for(let row=7;row<=104;row++){
+ const stockKnown=nursingPlan.rows[row-7].stockKnown;
  for(const col of ['D','E','F','G','H','I','J']){
   const ref=col+row,source=tm.get(ref),target=nm.get(ref);
   assert.ok(target,'missing nursing '+ref);
-  assert.equal(f(nm,ref),f(tm,ref),'nurse formula '+ref);
+  // Native exports intentionally retain balance formulas even for rows with
+  // no recorded lot. Build 222 leaves those cells blank. Validate the exact
+  // formulas for all 98 rows rather than requiring that old omission.
+  const expectedFormula=col==='F'?'D'+row+'+E'+row:col==='H'?'F'+row+'-G'+row:'';
+  assert.equal(f(nm,ref),expectedFormula,'native nurse formula '+ref);
+  assert.equal(f(tm,ref),stockKnown?expectedFormula:'','Build 222 nurse formula '+ref);
+  if(!stockKnown && ['D','E','F','G','H'].includes(col)) {
+   assert.equal(get(nm,ref),'0','no-lot row must cache numeric zero at '+ref);
+   assert.ok(!['s','inlineStr','str'].includes(target.getAttribute('t')),
+     'no-lot zero must stay numeric at '+ref);
+  }
   const originalValue=value(source),renderedValue=value(target);
   if(col==='I' && /^\d{4}-\d{2}-\d{2}$/.test(String(originalValue))){
    const serial=(Date.parse(originalValue+'T00:00:00Z')-
                  Date.UTC(1899,11,30))/86400000;
    assert.equal(Number(renderedValue),serial,'sortable nursing expiry '+ref);
   }else {
-   assert.equal(renderedValue,originalValue,'nurse value '+ref);
+   // The old Build 222 fixture leaves no-lot numeric cells blank.
+   // Native Kardex correctly preserves all 98 rows with explicit numeric 0.
+   if(!stockKnown && ['D','E','F','G','H'].includes(col) &&
+      originalValue==='' && renderedValue==='0') {
+     assert.ok(target,'numeric zero must have a physical cell at '+ref);
+     assert.ok(!['s','inlineStr','str'].includes(target.getAttribute('t')),
+       'stock zero must be numeric, not text: '+ref);
+   } else {
+     assert.equal(renderedValue,originalValue,'nurse value '+ref);
+   }
   }
  }
 }

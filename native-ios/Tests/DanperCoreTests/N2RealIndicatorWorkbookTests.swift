@@ -3,6 +3,119 @@ import XCTest
 @testable import DanperCore
 
 final class N2RealIndicatorWorkbookTests:XCTestCase {
+    private func withPlantBottleCounts(_ events:[[String:Any]])->[[String:Any]] {
+        events + events.filter {
+            ["opening","count"].contains($0["kind"] as? String ?? "")
+        }.map { original in
+            var event=original
+            event["id"]=(original["id"] as! String)+"-bottle"
+            event["code"]="16000013"
+            event["quantity"]=(original["kind"] as? String)=="opening" ? 2 : 1
+            return event
+        }
+    }
+    func testProvisionalAllVisitsKeepsPendingContainerWithoutInventingR() throws {
+        var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        var visits=try XCTUnwrap(snapshot["attentions"] as? [[String:Any]])
+        let boxVisit=try XCTUnwrap(visits.first {
+            $0["id"] as? String=="planta-open"
+        })
+        let boxItem=try XCTUnwrap((boxVisit["items"] as? [[String:Any]])?.first)
+        let idx=try XCTUnwrap(visits.firstIndex {
+            $0["id"] as? String=="pending-stock"
+        })
+        var pendingItem=try XCTUnwrap((visits[idx]["items"] as? [[String:Any]])?.first)
+        for key in ["code","name","unit"] {pendingItem[key]=boxItem[key]}
+        pendingItem["quantity"]=1
+        pendingItem.removeValue(forKey:"physicalUse")
+        visits[idx]["items"]=[pendingItem]
+        snapshot["attentions"]=visits
+        let proof=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
+        let catalog=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
+        let selected=Set(visits.compactMap{$0["id"] as? String})
+        let source=try JSONSerialization.data(withJSONObject:snapshot)
+        let mappings=try fixture("n2-reviewed-approved.json")
+        let template=try fixture("n1s-indicator-template-store.zip")
+        let provisional=try N2VerifiedIndicatorWorkbook.export(
+            snapshot:source,products:catalog,mappings:mappings,
+            template:template,start:"2026-10-09",end:"2026-11-08",
+            subdivision:"AMBAS",selectedVisitIDs:selected,allowPending:true)
+        XCTAssertTrue(provisional.provisional)
+        XCTAssertEqual(provisional.visits,5)
+        XCTAssertEqual(provisional.rows,5)
+        XCTAssertGreaterThanOrEqual(provisional.pendingLines,1)
+        let parts=try N1rStoredZip.unpack(provisional.xlsx)
+        XCTAssertEqual(parts.filter{$0.name.hasPrefix("xl/worksheets/sheet") &&
+            $0.name.hasSuffix(".xml")}.count,10)
+        let sheet=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,
+            encoding:.utf8))
+        // Find the synthetic worker's exported row; the R column MUST
+        // be empty (unknown), not zero (reuse) or one (new opening).
+        let rows=sheet.components(separatedBy:"</row>")
+        let pendingRow=try XCTUnwrap(rows.first{$0.contains("00000005")})
+        XCTAssertNotNil(pendingRow.range(
+            of:#"<c r="R[0-9]+"[^>]*/>"#,
+            options:.regularExpression))
+        let notes=try XCTUnwrap(String(data:try XCTUnwrap(
+            parts.first{$0.name=="xl/worksheets/sheet6.xml"}).data,
+            encoding:.utf8))
+        XCTAssertTrue(notes.contains("R PENDIENTE"))
+        // The same unknown package still blocks the official export.
+        XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
+            snapshot:source,products:catalog,mappings:mappings,
+            template:template,start:"2026-10-09",end:"2026-11-08",
+            subdivision:"AMBAS",selectedVisitIDs:selected,allowPending:false))
+    }
+    func testProvisionalHistoricalROnlyWithCompatibleLotAndNoPhysicalDoubleCount() {
+        let r1=N2PendingDispensingEvidence(
+            visitID:"sample-visit",itemID:"sample-item",lotID:"lot-real",
+            quantity:0,confirmNewContainer:true,operatorName:"ENFERMERIA",
+            reason:"Apertura histórica declarada",at:1792886400000,
+            newContainers:1)
+        let r0=N2PendingDispensingEvidence(
+            visitID:"sample-visit-2",itemID:"sample-item",lotID:"lot-real",
+            quantity:0,confirmNewContainer:false,operatorName:"ENFERMERIA",
+            reason:"Reutilización histórica declarada",at:1792886400000,
+            newContainers:0)
+        let allowed:Set<String>=["E-57"]
+        func r(_ record:N2PendingDispensingEvidence,
+               lot:String="E-57",unit:String="CJA",linked:Bool=false)->Int? {
+            N2VerifiedIndicatorWorkbook.provisionalHistoricalR(
+                record,lotCode:lot,lotUnit:unit,
+                approvedCodes:allowed,alreadyLinked:linked)
+        }
+        XCTAssertEqual(r(r1),1)
+        XCTAssertEqual(r(r0),0)
+        XCTAssertNil(r(r1,lot:"E-999"))
+        XCTAssertNil(r(r1,unit:"UND"))
+        XCTAssertNil(r(r1,linked:true))
+    }
+    func testSingleInventoryCutGuardDoesNotRequireTwoSiteReviews() {
+        let all:Set<String>=["fundo-1","planta-1"]
+        XCTAssertTrue(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-11-09",selected:all,all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-10-24",selected:all,all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-10-24",
+            today:"2026-10-24",selected:all,all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-11-09",selected:["fundo-1"],all:all,
+            hasUnresolvedHistory:false))
+        XCTAssertFalse(N2VerifiedIndicatorWorkbook.eligibleForSharedClose(
+            subdivision:"AMBAS",start:"2026-10-09",end:"2026-11-08",
+            today:"2026-11-09",selected:all,all:all,
+            hasUnresolvedHistory:true))
+    }
     private func fixture(_ name:String)throws->Data {
         let dir=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
         return try Data(contentsOf:URL(fileURLWithPath:dir).appendingPathComponent(name))
@@ -26,7 +139,7 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
            "quantity":0,"reason":"Cierre revisado",
            "document":"","expires":"","periodEnd":"2026-11-08","voidOf":""]
         ]
-        snapshot["ambulatoryReconciliation"]=events
+        snapshot["ambulatoryReconciliation"]=withPlantBottleCounts(events)
         let raw=try JSONSerialization.data(withJSONObject:snapshot)
         let catalog=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
         let x=try N2VerifiedIndicatorWorkbook.export(
@@ -38,8 +151,8 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             selectedVisitIDs:Set(["planta-open","planta-tablet-carton"]))
         XCTAssertEqual(x.visits,2)
         XCTAssertEqual(x.rows,2)
-        XCTAssertEqual(x.missingOpening,431)
-        XCTAssertEqual(x.missingClosingCount,431)
+        XCTAssertEqual(x.missingOpening,430)
+        XCTAssertEqual(x.missingClosingCount,430)
     }
     func testJointFundoAndPlantaIndicatorRequiresBothReconciledPeriods()throws {
         var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
@@ -76,7 +189,7 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,
                            .unreviewedPeriod)
         }
-        snapshot["ambulatoryReconciliation"]=base+planta
+        snapshot["ambulatoryReconciliation"]=base+withPlantBottleCounts(planta)
         let verified=try JSONSerialization.data(withJSONObject:snapshot)
         let result=try N2VerifiedIndicatorWorkbook.export(
             snapshot:verified,products:products,mappings:mappings,
@@ -85,8 +198,8 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
         XCTAssertEqual(result.visits,4)
         XCTAssertEqual(result.rows,4)
         XCTAssertFalse(result.provisional)
-        XCTAssertEqual(result.missingOpening,431)
-        XCTAssertEqual(result.missingClosingCount,431)
+        XCTAssertEqual(result.missingOpening,430)
+        XCTAssertEqual(result.missingClosingCount,430)
         let entries=try N1rStoredZip.unpack(result.xlsx)
         let sheet=try XCTUnwrap(entries.first(where:{$0.name=="xl/worksheets/sheet5.xml"}))
         let xml=try XCTUnwrap(String(data:sheet.data,encoding:.utf8))

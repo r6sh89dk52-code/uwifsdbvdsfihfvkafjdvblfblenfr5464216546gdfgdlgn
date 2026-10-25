@@ -29,7 +29,7 @@ public enum N2NativeInventoryCommands {
         let opened=num(x["openedRemaining"]) ?? 0
         return triple(sealed * capacity + loose + opened)
     }
-    private static func validLot(_ l:[String:Any])->Bool {
+    static func validLot(_ l:[String:Any])->Bool {
         guard let id=l["id"] as? String,!id.isEmpty,
               let code=l["code"] as? String,!code.isEmpty,
               let name=l["name"] as? String,!name.isEmpty,
@@ -128,6 +128,55 @@ public enum N2NativeInventoryCommands {
         state["stockLots"]=lots
         return try done(state)
     }
+    /// Only unused lots can have their label/expiry corrected in place.
+    /// Any lot with previous movements requires a separate audited inventory
+    /// action; never rewrite immutable before/after snapshots.
+    public static func correctUnusedLot(snapshot:Data,lotID:String,
+        reference:String,expires:String,reason:String,operatorName:String,
+        at:Int64)throws->Data {
+        let ref=reference.trimmingCharacters(in:.whitespacesAndNewlines)
+        let why=reason.trimmingCharacters(in:.whitespacesAndNewlines)
+        let op=operatorName.trimmingCharacters(in:.whitespacesAndNewlines)
+        guard !lotID.isEmpty,(1...120).contains(ref.utf8.count),
+              (8...250).contains(why.utf8.count),
+              (3...120).contains(op.utf8.count),at>0,
+              expires.isEmpty || (
+                 expires.range(of:#"^\d{4}-\d{2}-\d{2}$"#,
+                     options:.regularExpression) != nil &&
+                 ISO8601DateFormatter().date(from:expires+"T12:00:00Z") != nil
+              ) else{throw N2InventoryError.insufficientEvidence}
+        var root=try self.root(snapshot)
+        guard var lots=root["stockLots"] as? [[String:Any]],
+              let movements=root["stockMovements"] as? [[String:Any]],
+              let idx=lots.firstIndex(where:{$0["id"] as? String==lotID}),
+              !movements.contains(where:{$0["lotId"] as? String==lotID}),
+              validLot(lots[idx]) else{
+            throw N2InventoryError.invalidLot
+        }
+        var current=lots[idx]
+        let oldRef=current["lot"] as? String ?? ""
+        let oldExpiry=current["expires"] as? String ?? ""
+        guard oldRef != ref || oldExpiry != expires else{
+            throw N2InventoryError.invalidMovement
+        }
+        current["lot"]=ref
+        current["expires"]=expires
+        guard validLot(current) else{throw N2InventoryError.invalidLot}
+        var events=root["nativeLotMetadataCorrections"] as? [[String:Any]] ?? []
+        guard events.count<10000 else{throw N2InventoryError.limitReached}
+        events.append([
+            "id":UUID().uuidString,"lotId":lotID,"at":at,
+            "operator":op,"reason":why,
+            "oldReference":oldRef,"newReference":ref,
+            "oldExpires":oldExpiry,"newExpires":expires,
+            "scope":"metadata-only-no-stock-debit"
+        ])
+        lots[idx]=current
+        root["stockLots"]=lots
+        root["nativeLotMetadataCorrections"]=events
+        return try done(root)
+    }
+
     public static func extraordinary(snapshot:Data,movementID:String,
                                      lotID:String,at:Int64,
                                      sealedAdded:Int,looseAdded:Double,

@@ -1,6 +1,11 @@
 import XCTest
 
 final class N2MenuInteractionTests:XCTestCase {
+    private func tapVisible(_ element:XCUIElement,in app:XCUIApplication) {
+        if !element.isHittable {app.swipeUp()}
+        XCTAssertTrue(element.isHittable)
+        element.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).tap()
+    }
     private func capture(_ app:XCUIApplication,_ name:String) {
         let attachment=XCTAttachment(screenshot:app.screenshot())
         attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)
@@ -10,18 +15,19 @@ final class N2MenuInteractionTests:XCTestCase {
         app.launchArguments=["--danper-ui-probe"]
         app.launch()
         let type=app.buttons["choice-Tipo de atención"]
-        XCTAssertTrue(type.waitForExistence(timeout:10));type.tap()
+        XCTAssertTrue(type.waitForExistence(timeout:10));tapVisible(type,in:app)
         let disease=app.buttons["Enfermedad"]
         XCTAssertTrue(disease.waitForExistence(timeout:4))
         capture(app,"Menu-tipo-atencion-abierto")
         disease.tap()
         let system=app.buttons["choice-Sistema afectado"]
-        system.tap()
+        tapVisible(system,in:app)
         let osteo=app.buttons["Osteomuscular"]
         XCTAssertTrue(osteo.waitForExistence(timeout:4))
         capture(app,"Menu-sistema-abierto")
         osteo.tap()
-        app.buttons["choice-Situación al finalizar"].tap()
+        let ending=app.buttons["choice-Situación al finalizar"]
+        tapVisible(ending,in:app)
         let permit=app.buttons["Se retira con permiso"]
         XCTAssertTrue(permit.waitForExistence(timeout:4))
         capture(app,"Menu-permiso-abierto")

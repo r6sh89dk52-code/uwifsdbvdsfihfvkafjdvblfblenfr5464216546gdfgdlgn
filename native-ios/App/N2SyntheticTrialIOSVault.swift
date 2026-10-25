@@ -147,25 +147,50 @@ actor N2SyntheticTrialIOSVault {
         guard let secret=try deviceKey(create:false) else{return nil}
         return try N2ProtectedClinicalVaultCore(keyData:secret,namespace:.synthetic).inspect()
     }
-    /// The user must explicitly opt into a completely fictional five-worker
-    /// N2 workspace. Never invoked automatically by onboarding.
+    /// Fresh encrypted demonstration with no prepopulated workers or visits.
+    /// Does not copy the fixed five-worker sample or import any clinical data.
+    func startEmptyDemo()throws->N2ProtectedStoreSummary {
+        guard try inspect()==nil else {throw Failure.blockedMigration}
+        guard let secret=try deviceKey(create:true) else {
+            throw Failure.unavailableKeychain
+        }
+        return try N2ProtectedClinicalVaultCore(keyData:secret,namespace:.synthetic)
+            .activateEmptySynthetic(confirmed:true)
+    }
+
+    /// Opt-in sample fixture. Never implied by "start empty".
+    /// A pre-existing demonstration is never silently reused on activation.
     func startSyntheticDemo()throws->N2ProtectedStoreSummary {
+        guard try inspect()==nil else {throw Failure.blockedMigration}
         let fixture=try resource("n2-synthetic-clinical")
-        if let previous=try inspect(){return previous}
         guard let secret=try deviceKey(create:true) else{
             throw Failure.unavailableKeychain
         }
         return try N2ProtectedClinicalVaultCore(keyData:secret,namespace:.synthetic)
             .activateSyntheticFixture(fixture,confirmed:true)
     }
+    func currentRevision()throws->Int {
+        try protectedStore().currentRevision()
+    }
     func readDrafts()throws->[N2RecoverableDraft] {
         try protectedStore().readDrafts()
+    }
+    func readDraftsWithRevision()throws->(revision:Int,drafts:[N2RecoverableDraft]) {
+        try protectedStore().readDraftsWithRevision()
     }
     func dispensingLines(visitID:String)throws->[N2DispensingLine] {
         try protectedStore().dispensingLines(visitID:visitID)
     }
     func dispensingStatus(visitID:String)throws->[String:String] {
         try protectedStore().dispensingStatus(visitID:visitID)
+    }
+    func dashboardCounters(today:String,weekStart:String)throws
+        ->(today:Int,week:Int,drafts:Int)? {
+        try protectedStore().dashboardCounters(today:today,weekStart:weekStart)
+    }
+    func readDashboard()throws
+        ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
+        try protectedStore().readDashboard()
     }
     func readHistory()throws->N2NativeReadModel? {
         guard let secret=try deviceKey(create:false) else{return nil}
@@ -213,6 +238,43 @@ actor N2SyntheticTrialIOSVault {
     }
     func deleteDraft(id:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().removeDraft(id:id,expectedRevision:expectedRevision)
+    }
+    /// The sandbox uses its own encrypted synthetic namespace. The
+    /// accounting reader is read-only and never touches the clinical vault.
+    func automaticCutAccounting(through date:String)throws
+        ->N2AutomaticCutAccounting.Result {
+        return try protectedStore().automaticCutAccounting(
+            mappings:resource("n2-approved-mappings"),through:date)
+    }
+    func confirmPendingDispensing(_ evidence:N2PendingDispensingEvidence,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().confirmPendingDispensing(evidence,approvedCatalog:resource("n2-approved-mappings"),expectedRevision:expectedRevision)
+    }
+    func closeContainers(lotID:String,count:Int,disposition:String,operatorName:String,reason:String,at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().closeContainers(lotID:lotID,count:count,disposition:disposition,operatorName:operatorName,reason:reason,at:at,expectedRevision:expectedRevision)
+    }
+    func auxiliaryAccounting()throws->String {try protectedStore().auxiliaryAccounting()}
+    func registerAuxiliaryLot(clinicalCode:String,lot:Data,operatorName:String,evidence:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let context=try clinicalFormContext()
+        return try protectedStore().registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,catalog:context.products,
+            operatorName:operatorName,evidence:evidence,at:Int64(Date().timeIntervalSince1970*1000),expectedRevision:expectedRevision)
+    }
+    func retryDispensing(visitID:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().retryDispensing(visitID:visitID,approvedCatalog:resource("n2-approved-mappings"),
+            at:Int64(Date().timeIntervalSince1970*1000),expectedRevision:expectedRevision)
+    }
+    func confirmOperationalMapping(_ rule:N2OperationalMapping,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let context=try clinicalFormContext()
+        return try protectedStore().confirmOperationalMapping(rule,catalog:context.products,
+            explicitConsent:true,expectedRevision:expectedRevision)
+    }
+    /// Load both form inputs from one verified snapshot/revision.
+    func prepareClinicalForm()throws
+        ->(context:N2FormContext,drafts:[N2RecoverableDraft]) {
+        let products=try resource("n2-ambulatory-products")
+        let nursing=try resource("n2-nursing-catalog")
+        let mappings=try resource("n2-approved-mappings")
+        return try protectedStore().prepareClinicalForm(
+            products:products,nursing:nursing,mappings:mappings)
     }
     func clinicalFormContext()throws->N2FormContext {
         let products=try resource("n2-ambulatory-products")
@@ -280,6 +342,13 @@ actor N2SyntheticTrialIOSVault {
         try protectedStore().registerStockLot(lot,
             nursingCatalog:resource("n2-nursing-catalog"),expectedRevision:expectedRevision)
     }
+    func correctUnusedLot(lotID:String,reference:String,expires:String,
+        reason:String,operatorName:String,at:Int64,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().correctUnusedLot(lotID:lotID,reference:reference,
+            expires:expires,reason:reason,operatorName:operatorName,
+            at:at,expectedRevision:expectedRevision)
+    }
     func receiveStock(movementID:String,lotID:String,at:Int64,
                       sealedAdded:Int,looseAdded:Double,reason:String,
                       expectedRevision:Int)throws->N2ProtectedStoreSummary {
@@ -320,6 +389,11 @@ actor N2SyntheticTrialIOSVault {
             start:start,end:end,subdivision:subdivision,ids:ids,allowPending:allowPending)
     }
 
+    func exportOccupationalVigilance(start:String,end:String)throws
+        ->N2OccupationalVigilanceWorkbook.Result {
+        try protectedStore().exportOccupationalVigilance(start:start,end:end)
+    }
+
     func exportVerifiedDailyNursingWorkbook(date:String,shift:String,
         responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
         guard let source=Bundle.main.url(
@@ -333,7 +407,7 @@ actor N2SyntheticTrialIOSVault {
             date:date,shift:shift,responsible:responsible,site:site)
     }
     func exportVerifiedRangeNursingWorkbook(start:String,end:String,
-        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
+        responsible:String,site:String="",reconstructFromCount:Bool=false)throws->N2VerifiedNursingWorkbook.Result {
         guard let source=Bundle.main.url(
             forResource:"n1s-nursing-template-store",
             withExtension:"zip",subdirectory:"N1sDemoResources") else {
@@ -342,7 +416,9 @@ actor N2SyntheticTrialIOSVault {
         return try protectedStore().exportVerifiedRangeNursingWorkbook(
             catalog:resource("n2-nursing-catalog"),
             template:Data(contentsOf:source),
-            start:start,end:end,responsible:responsible,site:site)
+            start:start,end:end,responsible:responsible,site:site,
+            mappings:resource("n2-approved-mappings"),
+            reconstructFromCount:reconstructFromCount)
     }
     func exportPortableEncryptedBackup(password:String)throws->Data {
         guard let secret=try deviceKey(create:false) else{

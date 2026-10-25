@@ -40,33 +40,33 @@ final class N2PortableBackupInteropTests:XCTestCase {
             url:url,password:"This-is-a-wrong-14-char-password"))
     }
     func testExplicitSyntheticN2ActivationEnablesClinicalTabsWithoutRealBackup() async throws {
-        // CI deliberately builds the Simulator app without code signing.
-        // On that runner, Security.framework can refuse Keychain with
-        // errSecMissingEntitlement (-34018). Do not treat this as a passed
-        // iPhone/SideStore Keychain test: the encrypted core still has its
-        // independent Swift tests, and physical-device Keychain must be checked.
-        let before:N2ProtectedStoreSummary?
+        let before=try await N2SyntheticTrialIOSVault.shared.inspect()
+        let clinicalBefore=try await N2ProtectedClinicalIOSVault.shared.inspect()
         let created:N2ProtectedStoreSummary
-        do {
-            before=try await N2SyntheticTrialIOSVault.shared.inspect()
-            created=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
-        } catch N2SyntheticTrialIOSVault.Failure.keychainStatus(let status)
-            where status == -34018 {
-            throw XCTSkip("Simulador sin firmar carece de entitlement Keychain (-34018); requiere validación con app firmada en iPhone")
-        }
-        XCTAssertEqual(created.workers,5)
+        if let before {created=before}
+        else {created=try await N2SyntheticTrialIOSVault.shared.startEmptyDemo()}
+        XCTAssertEqual(created.workers,0)
+        XCTAssertEqual(created.attentions,0)
+        XCTAssertEqual(created.physicalMovements,0)
         XCTAssertEqual(created.revision,before?.revision ?? 1)
         let model=try await N2SyntheticTrialIOSVault.shared.clinicalFormContext()
-        XCTAssertEqual(model.workers.count,5)
+        XCTAssertEqual(model.workers.count,0)
         XCTAssertEqual(model.products.clinical.count,432)
         XCTAssertEqual(model.products.nursing.count,98)
         XCTAssertEqual(model.revision,created.revision)
-        let again=try await N2SyntheticTrialIOSVault.shared.startSyntheticDemo()
+        let reopened=try await N2SyntheticTrialIOSVault.shared.inspect()
+        let again=try XCTUnwrap(reopened)
         XCTAssertEqual(again.revision,created.revision)
+        do {
+            _=try await N2SyntheticTrialIOSVault.shared.startEmptyDemo()
+            XCTFail("No debe reemplazar una fuente ya activada")
+        } catch N2SyntheticTrialIOSVault.Failure.blockedMigration {}
         // The fictional startup does not create or import the protected
         // clinical vault of the old build222 or native real-source flow.
         let actualRealSource=try await N2ProtectedClinicalIOSVault.shared.inspect()
-        XCTAssertNil(actualRealSource)
+        XCTAssertEqual(actualRealSource?.revision,clinicalBefore?.revision)
+        XCTAssertEqual(actualRealSource?.workers,clinicalBefore?.workers)
+        XCTAssertEqual(actualRealSource?.attentions,clinicalBefore?.attentions)
     }
     func testBuild222EncryptedSourceReviewCannotBeChangedBeforeRestore() throws {
         // An entirely invented identity, only in an ephemeral XCTest archive.
@@ -104,10 +104,8 @@ final class N2PortableBackupInteropTests:XCTestCase {
                           "A differently encrypted archive must force a new review")
     }
     func testFullSyntheticClinicalBackupPreservesPhysicalHistoryAcrossReview()throws {
-        guard let fixture=Bundle.main.url(forResource:"n1e-clinical-stock",
-                   withExtension:"json",subdirectory:"N1sDemoResources") else{
-            throw XCTSkip("Clinical demo resource not bundled in this host")
-        }
+        let fixture=try XCTUnwrap(Bundle(for:Self.self).url(forResource:"n2-synthetic-clinical",
+                   withExtension:"json",subdirectory:"SyntheticFixtures"))
         let raw=try Data(contentsOf:fixture)
         let original=try N1eLegacyClinicalAudit.inspect(raw)
         let pass="N2-interop-full-clinical-backup-2026"

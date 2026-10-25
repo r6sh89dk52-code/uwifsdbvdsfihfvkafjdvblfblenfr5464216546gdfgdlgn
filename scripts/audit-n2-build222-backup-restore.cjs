@@ -49,8 +49,15 @@ assert(!gate.includes('N2SyntheticTrialIOSVault.shared'));
 assert(core.includes('guard try journal.recover() == nil'));
 assert(core.includes('N2ProtectedStoreError.targetNotEmpty'));
 assert(core.includes('active.snapshot==plaintext'));
-assert(workspace.includes('Restaurar respaldo completo de build 222'));
-assert(workspace.includes('Empezar solo con Excel PERSONAL'));
+for (const [destination, identifier] of [
+ ['N2NativeActivationView', 'clinical-first-run-restore-222'],
+ ['N2NativePersonalImportView', 'clinical-first-run-import-personal']
+]) {
+ const route = new RegExp('NavigationLink\\s*\\{\\s*' + destination +
+  '\\(\\)\\s*\\}\\s*label:\\s*\\{[\\s\\S]*?\\}\\s*' +
+  '\\.buttonStyle\\([^\\n]+\\)\\s*\\.accessibilityIdentifier\\("' + identifier + '"\\)');
+ assert(route.test(workspace), 'Missing first-run route: ' + identifier);
+}
 assert(tests.includes('testBuild222EncryptedSourceReviewCannotBeChangedBeforeRestore'));
 assert(tests.includes('testFullSyntheticClinicalBackupPreservesPhysicalHistoryAcrossReview'));
 console.log('PASS: contrato cifrado build 222 compatible con lector B11; vista previa independiente, SHA, fuente vacía, contadores y recuperación segura.');
