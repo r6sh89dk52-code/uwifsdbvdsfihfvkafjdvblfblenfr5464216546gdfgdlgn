@@ -53,3 +53,9 @@ Las operaciones guardadas muestran una ventana central después de completar la 
 Registrar → Buscar en padrón abre un buscador por DNI o nombres, ordenado y paginado de 25 en 25. La elección de una ficha es explícita. Si no se encuentra al trabajador, puede registrarse desde la misma atención; un DNI existente conduce al padrón y no sobrescribe la identidad. Si el padrón está vacío, se ofrece importar PERSONAL en ese paso.
 
 Los diálogos mantienen el foco de teclado, y las animaciones respetan prefers-reduced-motion. Validación: 24 pruebas de dominio y 17 casos UI pasados, con una repetición móvil omitida.
+
+## Tratamiento compacto
+
+Los 432 medicamentos e insumos se seleccionan desde Añadir en un catálogo emergente con búsqueda y desplazamiento propio. Los procedimientos independientes adicionales permanecen plegados. Cada producto elegido aparece como una línea de cantidad, procedimiento y estado; solo se despliega el medicamento que se edita. Confirmar un producto sin envase colapsa su detalle; en productos con envase se conservan visibles las decisiones físicas. El selector de lote queda bajo Inventario / FEFO automático. Las reglas de guardado, aperturas declaradas y exportación no se modificaron.
+
+Validación actual: 24 pruebas de dominio y 21 casos UI pasados; una repetición móvil del recorrido completo de catálogo se omite. Los 432 productos siguen disponibles y se seleccionaron individualmente mediante navegador.

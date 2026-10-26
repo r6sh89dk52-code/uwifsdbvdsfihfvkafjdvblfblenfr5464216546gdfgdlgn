@@ -16,7 +16,7 @@ import { trialMode, switchWorkspace } from "./workspace";
 import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { User } from "firebase/auth";
-import products from "../legacy/products.json";
+import { Treatment } from "./Treatment";
 import contract from "./generated/contract.json";
 import { kardexCatalog } from "../legacy/kardexCatalog";
 import {
@@ -26,7 +26,6 @@ import {
   SYSTEM_REQUIRED_CATEGORIES,
   type ClinicalStage,
 } from "../legacy/attentionStepValidation";
-import { inferProcedure } from "../legacy/procedureRules";
 import { readOfficialOrganization } from "./organization";
 import { store, put } from "./storage";
 import {
@@ -68,6 +67,7 @@ import {
 import { download } from "./workbooks";
 import "./style.css";
 import "./interaction.css";
+import "./treatment.css";
 const Occupational = lazy(() => import("./occupational"));
 const Tools = lazy(() => import("./tools"));
 export function useRecords<T>(collection: Collection) {
@@ -834,7 +834,7 @@ function Clinical() {
     moves = useRecords<Movement>("movements");
   const [d, setD] = useState<Draft>(emptyDraft),
     [q, setQ] = useState(""),
-    [search, setSearch] = useState(""),
+    [catalogOpen, setCatalogOpen] = useState(false),
     [workerForm, setWorkerForm] = useState<{
       worker: Worker;
       isNew: boolean;
@@ -868,12 +868,6 @@ function Clinical() {
       )
       .slice(0, 12);
   }, [workers, q]);
-  const productsFound = useMemo(() => {
-    const n = normalize(search);
-    return n
-      ? products.filter((p) => normalize(p.name + " " + p.code).includes(n))
-      : products;
-  }, [search]);
   const ctx = {
     validCategories: contract.categories,
     validSystems: contract.systems,
@@ -969,7 +963,10 @@ function Clinical() {
         throw new FieldError(
           "Selecciona al menos un procedimiento o producto",
           ["Buscar producto clínico"],
-          () => update({ step: 2 }),
+          () => {
+            update({ step: 2 });
+            setCatalogOpen(true);
+          },
         );
       if (d.items.some((i) => !i.procedureConfirmed))
         throw new FieldError(
@@ -1076,7 +1073,9 @@ function Clinical() {
     }
   }
   return (
-    <>
+    <div
+      className={"clinical-wizard " + (d.step === 2 ? "treatment-view" : "")}
+    >
       <div className="section-heading">
         <div>
           <p className="muted">
@@ -1439,201 +1438,14 @@ function Clinical() {
           </>
         )}
         {d.step === 2 && (
-          <>
-            <h3>Procedimientos realizados</h3>
-            <div className="checks">
-              {contract.procedures.map((p) => (
-                <Check
-                  key={p}
-                  label={p}
-                  value={d.procedures.includes(p)}
-                  onChange={(v) =>
-                    update({
-                      procedures: v
-                        ? [...d.procedures, p]
-                        : d.procedures.filter((x) => x !== p),
-                    })
-                  }
-                />
-              ))}
-            </div>
-            <h3>
-              Medicamentos e insumos · {products.length} productos oficiales
-            </h3>
-            <input
-              aria-label="Buscar producto clínico"
-              placeholder="Buscar escribiendo nombre o código"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <div
-              className="catalog-results"
-              role="list"
-              aria-label="Catálogo clínico"
-            >
-              {productsFound.map((p) => (
-                <button
-                  role="listitem"
-                  className="result"
-                  key={p.code}
-                  onClick={() => {
-                    const proposal = inferProcedure(
-                      p,
-                      d.items.filter((i) => i.procedureConfirmed),
-                      d.procedures,
-                    );
-                    update({
-                      items: [
-                        ...d.items,
-                        {
-                          ...p,
-                          id: crypto.randomUUID(),
-                          quantity: 1,
-                          procedure: proposal.procedure,
-                          procedureConfirmed: false,
-                          procedureSource: proposal.source,
-                          physicalQuantity: 0,
-                          newContainers: 1,
-                        },
-                      ],
-                    });
-                    setSearch("");
-                  }}
-                >
-                  <b>{p.name}</b>
-                  <small>
-                    {p.unit} · {p.code} <span>＋</span>
-                  </small>
-                </button>
-              ))}
-            </div>
-            {d.items.map((item) => (
-              <div className="inset" key={item.id} data-item-id={item.id}>
-                <div className="section-heading">
-                  <h3>{item.name}</h3>
-                  <button
-                    className="quiet"
-                    onClick={() =>
-                      update({ items: d.items.filter((i) => i.id !== item.id) })
-                    }
-                  >
-                    Quitar
-                  </button>
-                </div>
-                <div className="grid">
-                  <Text
-                    label={"Cantidad clínica (" + item.unit + ")"}
-                    type="number"
-                    value={String(item.quantity)}
-                    onChange={(v) =>
-                      patchItem(item.id, { quantity: Number(v) })
-                    }
-                  />
-                  <Select
-                    label="Procedimiento"
-                    value={item.procedure}
-                    onChange={(v) =>
-                      patchItem(item.id, {
-                        procedure: v,
-                        procedureConfirmed: false,
-                        procedureSource: "manual",
-                      })
-                    }
-                    options={contract.procedures}
-                  />
-                  <Field label="Lote / presentación física">
-                    <select
-                      value={item.selectedLotID || ""}
-                      onChange={(e) =>
-                        patchItem(item.id, { selectedLotID: e.target.value })
-                      }
-                    >
-                      <option value="">
-                        FEFO automático / pendiente sin existencias
-                      </option>
-                      {lots
-                        .filter((l) =>
-                          candidates(item).some((c) => c.kardexCode === l.code),
-                        )
-                        .map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.name} · {l.lot} · {l.catalogUnit} · vence{" "}
-                            {l.expires || "sin fecha"}
-                          </option>
-                        ))}
-                    </select>
-                  </Field>
-                </div>
-                <Check
-                  label="Confirmo el procedimiento realizado"
-                  value={item.procedureConfirmed}
-                  onChange={(v) =>
-                    patchItem(item.id, { procedureConfirmed: v })
-                  }
-                />
-                {lots.some(
-                  (l) =>
-                    candidates(item).some((c) => c.kardexCode === l.code) &&
-                    isContainer(l.catalogUnit),
-                ) && (
-                  <div className="grid">
-                    <Check
-                      label="Abrí nuevo envase"
-                      value={!!item.approveOpening}
-                      onChange={(v) =>
-                        patchItem(item.id, {
-                          approveOpening: v,
-                          reusePreviouslyOpened: !v,
-                        })
-                      }
-                    />
-                    {item.approveOpening && (
-                      <>
-                        <Text
-                          label="Número de envases abiertos"
-                          type="number"
-                          value={String(item.newContainers || 1)}
-                          onChange={(v) =>
-                            patchItem(item.id, { newContainers: Number(v) })
-                          }
-                        />
-                        <Check
-                          label="Confirmo agotamiento del envase anterior"
-                          value={!!item.closePriorContainer}
-                          onChange={(v) =>
-                            patchItem(item.id, { closePriorContainer: v })
-                          }
-                        />
-                      </>
-                    )}
-                    <Check
-                      label="Reutilicé un envase previamente abierto"
-                      value={!!item.reusePreviouslyOpened}
-                      onChange={(v) =>
-                        patchItem(item.id, {
-                          reusePreviouslyOpened: v,
-                          approveOpening: false,
-                        })
-                      }
-                    />
-                    <Text
-                      label="Contenido físico usado (solo si se mide)"
-                      type="number"
-                      value={String(item.physicalQuantity || 0)}
-                      onChange={(v) =>
-                        patchItem(item.id, { physicalQuantity: Number(v) })
-                      }
-                    />
-                  </div>
-                )}
-                <p className="muted">
-                  {candidates(item).length
-                    ? "El motor verificará el lote al guardar."
-                    : "Sin asociación verificada: se conservará el consumo clínico pendiente."}
-                </p>
-              </div>
-            ))}
-          </>
+          <Treatment
+            d={d}
+            lots={lots}
+            update={update}
+            patchItem={patchItem}
+            catalogOpen={catalogOpen}
+            setCatalogOpen={setCatalogOpen}
+          />
         )}
         {d.step === 3 && (
           <>
@@ -1764,7 +1576,7 @@ function Clinical() {
       <p className="muted">
         {moves.length} eventos físicos auditables en el inventario.
       </p>
-    </>
+    </div>
   );
 }
 function History() {

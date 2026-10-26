@@ -1,0 +1,40 @@
+{
+  "nativeHead": "9bec8e01ccbb3f1a674372cf6e48df049dc4f014",
+  "buildPassed": true,
+  "domainTests": {
+    "passed": 24,
+    "failed": 0
+  },
+  "uiFullSuite": {
+    "startTime": "2026-10-26T01:33:11.876Z",
+    "duration": 89242.367,
+    "expected": 21,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "followupCompactView": {
+    "passed": 2,
+    "failed": 0
+  },
+  "viewports": {
+    "desktop": {
+      "width": 1366,
+      "height": 768
+    },
+    "mobile": {
+      "width": 390,
+      "height": 664
+    }
+  },
+  "clinicalWritesEnabled": false,
+  "features": [
+    "Otros procedimientos plegados de inicio",
+    "Catálogo de 432 productos en diálogo con desplazamiento propio",
+    "Selección múltiple por nombre o código",
+    "Líneas de medicamentos plegadas; un editor visible por vez",
+    "Resumen de cantidad y procedimiento; confirmación explícita conservada",
+    "Corrección abre únicamente el medicamento afectado",
+    "FEFO y declaraciones R=1/0 conservadas"
+  ]
+}

@@ -42,12 +42,21 @@ test("Recorrido clínico, persistencia, catálogo completo y modo oscuro", async
   await page.getByLabel("Estado reportado").selectOption("none");
   await page.getByLabel("He revisado las alergias").check();
   await page.getByRole("button", { name: "Continuar" }).click();
-  await expect(page.getByRole("listitem")).toHaveCount(432);
+  await page.locator(".other-procedures>summary").click();
   await page.getByLabel("OBSERVACION", { exact: true }).check();
+  await page.locator(".other-procedures>summary").click();
+  await page
+    .getByRole("button", { name: /Añadir medicamento o insumo/ })
+    .click();
+  await expect(page.getByRole("listitem")).toHaveCount(432);
   await page
     .getByRole("listitem")
     .filter({ hasText: "PARACETAMOL TABLETA 500 MG" })
     .click();
+  await page
+    .getByRole("button", { name: "Listo · volver al tratamiento", exact: true })
+    .click();
+  await page.locator(".medication-summary").click();
   await page.getByLabel("Confirmo el procedimiento realizado").check();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page.getByLabel("Responsable", { exact: true })).toHaveValue(
@@ -122,17 +131,22 @@ test("Todos los 432 productos son seleccionables desde el formulario", async ({
     .getByRole("button", { name: "Registrar" })
     .click();
   await page.getByLabel("Reanudar borrador").selectOption({ index: 1 });
+  await page
+    .getByRole("button", { name: /Añadir medicamento o insumo/ })
+    .click();
   const names = await page.getByRole("listitem").allTextContents();
   expect(names).toHaveLength(432);
-  for (let i = 0; i < 432; i++) {
-    const product = page.getByRole("listitem").nth(i);
-    await product.click();
-    await expect(
-      page.getByRole("button", { name: "Quitar", exact: true }),
-    ).toHaveCount(1);
-    await page.getByRole("button", { name: "Quitar", exact: true }).click();
-  }
-  await expect(page.getByRole("listitem")).toHaveCount(432);
+  for (let i = 0; i < 432; i++) await page.getByRole("listitem").nth(i).click();
+  await page
+    .getByRole("button", { name: "Listo · volver al tratamiento", exact: true })
+    .click();
+  await expect(page.locator(".medication-row")).toHaveCount(432);
+  await expect(page.locator(".medication-row[open]")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Quitar", exact: true })
+    .first()
+    .click();
+  await expect(page.locator(".medication-row")).toHaveCount(431);
 });
 test("Módulos adicionales, navegación y límites responsivos", async ({
   page,

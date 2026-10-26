@@ -134,6 +134,7 @@ export function focusCorrection(feedback: Feedback) {
       const scope = feedback.selector
         ? document.querySelector<HTMLElement>(feedback.selector) || base
         : base;
+      if (scope instanceof HTMLDetailsElement) scope.open = true;
       const fields = Array.from(
         scope.querySelectorAll<HTMLElement>(
           "input:not([type=hidden]),select,textarea,button",

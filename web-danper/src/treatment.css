@@ -1,0 +1,502 @@
+.treatment-view {
+  max-width: 1100px;
+  margin-inline: auto;
+}
+.treatment-view > .section-heading {
+  margin-bottom: 10px;
+}
+.treatment-view > .steps {
+  margin-bottom: 14px;
+}
+.treatment-view > .card {
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.treatment-view > .card > h2 {
+  margin-bottom: 15px;
+}
+.compact-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.compact-heading h3,
+.medication-toolbar h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.compact-heading small {
+  font-size: 10px;
+}
+.procedure-options {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 12px;
+  align-items: start;
+}
+.procedure-options > .check {
+  margin: 0;
+  min-height: 41px;
+  padding: 8px 11px;
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.other-procedures > summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+  background: var(--inset);
+}
+.other-procedures > summary .badge {
+  margin-left: 7px;
+  font-size: 9px;
+  padding: 2px 6px;
+}
+.procedure-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 10px;
+}
+.procedure-chips .check {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 10px;
+  flex: 1 1 155px;
+}
+.procedure-chips .check:has(input:checked) {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 7%, var(--surface));
+}
+.procedure-summary {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.medication-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 17px;
+  margin: 15px 0 12px;
+  border-top: 1px solid var(--border);
+}
+.medication-toolbar small {
+  font-size: 10px;
+  margin-top: 5px;
+}
+.medication-toolbar button {
+  font-size: 12px;
+  padding: 10px 13px;
+}
+.treatment-empty {
+  margin: 9px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.medication-lines {
+  display: grid;
+  gap: 8px;
+}
+.medication-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--inset);
+  overflow: clip;
+}
+.medication-summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  list-style: none;
+  cursor: pointer;
+  padding: 12px;
+}
+.medication-summary::-webkit-details-marker {
+  display: none;
+}
+.medication-description {
+  flex: 1;
+  min-width: 0;
+}
+.medication-description strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.medication-description small {
+  font-size: 10px;
+  margin-top: 3px;
+}
+.medication-chevron {
+  color: var(--brand);
+  font-size: 23px;
+  transition: transform 0.18s;
+}
+.medication-row[open] > .medication-summary .medication-chevron {
+  transform: rotate(90deg);
+}
+.medication-row[open] > .medication-summary {
+  border-bottom: 1px solid var(--border);
+}
+.medication-summary .quiet {
+  padding: 7px;
+  font-size: 10px;
+}
+.medication-status {
+  font-size: 9px;
+  white-space: nowrap;
+  padding: 4px 7px;
+  border-radius: 20px;
+}
+.medication-status.pending {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+}
+.medication-status.confirmed {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, var(--surface));
+}
+.medication-editor {
+  padding: 14px;
+}
+.medication-row[open] > .medication-editor {
+  animation: panel-in 0.18s ease-out;
+}
+.medication-editor > .grid {
+  gap: 12px;
+}
+.medication-editor .field {
+  margin-bottom: 9px;
+}
+.medication-editor .field > span {
+  margin-bottom: 5px;
+}
+.medication-editor .check {
+  margin: 9px 0;
+}
+.medication-editor input,
+.medication-editor select {
+  padding: 9px 11px;
+}
+.medication-editor > p.muted {
+  margin: 6px 0;
+  font-size: 10px;
+}
+.physical-details {
+  border-top: 1px solid var(--border);
+  padding-top: 9px;
+  margin: 3px 0 10px;
+}
+.physical-details > summary {
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 5px 0;
+}
+.physical-details[open] > .field {
+  margin-top: 10px;
+}
+.close-medication {
+  display: block;
+  margin-left: auto;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+.treatment-view > .card > .actions {
+  position: sticky;
+  bottom: 12px;
+  z-index: 3;
+  margin-top: 14px;
+  padding: 10px 0 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.roster-dialog.clinical-product-dialog {
+  width: min(680px, calc(100vw - 28px));
+  overflow: hidden;
+  display: none;
+  flex-direction: column;
+  max-height: calc(100dvh - 30px);
+}
+.roster-dialog.clinical-product-dialog[open] {
+  display: flex;
+}
+.clinical-product-dialog > .roster-header {
+  flex-shrink: 0;
+  margin-bottom: 15px;
+}
+.clinical-product-dialog > .field {
+  flex-shrink: 0;
+  margin-bottom: 6px;
+}
+.picker-count {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 7px 0 10px;
+  flex-shrink: 0;
+}
+.clinical-picker-results {
+  min-height: 80px;
+  max-height: 44dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-block: 1px solid var(--border);
+}
+.clinical-picker-results .result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 8px;
+  border-radius: 7px;
+  border-bottom: 1px solid var(--border);
+}
+.clinical-picker-results .result small {
+  font-size: 10px;
+  margin-top: 3px;
+}
+.picker-add {
+  font-size: 16px;
+  color: var(--brand);
+  white-space: nowrap;
+}
+.picker-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 15px;
+  flex-shrink: 0;
+}
+.picker-footer small {
+  font-size: 10px;
+}
+.picker-footer button {
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .treatment-view > .card {
+    padding: 16px;
+  }
+  .procedure-options {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .compact-heading {
+    align-items: flex-start;
+  }
+  .compact-heading small {
+    max-width: 115px;
+    text-align: right;
+  }
+  .procedure-options > .check {
+    min-height: 38px;
+  }
+  .medication-toolbar {
+    flex-wrap: wrap;
+    padding-top: 12px;
+    margin-top: 12px;
+    gap: 10px;
+  }
+  .medication-toolbar button {
+    width: 100%;
+    min-height: 42px;
+  }
+  .medication-summary {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+  .medication-description {
+    flex-basis: calc(100% - 40px);
+  }
+  .medication-status {
+    margin-left: 20px;
+  }
+  .medication-summary .quiet {
+    margin-left: auto;
+  }
+  .medication-editor {
+    padding: 12px;
+  }
+  .treatment-view > .card > .actions {
+    bottom: 74px;
+    padding-top: 9px;
+  }
+  .treatment-view > .card > .actions > button {
+    flex: 1 1 0;
+  }
+  .picker-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 10px;
+  }
+  .picker-footer button {
+    width: 100%;
+  }
+  .clinical-product-dialog .roster-header h2 {
+    font-size: 19px;
+  }
+  .clinical-product-dialog .roster-header > .quiet {
+    padding: 7px;
+    white-space: nowrap;
+  }
+  .clinical-picker-results {
+    max-height: 42dvh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .medication-chevron,
+  .medication-editor {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.add-product-short {
+  display: none;
+}
+.treatment-view > .section-heading p {
+  font-size: 10px;
+  margin: 0;
+  line-height: 1.4;
+}
+.treatment-view > .section-heading > select {
+  max-width: 230px;
+  padding: 7px 9px;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  .treatment-view > .section-heading {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .treatment-view > .section-heading > div {
+    flex: 1;
+  }
+  .treatment-view > .section-heading > select {
+    max-width: 170px;
+    font-size: 10px;
+  }
+  .procedure-options {
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+  .procedure-options > .check {
+    font-size: 10px;
+  }
+  .other-procedures > summary {
+    font-size: 10px;
+    padding: 11px 8px;
+  }
+  .medication-toolbar {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .medication-toolbar button {
+    width: auto;
+    flex-shrink: 0;
+  }
+  .add-product-full {
+    display: none;
+  }
+  .add-product-short {
+    display: inline;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace:has(.treatment-view) > header {
+    padding-block: 14px;
+  }
+  .treatment-view > .section-heading > div {
+    display: none;
+  }
+  .treatment-view > .section-heading {
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .treatment-view > .steps {
+    margin-bottom: 10px;
+  }
+  .treatment-view > .steps button {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 2px;
+  }
+  .treatment-view > .card {
+    padding: 12px;
+  }
+  .treatment-view > .card > h2 {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+  .treatment-view .procedure-summary {
+    display: none;
+  }
+  .medication-toolbar {
+    padding-top: 8px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+  .medication-lines {
+    gap: 6px;
+  }
+  .medication-summary {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 2px;
+    padding: 8px;
+  }
+  .medication-description {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .medication-description strong {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .medication-description small {
+    font-size: 9px;
+    line-height: 1.4;
+  }
+  .medication-chevron {
+    grid-column: 1;
+    grid-row: 1 / 3;
+  }
+  .medication-status {
+    grid-column: 3;
+    grid-row: 1;
+    margin: 0;
+    padding: 2px 5px;
+    font-size: 8px;
+  }
+  .medication-summary .quiet {
+    grid-column: 3;
+    grid-row: 2;
+    margin: 0;
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+  .treatment-view > .card > .actions {
+    margin-top: 10px;
+  }
+}
