@@ -31,14 +31,12 @@ test("Importar PERSONAL con vista previa, paginación y operaciones auditadas de
       "LA VENTUROSA",
     ]),
   );
-  await page
-    .getByLabel("Importar PERSONAL")
-    .setInputFiles({
-      name: "PERSONAL_FICTICIO.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer: Buffer.from(data),
-    });
+  await page.getByLabel("Importar PERSONAL").setInputFiles({
+    name: "PERSONAL_FICTICIO.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from(data),
+  });
   await page
     .getByLabel("Revisé las discrepancias y confirmo incorporar el padrón")
     .check();
@@ -56,22 +54,25 @@ test("Importar PERSONAL con vista previa, paginación y operaciones auditadas de
     page.getByRole("cell", { name: "PERSONA FICTICIA 100", exact: true }),
   ).toBeVisible();
   await open("Kardex e inventario");
-  await page.getByLabel("Producto oficial de enfermería").selectOption("E-87");
+  await page
+    .getByRole("combobox", { name: "Producto oficial de enfermería" })
+    .fill("ALCOHOL 120");
+  await page.getByRole("option", { name: /ALCOHOL 120 ML/ }).click();
+  await expect(
+    page.getByText("Presentación: FCO", { exact: true }),
+  ).toBeVisible();
   await page.getByLabel("Lote", { exact: true }).fill("LOTE-FICTICIO");
   await page.getByLabel("Vencimiento", { exact: true }).fill("2027-12-31");
-  await page.getByLabel("Unidad física verificada").selectOption("FCO");
-  await page
-    .getByLabel("Envases cerrados / unidades", { exact: true })
-    .fill("2");
+  await page.getByLabel("Cantidad inicial (FCO)", { exact: true }).fill("2");
   await page.getByRole("button", { name: "Guardar lote", exact: true }).click();
   await expect(
     page.getByRole("cell", { name: "LOTE-FICTICIO", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Operar", exact: true }).click();
   await page.getByLabel("Ingreso de cerrados / unidades").fill("3");
-  await page
-    .getByLabel("Responsable", { exact: true })
-    .fill("OPERADOR FICTICIO");
+  await expect(page.getByLabel("Responsable", { exact: true })).toHaveValue(
+    "Felipe Azcárate Silva",
+  );
   await page
     .getByLabel("Motivo / documento")
     .fill("Ingreso mediante documento ficticio");

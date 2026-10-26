@@ -1,3 +1,4 @@
+import contract from "../../src/generated/contract.json" with { type: "json" };
 import { test, expect } from "@playwright/test";
 test("Recorrido clínico, persistencia, catálogo completo y modo oscuro", async ({
   page,
@@ -19,6 +20,8 @@ test("Recorrido clínico, persistencia, catálogo completo y modo oscuro", async
   await page.getByLabel("Apellidos y nombres").fill("TRABAJADOR FICTICIO");
   await page.getByLabel("Área", { exact: true }).fill("AREA FICTICIA");
   await page.getByLabel("Labor / puesto").fill("LABOR FICTICIA");
+  await page.getByLabel("Sede", { exact: true }).selectOption("PLVENTUROSA");
+  await page.getByLabel("Sexo (M/F)").selectOption("F");
   await page.getByRole("button", { name: "Guardar ficha" }).click();
   await expect(
     page.getByText("TRABAJADOR FICTICIO", { exact: true }),
@@ -45,10 +48,16 @@ test("Recorrido clínico, persistencia, catálogo completo y modo oscuro", async
     .click();
   await page.getByLabel("Confirmo el procedimiento realizado").check();
   await page.getByRole("button", { name: "Continuar" }).click();
-  await page
-    .getByLabel("Responsable", { exact: true })
-    .fill("OPERADOR FICTICIO");
-  await page.getByLabel("DNI del responsable").fill("00000002");
+  await expect(page.getByLabel("Responsable", { exact: true })).toHaveValue(
+    contract.clinician.name,
+  );
+  await expect(page.getByLabel("DNI del responsable")).toHaveValue(
+    contract.clinician.dni,
+  );
+  await expect(page.getByLabel("Responsable", { exact: true })).toHaveAttribute(
+    "readonly",
+    "",
+  );
   await page
     .getByRole("button", { name: "Guardar atención", exact: true })
     .click();

@@ -1,3 +1,7 @@
+import { clinician } from "./clinician";
+import { trialMode, switchWorkspace } from "./workspace";
+import { loadTrial } from "./trial";
+import { exportDataSheet } from "./dataExport";
 import { useState } from "react";
 import {
   Section,
@@ -242,7 +246,7 @@ function Reports() {
   const [start, setStart] = useState(initial.start),
     [end, setEnd] = useState(limaDay()),
     [provisional, setProvisional] = useState(true),
-    [responsible, setResponsible] = useState("");
+    [responsible, setResponsible] = useState(clinician.name);
   const action = useAction();
   const effective = visits.map((v) => {
     const result = { ...v };
@@ -262,6 +266,7 @@ function Reports() {
           <Text label="Hasta" type="date" value={end} onChange={setEnd} />
           <Text
             label="Responsable del Kardex"
+            readOnly
             value={responsible}
             onChange={setResponsible}
           />
@@ -295,7 +300,7 @@ function Reports() {
                 );
                 download(
                   "DANPER_INDICADOR_" +
-                    (provisional ? "PROVISIONAL_" : "") +
+                    (plan.provisional ? "PROVISIONAL_" : "") +
                     end +
                     ".xlsx",
                   exportIndicator(plan),
@@ -496,6 +501,67 @@ function Settings() {
   const action = useAction();
   return (
     <>
+      <Section title="Prueba con datos ficticios">
+        <p>
+          Explora el historial, registra atenciones y prueba las exportaciones
+          con tres trabajadores, dos atenciones y un lote ficticios. Se guardan
+          en un espacio separado de tus registros y nunca se envían a Firebase.
+        </p>
+        <div className="actions">
+          <button
+            onClick={() =>
+              void action.run(async () => {
+                await loadTrial();
+                switchWorkspace(true);
+              })
+            }
+          >
+            {trialMode
+              ? "Continuar prueba local"
+              : "Probar con datos ficticios"}
+          </button>
+          {trialMode && (
+            <button
+              className="quiet"
+              onClick={() => {
+                download(
+                  "PERSONAL_FICTICIO_PARA_IMPORTAR.xlsx",
+                  exportDataSheet(
+                    "PERSONAL",
+                    [
+                      "DNI",
+                      "NOMBRES",
+                      "AREA",
+                      "LABOR",
+                      "SEXO",
+                      "FECHA NACIMIENTO",
+                      "SEDE",
+                    ],
+                    ["00000004", "00000005"].map((dni, i) => [
+                      dni,
+                      "PERSONA IMPORTADA FICTICIA " + (i + 1),
+                      "PRODUCCION",
+                      "PUESTO FICTICIO",
+                      i ? "M" : "F",
+                      "1996-01-01",
+                      i ? "PLVENTUROSA" : "LA VENTUROSA",
+                    ]),
+                  ),
+                );
+              }}
+            >
+              Descargar PERSONAL ficticio
+            </button>
+          )}
+        </div>
+        {trialMode && (
+          <p className="muted">
+            Para probar la importación, descarga PERSONAL ficticio y cárgalo
+            desde Trabajadores → Importar PERSONAL. Puedes volver a tus
+            registros desde el aviso superior; tus pruebas quedan conservadas.
+          </p>
+        )}
+      </Section>
       <Section title="Fuente compartida y sincronización">
         <p>
           {configured

@@ -1,3 +1,4 @@
+import { clinician } from "./clinician";
 import contract from "./generated/contract.json";
 import { reviewedAssociations } from "../legacy/reviewedKardexAssociations";
 import {
@@ -126,6 +127,7 @@ export function closeContainer(
     },
     description: reason,
     operatorName,
+    ...(operatorName === clinician.name ? { operatorDni: clinician.dni } : {}),
     closedContainers: count,
     containerDisposition: disposition,
     containerAccountingVersion: 1,
@@ -452,6 +454,7 @@ export function saveClinical(
           ? "Apertura declarada / uso de envase abierto"
           : "Dispensación clínica FEFO",
         operatorName: visit.responsible,
+        operatorDni: visit.responsibleDni,
         dispenseRef: ref,
         ...(container
           ? { containerAccountingVersion: 1, declaredOpenings: p.r }
@@ -513,5 +516,6 @@ export function postInventory(
     after,
     description: reason,
     operatorName,
+    ...(operatorName === clinician.name ? { operatorDni: clinician.dni } : {}),
   };
 }

@@ -1,3 +1,4 @@
+import { trialMode } from "./workspace";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -164,6 +165,11 @@ async function pull() {
   }
 }
 export async function synchronize() {
+  if (trialMode) {
+    syncStatus.message = "Prueba ficticia local · sin sincronización";
+    notify();
+    return;
+  }
   if (running) return;
   const queued = await store.queue();
   syncStatus.pending = queued.filter((o) => o.state === "pending").length;

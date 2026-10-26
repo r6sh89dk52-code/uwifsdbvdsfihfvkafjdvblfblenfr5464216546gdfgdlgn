@@ -1,3 +1,4 @@
+import { trialMode } from "./workspace";
 import {
   key,
   type Collection,
@@ -7,7 +8,7 @@ import {
 } from "./model";
 export class LocalStore {
   private db!: IDBDatabase;
-  async open(name = "danper-web-v1") {
+  async open(name = trialMode ? "danper-web-trial-v1" : "danper-web-v1") {
     this.db = await new Promise<IDBDatabase>((resolve, reject) => {
       const r = indexedDB.open(name, 1);
       r.onupgradeneeded = () => {
@@ -110,7 +111,7 @@ export class LocalStore {
           });
         };
       }
-      if (enqueue)
+      if (enqueue && this.db.name !== "danper-web-trial-v1")
         tx.objectStore("outbox").add({
           id,
           deviceId,

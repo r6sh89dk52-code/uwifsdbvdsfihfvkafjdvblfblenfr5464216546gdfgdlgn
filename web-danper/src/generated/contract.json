@@ -1,5 +1,9 @@
 {
   "sourceHead": "9bec8e01ccbb3f1a674372cf6e48df049dc4f014",
+  "clinician": {
+    "name": "Felipe Azcárate Silva",
+    "dni": "74958455"
+  },
   "categories": [
     "ACCIDENTE COMUN",
     "ACCIDENTE DE TRABAJO",
@@ -514,6 +518,8 @@
     }
   ],
   "hashes": {
+    "native-ios/Sources/DanperCore/N2NativeFormContext.swift": "872d2e508d78a524a299f078de1f7bafc2c755ae97164c33fbeae5e4bd8f29d0",
+    "native-ios/Sources/DanperCore/N2NativeCatalogIndex.swift": "f1150463ecb4356458316f2b90104dba9fe04c42349a866c9514d42a0ec69dfb",
     "src/products.json": "7de62d97b31e90d313b9ccaa4bc811beaed31c6ab85d9bd4b9735704cebf37dd",
     "src/kardexCatalog.ts": "5951446a4ba0031b30c86c3b401471aea207599c805cc9ef67d982662bc1f7ed",
     "src/reviewedKardexAssociations.ts": "5b9db7bb67c6494cc51d2ca93266d6a7054f38a42d38fc1967e82ff7017dd433",

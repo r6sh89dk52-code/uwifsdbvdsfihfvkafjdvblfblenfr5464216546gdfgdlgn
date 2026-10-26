@@ -5,8 +5,8 @@ Estado: desarrollo parcial compilable y probado en los casos cubiertos. No cumpl
 ## Validaciones realizadas
 
 - Build React/TypeScript/Vite de producción, con recursos generados desde Swift y precaché PWA.
-- 20 pruebas de dominio: catálogos, reglas condicionales, envases declarados, FEFO multilote, stock insuficiente, reintentos, corte Lima 9–8, atención histórica, concurrencia IndexedDB, 10 000 trabajadores, importación de resultados/campañas, cifrado y rechazo de respaldo alterado, indicador, Kardex y vigilancia.
-- Playwright: 7 casos pasados en Chromium para escritorio y emulación móvil; 1 omitido deliberadamente porque repite en móvil el recorrido individual de los 432 productos ya ejecutado en escritorio. Incluye importación XLSX con vista previa y paginación, ingreso de inventario, persistencia, cuatro pasos de atención, navegación y oscuro.
+- 24 pruebas de dominio (incluyen identidad heredada de Swift, presentaciones nativas, aislamiento de prueba y equivalencia diario/semanal): catálogos, reglas condicionales, envases declarados, FEFO multilote, stock insuficiente, reintentos, corte Lima 9–8, atención histórica, concurrencia IndexedDB, 10 000 trabajadores, importación de resultados/campañas, cifrado y rechazo de respaldo alterado, indicador, Kardex y vigilancia.
+- Playwright: 9 casos pasados en Chromium para escritorio y emulación móvil; 1 omitido deliberadamente porque repite en móvil el recorrido individual de los 432 productos ya ejecutado en escritorio. Incluye importación XLSX con vista previa y paginación, ingreso de inventario, persistencia, cuatro pasos de atención, navegación, oscuro, aislamiento ficticio y descargas reales de Indicador/Kardex/vigilancia.
 - PWA de producción con Firebase: pantalla de acceso y recursos estáticos disponibles offline. Módulos y preferencias se probaron antes en modo local; esta prueba autenticada no los acredita. No acredita instalación ni todos los navegadores.
 - Auditoría npm guardada: cero vulnerabilidades conocidas reportadas en ese momento.
 

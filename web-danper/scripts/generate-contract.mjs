@@ -63,6 +63,8 @@ for (const link of additional)
   )
     throw Error("Asociación adicional incompatible");
 const paths = [
+  "native-ios/Sources/DanperCore/N2NativeFormContext.swift",
+  "native-ios/Sources/DanperCore/N2NativeCatalogIndex.swift",
   "src/products.json",
   "src/kardexCatalog.ts",
   "src/reviewedKardexAssociations.ts",
@@ -73,6 +75,13 @@ const paths = [
 ];
 const contract = {
   sourceHead: "9bec8e01ccbb3f1a674372cf6e48df049dc4f014",
+  clinician: Object.fromEntries(
+    [
+      ...source("native-ios/Sources/DanperCore/N2NativeFormContext.swift")
+        .split("public enum N2WorkerAge")[0]
+        .matchAll(/public static let (name|dni)="([^"]+)"/g),
+    ].map((m) => [m[1], m[2]]),
+  ),
   categories: array(swift, "categories"),
   systems: array(swift, "systems"),
   diagnoses: array(swift, "diagnoses"),
@@ -95,6 +104,8 @@ const contract = {
     ]),
   ),
 };
+if (!contract.clinician.name || !/^\d{8}$/.test(contract.clinician.dni))
+  throw Error("Identidad del responsable nativo ausente");
 fs.mkdirSync("src/generated", { recursive: true });
 fs.writeFileSync(
   "src/generated/contract.json",

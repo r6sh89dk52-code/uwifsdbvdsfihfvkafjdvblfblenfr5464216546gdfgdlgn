@@ -1,0 +1,31 @@
+{
+  "nativeHead": "9bec8e01ccbb3f1a674372cf6e48df049dc4f014",
+  "buildPassed": true,
+  "domainTests": {
+    "passed": 24,
+    "failed": 0
+  },
+  "uiFullSuite": {
+    "passed": 9,
+    "failed": 0,
+    "skipped": 1
+  },
+  "afterMobileButtonLayoutChange": {
+    "scope": "tests/ui/trial.spec.ts desktop and mobile",
+    "passed": 2,
+    "failed": 0
+  },
+  "covered": [
+    "sede y sexo con selectores",
+    "identidad nativa en nuevas atenciones",
+    "presentacion Kardex heredada y excepciones",
+    "aislamiento IndexedDB y exclusión de outbox",
+    "importacion PERSONAL ficticio",
+    "descargas Indicador Kardex vigilancia",
+    "exportacion sin pendientes y frecuencia diaria"
+  ],
+  "realGoogleInteractiveLoginTested": false,
+  "swiftTestsExecuted": false,
+  "realClinicalSyncEnabled": false,
+  "completeNativeExportParityCertified": false
+}

@@ -39,3 +39,9 @@ Firestore Standard se configura en Santiago, `southamerica-west1`, con reglas qu
 Sincronización real y resolución completa de conflictos, migración íntegra con journal cifrado nativo, todas las reglas/fixtures de contabilidad automática y conciliación, rectificación nativa completa, inventario auxiliar, validación comparativa de vigilancia osteomuscular, plantilla oficial de descansos y estadísticas, paridad completa de importadores EMO/colinesterasa y sus programaciones originales, prueba Safari/Firefox/Edge e instalación PWA. El manifiesto, precaché y recarga offline de producción pasaron en Chromium; la compatibilidad entre todos los navegadores todavía no está certificada.
 
 La prueba de apertura R=1,0,0,1,0 reproduce expectativas explícitas de `N3DeclaredContainerTests.swift`; aún no es una ejecución comparativa simultánea del paquete Swift y TypeScript. Las pruebas de concurrencia actuales verifican IndexedDB local, no sustituyen dos clientes Firestore reales.
+
+## Ajustes de formularios y prueba ficticia
+
+El responsable de registros nuevos usa la identidad preconfigurada en SwiftUI. Sede y sexo se eligen con selectores. El Kardex permite pegar o escribir el producto, muestra sugerencias y hereda la presentación del catálogo nativo; una unidad no verificada exige elección explícita. El registro inicial ya no solicita stock mínimo ni capacidad interna. Las aperturas R=1/0 durante dispensación conservan su confirmación física.
+
+En Ajustes, **Probar con datos ficticios** abre una base IndexedDB separada, con tres trabajadores, dos atenciones y un lote. Nunca entra en la cola cloud. Dentro de la prueba puedes descargar PERSONAL ficticio y cargarlo desde Trabajadores para verificar la importación con vista previa. **Volver a mis registros** retorna al espacio habitual sin sobrescribirlo. El respaldo nativo real sigue limitado a staging.

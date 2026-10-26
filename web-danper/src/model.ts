@@ -1,3 +1,4 @@
+import { clinician } from "./clinician";
 import type { WorkerRecord } from "../legacy/workerRules";
 import type { ExportVisit } from "../legacy/ambulatoryRows";
 export type Worker = WorkerRecord & { birthDate?: string; active?: boolean };
@@ -63,6 +64,7 @@ export type Movement = {
   after: Lot;
   description: string;
   operatorName: string;
+  operatorDni?: string;
   declaredOpenings?: number;
   containerAccountingVersion?: number;
   closedContainers?: number;
@@ -217,8 +219,8 @@ export function emptyDraft(): Draft {
     returned: false,
     photoSent: false,
     photoReviewed: false,
-    responsible: "",
-    responsibleDni: "",
+    responsible: clinician.name,
+    responsibleDni: clinician.dni,
     standaloneProcedures: [],
     procedures: [],
     dispensingSite: "LA VENTUROSA",

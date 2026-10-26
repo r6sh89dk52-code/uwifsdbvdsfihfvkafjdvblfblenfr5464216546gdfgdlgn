@@ -1,3 +1,8 @@
+import { ModuleIcon, moduleDetails } from "./ModuleIcon";
+import { clinician } from "./clinician";
+import { nursingCatalog } from "./nursingCatalog";
+import { NursingSearch } from "./NursingSearch";
+import { trialMode, switchWorkspace } from "./workspace";
 import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { User } from "firebase/auth";
@@ -113,6 +118,10 @@ export function Select({
           <option key={v} value={v}>
             {(
               {
+                M: "Masculino",
+                F: "Femenino",
+                "LA VENTUROSA": "Fundo La Venturosa",
+                PLVENTUROSA: "Planta La Venturosa",
                 system: "Seguir el sistema",
                 light: "Claro",
                 dark: "Oscuro",
@@ -140,12 +149,14 @@ export function Text({
   onChange,
   type = "text",
   list,
+  readOnly = false,
 }: {
   label: string;
   value: string;
   onChange: (s: string) => void;
   type?: string;
   list?: string;
+  readOnly?: boolean;
 }) {
   return (
     <Field label={label}>
@@ -153,6 +164,7 @@ export function Text({
         aria-label={label}
         type={type}
         list={list}
+        readOnly={readOnly}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -335,6 +347,7 @@ function App() {
               key={n}
               onClick={() => go(n)}
             >
+              <ModuleIcon name={n} />
               {n}
             </button>
           ))}
@@ -370,7 +383,24 @@ function App() {
           </div>
         </header>
         <main>
-          {configured && !cloudWritesEnabled && <p className="notice" role="status">Versión en validación. Los registros se guardan en este navegador; la sincronización clínica compartida está desactivada.</p>}
+          {trialMode && (
+            <div className="warning trial-banner">
+              <strong>PRUEBA LOCAL · DATOS FICTICIOS</strong>
+              <p>
+                Este espacio está separado de tus registros y nunca se
+                sincroniza.
+              </p>
+              <button onClick={() => switchWorkspace(false)}>
+                Volver a mis registros
+              </button>
+            </div>
+          )}
+          {configured && !trialMode && !cloudWritesEnabled && (
+            <p className="notice" role="status">
+              Versión en validación. Los registros se guardan en este navegador;
+              la sincronización clínica compartida está desactivada.
+            </p>
+          )}
           <Suspense fallback={<Empty>Cargando módulo…</Empty>}>
             {module === "Trabajadores" ? (
               <Workers />
@@ -497,9 +527,13 @@ function Dashboard({
             "Alertas",
             "Indicadores y exportaciones",
           ].map((m) => (
-            <button key={m} onClick={() => go(m)}>
-              {m}
-              <span>↗</span>
+            <button key={m} aria-label={m} onClick={() => go(m)}>
+              <ModuleIcon name={m} />
+              <div>
+                <strong>{m}</strong>
+                <small>{moduleDetails[m]}</small>
+              </div>
+              <span aria-hidden="true">↗</span>
             </button>
           ))}
         </div>
@@ -576,27 +610,47 @@ function WorkerEditor({
             "site",
             "ubigeo",
           ] as const
-        ).map((k, i) => (
-          <Text
-            key={k}
-            label={
-              [
-                "DNI",
-                "Apellidos y nombres",
-                "Área",
-                "Labor / puesto",
-                "Sexo (M/F)",
-                "Nacimiento",
-                "Sede",
-                "Ubigeo",
-              ][i]
-            }
-            type={k === "birthDate" ? "date" : "text"}
-            list={k === "area" ? "official-areas" : undefined}
-            value={w[k] || ""}
-            onChange={(v) => setW({ ...w, [k]: v })}
-          />
-        ))}
+        ).map((k, i) =>
+          k === "site" || k === "sex" ? (
+            <Select
+              key={k}
+              label={k === "site" ? "Sede" : "Sexo (M/F)"}
+              value={w[k] || ""}
+              options={
+                k === "site"
+                  ? [
+                      ...new Set([
+                        "LA VENTUROSA",
+                        "PLVENTUROSA",
+                        ...(w.site ? [w.site] : []),
+                      ]),
+                    ]
+                  : ["M", "F"]
+              }
+              onChange={(v) => setW({ ...w, [k]: v })}
+            />
+          ) : (
+            <Text
+              key={k}
+              label={
+                [
+                  "DNI",
+                  "Apellidos y nombres",
+                  "Área",
+                  "Labor / puesto",
+                  "Sexo (M/F)",
+                  "Nacimiento",
+                  "Sede",
+                  "Ubigeo",
+                ][i]
+              }
+              type={k === "birthDate" ? "date" : "text"}
+              list={k === "area" ? "official-areas" : undefined}
+              value={w[k] || ""}
+              onChange={(v) => setW({ ...w, [k]: v })}
+            />
+          ),
+        )}
       </div>
       <datalist id="official-areas">
         {areas
@@ -910,7 +964,15 @@ function Clinical() {
             onChange={(e) => {
               const found = drafts.find((x) => x.id === e.target.value);
               if (found) {
-                setD(found);
+                setD({
+                  ...found,
+                  responsible: found.responsible || clinician.name,
+                  responsibleDni:
+                    found.responsibleDni ||
+                    (!found.responsible || found.responsible === clinician.name
+                      ? clinician.dni
+                      : ""),
+                });
                 setIssues([]);
               }
             }}
@@ -1337,11 +1399,13 @@ function Clinical() {
               )}
               <Text
                 label="Responsable"
+                readOnly
                 value={d.responsible}
                 onChange={(v) => update({ responsible: v })}
               />
               <Text
                 label="DNI del responsable"
+                readOnly
                 value={d.responsibleDni}
                 onChange={(v) => update({ responsibleDni: v })}
               />
@@ -1465,7 +1529,7 @@ function History() {
     [field, setField] = useState("diagnosis"),
     [value, setValue] = useState(""),
     [reason, setReason] = useState(""),
-    [operator, setOperator] = useState("");
+    [operator, setOperator] = useState(clinician.name);
   const action = useAction();
   const found = visits
     .filter((v) =>
@@ -1573,6 +1637,7 @@ function History() {
             <Text label="Motivo" value={reason} onChange={setReason} />
             <Text
               label="Responsable de corrección"
+              readOnly
               value={operator}
               onChange={setOperator}
             />
@@ -1597,6 +1662,7 @@ function History() {
                   after: value,
                   reason,
                   operatorName: operator,
+                  operatorDni: clinician.dni,
                   at: Date.now(),
                 });
                 setValue("");
@@ -1630,18 +1696,17 @@ function Inventory() {
     [selected, setSelected] = useState(""),
     [lot, setLot] = useState(""),
     [expires, setExpires] = useState(""),
-    [unit, setUnit] = useState("UND"),
+    [exceptionUnit, setExceptionUnit] = useState(""),
     [sealed, setSealed] = useState("0"),
-    [capacity, setCapacity] = useState("1"),
-    [volume, setVolume] = useState(false),
-    [minimum, setMinimum] = useState(""),
     [active, setActive] = useState<Lot | null>(null),
     [kind, setKind] = useState("extraordinary"),
     [amount, setAmount] = useState("0"),
     [loose, setLoose] = useState("0"),
     [reason, setReason] = useState(""),
-    [operator, setOperator] = useState(""),
+    [operator, setOperator] = useState(clinician.name),
     [disposition, setDisposition] = useState("agotado");
+  const selectedProduct = nursingCatalog.find((p) => p.id === selected);
+  const unit = selectedProduct?.unit || exceptionUnit;
   const action = useAction();
   const commitMove = async (m: Movement, revision: number) =>
     atomic([
@@ -1661,19 +1726,13 @@ function Inventory() {
       </div>
       <Section title="Registrar lote y stock inicial">
         <div className="grid">
-          <Field label="Producto oficial de enfermería">
-            <select
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-            >
-              <option value="">Seleccionar producto…</option>
-              {kardexCatalog.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <NursingSearch
+            value={selected}
+            onChange={(id) => {
+              setSelected(id);
+              setExceptionUnit("");
+            }}
+          />
           <Text label="Lote" value={lot} onChange={setLot} />
           <Text
             label="Vencimiento"
@@ -1681,53 +1740,40 @@ function Inventory() {
             value={expires}
             onChange={setExpires}
           />
-          <Select
-            label="Unidad física verificada"
-            value={unit}
-            options={[
-              "UND",
-              "TBL",
-              "PAR",
-              "FCO",
-              "CJA",
-              "PAQ",
-              "LT",
-              "ML",
-              "TUB",
-            ]}
-            empty={false}
-            onChange={setUnit}
-          />
+          {selectedProduct && (
+            <div className="presentation">
+              <span className="badge">
+                {unit
+                  ? "Presentación: " + unit
+                  : "Presentación pendiente de verificar"}
+              </span>
+              <p>
+                La presentación proviene del catálogo nativo. Registra la
+                cantidad en esa unidad.
+              </p>
+            </div>
+          )}
+          {selectedProduct && !selectedProduct.unit && (
+            <Select
+              label="Presentación excepcional verificada"
+              value={exceptionUnit}
+              options={[
+                ...new Set(nursingCatalog.map((p) => p.unit).filter(Boolean)),
+              ].sort()}
+              onChange={setExceptionUnit}
+            />
+          )}
           <Text
-            label="Envases cerrados / unidades"
+            label={"Cantidad inicial" + (unit ? " (" + unit + ")" : "")}
             type="number"
             value={sealed}
             onChange={setSealed}
           />
-          <Text
-            label="Stock mínimo (opcional)"
-            type="number"
-            value={minimum}
-            onChange={setMinimum}
-          />
-          <Check
-            label="Conozco y mediré la capacidad interna"
-            value={volume}
-            onChange={setVolume}
-          />
-          {volume && (
-            <Text
-              label="Capacidad física verificada por envase"
-              type="number"
-              value={capacity}
-              onChange={setCapacity}
-            />
-          )}
         </div>
         <button
           onClick={() =>
             void action.run(async () => {
-              const p = kardexCatalog.find((p) => p.id === selected);
+              const p = nursingCatalog.find((p) => p.id === selected);
               if (!p) throw Error("Selecciona un producto");
               if (
                 lots.some(
@@ -1744,21 +1790,20 @@ function Inventory() {
                 lot,
                 expires,
                 container: isContainer(unit) ? "otro" : "unidad",
-                unitsPerContainer: volume ? Number(capacity) : 1,
+                unitsPerContainer: 1,
                 sealedContainers: Number(sealed),
                 looseUnits: 0,
                 openedRemaining: 0,
                 declaredOpenContainers: 0,
-                volumeTrackingEnabled: volume,
+                volumeTrackingEnabled: false,
                 updatedAt: Date.now(),
-                ...(minimum !== "" ? { minimum: Number(minimum) } : {}),
               };
-              validateLot(l);
               if (
-                minimum !== "" &&
-                (!Number.isFinite(l.minimum) || l.minimum! < 0)
+                !Number.isSafeInteger(l.sealedContainers) ||
+                l.sealedContainers <= 0
               )
-                throw Error("Stock mínimo inválido");
+                throw Error("Indica una cantidad inicial mayor que cero");
+              validateLot(l);
               await put("lots", id, l);
               setLot("");
               setSealed("0");
@@ -1847,7 +1892,7 @@ function Inventory() {
               value={amount}
               onChange={setAmount}
             />
-            {kind !== "containerState" && (
+            {kind !== "containerState" && active.volumeTrackingEnabled && (
               <Text
                 label="Unidades sueltas"
                 type="number"
@@ -1864,7 +1909,12 @@ function Inventory() {
                 onChange={setDisposition}
               />
             )}
-            <Text label="Responsable" value={operator} onChange={setOperator} />
+            <Text
+              label="Responsable"
+              readOnly
+              value={operator}
+              onChange={setOperator}
+            />
             <Text
               label="Motivo / documento"
               value={reason}

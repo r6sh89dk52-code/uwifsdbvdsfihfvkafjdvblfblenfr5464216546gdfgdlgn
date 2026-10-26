@@ -1,3 +1,4 @@
+import { trialMode } from "./workspace";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { readAmbulatoryArchive } from "../legacy/ambulatoryArchive";
 import {
@@ -233,20 +234,23 @@ export function indicatorPlan(
   const lines: { id: string; cells: ExportValue[] }[] = [];
   const blockers: string[] = [];
   const frequency = new Map<string, number>();
-  let pending = 0;
+  let pending = 0,
+    linked = 0;
   for (const a of visits
     .filter((v) => v.date >= start && v.date <= end)
     .sort(
       (a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
     )) {
-    const count = (frequency.get(a.worker.dni) || 0) + 1;
-    frequency.set(a.worker.dni, count);
+    const frequencyKey = JSON.stringify([a.date, a.worker.dni]);
+    const count = (frequency.get(frequencyKey) || 0) + 1;
+    frequency.set(frequencyKey, count);
     for (const item of a.items.length ? a.items : [undefined]) {
       const events = movements.filter(
         (m) =>
           m.dispenseRef?.attentionId === a.id &&
           m.dispenseRef.itemId === item?.id,
       );
+      if (item && events.length) linked++;
       if (item && !events.length) {
         pending++;
         if (!provisional)
@@ -307,10 +311,10 @@ export function indicatorPlan(
     start,
     end,
     visits: visits.filter((v) => v.date >= start && v.date <= end).length,
-    linkedDeliveries: lines.length - pending,
-    provisional,
+    linkedDeliveries: linked,
+    provisional: provisional && pending > 0,
     pendingDeliveries: pending,
-    ...(provisional
+    ...(provisional && pending > 0
       ? {
           unverifiedLineIds: lines
             .filter(
@@ -438,7 +442,8 @@ export function download(name: string, bytes: Uint8Array | string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = name;
+  a.download =
+    trialMode && !name.startsWith("FICTICIO_") ? "FICTICIO_" + name : name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
