@@ -7,7 +7,7 @@ Estado: desarrollo parcial compilable y probado en los casos cubiertos. No cumpl
 - Build React/TypeScript/Vite de producción, con recursos generados desde Swift y precaché PWA.
 - 20 pruebas de dominio: catálogos, reglas condicionales, envases declarados, FEFO multilote, stock insuficiente, reintentos, corte Lima 9–8, atención histórica, concurrencia IndexedDB, 10 000 trabajadores, importación de resultados/campañas, cifrado y rechazo de respaldo alterado, indicador, Kardex y vigilancia.
 - Playwright: 7 casos pasados en Chromium para escritorio y emulación móvil; 1 omitido deliberadamente porque repite en móvil el recorrido individual de los 432 productos ya ejecutado en escritorio. Incluye importación XLSX con vista previa y paginación, ingreso de inventario, persistencia, cuatro pasos de atención, navegación y oscuro.
-- PWA en compilación de producción: recarga offline, carga de módulo diferido offline y persistencia de preferencias. No acredita instalación ni todos los navegadores.
+- PWA de producción con Firebase: pantalla de acceso y recursos estáticos disponibles offline. Módulos y preferencias se probaron antes en modo local; esta prueba autenticada no los acredita. No acredita instalación ni todos los navegadores.
 - Auditoría npm guardada: cero vulnerabilidades conocidas reportadas en ese momento.
 
 ## Trabajo de código pendiente (no atribuirlo a falta de credenciales)
@@ -25,7 +25,7 @@ Estado: desarrollo parcial compilable y probado en los casos cubiertos. No cumpl
 
 ## Dependencias externas concretas
 
-- Proyecto Firebase real, configuración pública de app web y UID Google autorizado. El prototipo local encontrado tiene esos valores vacíos. No se obtuvo un proyecto ni se desplegó Hosting.
+- Firebase real ya creado y Hosting publicado: https://danper-salud-web-20261025.web.app. Google Auth configurado y una sola cuenta Google autorizada registrada. Inicio interactivo de Google pendiente de prueba. Firestore Standard configurado en Santiago; mantener reglas cerradas y escrituras desactivadas.
 - Entorno con Swift/Xcode para ejecutar las pruebas del adaptador y las fuentes nativas. En este Windows no se encontró toolchain Swift.
 - Emulador Firestore/Authentication para pruebas de reglas y de concurrencia remota; no se ejecutaron. No usar la prueba IndexedDB como sustituto de pruebas Firestore.
 - Respaldo cifrado autorizado para ensayo de migración local íntegra; no se descifró ni modificó ningún respaldo clínico real.

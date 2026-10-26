@@ -6,3 +6,6 @@ playwright-report/
 test-results/
 .firebaserc
 firestore.authorized.rules
+firebase.authorized.json
+firebase-debug.log
+firebase-debug.*.log

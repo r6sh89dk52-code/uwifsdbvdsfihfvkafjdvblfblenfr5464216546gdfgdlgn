@@ -36,22 +36,40 @@ try {
   await page.goto("http://127.0.0.1:5197");
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
-  await page
-    .getByRole("heading", { name: "Cuidamos la salud de nuestro equipo" })
-    .waitFor();
+  await page.locator("main.login, .shell").waitFor();
+  const signedOut = await page
+    .getByRole("button", { name: "Ingresar con Google" })
+    .isVisible();
+  const heading = signedOut
+    ? "DANPER SALUD"
+    : "Cuidamos la salud de nuestro equipo";
+  await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+  const cachedPaths = await page.evaluate(async () =>
+    (
+      await Promise.all(
+        (await caches.keys()).map(async (key) =>
+          (await (await caches.open(key)).keys()).map(
+            (r) => new URL(r.url).pathname,
+          ),
+        ),
+      )
+    ).flat(),
+  );
+  if (!cachedPaths.some((p) => p.startsWith("/assets/") && p.endsWith(".js")))
+    throw Error("No hay JavaScript precargado");
   await context.setOffline(true);
   await page.reload();
-  await page
-    .getByRole("heading", { name: "Cuidamos la salud de nuestro equipo" })
-    .waitFor();
-  await page
-    .getByRole("navigation", { name: "Navegación principal" })
-    .getByRole("button", { name: "Ajustes" })
-    .click();
-  await page.getByLabel("Tema", { exact: true }).selectOption("dark");
-  await page.reload();
-  if ((await page.locator("html").getAttribute("data-theme")) !== "dark")
-    throw Error("Preferencia no persistió offline");
+  await page.getByRole("heading", { name: heading, exact: true }).waitFor();
+  if (!signedOut) {
+    await page
+      .getByRole("navigation", { name: "Navegación principal" })
+      .getByRole("button", { name: "Ajustes" })
+      .click();
+    await page.getByLabel("Tema", { exact: true }).selectOption("dark");
+    await page.reload();
+    if ((await page.locator("html").getAttribute("data-theme")) !== "dark")
+      throw Error("Preferencia no persistió offline");
+  }
   if (errors.length) throw Error(errors.join("\n"));
   fs.mkdirSync("validation", { recursive: true });
   fs.writeFileSync(
@@ -61,8 +79,10 @@ try {
         browser: "Chromium",
         productionBuild: true,
         offlineReload: true,
-        lazyModuleOffline: true,
-        themePersistedOffline: true,
+        signedOut,
+        staticAssetsCached: true,
+        lazyModuleOffline: signedOut ? null : true,
+        themePersistedOffline: signedOut ? null : true,
         errors,
       },
       null,
@@ -70,7 +90,7 @@ try {
     ),
   );
   console.log(
-    "PASS PWA producción: recarga offline, módulo diferido y preferencias persistidas.",
+    "PASS PWA producción: recarga offline y recursos estáticos; alcance detallado en validation/pwa.json.",
   );
 } finally {
   await browser?.close();

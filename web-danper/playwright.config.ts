@@ -22,6 +22,12 @@ export default defineConfig({
     command: "npm run dev -- --port 5189 --strictPort",
     url: "http://127.0.0.1:5189",
     reuseExistingServer: !process.env.CI,
+    env: {
+      VITE_FIREBASE_API_KEY: "",
+      VITE_FIREBASE_PROJECT_ID: "",
+      VITE_AUTHORIZED_UID: "",
+      VITE_CLOUD_WRITES_ENABLED: "false",
+    },
   },
   reporter: [
     ["list"],

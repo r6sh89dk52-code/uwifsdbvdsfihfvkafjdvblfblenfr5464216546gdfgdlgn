@@ -46,4 +46,4 @@ Reglas verificadas: un examen general EMO no acredita colinesterasa; el resultad
 
 ## No finalizado
 
-La plataforma integral solicitada **no está terminada**. No hay URL publicada, migración cloud habilitada ni sincronización comprobada con iPhone. Falta implementar/validar los puntos marcados parciales, en especial conciliación completa, conflictos cloud, journal nativo, conciliación del indicador y reportes estadísticos adicionales. No debe confundirse una compilación correcta o las pruebas de casos cubiertos con validación clínica completa.
+La plataforma integral solicitada **no está terminada**. Hosting publicado en https://danper-salud-web-20261025.web.app; migración cloud deshabilitada y sincronización con iPhone todavía sin comprobar. Falta implementar/validar los puntos marcados parciales, en especial conciliación completa, conflictos cloud, journal nativo, conciliación del indicador y reportes estadísticos adicionales. No debe confundirse una compilación correcta o las pruebas de casos cubiertos con validación clínica completa.

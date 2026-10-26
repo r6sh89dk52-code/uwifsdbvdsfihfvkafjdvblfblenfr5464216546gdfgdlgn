@@ -15,7 +15,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "firebase:prepare": "node scripts/prepare-firebase.mjs",
     "format": "prettier --write src tests scripts/*.mjs *.ts",
-    "test:pwa": "node scripts/test-pwa.mjs"
+    "test:pwa": "node scripts/test-pwa.mjs",
+    "firebase:configure": "node scripts/configure-firebase-project.mjs"
   },
   "dependencies": {
     "fflate": "0.8.3",

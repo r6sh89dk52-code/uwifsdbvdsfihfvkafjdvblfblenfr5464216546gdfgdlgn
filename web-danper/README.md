@@ -1,6 +1,6 @@
 # DANPER SALUD WEB — desarrollo integral en curso
 
-React + TypeScript + Vite, generado desde el HEAD nativo auditado. **No es todavía una plataforma clínica integral validada ni está desplegada.** Consulta [la matriz y pendientes](docs/AUDITORIA_Y_PARIDAD.md).
+React + TypeScript + Vite, generado desde el HEAD nativo auditado. **No es todavía una plataforma clínica integral validada. Hosting está publicado para validación.** Consulta [la matriz y pendientes](docs/AUDITORIA_Y_PARIDAD.md).
 
 ## Ejecutar en Windows
 
@@ -19,19 +19,11 @@ Los datos iniciales están vacíos. No se incluyen trabajadores reales ni una ba
 
 ## Firebase
 
-No se encontró configuración real en los recursos accesibles. Copia `.env.example` a `.env.local` y completa la configuración pública de la aplicación Firebase y el UID autorizado. Habilita Google en Authentication y crea Firestore. No incluyas claves privadas ni cuentas de servicio.
+Proyecto real: `danper-salud-web-20261025`. [Abrir la versión publicada](https://danper-salud-web-20261025.web.app). Google Authentication está configurado para la cuenta autorizada; su inicio interactivo de sesión aún no tiene prueba de extremo a extremo.
 
-```powershell
-$env:FIREBASE_PROJECT_ID = 'ID_REAL'
-$env:DANPER_AUTHORIZED_UID = 'UID_VERIFICADO'
-npm run firebase:prepare
-npm run build
-firebase emulators:start --config firebase.authorized.json
-# Ejecutar y revisar primero las pruebas de reglas y sincronización pendientes.
-firebase deploy --config firebase.authorized.json --only hosting,firestore
-```
+Firestore Standard se configura en Santiago, `southamerica-west1`, con reglas que deniegan todo. Las escrituras clínicas permanecen desactivadas y no se migraron datos reales. El archivo `firebase-project.public.json` contiene únicamente identificadores públicos del proyecto y el UID autorizado.
 
-Firebase CLI no es dependencia del runtime de la web. Se requiere una sesión autorizada para desplegar. El script no crea cuentas ni activa facturación. `firestore.rules` deniega todo por defecto. No se proporciona URL web.app porque no se ha desplegado.
+`npm run firebase:configure` prepara la configuración local pública sin activar escrituras. Luego ejecuta `npm run build`. El despliegue requiere la sesión autorizada de Firebase CLI. No adjuntes claves privadas ni cuentas de servicio.
 
 ## Alcance comprobable
 

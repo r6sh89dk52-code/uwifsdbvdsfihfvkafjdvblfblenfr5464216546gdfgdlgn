@@ -16,6 +16,7 @@ import { store, put } from "./storage";
 import {
   authSetup,
   configured,
+  cloudWritesEnabled,
   login,
   logout,
   synchronize,
@@ -369,6 +370,7 @@ function App() {
           </div>
         </header>
         <main>
+          {configured && !cloudWritesEnabled && <p className="notice" role="status">Versión en validación. Los registros se guardan en este navegador; la sincronización clínica compartida está desactivada.</p>}
           <Suspense fallback={<Empty>Cargando módulo…</Empty>}>
             {module === "Trabajadores" ? (
               <Workers />

@@ -2,7 +2,9 @@
   "browser": "Chromium",
   "productionBuild": true,
   "offlineReload": true,
-  "lazyModuleOffline": true,
-  "themePersistedOffline": true,
+  "signedOut": true,
+  "staticAssetsCached": true,
+  "lazyModuleOffline": null,
+  "themePersistedOffline": null,
   "errors": []
 }
