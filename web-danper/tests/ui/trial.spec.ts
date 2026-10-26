@@ -1,3 +1,4 @@
+import { acknowledge } from "./feedback-helper";
 import { test, expect } from "@playwright/test";
 import { unzipSync, strFromU8 } from "fflate";
 import fs from "node:fs/promises";
@@ -26,6 +27,7 @@ test("Prueba ficticia aislada, importación PERSONAL y descargas por período", 
     .getByRole("button", { name: "Descargar PERSONAL ficticio", exact: true })
     .click();
   const sample = await samplePromise;
+  await acknowledge(page, "Archivo preparado");
   await nav.getByRole("button", { name: "Inicio" }).click();
   await page
     .getByRole("button", { name: "Trabajadores", exact: true })
@@ -41,6 +43,7 @@ test("Prueba ficticia aislada, importación PERSONAL y descargas por período", 
   await page
     .getByRole("button", { name: "Confirmar importación", exact: true })
     .click();
+  await acknowledge(page);
   await expect(
     page.getByText("2 fichas incorporadas por DNI.", { exact: true }),
   ).toBeVisible();
@@ -60,6 +63,7 @@ test("Prueba ficticia aislada, importación PERSONAL y descargas por período", 
     const pending = page.waitForEvent("download");
     await page.getByRole("button", { name, exact: true }).click();
     const file = await pending;
+    await acknowledge(page, "Archivo preparado");
     const archive = unzipSync(
       new Uint8Array(await fs.readFile((await file.path())!)),
     );
@@ -74,7 +78,11 @@ test("Prueba ficticia aislada, importación PERSONAL y descargas por período", 
     return (await import(module)).store.queue();
   });
   expect(queue).toEqual([]);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+  ).toBeLessThanOrEqual(1);
   await page.screenshot({
     path: "test-results/" + info.project.name + "-trial.png",
     fullPage: true,

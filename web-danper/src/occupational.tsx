@@ -1,3 +1,4 @@
+import { FieldError } from "./feedback";
 import { useMemo, useState } from "react";
 import {
   useRecords,
@@ -346,14 +347,27 @@ function Exams({ kind }: { kind: "emo" | "cholinesterase" }) {
             <button
               onClick={() =>
                 void action.run(async () => {
-                  if (!/^\d{8}$/.test(edit.dni)) throw Error("DNI inválido");
+                  if (!/^\d{8}$/.test(edit.dni))
+                    throw new FieldError(
+                      "Introduce un DNI válido de 8 dígitos.",
+                      ["DNI"],
+                    );
                   if (
                     edit.verified &&
                     (!parseDate(edit.date) || !edit.result.trim())
                   )
-                    throw Error("Verifica fecha y resultado");
+                    throw new FieldError(
+                      "Verifica la fecha y el resultado original.",
+                      [
+                        !parseDate(edit.date)
+                          ? "Fecha de examen"
+                          : "Resultado / aptitud original",
+                      ],
+                    );
                   if (edit.nextDate && !parseDate(edit.nextDate))
-                    throw Error("Programación inválida");
+                    throw new FieldError("Verifica la fecha de programación.", [
+                      "Próximo examen (selección manual)",
+                    ]);
                   if (
                     edit.verified &&
                     kind === "cholinesterase" &&
@@ -361,7 +375,10 @@ function Exams({ kind }: { kind: "emo" | "cholinesterase" }) {
                       normalize(edit.type + " " + edit.profile),
                     )
                   )
-                    throw Error("El tipo/perfil no acredita colinesterasa");
+                    throw new FieldError(
+                      "El tipo o perfil no acredita colinesterasa.",
+                      ["Tipo de examen", "Perfil"],
+                    );
                   const w = roster.get(edit.dni);
                   await put(kind, edit.id, {
                     ...edit,
@@ -725,13 +742,20 @@ function Leaves() {
         <button
           onClick={() =>
             void action.run(async () => {
-              if (
-                !workers.some((w) => w.dni === edit.dni) ||
-                !parseDate(edit.start) ||
-                !parseDate(edit.end) ||
-                edit.end < edit.start
-              )
-                throw Error("Verifica trabajador y fechas de descanso");
+              if (!workers.some((w) => w.dni === edit.dni))
+                throw new FieldError("Selecciona un trabajador del padrón.", [
+                  "DNI del trabajador",
+                ]);
+              if (!parseDate(edit.start))
+                throw new FieldError(
+                  "Revisa la fecha de inicio del descanso.",
+                  ["Fecha de inicio"],
+                );
+              if (!parseDate(edit.end) || edit.end < edit.start)
+                throw new FieldError(
+                  "La fecha de término debe ser válida e igual o posterior al inicio.",
+                  ["Fecha de término"],
+                );
               await put("leaves", edit.id, edit);
               setEdit({
                 ...edit,

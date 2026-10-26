@@ -1,0 +1,35 @@
+{
+  "nativeHead": "9bec8e01ccbb3f1a674372cf6e48df049dc4f014",
+  "buildPassed": true,
+  "domainTests": {
+    "passed": 24,
+    "failed": 0
+  },
+  "ui": {
+    "startTime": "2026-10-26T01:05:46.485Z",
+    "duration": 87904.79800000001,
+    "expected": 17,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "features": [
+    "Confirmaciones centrales después de la transacción",
+    "Errores con Corregir, enfoque y resaltado del campo",
+    "Borradores automáticos silenciosos",
+    "Búsqueda de padrón DNI/nombres con 25 filas por página",
+    "Registro desde búsqueda sin coincidencias y protección de DNI existente",
+    "Datos de formulario conservados al corregir",
+    "Diálogos centrados medidos en ambos ejes",
+    "Foco de teclado contenido en el diálogo",
+    "Movimiento reducido respetado",
+    "Descargas, atención y operaciones de Kardex con confirmación"
+  ],
+  "realGoogleInteractiveLoginTested": false,
+  "realClinicalSyncEnabled": false,
+  "followupBackupValidation": {
+    "scope": "Registro manual desktop y móvil con respaldo ficticio inválido",
+    "passed": 2,
+    "failed": 0
+  }
+}

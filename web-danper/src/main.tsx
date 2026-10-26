@@ -1,3 +1,13 @@
+import { FeedbackHost } from "./FeedbackHost";
+import { WorkerSearch } from "./WorkerSearch";
+import {
+  beginOperation,
+  finishOperation,
+  notifySaved,
+  notifySuccess,
+  notifyFailure,
+  FieldError,
+} from "./feedback";
 import { ModuleIcon, moduleDetails } from "./ModuleIcon";
 import { clinician } from "./clinician";
 import { nursingCatalog } from "./nursingCatalog";
@@ -12,6 +22,7 @@ import { kardexCatalog } from "../legacy/kardexCatalog";
 import {
   validateClinicalStage,
   findFirstInvalidStage,
+  findFirstIncompleteStage,
   SYSTEM_REQUIRED_CATEGORIES,
   type ClinicalStage,
 } from "../legacy/attentionStepValidation";
@@ -56,6 +67,7 @@ import {
 } from "./accounting";
 import { download } from "./workbooks";
 import "./style.css";
+import "./interaction.css";
 const Occupational = lazy(() => import("./occupational"));
 const Tools = lazy(() => import("./tools"));
 export function useRecords<T>(collection: Collection) {
@@ -184,6 +196,7 @@ export function Check({
     <label className="check">
       <input
         type="checkbox"
+        aria-label={label}
         checked={value}
         onChange={(e) => onChange(e.target.checked)}
       />
@@ -214,10 +227,22 @@ export function useAction() {
     error,
     run: async (fn: () => Promise<unknown>) => {
       setError("");
+      const origin = document.activeElement as HTMLElement;
+      const scope = origin?.closest<HTMLElement>(".editor,section.card,main");
+      const button = origin instanceof HTMLButtonElement ? origin : undefined;
+      const wasDisabled = button?.disabled;
+      if (button) button.disabled = true;
+      beginOperation();
+      let ok = false;
       try {
         await fn();
+        ok = true;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Operación no completada");
+        notifyFailure(e, scope || undefined);
+      } finally {
+        finishOperation(ok);
+        if (button?.isConnected) button.disabled = !!wasDisabled;
       }
     },
   };
@@ -231,6 +256,7 @@ export async function atomic(changes: Change[]) {
       detail: [...new Set(changes.map((c) => c.collection))],
     }),
   );
+  notifySaved([...new Set(changes.map((c) => c.collection))]);
   void synchronize();
 }
 export async function changed(
@@ -587,17 +613,19 @@ function WorkerEditor({
   worker,
   onSave,
   onCancel,
+  isNew = !worker.dni,
 }: {
   worker: Worker;
   onSave: (w: Worker) => Promise<void>;
   onCancel: () => void;
+  isNew?: boolean;
 }) {
   const [w, setW] = useState(worker);
   const action = useAction();
   const areas = useMemo(() => readOfficialOrganization(), []);
   return (
     <div className="editor">
-      <h3>{worker.dni ? "Editar trabajador" : "Nuevo trabajador"}</h3>
+      <h3>{isNew ? "Nuevo trabajador" : "Editar trabajador"}</h3>
       <div className="grid">
         {(
           [
@@ -644,6 +672,7 @@ function WorkerEditor({
                   "Ubigeo",
                 ][i]
               }
+              readOnly={k === "dni" && !isNew}
               type={k === "birthDate" ? "date" : "text"}
               list={k === "area" ? "official-areas" : undefined}
               value={w[k] || ""}
@@ -663,14 +692,24 @@ function WorkerEditor({
         <button
           onClick={() =>
             void action.run(async () => {
-              if (
-                !/^\d{8}$/.test(w.dni) ||
-                !w.name.trim() ||
-                (w.sex && !["M", "F"].includes(w.sex))
-              )
-                throw Error("Verifica DNI, nombre y sexo");
-              if (worker.dni && w.dni !== worker.dni)
-                throw Error("El DNI canónico no se cambia desde la ficha");
+              if (!/^\d{8}$/.test(w.dni))
+                throw new FieldError("Introduce un DNI válido de 8 dígitos.", [
+                  "DNI",
+                ]);
+              if (!w.name.trim())
+                throw new FieldError(
+                  "Completa los apellidos y nombres del trabajador.",
+                  ["Apellidos y nombres"],
+                );
+              if (w.sex && !["M", "F"].includes(w.sex))
+                throw new FieldError("Selecciona el sexo registrado.", [
+                  "Sexo (M/F)",
+                ]);
+              if (!isNew && w.dni !== worker.dni)
+                throw new FieldError(
+                  "El DNI canónico no se cambia desde la ficha.",
+                  ["DNI"],
+                );
               await onSave({
                 ...w,
                 source: "manual",
@@ -796,7 +835,12 @@ function Clinical() {
   const [d, setD] = useState<Draft>(emptyDraft),
     [q, setQ] = useState(""),
     [search, setSearch] = useState(""),
-    [newWorker, setNewWorker] = useState(false),
+    [workerForm, setWorkerForm] = useState<{
+      worker: Worker;
+      isNew: boolean;
+    } | null>(null),
+    [rosterOpen, setRosterOpen] = useState(false),
+    [showImport, setShowImport] = useState(false),
     [issues, setIssues] = useState<string[]>([]),
     [notice, setNotice] = useState(""),
     [saving, setSaving] = useState(false);
@@ -808,7 +852,10 @@ function Clinical() {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (d.worker.dni || d.diagnosis || d.items.length)
-        void put("drafts", d.id, d, false).catch((e) => setIssues([e.message]));
+        void put("drafts", d.id, d, false).catch((e) => {
+          setIssues([e.message]);
+          notifyFailure(e);
+        });
     }, 500);
     return () => clearTimeout(timer);
   }, [d]);
@@ -853,29 +900,100 @@ function Clinical() {
       },
     });
     setQ("");
+    setRosterOpen(false);
+    setWorkerForm(null);
+    setIssues([]);
+  };
+  const openNewWorker = (query = "") => {
+    const dni = query.replace(/\s/g, "");
+    const existing = workers.find((w) => w.dni === dni);
+    if (existing) {
+      selectWorker(existing);
+      return;
+    }
+    setRosterOpen(false);
+    setWorkerForm({
+      isNew: true,
+      worker: { ...emptyDraft().worker, dni: /^\d{8}$/.test(dni) ? dni : "" },
+    });
+  };
+  const clinicalLabels: Record<string, string[]> = {
+    "worker-dni": ["Buscar trabajador para atención"],
+    "worker-name": ["Buscar trabajador para atención"],
+    "clinical-date": ["Fecha"],
+    "clinical-time": ["Hora"],
+    "clinical-category": ["Tipo de atención"],
+    "clinical-system": ["Sistema afectado"],
+    "clinical-segment": ["Segmento osteomuscular"],
+    "clinical-diagnosis": ["Diagnóstico presuntivo / comentario clínico"],
+    "allergy-status": ["Estado reportado"],
+    "allergy-substances": ["Sustancias / medicamentos reportados"],
+    "treatment-items": ["Cantidad clínica", "Procedimiento"],
+    "result-permission-time": ["Hora del permiso"],
+  };
+  const reportIssues = (errors: ReturnType<typeof validateClinicalStage>) => {
+    if (!errors.length) return;
+    setIssues(errors.map((e) => e.message));
+    update({ step: errors[0].step });
+    const first = errors[0];
+    const itemIndex =
+      Number(first.message.match(/producto (\d+)/)?.[1] || 0) - 1;
+    const labels =
+      first.field === "treatment-items"
+        ? [
+            /procedimiento/i.test(first.message)
+              ? "Procedimiento"
+              : "Cantidad clínica",
+          ]
+        : clinicalLabels[first.field] || [];
+    notifyFailure(
+      new FieldError(
+        errors.map((e) => e.message).join("\n"),
+        labels,
+        () => update({ step: first.step }),
+        itemIndex >= 0
+          ? '[data-item-id="' + d.items[itemIndex]?.id + '"]'
+          : undefined,
+      ),
+    );
   };
   async function save() {
     setSaving(true);
     try {
       const errors = findFirstInvalidStage(d, ctx);
       if (errors.length) {
-        setIssues(errors.map((e) => e.message));
-        update({ step: errors[0].step });
+        reportIssues(errors);
         return;
       }
       if (!d.procedures.length && !d.items.length)
-        throw Error("Selecciona al menos un procedimiento o producto");
+        throw new FieldError(
+          "Selecciona al menos un procedimiento o producto",
+          ["Buscar producto clínico"],
+          () => update({ step: 2 }),
+        );
       if (d.items.some((i) => !i.procedureConfirmed))
-        throw Error("Confirma los procedimientos sugeridos de cada producto");
+        throw new FieldError(
+          "Confirma los procedimientos sugeridos de cada producto",
+          ["Confirmo el procedimiento realizado"],
+          () => update({ step: 2 }),
+          '[data-item-id="' +
+            d.items.find((i) => !i.procedureConfirmed)?.id +
+            '"]',
+        );
       if (!d.responsible.trim() || !/^\d{8}$/.test(d.responsibleDni))
         throw Error("Completa responsable y DNI");
       if (wound && !d.photoReviewed)
-        throw Error(
+        throw new FieldError(
           "Confirma la revisión del estado de fotografía de curación",
+          ["Revisé el estado de la fotografía de curación"],
+          () => update({ step: 3 }),
         );
       const current = await store.get("attentions", d.id);
       if (current) {
         setNotice("Esta atención ya está guardada.");
+        notifySuccess(
+          "Esta atención ya está guardada. No se creó un duplicado.",
+        );
         return;
       }
       const currentLots = await store.all<Lot>("lots");
@@ -883,7 +1001,15 @@ function Clinical() {
         (e) => e.data,
       );
       const worker = (await store.get<Worker>("workers", d.worker.dni))?.data;
-      if (!worker) throw Error("Trabajador no disponible");
+      if (!worker)
+        throw new FieldError(
+          "Trabajador no disponible. Búscalo nuevamente en el padrón.",
+          ["Buscar trabajador para atención"],
+          () => {
+            update({ step: 0 });
+            setRosterOpen(true);
+          },
+        );
       const visit = {
         ...d,
         worker,
@@ -993,16 +1119,18 @@ function Clinical() {
           (s, i) => (
             <button
               key={s}
-              className={d.step === i ? "active" : ""}
+              className={d.step === i ? "active" : d.step > i ? "complete" : ""}
+              aria-current={d.step === i ? "step" : undefined}
               onClick={() => {
                 if (i > d.step) {
-                  const errs = validateClinicalStage(
+                  const errs = findFirstIncompleteStage(
                     d.step as ClinicalStage,
+                    i as ClinicalStage,
                     d,
                     ctx,
                   );
                   if (errs.length) {
-                    setIssues(errs.map((e) => e.message));
+                    reportIssues(errs);
                     return;
                   }
                 }
@@ -1017,6 +1145,7 @@ function Clinical() {
         )}
       </div>
       <Section
+        key={d.step}
         title={
           [
             "Seleccionar trabajador",
@@ -1028,63 +1157,190 @@ function Clinical() {
       >
         {d.step === 0 && (
           <>
-            <input
-              className="full"
-              aria-label="Buscar trabajador para atención"
-              placeholder="Escribe DNI o nombres del trabajador"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            {matches.length > 0 && (
-              <div className="results">
-                {matches.map((w) => (
-                  <button
-                    className="result"
-                    key={w.dni}
-                    onClick={() => selectWorker(w)}
+            <div className="worker-intro">
+              <span className="eyebrow">1 · IDENTIFICA AL TRABAJADOR</span>
+              <h3>Primero, encuentra su ficha</h3>
+              <p>
+                Busca en el padrón por DNI o nombres. Si la persona aún no
+                figura, registra su ficha y continúa esta misma atención.
+              </p>
+            </div>
+            <div className="worker-paths">
+              <button
+                className="worker-path"
+                onClick={() => setRosterOpen(true)}
+              >
+                <span className="avatar" aria-hidden="true">
+                  ⌕
+                </span>
+                <span>
+                  <strong>Buscar en padrón</strong>
+                  <small>
+                    {workers.length} trabajadores disponibles · DNI o nombres
+                  </small>
+                </span>
+                <span aria-hidden="true">→</span>
+              </button>
+              <button
+                className="worker-path secondary"
+                onClick={() => openNewWorker(q)}
+                aria-label="Registrar trabajador sin salir"
+              >
+                <span className="avatar" aria-hidden="true">
+                  ＋
+                </span>
+                <span>
+                  <strong>Registrar nuevo trabajador</strong>
+                  <small>Crear ficha y usarla en esta atención</small>
+                </span>
+              </button>
+            </div>
+            {!d.worker.dni && !workerForm && (
+              <div className="quick-lookup">
+                <label className="field">
+                  <span>Búsqueda rápida por DNI o nombres</span>
+                  <input
+                    aria-label="Buscar trabajador para atención"
+                    placeholder="Escribe DNI, nombres o apellidos"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                  />
+                </label>
+                {q.trim() && (
+                  <div
+                    className="results"
+                    aria-label="Coincidencias del padrón"
                   >
-                    <b>{w.name}</b>
-                    <small>
-                      {w.dni} · {w.area} · {w.labor}
-                    </small>
-                  </button>
-                ))}
+                    {matches.map((w) => (
+                      <button
+                        className="result roster-row"
+                        key={w.dni}
+                        onClick={() => selectWorker(w)}
+                      >
+                        <span>
+                          <strong>{w.name}</strong>
+                          <small>
+                            {w.dni} · {w.site} · {w.area}
+                          </small>
+                        </span>
+                        <span aria-hidden="true">Seleccionar →</span>
+                      </button>
+                    ))}
+                    {!matches.length && (
+                      <div className="inset">
+                        <p>
+                          No encontramos coincidencias. Revisa el dato o
+                          registra una ficha nueva.
+                        </p>
+                        <button
+                          className="quiet"
+                          onClick={() => openNewWorker(q)}
+                        >
+                          Registrar con este DNI
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
+            {!workers.length && (
+              <div className="notice">
+                <strong>Tu padrón local está vacío</strong>
+                <p>
+                  Importa PERSONAL para buscar a tus colaboradores o registra
+                  una ficha manual.
+                </p>
+                <button
+                  className="quiet"
+                  onClick={() => setShowImport((s) => !s)}
+                >
+                  {showImport
+                    ? "Ocultar importación"
+                    : "Importar padrón PERSONAL"}
+                </button>
+              </div>
+            )}
+            {workers.length > 0 && (
+              <button
+                className="quiet"
+                onClick={() => setShowImport((s) => !s)}
+              >
+                {showImport
+                  ? "Ocultar importación"
+                  : "Actualizar padrón desde PERSONAL"}
+              </button>
+            )}
+            {showImport && (
+              <Suspense fallback={<Empty>Cargando importación…</Empty>}>
+                <Tools mode="workers" />
+              </Suspense>
+            )}
             {d.worker.dni && (
-              <div className="selected-worker">
-                <span className="avatar">{d.worker.name.slice(0, 1)}</span>
+              <div className="selected-worker verified-worker">
+                <span className="avatar" aria-hidden="true">
+                  ✓
+                </span>
                 <div>
+                  <span className="eyebrow">TRABAJADOR SELECCIONADO</span>
                   <strong>{d.worker.name}</strong>
                   <p>
-                    {d.worker.dni} · {d.worker.site}
+                    DNI {d.worker.dni} ·{" "}
+                    {d.worker.site === "PLVENTUROSA"
+                      ? "Planta La Venturosa"
+                      : "Fundo La Venturosa"}
                   </p>
                   <small>
                     {d.worker.area} · {d.worker.labor}
                   </small>
                 </div>
-                <button className="quiet" onClick={() => setNewWorker(true)}>
-                  Editar ficha
-                </button>
+                <div className="worker-card-actions">
+                  <button className="quiet" onClick={() => setRosterOpen(true)}>
+                    Cambiar trabajador
+                  </button>
+                  <button
+                    className="quiet"
+                    onClick={() =>
+                      setWorkerForm({ worker: d.worker, isNew: false })
+                    }
+                  >
+                    Editar ficha
+                  </button>
+                </div>
               </div>
             )}
-            <button className="quiet" onClick={() => setNewWorker(true)}>
-              ＋ Registrar trabajador sin salir
-            </button>
-            {newWorker && (
+            {workerForm && (
               <WorkerEditor
-                worker={d.worker}
-                onCancel={() => setNewWorker(false)}
+                key={
+                  (workerForm.isNew ? "new:" : "edit:") + workerForm.worker.dni
+                }
+                worker={workerForm.worker}
+                isNew={workerForm.isNew}
+                onCancel={() => setWorkerForm(null)}
                 onSave={async (w) => {
                   const old = await store.get<Worker>("workers", w.dni);
-                  if (!d.worker.dni && old)
-                    throw Error(
-                      "DNI existente; selecciónalo desde la búsqueda",
+                  if (workerForm.isNew && old)
+                    throw new FieldError(
+                      "Este DNI ya existe. Selecciona la ficha del padrón para evitar duplicados.",
+                      ["DNI"],
+                      () => {
+                        setWorkerForm(null);
+                        setQ(w.dni);
+                        setRosterOpen(true);
+                      },
                     );
                   await put("workers", w.dni, w);
                   selectWorker(w);
-                  setNewWorker(false);
                 }}
+              />
+            )}
+            {rosterOpen && (
+              <WorkerSearch
+                workers={workers}
+                initialQuery={q}
+                onSelect={selectWorker}
+                onNew={openNewWorker}
+                onClose={() => setRosterOpen(false)}
               />
             )}
           </>
@@ -1252,7 +1508,7 @@ function Clinical() {
               ))}
             </div>
             {d.items.map((item) => (
-              <div className="inset" key={item.id}>
+              <div className="inset" key={item.id} data-item-id={item.id}>
                 <div className="section-heading">
                   <h3>{item.name}</h3>
                   <button
@@ -1487,7 +1743,7 @@ function Clinical() {
                   d,
                   ctx,
                 );
-                setIssues(errs.map((e) => e.message));
+                if (errs.length) reportIssues(errs);
                 if (!errs.length) update({ step: d.step + 1 });
               }}
             >
@@ -1774,13 +2030,29 @@ function Inventory() {
           onClick={() =>
             void action.run(async () => {
               const p = nursingCatalog.find((p) => p.id === selected);
-              if (!p) throw Error("Selecciona un producto");
+              if (!p)
+                throw new FieldError(
+                  "Selecciona un producto de las sugerencias.",
+                  ["Producto oficial de enfermería"],
+                );
               if (
                 lots.some(
                   (l) => l.code === p.id && normalize(l.lot) === normalize(lot),
                 )
               )
-                throw Error("Lote existente: registra un ingreso");
+                throw new FieldError(
+                  "Este lote ya está registrado. Revisa la referencia o utiliza Operar para registrar un ingreso.",
+                  ["Lote"],
+                );
+              if (!lot.trim())
+                throw new FieldError("Escribe la referencia del lote.", [
+                  "Lote",
+                ]);
+              if (!unit)
+                throw new FieldError(
+                  "Selecciona una presentación verificada.",
+                  ["Presentación excepcional verificada"],
+                );
               const id = crypto.randomUUID();
               const l: Lot = {
                 id,
@@ -1802,7 +2074,10 @@ function Inventory() {
                 !Number.isSafeInteger(l.sealedContainers) ||
                 l.sealedContainers <= 0
               )
-                throw Error("Indica una cantidad inicial mayor que cero");
+                throw new FieldError(
+                  "Indica una cantidad inicial mayor que cero.",
+                  ["Cantidad inicial"],
+                );
               validateLot(l);
               await put("lots", id, l);
               setLot("");
@@ -1924,6 +2199,11 @@ function Inventory() {
           <button
             onClick={() =>
               void action.run(async () => {
+                if (reason.trim().length < 10)
+                  throw new FieldError(
+                    "Indica el motivo o documento de la operación (al menos 10 caracteres).",
+                    ["Motivo / documento"],
+                  );
                 const entity = (await store.get<Lot>("lots", active.id))!;
                 const current = entity.data;
                 const m =
@@ -2114,4 +2394,9 @@ function Alerts() {
 await store.open();
 if ("serviceWorker" in navigator && import.meta.env.PROD)
   void navigator.serviceWorker.register("/sw.js");
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <>
+    <FeedbackHost />
+    <App />
+  </>,
+);

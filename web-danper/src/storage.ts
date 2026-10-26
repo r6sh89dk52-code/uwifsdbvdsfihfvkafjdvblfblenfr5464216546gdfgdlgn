@@ -1,3 +1,4 @@
+import { notifySaved } from "./feedback";
 import { trialMode } from "./workspace";
 import {
   key,
@@ -190,4 +191,5 @@ export async function put(
   window.dispatchEvent(
     new CustomEvent("danper-data", { detail: [collection] }),
   );
+  notifySaved([collection]);
 }

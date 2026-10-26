@@ -1,3 +1,4 @@
+import { acknowledge } from "./feedback-helper";
 import { test, expect } from "@playwright/test";
 import { exportDataSheet } from "../../src/dataExport";
 test("Importar PERSONAL con vista previa, paginación y operaciones auditadas de inventario", async ({
@@ -43,6 +44,7 @@ test("Importar PERSONAL con vista previa, paginación y operaciones auditadas de
   await page
     .getByRole("button", { name: "Confirmar importación", exact: true })
     .click();
+  await acknowledge(page);
   await expect(page.getByRole("status")).toContainText("101 fichas");
   await expect(page.getByRole("row")).toHaveCount(26);
   await page.getByRole("button", { name: "Siguiente", exact: true }).click();
@@ -65,6 +67,7 @@ test("Importar PERSONAL con vista previa, paginación y operaciones auditadas de
   await page.getByLabel("Vencimiento", { exact: true }).fill("2027-12-31");
   await page.getByLabel("Cantidad inicial (FCO)", { exact: true }).fill("2");
   await page.getByRole("button", { name: "Guardar lote", exact: true }).click();
+  await acknowledge(page);
   await expect(
     page.getByRole("cell", { name: "LOTE-FICTICIO", exact: true }),
   ).toBeVisible();
@@ -79,6 +82,7 @@ test("Importar PERSONAL con vista previa, paginación y operaciones auditadas de
   await page
     .getByRole("button", { name: "Confirmar operación física" })
     .click();
+  await acknowledge(page);
   await expect(
     page.getByRole("cell", { name: "5", exact: true }),
   ).toBeVisible();

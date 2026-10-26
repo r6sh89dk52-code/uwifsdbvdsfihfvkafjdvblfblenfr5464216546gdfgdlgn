@@ -1,3 +1,4 @@
+import { notifySuccess } from "./feedback";
 import { trialMode } from "./workspace";
 import { strFromU8, strToU8, zipSync } from "fflate";
 import { readAmbulatoryArchive } from "../legacy/ambulatoryArchive";
@@ -445,6 +446,12 @@ export function download(name: string, bytes: Uint8Array | string) {
   a.download =
     trialMode && !name.startsWith("FICTICIO_") ? "FICTICIO_" + name : name;
   a.click();
+  notifySuccess(
+    "El archivo " +
+      a.download +
+      " está preparado. Revisa las descargas de tu navegador.",
+    "Archivo preparado",
+  );
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 export function projectedConsumption(

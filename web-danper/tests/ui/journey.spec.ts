@@ -1,3 +1,4 @@
+import { acknowledge } from "./feedback-helper";
 import contract from "../../src/generated/contract.json" with { type: "json" };
 import { test, expect } from "@playwright/test";
 test("Recorrido clínico, persistencia, catálogo completo y modo oscuro", async ({
@@ -23,6 +24,7 @@ test("Recorrido clínico, persistencia, catálogo completo y modo oscuro", async
   await page.getByLabel("Sede", { exact: true }).selectOption("PLVENTUROSA");
   await page.getByLabel("Sexo (M/F)").selectOption("F");
   await page.getByRole("button", { name: "Guardar ficha" }).click();
+  await acknowledge(page);
   await expect(
     page.getByText("TRABAJADOR FICTICIO", { exact: true }),
   ).toBeVisible();
@@ -61,6 +63,7 @@ test("Recorrido clínico, persistencia, catálogo completo y modo oscuro", async
   await page
     .getByRole("button", { name: "Guardar atención", exact: true })
     .click();
+  await acknowledge(page);
   await expect(page.getByRole("status")).toContainText("Atención guardada");
   await page.reload();
   await page

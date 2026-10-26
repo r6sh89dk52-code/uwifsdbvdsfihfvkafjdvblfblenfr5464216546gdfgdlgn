@@ -1,1 +1,1 @@
-npm run build: PASS. TypeScript --noEmit, Vite 7.3.7 y precache estático generados. Build publicado en https://danper-salud-web-20261025.web.app.
+npm run build: PASS. TypeScript --noEmit, Vite 7.3.7, 83 módulos y precache estático generados. Ventanas centrales y padrón; 24 pruebas de dominio y 17 UI pasadas, 1 repetición móvil omitida. Verificación específica posterior de respaldo inválido: 2 casos pasados.

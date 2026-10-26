@@ -1,3 +1,4 @@
+import { notifySuccess, FieldError } from "./feedback";
 import { clinician } from "./clinician";
 import { trialMode, switchWorkspace } from "./workspace";
 import { loadTrial } from "./trial";
@@ -648,6 +649,7 @@ function Settings() {
               await store.setMeta("migrationStaging", result.snapshot);
               setPreview(result);
               setConfirm(false);
+              if(result.errors.length)throw new FieldError(result.errors.join("\n"), ["Respaldo cifrado"]);
             })
           }
         />
@@ -681,6 +683,9 @@ function Settings() {
               onClick={() =>
                 void action.run(async () => {
                   await store.setMeta("migrationReviewedAt", Date.now());
+                  notifySuccess(
+                    "Staging local revisado. No se crearon ni sobrescribieron datos cloud.",
+                  );
                   setMessage(
                     "Staging local revisado. No se crearon ni sobrescribieron datos cloud.",
                   );
