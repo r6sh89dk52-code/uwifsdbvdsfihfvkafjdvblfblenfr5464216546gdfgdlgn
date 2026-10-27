@@ -209,7 +209,7 @@ public enum N2OccupationalVigilanceWorkbook {
     """
     public static func export(snapshot:Data,start:String,end:String)throws->Result {
         guard iso(start),iso(end),start<=end else{throw Failure.invalidDates}
-        _=try N1eLegacyClinicalAudit.inspect(snapshot,allowEmptySynthetic:true)
+        _=try N2VersionedSnapshotAudit.inspect(snapshot,allowEmptySynthetic:true)
         _=try N1fLosslessFieldGate.inspect(snapshot)
         guard let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let visits=root["attentions"] as? [[String:Any]] else {

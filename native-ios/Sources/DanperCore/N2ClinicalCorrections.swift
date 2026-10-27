@@ -68,7 +68,7 @@ public enum N2ClinicalCorrections {
     private static func json(_ data:Data)throws->[String:Any] {
         guard let obj=try? JSONSerialization.jsonObject(with:data) as? [String:Any],
               obj["attentions"] is [[String:Any]],obj["stockMovements"] is [[String:Any]],
-              (try? N1eLegacyClinicalAudit.inspect(data,allowEmptySynthetic:true)) != nil,
+              (try? N2VersionedSnapshotAudit.inspect(data,allowEmptySynthetic:true)) != nil,
               (try? N1fLosslessFieldGate.inspect(data)) != nil else {
             throw N2CorrectionError.invalidSnapshot
         }
@@ -370,7 +370,7 @@ public enum N2ClinicalCorrections {
         }else{drafts.append(row)}
         source["clinicalCorrectionDrafts"]=drafts
         let bytes=try JSONSerialization.data(withJSONObject:source,options:[.sortedKeys])
-        _=try N1eLegacyClinicalAudit.inspect(bytes)
+        _=try N2VersionedSnapshotAudit.inspect(bytes)
         _=try N1fLosslessFieldGate.inspect(bytes)
         return bytes
     }
@@ -382,7 +382,7 @@ public enum N2ClinicalCorrections {
         }
         source["clinicalCorrectionDrafts"]=drafts.filter{$0["visitID"] as? String != visitID}
         let bytes=try JSONSerialization.data(withJSONObject:source,options:[.sortedKeys])
-        _=try N1eLegacyClinicalAudit.inspect(bytes)
+        _=try N2VersionedSnapshotAudit.inspect(bytes)
         _=try N1fLosslessFieldGate.inspect(bytes)
         return bytes
     }
@@ -453,7 +453,7 @@ public enum N2ClinicalCorrections {
             }
         }
         let result=try JSONSerialization.data(withJSONObject:obj,options:[.sortedKeys])
-        _=try N1eLegacyClinicalAudit.inspect(result)
+        _=try N2VersionedSnapshotAudit.inspect(result)
         _=try N1fLosslessFieldGate.inspect(result)
         // Audit the entire chain including this newly appended revision.
         _=try project(obj)

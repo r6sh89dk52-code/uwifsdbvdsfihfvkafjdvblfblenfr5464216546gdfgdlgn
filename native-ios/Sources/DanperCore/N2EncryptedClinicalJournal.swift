@@ -159,7 +159,7 @@ internal final class N2EncryptedClinicalJournal {
               // The only zero-record exception is the exact canonical empty
               // snapshot. No partially empty, corrupted or imported source
               // can bypass the existing production audit.
-              (try? N1eLegacyClinicalAudit.inspect(
+              (try? N2VersionedSnapshotAudit.inspect(
                   data,allowEmptySynthetic:N2EmptyDemoSnapshot.matches(data))) != nil,
               (try? N1fLosslessFieldGate.inspect(data)) != nil else {
             throw Failure.invalidSnapshot

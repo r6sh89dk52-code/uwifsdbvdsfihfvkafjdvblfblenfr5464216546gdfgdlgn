@@ -17,7 +17,7 @@ public enum N2DraftRecoveryError:Error,Equatable {
 
 public enum N2NativeDraftRecovery {
     public static func read(_ snapshot:Data)throws->[N2RecoverableDraft] {
-        guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
+        guard (try? N2VersionedSnapshotAudit.inspect(snapshot)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil else {
             throw N2DraftRecoveryError.invalidSnapshot
         }

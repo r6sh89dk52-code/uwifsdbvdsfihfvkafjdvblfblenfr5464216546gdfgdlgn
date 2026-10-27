@@ -109,7 +109,7 @@ public enum N2FormError:Error,Equatable {
 public enum N2NativeFormContextReader {
     public static func read(snapshot:Data,revision:Int,products:N2NativeCatalogIndex)
         throws->N2FormContext {
-        guard (try? N1eLegacyClinicalAudit.inspect(snapshot,allowEmptySynthetic:true)) != nil,
+        guard (try? N2VersionedSnapshotAudit.inspect(snapshot,allowEmptySynthetic:true)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil else {
             throw N2FormError.absentSnapshot
         }

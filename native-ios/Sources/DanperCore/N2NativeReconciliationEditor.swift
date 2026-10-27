@@ -38,7 +38,7 @@ public enum N2NativeReconciliationEditor {
         return check.year==c[0] && check.month==c[1] && check.day==c[2]
     }
     private static func parsed(_ snapshot:Data)throws->[String:Any] {
-        guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
+        guard (try? N2VersionedSnapshotAudit.inspect(snapshot)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
               let root=try? JSONSerialization.jsonObject(with:snapshot)
                     as? [String:Any],
@@ -158,7 +158,7 @@ public enum N2NativeReconciliationEditor {
         _=try valid(entries,catalog:codes)
         root["ambulatoryReconciliation"]=entries
         let data=try JSONSerialization.data(withJSONObject:root,options:[.sortedKeys])
-        guard (try? N1eLegacyClinicalAudit.inspect(data)) != nil,
+        guard (try? N2VersionedSnapshotAudit.inspect(data)) != nil,
               (try? N1fLosslessFieldGate.inspect(data)) != nil else{
             throw N2ReconciliationEditError.invalidSource
         }

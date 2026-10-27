@@ -197,7 +197,7 @@ public enum N2ContainerAccounting {
 
     public static func close(snapshot:Data,lotID:String,count:Int,disposition:String,
                              operatorName:String,reason:String,at:Int64)throws->Data {
-        _=try N1eLegacyClinicalAudit.inspect(snapshot)
+        _=try N2VersionedSnapshotAudit.inspect(snapshot)
         guard var root=try JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               var lots=root["stockLots"] as? [[String:Any]],
               var movements=root["stockMovements"] as? [[String:Any]],
@@ -220,7 +220,7 @@ public enum N2ContainerAccounting {
         lots[index]=after;movements.append(movement)
         root["stockLots"]=lots;root["stockMovements"]=movements
         let result=try JSONSerialization.data(withJSONObject:root,options:.sortedKeys)
-        _=try N1eLegacyClinicalAudit.inspect(result)
+        _=try N2VersionedSnapshotAudit.inspect(result)
         _=try N1fLosslessFieldGate.inspect(result)
         return result
     }

@@ -153,7 +153,7 @@ public enum N2VerifiedIndicatorWorkbook {
             throw Failure.unverifiedDelivery
         }
         let clinical=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
-        let parity=try N1eLegacyClinicalAudit.inspect(clinical)
+        let parity=try N2VersionedSnapshotAudit.inspect(clinical)
         _=try N1fLosslessFieldGate.inspect(clinical)
         guard let source=try? JSONSerialization.jsonObject(with:clinical)
                     as? [String:Any],

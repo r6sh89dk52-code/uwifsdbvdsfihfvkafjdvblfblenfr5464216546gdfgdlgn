@@ -63,7 +63,7 @@ public struct N2PendingDispensingEvidence:Codable,Sendable,Equatable {
     public func append(snapshot:Data,explicitConsent:Bool)throws->Data {
         try validate()
         guard explicitConsent else{throw Failure.invalidEvidence}
-        _=try N1eLegacyClinicalAudit.inspect(snapshot)
+        _=try N2VersionedSnapshotAudit.inspect(snapshot)
         guard var root=try JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let visits=root["attentions"] as? [[String:Any]],
               let visit=visits.first(where:{$0["id"] as? String==visitID && $0["status"] as? String=="saved"}),

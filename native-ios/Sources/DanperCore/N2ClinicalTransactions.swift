@@ -94,7 +94,10 @@ public enum N2NativeClinicalTransaction {
     /// a fabricated R=0 or an unconfirmed opening.
     public static func appendSavedVisit(snapshot:Data, visit:Data,
                                         approvedCatalog:Data, at:Int64) throws -> N2ClinicalResult {
-        try execute(snapshot:snapshot,visit:visit,approvedCatalog:approvedCatalog,
+        if N2SimpleInventory.isActive(snapshot) {
+            return try N2SimpleInventory.saveVisit(snapshot:snapshot,visit:visit,at:at)
+        }
+        return try execute(snapshot:snapshot,visit:visit,approvedCatalog:approvedCatalog,
                     at:at,append:true)
     }
 
@@ -102,6 +105,7 @@ public enum N2NativeClinicalTransaction {
     /// Never silently reconstruct historical physical movements.
     public static func retryCurrentSavedVisit(snapshot:Data, visitID:String,
                                               approvedCatalog:Data, at:Int64) throws -> N2ClinicalResult {
+        guard !N2SimpleInventory.isActive(snapshot) else{throw N2SimpleInventoryError.legacyOperation}
         guard let root=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let visits=root["attentions"] as? [[String:Any]],
               let visit=visits.first(where:{$0["id"] as? String == visitID}),
@@ -115,7 +119,7 @@ public enum N2NativeClinicalTransaction {
                                 at:Int64,append:Bool) throws -> N2ClinicalResult {
         guard at>0,at<9_007_199_254_740_991 else{throw N2ClinicalError.invalidTime}
         // Validate original AND derived ledger before making it eligible for a write.
-        _=try N1eLegacyClinicalAudit.inspect(snapshot)
+        _=try N2VersionedSnapshotAudit.inspect(snapshot)
         _=try N1fLosslessFieldGate.inspect(snapshot)
         let approved=try mappings(approvedCatalog)
         let operational=try N2OperationalMappings.read(snapshot)
@@ -534,7 +538,7 @@ public enum N2NativeClinicalTransaction {
         root["stockMovements"]=movements
         guard JSONSerialization.isValidJSONObject(root),
               let candidate=try? JSONSerialization.data(withJSONObject:root),
-              (try? N1eLegacyClinicalAudit.inspect(candidate)) != nil,
+              (try? N2VersionedSnapshotAudit.inspect(candidate)) != nil,
               (try? N1fLosslessFieldGate.inspect(candidate)) != nil else {
             throw N2ClinicalError.inconsistentHistory
         }

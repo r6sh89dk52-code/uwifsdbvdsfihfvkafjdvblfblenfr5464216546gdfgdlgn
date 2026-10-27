@@ -51,7 +51,7 @@ public enum N2AuxiliaryInventory {
         lots.append(physical)
         root["nativeAuxiliaryCatalog"]=entries;root["stockLots"]=lots
         let result=try JSONSerialization.data(withJSONObject:root,options:.sortedKeys)
-        _=try N1eLegacyClinicalAudit.inspect(result,allowEmptySynthetic:true)
+        _=try N2VersionedSnapshotAudit.inspect(result,allowEmptySynthetic:true)
         _=try N1fLosslessFieldGate.inspect(result)
         return result
     }

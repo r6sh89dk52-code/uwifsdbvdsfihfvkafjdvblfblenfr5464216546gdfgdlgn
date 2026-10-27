@@ -57,7 +57,7 @@ public enum N2AutomaticCutAccounting {
               let visits=root["attentions"] as? [[String:Any]],
               let approved=try? JSONSerialization.jsonObject(with:mappings)
                                   as? [[String:Any]],approved.count==86,
-              (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
+              (try? N2VersionedSnapshotAudit.inspect(snapshot)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil else{
             throw Failure.invalidSource
         }

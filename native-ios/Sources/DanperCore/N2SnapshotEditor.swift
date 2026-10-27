@@ -38,7 +38,7 @@ public enum N2SnapshotEditor {
     private static func finish(_ root:[String:Any])throws->Data {
         guard JSONSerialization.isValidJSONObject(root),
               let raw=try? JSONSerialization.data(withJSONObject:root,options:[.sortedKeys]),
-              (try? N1eLegacyClinicalAudit.inspect(raw)) != nil,
+              (try? N2VersionedSnapshotAudit.inspect(raw)) != nil,
               (try? N1fLosslessFieldGate.inspect(raw)) != nil else {
             throw N2SnapshotEditError.validationFailed
         }

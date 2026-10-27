@@ -100,7 +100,7 @@ public enum N2NursingReportBuilder {
     }
     private static func decoded(_ snapshot:Data,_ catalog:Data,site:String="")throws
         -> ([[String:Any]],[[String:Any]],[[String:Any]]) {
-        guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
+        guard (try? N2VersionedSnapshotAudit.inspect(snapshot)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
               let data=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               let lots=data["stockLots"] as? [[String:Any]],

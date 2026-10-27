@@ -47,7 +47,7 @@ public final class N2ProtectedClinicalVaultCore {
     }
     private func summary(_ record:N2EncryptedClinicalJournal.Recovered) throws
         -> N2ProtectedStoreSummary {
-        let a=try N1eLegacyClinicalAudit.inspect(
+        let a=try N2VersionedSnapshotAudit.inspect(
             record.snapshot,
             allowEmptySynthetic:directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT")
         let b=try N1fLosslessFieldGate.inspect(record.snapshot)
@@ -307,7 +307,7 @@ public final class N2ProtectedClinicalVaultCore {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
         }
-        _=try N1eLegacyClinicalAudit.inspect(active.snapshot)
+        _=try N2VersionedSnapshotAudit.inspect(active.snapshot)
         return active.snapshot
     }
     /// Starts a genuinely EMPTY encrypted practice vault. Unlike the bundled
@@ -352,7 +352,7 @@ public final class N2ProtectedClinicalVaultCore {
               N2SyntheticFixtureIdentity.matches(workers:workers,visits:visits) else {
             throw N2ProtectedStoreError.unsafeSource
         }
-        _=try N1eLegacyClinicalAudit.inspect(source)
+        _=try N2VersionedSnapshotAudit.inspect(source)
         _=try N1fLosslessFieldGate.inspect(source)
         let n=try journal.commit(source,expectedRevision:0)
         guard let active=try journal.recover(),active.revision==n,
@@ -385,7 +385,7 @@ public final class N2ProtectedClinicalVaultCore {
               audit.danglingCorrections==0 else {
             throw N2ProtectedStoreError.unsafeSource
         }
-        _=try N1eLegacyClinicalAudit.inspect(plaintext)
+        _=try N2VersionedSnapshotAudit.inspect(plaintext)
         let n=try journal.commit(plaintext,expectedRevision:0)
         guard let active=try journal.recover(),active.revision==n,
               active.snapshot==plaintext else{

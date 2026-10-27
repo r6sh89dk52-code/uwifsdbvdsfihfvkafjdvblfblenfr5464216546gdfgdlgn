@@ -52,7 +52,7 @@ public enum N2NativeInventoryCommands {
         return true
     }
     private static func root(_ snapshot:Data)throws->[String:Any] {
-        guard (try? N1eLegacyClinicalAudit.inspect(snapshot)) != nil,
+        guard (try? N2VersionedSnapshotAudit.inspect(snapshot)) != nil,
               (try? N1fLosslessFieldGate.inspect(snapshot)) != nil,
               let source=try? JSONSerialization.jsonObject(with:snapshot) as? [String:Any]
         else{throw N2InventoryError.invalidSnapshot}
@@ -61,7 +61,7 @@ public enum N2NativeInventoryCommands {
     private static func done(_ next:[String:Any])throws->Data {
         guard let raw=try? JSONSerialization.data(withJSONObject:next,
                 options:[.sortedKeys]),
-              (try? N1eLegacyClinicalAudit.inspect(raw)) != nil,
+              (try? N2VersionedSnapshotAudit.inspect(raw)) != nil,
               (try? N1fLosslessFieldGate.inspect(raw)) != nil else {
             throw N2InventoryError.invalidSnapshot
         }

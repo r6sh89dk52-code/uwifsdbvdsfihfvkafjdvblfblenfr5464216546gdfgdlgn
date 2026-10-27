@@ -68,7 +68,7 @@ public enum N2PersonalRosterImport {
         ]
         let data=try JSONSerialization.data(withJSONObject:root,
                                             options:[.sortedKeys])
-        _=try N1eLegacyClinicalAudit.inspect(data)
+        _=try N2VersionedSnapshotAudit.inspect(data)
         _=try N1fLosslessFieldGate.inspect(data)
         return data
     }
@@ -78,7 +78,7 @@ public enum N2PersonalRosterImport {
     public static func merge(snapshot:Data,preview:N2PersonalImportPreview,
                              site:String)throws->(Data,N2PersonalImportResult) {
         try validate(preview,site)
-        _=try N1eLegacyClinicalAudit.inspect(snapshot)
+        _=try N2VersionedSnapshotAudit.inspect(snapshot)
         _=try N1fLosslessFieldGate.inspect(snapshot)
         guard var root=try JSONSerialization.jsonObject(with:snapshot) as? [String:Any],
               var people=root["workers"] as? [[String:Any]] else {
@@ -144,7 +144,7 @@ public enum N2PersonalRosterImport {
         root["workers"]=people
         let next=try JSONSerialization.data(withJSONObject:root,
                                             options:[.sortedKeys])
-        _=try N1eLegacyClinicalAudit.inspect(next)
+        _=try N2VersionedSnapshotAudit.inspect(next)
         _=try N1fLosslessFieldGate.inspect(next)
         return (next,N2PersonalImportResult(
             before:before,after:people.count,added:added,
