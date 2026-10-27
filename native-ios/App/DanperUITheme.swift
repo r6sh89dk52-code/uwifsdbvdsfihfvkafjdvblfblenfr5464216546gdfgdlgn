@@ -377,7 +377,11 @@ struct DanperInlineSearch:View {
         revealTask?.cancel()
         revealTask=Task { @MainActor in
             do {try await Task.sleep(for:.milliseconds(220))} catch{return}
-            if focused || initial {reveal(searchAnchor)}
+            if focused || initial {
+                let target=query.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty
+                    ? searchAnchor:searchAnchor+"-results"
+                reveal(target)
+            }
         }
     }
     private var matches:[DanperSearchOption] {
@@ -400,28 +404,34 @@ struct DanperInlineSearch:View {
                 Text("Escribe para ver sugerencias de los \(options.count) productos.").font(.caption).foregroundStyle(.secondary)
             } else {
                 if matches.isEmpty {Text("No se encontraron productos.").font(.caption).foregroundStyle(.secondary)}
-                ScrollView {
-                    LazyVStack(spacing:8) {
-                        ForEach(matches) { option in
-                            Button {
-                                onSelect(option.id);query="";focused=false
-                            } label: {
-                                VStack(alignment:.leading,spacing:5) {
-                                    Text(option.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                                    Text(option.detail).font(.caption).foregroundStyle(.secondary)
-                                }.padding(12).frame(maxWidth:.infinity,alignment:.leading)
-                                    .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:12))
-                                    .contentShape(RoundedRectangle(cornerRadius:12))
-                            }.buttonStyle(.plain).accessibilityIdentifier("suggestion-"+option.id)
+                VStack(spacing:0) {
+                    Color.clear.frame(height:1).id(searchAnchor+"-results").accessibilityHidden(true)
+                    ScrollView {
+                        LazyVStack(spacing:8) {
+                            ForEach(matches) { option in
+                                Button {
+                                    onSelect(option.id);query="";focused=false
+                                } label: {
+                                    VStack(alignment:.leading,spacing:5) {
+                                        Text(option.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                                        Text(option.detail).font(.caption).foregroundStyle(.secondary)
+                                    }.padding(12).frame(maxWidth:.infinity,alignment:.leading)
+                                        .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:12))
+                                        .contentShape(RoundedRectangle(cornerRadius:12))
+                                }.buttonStyle(.plain).accessibilityIdentifier("suggestion-"+option.id)
+                            }
                         }
-                    }
-                }.frame(maxHeight:240)
+                    }.frame(maxHeight:240)
+                }
             }
         }
         .id(searchAnchor)
         .onAppear {revealResults(initial:true)}
         .onChange(of:query){_,_ in revealResults()}
         .onChange(of:focused){_,isFocused in if isFocused {revealResults()}}
+        .onReceive(NotificationCenter.default.publisher(for:UIResponder.keyboardDidChangeFrameNotification)) {_ in
+            if focused {revealResults()}
+        }
         .onDisappear{revealTask?.cancel()}
     }
 }
