@@ -17,7 +17,7 @@ La rama de construcción parte de Premium. No integra el PR #8 (abierto, borrado
 
 La ejecución 40519139035 terminó cancelada: Linux falló y macOS compiló para simulador antes de cancelarse durante XCTest. La 40516590929 falló: compilación correcta, Keychain -34018 con CODE_SIGNING_ALLOWED=NO y fallos de interfaz. Ninguna produjo IPA.
 
-Los fallos Linux de la rama Glass incluyen expectativas anteriores sobre la exportación provisional y el cierre del envase. Premium ya contiene pruebas más precisas: R=1000 para una unidad individual declarada en exportación provisional; físico residual -1 y R=0 al agotar un envase previamente abierto. No se trasladan cambios del núcleo clínico desde Glass. Este pipeline ejecuta las suites completas de Premium para verificarlo de nuevo.
+Los fallos Linux de la rama Glass incluyen expectativas anteriores sobre la exportación provisional, corregidas previamente en Premium: R=1000 para una unidad individual declarada en una exportación provisional, mientras un envase pendiente conserva R sin asignar. Además falló la validación del agotamiento anterior y la prueba terminó accediendo a una lista vacía; esa ruta no cambia entre las ramas y su causa específica en Linux sigue pendiente. No se declara corregida por este pipeline macOS. La regla esperada sigue siendo físico residual -1 y R=0 al agotar el envase previo, con R=1 solo para la apertura nueva. Este pipeline ejecuta de nuevo todas las pruebas de Premium en el entorno Apple objetivo.
 
 ## Ejecución controlada
 
@@ -40,3 +40,11 @@ El IPA necesita firma compatible con el dispositivo. Conservar el bundle ID por 
 El error de iLoader 7252 corresponde al certificado del equipo seleccionado y debe resolverse en el instalador. No se revocan certificados ni se desinstala la aplicación como parte de esta entrega.
 
 Referencias: [GitHub workflow_dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow), [runner macos-15](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md), [Apple App ID prefixes y Keychain](https://developer.apple.com/library/archive/technotes/tn2311/).
+
+## Primera ejecución macOS y ajustes de automatización
+
+Run 40521728126, SHA b7b3934c518a2b46b8c930a733b0f3337e025b0c: JavaScript aprobado; 383/383 Swift core; Release iphoneos compilado; 15/15 XCTest nativos; 3/7 pruebas de interacción aprobadas. Se conserva el resultado fallido y su xcresult. El IPA no se publicó.
+
+SpringBoard mostró Enter iPhone Passcode: faltaba inscribir Face ID en el runner. Se añade un iPhone 16 nuevo, arranque verificado y los dos comandos notifyutil ya documentados en PREMIUM_REDESIGN_20261026.md. No cambia LocalAuthentication en la aplicación.
+
+La prueba de escritura suponía que un tap posicionaba el cursor al final. Se realiza selección explícita antes de escribir el texto editado y se añade igualdad exacta, conservando las comprobaciones de teclado, sufijo y persistencia. La nueva ejecución verificará esta corrección del manejo de selección; los fallos previos se mantienen registrados.

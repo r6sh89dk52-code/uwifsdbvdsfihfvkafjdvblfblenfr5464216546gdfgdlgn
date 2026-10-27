@@ -55,7 +55,18 @@ final class N2PremiumRedesignTests:XCTestCase {
         let hiddenDraft=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["Siguiente"])
         XCTAssertEqual(XCTWaiter.wait(for:[hiddenDraft],timeout:5),.completed)
         XCTAssertFalse(app.buttons["Anterior"].exists)
-        diagnosis.typeText(" CORREGIDO")
+        // iOS 18.5 places the caret at the tap location. Select the existing
+        // draft explicitly, rather than assuming that tapping moves to end.
+        let original=diagnosis.value as? String ?? ""
+        XCTAssertEqual(original,"BORRADOR FICTICIO REDISENO")
+        diagnosis.press(forDuration:1.2)
+        let selectAllPredicate=NSPredicate(format:"label IN %@",["Select All","Seleccionar todo"])
+        let menu=app.menuItems.matching(selectAllPredicate).firstMatch
+        let button=app.buttons.matching(selectAllPredicate).firstMatch
+        if menu.waitForExistence(timeout:2) {menu.tap()}
+        else {XCTAssertTrue(button.waitForExistence(timeout:3),app.debugDescription);button.tap()}
+        diagnosis.typeText(original+" CORREGIDO")
+        XCTAssertEqual(diagnosis.value as? String,original+" CORREGIDO")
         XCTAssertTrue((diagnosis.value as? String)?.hasSuffix(" CORREGIDO") == true)
         capture(app,"Borrador-teclado-sin-barras")
         app.buttons["danper-dismiss-keyboard"].tap()

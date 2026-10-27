@@ -83,11 +83,17 @@ jobs:
           SIM_ID=$(python3 - <<'PY'
           import json, subprocess
           devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
-          candidates=[d for group in devices.values() for d in group if d['name']=='iPhone 16' and d.get('isAvailable')]
+          candidates=[(runtime,d) for runtime,group in devices.items() for d in group if d['name']=='iPhone 16' and d.get('isAvailable')]
           if not candidates: raise SystemExit('No available iPhone 16 simulator; validation cannot pass.')
-          print(candidates[-1]['udid'])
+          runtime,_=candidates[-1]
+          print(subprocess.check_output(['xcrun','simctl','create','DANPER-Premium-CI','com.apple.CoreSimulator.SimDeviceType.iPhone-16',runtime],text=True).strip())
           PY
           )
+          xcrun simctl boot "$SIM_ID"
+          xcrun simctl bootstatus "$SIM_ID" -b
+          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
+          xcrun simctl spawn "$SIM_ID" notifyutil -s com.apple.BiometricKit.enrollmentChanged 1
+          xcrun simctl spawn "$SIM_ID" notifyutil -p com.apple.BiometricKit.enrollmentChanged
           # Ad-hoc simulator signing preserves real Keychain entitlements.
           # The device Release build above remains completely unsigned.
           xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
