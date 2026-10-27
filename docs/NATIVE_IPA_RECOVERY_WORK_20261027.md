@@ -97,3 +97,12 @@ Correcciones exclusivamente de CI:
 - El workflow completo conserva su disparador por `ci/native-ipa-request.txt`; editar únicamente la receta no dispara otra compilación completa. La recuperación tiene su propio disparador y no compite con otra compilación macOS.
 
 Candidato existente (sin nueva firma ni instalación): artifact 12745669311 del run 40532104867, SHA-256 del IPA `45ac34dcb0166efd114b800d285a052ad9a62826cdbee530d3587be17503e558`. Hasta que las nuevas pruebas terminen, la validación integral permanece BLOCKED.
+
+
+## SDK-matched recovery result and CoreAuthUI cold-start correction
+
+Run 40564628155 tested compiled source 65994d5ecb3a9c15f74fe950cfc16fe07844bc40 with recipe b611d9460b0effe6baeac7bd3f034fc4859cca42 on iPhone 16, iOS Simulator 18.5 (22F77). Native XCTest: 15/15 PASS. UI: 4/7 PASS, 3 FAIL, no skips. Fixture: 1/1 PASS. Failed methods: N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground (line 31); both N3ClinicalJourneyTests methods (line 209), blocked at access before clinical setup. Validation promotion was correctly skipped.
+
+Read-only diagnosis run 40576175937 exported the existing xcresult diagnostics and confirmed LocalAuthentication error -1000, `UI activation timed out after 5 seconds`. CoreAuthUI first launch did not connect before the system watchdog; late connection returned `No pending UI mechanism`. This occurred with the SDK-matched runtime too: runtime pinning alone was insufficient. Videos show the permission alert accepted, then checking state, then authentication failure with no biometric sheet.
+
+The next CI recipe explicitly launches Apple's CoreAuthUI on each isolated simulator before DANPER tests, allowing its cold startup to settle. It grants no DANPER permission, never supplies an authentication result, and changes no app/test source, assertion, signing, vault, Keychain or clinical code. Actual test results remain required; this correction is unverified until the next recovery run completes. Candidate source and IPA hash remain unchanged; no VALIDATED artifact is justified by the failed run or diagnostic success.

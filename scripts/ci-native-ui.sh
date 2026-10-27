@@ -59,6 +59,13 @@ new_simulator() {
   SIM_ID=$(xcrun simctl clone "$BASE_ID" "DANPER-CI-$GITHUB_RUN_ID-$1")
   boot_ready "$SIM_ID"
   defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
+  # Existing xcresult diagnostics show CoreAuthUI cold startup exceeding the
+  # system's fixed five-second activation watchdog. Initialize Apple's service
+  # before launching DANPER; no app permission, policy or authentication result
+  # is granted here. The unchanged tests must still drive real LocalAuthentication.
+  xcrun simctl launch "$SIM_ID" com.apple.CoreAuthUI \
+    2>&1 | tee "$BUILD_DIR/logs/$1-coreauth-prewarm.log"
+  sleep 10
   xcrun simctl spawn "$SIM_ID" notifyutil -s com.apple.BiometricKit.enrollmentChanged 1
   xcrun simctl spawn "$SIM_ID" notifyutil -p com.apple.BiometricKit.enrollmentChanged
   xcrun simctl spawn "$SIM_ID" notifyutil -g com.apple.BiometricKit.enrollmentChanged | tee "$BUILD_DIR/logs/$1-enrollment.log"

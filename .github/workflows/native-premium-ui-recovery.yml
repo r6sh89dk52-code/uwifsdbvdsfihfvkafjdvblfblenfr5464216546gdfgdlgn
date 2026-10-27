@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/native-premium-ui-recovery.yml'
       - 'ci/native-ui-request.txt'
+      - 'scripts/ci-native-ui.sh'
   workflow_dispatch:
 permissions:
   contents: read
