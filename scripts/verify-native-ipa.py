@@ -59,7 +59,7 @@ def verify(args):
             if any(part in ('_CodeSignature', 'SyntheticFixtures', 'Documents', 'Library')
                    for part in PurePosixPath(name).parts):
                 raise ValueError('Unexpected signature, test fixture or user directory: ' + name)
-            if name.endswith(('.danperbackup', '.mobileprovision', '.sqlite', '.sqlite3')):
+            if name.lower().endswith(('.danperbackup', '.mobileprovision', '.sqlite', '.sqlite3', '.db', '.xlsx', '.xls', '.csv', '.p12', '.pfx', '.pem', '.key', '.cer', '.crt')):
                 raise ValueError('Unexpected personal data or signing material: ' + name)
         info = plistlib.loads(archive.read(prefix + 'Info.plist'))
         expected = {
@@ -77,6 +77,9 @@ def verify(args):
             raise ValueError('Missing Face ID purpose')
         if not any('/LaunchScreen.storyboardc/' in n for n in names):
             raise ValueError('Compiled launch storyboard missing')
+        icons = info.get('CFBundleIcons', {}).get('CFBundlePrimaryIcon', {}).get('CFBundleIconFiles', [])
+        if not icons or not any(n.startswith(prefix + icon) and n.endswith('.png') for icon in icons for n in names):
+            raise ValueError('Compiled AppIcon missing')
         if prefix + 'Assets.car' not in names:
             raise ValueError('Compiled image assets missing')
         binary_info = inspect_macho(archive.read(prefix + 'DANPERNative'))
@@ -102,7 +105,11 @@ def verify(args):
         **binary_info,
         'ipa': args.ipa.name, 'sha256': hashlib.sha256(args.ipa.read_bytes()).hexdigest(),
         'toolchain': toolchain,
-        'validation': {'javascript': 'passed', 'swift_core': 'passed', 'native_and_ui_xctest': 'passed'},
+        'sdk': subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-version'], text=True).strip(),
+        'status': 'CANDIDATE_UNSIGNED_NOT_CLINICALLY_VALIDATED',
+        'technical_verification': 'PASS',
+        'privacy_audit': 'PASS: resource allowlist and hashes; no personal data or signing material detected',
+        'validation': {'javascript': 'NOT RUN', 'swift_core': 'NOT RUN', 'native_and_ui_xctest': 'NOT RUN'},
         'resource_sha256': hashes,
         'installation': 'Requires signing; no physical device installation performed',
     }

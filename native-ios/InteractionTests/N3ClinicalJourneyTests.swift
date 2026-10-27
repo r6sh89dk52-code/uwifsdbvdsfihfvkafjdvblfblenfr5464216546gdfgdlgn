@@ -181,6 +181,9 @@ final class N3ClinicalJourneyTests:XCTestCase {
         return true
     }
     func testProtectedClinicalJourneyAndRelaunch() {
+        runProtectedClinicalJourney()
+    }
+    private func runProtectedClinicalJourney() {
         #if !targetEnvironment(simulator)
         XCTFail("N3 solo admite un Simulator aislado sin datos clínicos reales")
         return
@@ -273,6 +276,9 @@ final class N3ClinicalJourneyTests:XCTestCase {
     }
     /// Uses the synthetic N3 source created by the preceding protected journey.
     func testRelaunchExistingClinicalSourceWithoutSetup() {
+        // Build this method's own synthetic source on its fresh CI device.
+        // No test may rely on a preceding method having succeeded.
+        runProtectedClinicalJourney()
         #if !targetEnvironment(simulator)
         XCTFail("Prueba exclusiva de un Simulator aislado con los registros ficticios N3")
         return

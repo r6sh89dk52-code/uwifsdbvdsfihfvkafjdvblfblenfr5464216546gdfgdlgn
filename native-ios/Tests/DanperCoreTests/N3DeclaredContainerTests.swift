@@ -236,12 +236,13 @@ final class N3DeclaredContainerTests:XCTestCase {
         let moves=try XCTUnwrap(all["stockMovements"] as? [[String:Any]])
         let closings=moves.filter{$0["kind"] as? String=="containerState"}
         XCTAssertEqual(closings.count,1)
-        XCTAssertEqual(closings[0]["containerDisposition"] as? String,"agotado")
-        XCTAssertEqual((closings[0]["excelQuantity"] as? NSNumber)?.doubleValue,0)
+        let closing=try XCTUnwrap(closings.first,"Falta el agotamiento verificado del envase anterior")
+        XCTAssertEqual(closing["containerDisposition"] as? String,"agotado")
+        XCTAssertEqual((closing["excelQuantity"] as? NSNumber)?.doubleValue,0)
         // The emptied prior bottle removes its residual physical contents
         // once, while only the NEW opening produces Kardex R=1.
-        XCTAssertEqual((closings[0]["physicalChange"] as? NSNumber)?.doubleValue,-1)
-        XCTAssertEqual((closings[0]["quantity"] as? NSNumber)?.doubleValue,0)
+        XCTAssertEqual((closing["physicalChange"] as? NSNumber)?.doubleValue,-1)
+        XCTAssertEqual((closing["quantity"] as? NSNumber)?.doubleValue,0)
         var corrupted=all
         var forged=try XCTUnwrap(corrupted["stockMovements"] as? [[String:Any]])
         guard let closingIndex=forged.firstIndex(where:{

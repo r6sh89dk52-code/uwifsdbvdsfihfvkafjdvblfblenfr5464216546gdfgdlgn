@@ -1,137 +1,227 @@
-name: DANPER Native Premium - verified unsigned iPhone IPA
-run-name: Native Premium IPA · ${{ github.sha }}
-
+name: DANPER Premium native IPA - candidate and validation
+run-name: Premium native IPA · ${{ github.sha }}
 on:
   push:
-    branches: [build/native-premium-ipa-20261027]
+    branches: [ci/premium-native-ipa-work-20261027]
     paths:
       - '.github/workflows/native-premium-ipa.yml'
       - 'ci/native-ipa-request.txt'
   workflow_dispatch:
-
 permissions:
   contents: read
-
+  actions: read
 concurrency:
-  group: native-premium-ipa-${{ github.ref }}
+  group: danper-premium-native-distribution
   cancel-in-progress: false
-
 defaults:
   run:
     shell: bash
-
+env:
+  DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
 jobs:
-  native-ipa:
+  build:
+    name: A - Release iphoneos ARM64 and unsigned candidate
     runs-on: macos-15
-    timeout-minutes: 55
+    timeout-minutes: 35
     steps:
-      - name: Initialize isolated runner directories
-        run: |
-          echo "BUILD_DIR=$RUNNER_TEMP/danper-native-ipa" >> "$GITHUB_ENV"
-          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-native-fixtures" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Record source and installed Apple toolchain
+      - name: Initialize isolated outputs
+        run: |
+          echo "BUILD_DIR=$RUNNER_TEMP/danper-native-ipa" >> "$GITHUB_ENV"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-native-fixtures" >> "$GITHUB_ENV"
+      - name: Pinned dependencies, sanitized resources and Xcode project
+        run: bash scripts/ci-native-prepare.sh
+      - name: Compile physical iPhone Release with Apple signing disabled
         run: |
           set -euo pipefail
-          test "$GITHUB_REF" = refs/heads/build/native-premium-ipa-20261027
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          mkdir -p "$BUILD_DIR/logs" "$DANPER_N1_FIXTURE_DIR"
-          xcodebuild -version | tee "$BUILD_DIR/logs/toolchain.txt"
-          xcrun --sdk iphoneos --show-sdk-version | tee -a "$BUILD_DIR/logs/toolchain.txt"
-          xcode-select -p | tee -a "$BUILD_DIR/logs/toolchain.txt"
-          swift --version | tee -a "$BUILD_DIR/logs/toolchain.txt"
-          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
-          xcodegen --version | tee -a "$BUILD_DIR/logs/toolchain.txt"
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$BUILD_DIR/device" -disableAutomaticPackageResolution \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' DEVELOPMENT_TEAM='' \
+            build 2>&1 | tee "$BUILD_DIR/logs/iphone-release.log"
+      - name: Package and independently verify candidate
+        run: bash scripts/package-native-premium-ipa.sh
+      - name: Publish technically verified candidate, checksum and provenance
+        id: candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: CANDIDATE_UNSIGNED_NOT_CLINICALLY_VALIDATED_${{ github.sha }}
+          path: ${{ runner.temp }}/danper-native-ipa/deliverables/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Candidate download and explicit validation status
+        env:
+          ARTIFACT_URL: ${{ steps.candidate.outputs.artifact-url }}
+        run: |
+          echo "[Candidate IPA, NOT CLINICALLY VALIDATED]($ARTIFACT_URL)" >> "$GITHUB_STEP_SUMMARY"
+          cat "$BUILD_DIR/deliverables/SHA256SUMS.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve technical evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: A_TECHNICAL_EVIDENCE_${{ github.run_id }}
+          path: ${{ runner.temp }}/danper-native-ipa/logs
+          retention-days: 14
+
+  clinical:
+    name: B - JavaScript and macOS clinical Swift tests
+    needs: build
+    if: ${{ always() && !cancelled() }}
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare clinical fixtures directory and npm dependencies
+        run: |
+          mkdir -p "$RUNNER_TEMP/clinical/logs"
+          echo "BUILD_DIR=$RUNNER_TEMP/clinical" >> "$GITHUB_ENV"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/fixtures" >> "$GITHUB_ENV"
           npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run JavaScript regression and native presentation gates
+      - name: JavaScript regression and native contracts
         run: |
           set -euo pipefail
           npm run test:logic 2>&1 | tee "$BUILD_DIR/logs/javascript.log"
           for gate in audit-n2-workspace-routing audit-n2-personal-import audit-n2-build222-backup-restore audit-n2-joint-indicator test-n2-workspace-routing test-n2-build222-ui-parity test-n2-premium-redesign; do
             node "scripts/$gate.cjs" 2>&1 | tee -a "$BUILD_DIR/logs/javascript.log"
           done
-      - name: Generate synthetic fixtures and run all Swift core tests
-        run: |
-          set -euo pipefail
-          for generator in generate-native-compat-fixtures generate-n1e-clinical-fixtures generate-n1f-lossless-fixtures generate-n1h-clinical-parity generate-n1p-excel-parity generate-n1q-reconciliation-fixtures generate-n1r-stored-xlsx-template generate-n1s-official-excel-fixtures generate-n2-approved-fixture generate-n2-nursing-parity generate-n2-procedure-parity generate-n2-stock-commands-fixtures; do
-            node "scripts/$generator.cjs" >> "$BUILD_DIR/logs/fixtures.log" 2>&1
-          done
-          swift test --package-path native-ios --jobs 3 2>&1 | tee "$BUILD_DIR/logs/swift-core.log"
-      - name: Prepare sanitized app resources and Xcode project
-        run: |
-          set -euo pipefail
-          node scripts/prepare-n1s-ios-demo-resources.cjs 2>&1 | tee "$BUILD_DIR/logs/resources.log"
-          bash native-ios/scripts/make-app-icon.sh
-          xcodegen generate --spec native-ios/project.yml
-          xcodebuild -resolvePackageDependencies -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative >> "$BUILD_DIR/logs/toolchain.txt" 2>&1
-      - name: Compile Release for physical iPhone ARM64 with signing disabled
-        run: |
-          set -euo pipefail
-          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
-            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
-            -derivedDataPath "$BUILD_DIR/device" ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
-            build 2>&1 | tee "$BUILD_DIR/logs/iphone-release.log"
-      - name: Run native and interaction XCTest on an isolated iPhone 16 simulator
-        timeout-minutes: 22
-        run: |
-          set -euo pipefail
-          SIM_ID=$(python3 - <<'PY'
-          import json, subprocess
-          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
-          candidates=[(runtime,d) for runtime,group in devices.items() for d in group if d['name']=='iPhone 16' and d.get('isAvailable')]
-          if not candidates: raise SystemExit('No available iPhone 16 simulator; validation cannot pass.')
-          runtime,_=candidates[-1]
-          print(subprocess.check_output(['xcrun','simctl','create','DANPER-Premium-CI','com.apple.CoreSimulator.SimDeviceType.iPhone-16',runtime],text=True).strip())
-          PY
-          )
-          xcrun simctl boot "$SIM_ID"
-          xcrun simctl bootstatus "$SIM_ID" -b
-          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
-          xcrun simctl spawn "$SIM_ID" notifyutil -s com.apple.BiometricKit.enrollmentChanged 1
-          xcrun simctl spawn "$SIM_ID" notifyutil -p com.apple.BiometricKit.enrollmentChanged
-          # Ad-hoc simulator signing preserves real Keychain entitlements.
-          # The device Release build above remains completely unsigned.
-          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
-            -configuration Debug -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" \
-            -destination-timeout 180 -parallel-testing-enabled NO \
-            -derivedDataPath "$BUILD_DIR/simulator" -resultBundlePath "$BUILD_DIR/Acceptance.xcresult" \
-            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test \
-            2>&1 | tee "$BUILD_DIR/logs/ios-tests.log"
-      - name: Package and independently inspect the unsigned IPA
-        run: bash scripts/package-native-premium-ipa.sh
-      - name: Publish verified IPA, SHA-256 and build provenance
-        id: ipa
-        uses: actions/upload-artifact@v4
-        with:
-          name: DANPER_NATIVE_PREMIUM_UNSIGNED_${{ github.run_id }}
-          path: ${{ runner.temp }}/danper-native-ipa/deliverables/*
-          retention-days: 14
-          if-no-files-found: error
-          compression-level: 0
-      - name: Publish compiler logs and XCTest evidence
+      - name: All Swift clinical tests with synthetic fixtures
+        if: ${{ !cancelled() }}
+        run: bash scripts/ci-native-clinical.sh
+      - name: Preserve clinical evidence including failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DANPER_NATIVE_VALIDATION_${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/danper-native-ipa/logs
-            ${{ runner.temp }}/danper-native-ipa/Acceptance.xcresult
-          retention-days: 7
-          if-no-files-found: warn
-      - name: Write download link to the run summary
-        if: success()
-        env:
-          ARTIFACT_URL: ${{ steps.ipa.outputs.artifact-url }}
+          name: B_CLINICAL_EVIDENCE_${{ github.run_id }}
+          path: ${{ runner.temp }}/clinical/logs
+          retention-days: 14
+
+  linux:
+    name: B2 - Linux portability diagnosis, failures remain visible
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare synthetic fixtures and dependencies
         run: |
-          {
-            echo '### DANPER SwiftUI native · unsigned iPhone IPA'
-            echo "Commit: \`$GITHUB_SHA\`"
-            echo "[Download IPA, checksum and provenance]($ARTIFACT_URL)"
-            cat "$BUILD_DIR/deliverables/SHA256SUMS.txt"
-            echo 'Signing is required before installation. No device was modified by this workflow.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$RUNNER_TEMP/linux/logs"
+          echo "BUILD_DIR=$RUNNER_TEMP/linux" >> "$GITHUB_ENV"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/fixtures" >> "$GITHUB_ENV"
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Complete Linux Swift suite, no assertion suppression
+        run: bash scripts/ci-native-clinical.sh
+      - name: Preserve portability diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: B2_LINUX_EVIDENCE_${{ github.run_id }}
+          path: ${{ runner.temp }}/linux/logs
+          retention-days: 14
+
+  interaction:
+    name: C - Native XCTest and isolated iPhone 16 journeys
+    needs: [build, clinical]
+    if: ${{ always() && !cancelled() }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Initialize isolated test outputs
+        run: |
+          echo "BUILD_DIR=$RUNNER_TEMP/interaction" >> "$GITHUB_ENV"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/fixtures" >> "$GITHUB_ENV"
+      - name: Prepare native project and all synthetic fixtures
+        run: |
+          bash scripts/ci-native-prepare.sh
+          bash scripts/ci-native-clinical.sh fixtures-only
+      - name: Export historical xcresult attachments for diagnosis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh run download 40521728126 -n DANPER_NATIVE_VALIDATION_40521728126 -D "$BUILD_DIR/historical"; then
+            xcrun xcresulttool export attachments --path "$BUILD_DIR/historical/Acceptance.xcresult" \
+              --output-path "$BUILD_DIR/historical-attachments" > "$BUILD_DIR/logs/historical-export.log" 2>&1 \
+              || echo 'Historical attachment export BLOCKED' >> "$BUILD_DIR/logs/historical-export.log"
+            rm -rf "$BUILD_DIR/historical"
+          else
+            echo 'Historical artifact download BLOCKED' > "$BUILD_DIR/logs/historical-export.log"
+          fi
+      - name: Execute every native and interaction test, isolated by method
+        timeout-minutes: 48
+        run: bash scripts/ci-native-ui.sh
+      - name: Preserve xcresult, screenshots and device logs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: C_XCTEST_EVIDENCE_${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/interaction/logs
+            ${{ runner.temp }}/interaction/results
+            ${{ runner.temp }}/interaction/historical-attachments
+            ${{ runner.temp }}/interaction/ui-methods.txt
+          retention-days: 14
+
+  validate:
+    name: D - Promote exact tested SHA only when every mandatory job passes
+    needs: [build, clinical, linux, interaction]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: CANDIDATE_UNSIGNED_NOT_CLINICALLY_VALIDATED_${{ github.sha }}
+          path: final
+      - name: Verify unchanged IPA checksum and record actual successful gates
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          GATE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          (cd final && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY'
+          import hashlib,json,os,zipfile
+          from pathlib import Path
+          folder=Path('final');p=folder/'BUILD_PROVENANCE.json';d=json.loads(p.read_text())
+          assert d['commit']==os.environ['SOURCE_SHA']
+          gates=json.loads(os.environ['GATE_RESULTS'])
+          assert all(v['result']=='success' for v in gates.values()),gates
+          ipa=folder/d['ipa'];assert hashlib.sha256(ipa.read_bytes()).hexdigest()==d['sha256']
+          with zipfile.ZipFile(ipa) as z: assert z.testzip() is None
+          d['status']='VALIDATED_UNSIGNED';d['validation']={k:'PASS' for k in gates}
+          d['evidence_run_url']=d['run_url'];d['promotion']='Exact same IPA bytes as candidate, all mandatory jobs successful'
+          p.write_text(json.dumps(d,indent=2)+'\n')
+          (folder/'VALIDATED_SHA.txt').write_text(d['commit']+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VALIDATED_UNSIGNED_${{ github.sha }}
+          path: final/*
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0

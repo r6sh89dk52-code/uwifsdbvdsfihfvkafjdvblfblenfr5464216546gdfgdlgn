@@ -17,7 +17,9 @@ cp -R "$APP" "$BUILD_DIR/staging/Payload/"
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
 NUMBER=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
 SOURCE_SHA=$(git rev-parse HEAD)
-IPA_NAME="DANPER_NATIVE_${VERSION}_${NUMBER}_${SOURCE_SHA:0:12}_UNSIGNED.ipa"
+test "$VERSION" = 0.4.1
+test "$NUMBER" = 11
+IPA_NAME="DANPER_NATIVE_${VERSION}_${NUMBER}_${SOURCE_SHA:0:12}_CANDIDATE_UNSIGNED_NOT_CLINICALLY_VALIDATED.ipa"
 IPA="$BUILD_DIR/deliverables/$IPA_NAME"
 (cd "$BUILD_DIR/staging" && /usr/bin/zip -qry "$IPA" Payload)
 unzip -t "$IPA" > "$BUILD_DIR/logs/zip-integrity.txt"
