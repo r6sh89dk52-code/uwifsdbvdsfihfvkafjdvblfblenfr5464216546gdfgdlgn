@@ -126,57 +126,138 @@ struct DANPERNativeApp: App {
 }
 
 
-/// Build222 branded welcome: red upper field and rounded lower access panel.
-/// Authentication is owned by the app lifecycle above; this is presentation only.
+/// Visual-only access cover. The app above continues to own every LAContext,
+/// automatic attempt, retry, error and background-lock transition.
 struct DanperAccessView:View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var appeared=false
     let unlocking:Bool
     let canRetry:Bool
     let error:String
     let onUnlock:()->Void
+    private var version:String {
+        let info=Bundle.main.infoDictionary ?? [:]
+        let version=info["CFBundleShortVersionString"] as? String ?? "—"
+        let build=info["CFBundleVersion"] as? String ?? "—"
+        return "Versión \(version) · Compilación \(build)"
+    }
     var body:some View {
-        ScrollView {
-            VStack(spacing:28) {
-                VStack(spacing:12) {
-                    Image("BrandLogo").resizable().scaledToFit()
-                        .frame(maxWidth:180,maxHeight:120)
-                        .padding(20)
-                        .background(.white,in:RoundedRectangle(cornerRadius:24))
-                    Text("DANPER").font(.system(.largeTitle,design:.rounded,weight:.heavy))
-                    Text("SALUD MÓVIL").font(.caption.weight(.bold)).tracking(2)
-                    Text("Bienvenido").font(.largeTitle.bold())
-                    Text("Departamento de Salud").font(.title3)
-                }.foregroundStyle(.white).frame(maxWidth:.infinity).padding(.top,32)
-                VStack(spacing:16) {
-                    Label("Acceso protegido",systemImage:"lock.shield.fill")
-                        .font(.headline)
-                    Text("Tu espacio para una atención más rápida, organizada y segura.")
-                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    if !error.isEmpty {Text(error).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center)}
-                    if unlocking {
-                        HStack(spacing:12) {ProgressView();Text("Verificando identidad…").font(.subheadline)}
-                            .frame(maxWidth:.infinity,minHeight:50)
-                    } else {
+        GeometryReader { geometry in
+            let heroHeight:CGFloat=typeSize.isAccessibilitySize ? 430 : min(max(geometry.size.height * 0.48,280),420)
+            ScrollView {
+                VStack(spacing:0) {
+                    hero(height:heroHeight,topInset:geometry.safeAreaInsets.top)
+                    VStack(spacing:14) {
+                        Image(systemName:"faceid")
+                            .font(.system(size:34,weight:.medium))
+                            .foregroundStyle(GlassClinical.red)
+                            .frame(width:66,height:66)
+                            .background(GlassClinical.red.opacity(0.10),in:RoundedRectangle(cornerRadius:20))
+                            .overlay(RoundedRectangle(cornerRadius:20).strokeBorder(GlassClinical.red.opacity(0.35)))
+                            .accessibilityHidden(true)
+                        VStack(spacing:5) {
+                            Text("Bienvenido").font(.largeTitle.bold())
+                            Text("Accede de forma segura a tu información de salud ocupacional.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        if !error.isEmpty {
+                            Label(error,systemImage:"exclamationmark.circle")
+                                .font(.footnote).foregroundStyle(.primary)
+                                .padding(10).frame(maxWidth:.infinity)
+                                .background(Color.orange.opacity(0.16),in:RoundedRectangle(cornerRadius:12))
+                                .accessibilityIdentifier("access-error")
+                        }
                         Button(action:onUnlock) {
-                            Label(canRetry ? "Reintentar Face ID" : "Ingresar con Face ID",systemImage:"faceid")
-                        }.buttonStyle(DanperPrimaryButton())
+                            HStack(spacing:12) {
+                                if unlocking {ProgressView().tint(.white)}
+                                else {Image(systemName:"faceid").font(.title2)}
+                                Text(unlocking ? "Verificando identidad…" : canRetry ? "Reintentar Face ID" : "Ingresar con Face ID")
+                                    .font(.headline).fixedSize(horizontal:false,vertical:true)
+                                Spacer(minLength:0)
+                                if !unlocking {Image(systemName:"chevron.right").font(.footnote.weight(.bold))}
+                            }
+                            .padding(.horizontal,20).padding(.vertical,15)
+                            .frame(maxWidth:.infinity,minHeight:54)
+                            .foregroundStyle(.white)
+                            .background(GlassClinical.gradient,in:Capsule())
+                        }
+                        .buttonStyle(.plain).disabled(unlocking)
+                        .accessibilityIdentifier("access-face-id")
+                        // Both controls invoke the existing deviceOwnerAuthentication
+                        // policy. iOS alone offers/validates the device passcode.
+                        Button(action:onUnlock) {
+                            HStack(spacing:12) {
+                                Image(systemName:"circle.grid.3x3.fill").foregroundStyle(.secondary)
+                                Text("Usar código del dispositivo").font(.subheadline)
+                                    .fixedSize(horizontal:false,vertical:true)
+                                Spacer(minLength:0)
+                                Image(systemName:"chevron.right").font(.footnote.weight(.bold)).foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal,20).padding(.vertical,15)
+                            .frame(maxWidth:.infinity,minHeight:52)
+                            .modifier(GlassClinicalSurface(radius:28))
+                        }
+                        .buttonStyle(.plain).disabled(unlocking)
+                        .accessibilityIdentifier("access-device-code")
+                        VStack(spacing:9) {
+                            HStack(spacing:10) {
+                                Image(systemName:"lock.shield").font(.title2).foregroundStyle(GlassClinical.red)
+                                VStack(alignment:.leading,spacing:3) {
+                                    Text("Fuente clínica protegida").font(.caption.weight(.semibold))
+                                    Text("Acceso protegido con Face ID o código del iPhone")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                            Text(version).font(.caption2).foregroundStyle(.secondary)
+                            #if DEBUG
+                            Label("Modo de prueba · datos ficticios",systemImage:"lock.shield")
+                                .font(.caption2).foregroundStyle(.secondary)
+                            #endif
+                        }.padding(.top,5)
                     }
-                    Text("Acceso protegido con Face ID o código del iPhone").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    #if DEBUG
-                    // Only the simulator/developer build exposes the demo notice.
-                    Label("Modo de prueba · datos ficticios",systemImage:"lock.shield")
-                        .font(.caption2).foregroundStyle(.secondary)
-                    #endif
-                }.padding(24).frame(maxWidth:.infinity)
-                    .background(DanperStyle.surface,in:UnevenRoundedRectangle(topLeadingRadius:32,topTrailingRadius:32))
-            }.padding(20).frame(maxWidth:540)
+                    .padding(.horizontal,24).padding(.bottom,16)
+                    .frame(maxWidth:540)
+                    .opacity(appeared ? 1:0)
+                }
                 .frame(maxWidth:.infinity)
-                .opacity(appeared ? 1:0)
-                .offset(y:appeared ? 0:12)
-        }.background(DanperStyle.red.ignoresSafeArea())
-            .onAppear {
-                withAnimation(reduceMotion ? nil : .easeOut(duration:0.3)){appeared=true}
+                .frame(minHeight:geometry.size.height,alignment:.top)
             }
+            .scrollIndicators(.hidden)
+            .background(GlassClinical.canvas.ignoresSafeArea())
+        }
+        .onAppear {
+            withAnimation(reduceMotion ? nil : .easeOut(duration:0.3)){appeared=true}
+        }
+    }
+    private func hero(height:CGFloat,topInset:CGFloat)->some View {
+        ZStack(alignment:.topLeading) {
+            GeometryReader { proxy in
+                Image("AccessNurseHero").resizable().scaledToFill()
+                    .frame(width:proxy.size.width,height:height+topInset,alignment:.top)
+                    .clipped().offset(y:-topInset)
+                LinearGradient(stops:[.init(color:.black.opacity(0.3),location:0),
+                                      .init(color:.clear,location:0.45),
+                                      .init(color:GlassClinical.canvas,location:1)],
+                               startPoint:.top,endPoint:.bottom)
+                    .padding(.top,-topInset)
+                GlassClinicalWave().fill(GlassClinical.gradient)
+                    .frame(height:130).frame(maxHeight:.infinity,alignment:.bottom)
+                    .opacity(0.8)
+                    .mask(LinearGradient(colors:[.white,.clear],startPoint:.top,endPoint:.bottom))
+            }.accessibilityHidden(true)
+            VStack(alignment:.leading,spacing:2) {
+                GlassClinicalWordmark().foregroundStyle(GlassClinical.red)
+                Text("SALUD MÓVIL").font(.caption2.weight(.bold)).tracking(3).foregroundStyle(.white)
+                Spacer()
+                Text("Cuidamos lo más importante, nuestra gente")
+                    .font(typeSize.isAccessibilitySize ? .headline : .title3.weight(.semibold))
+                    .foregroundStyle(.white).shadow(color:.black.opacity(0.8),radius:5)
+                    .frame(maxWidth:typeSize.isAccessibilitySize ? .infinity : 205,alignment:.leading)
+                    .fixedSize(horizontal:false,vertical:true)
+                    .padding(.bottom,60)
+            }.padding(.horizontal,24).padding(.top,8)
+        }.frame(height:height)
     }
 }
