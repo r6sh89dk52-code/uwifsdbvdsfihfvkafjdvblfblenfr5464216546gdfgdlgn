@@ -1,0 +1,194 @@
+name: DANPER SwiftUI Premium - unsigned iPhone ARM64 (independent)
+# Push once to this separate CI branch, or edit only ci/rebuild-native-ipa.txt
+# to explicitly request a fresh build. Does not touch main or the device.
+on:
+  push:
+    branches: [ci/native-unsigned-device-ipa-20261027]
+    paths:
+      - '.github/workflows/ios-native-arm64-standalone.yml'
+      - 'ci/rebuild-native-ipa.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: danper-premium-iphoneos-arm64-independent
+  cancel-in-progress: false
+jobs:
+  iphoneos:
+    name: Real iPhone Release build, verify unsigned IPA and publish
+    runs-on: macos-15
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check source, tools and app identity
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn'
+          test "$GITHUB_REF" = 'refs/heads/ci/native-unsigned-device-ipa-20261027'
+          test -f native-ios/project.yml
+          test -f native-ios/App/DANPERNativeApp.swift
+          test -f native-ios/App/LaunchScreen.storyboard
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview' native-ios/project.yml
+          grep -q 'MARKETING_VERSION: "0.4.1"' native-ios/project.yml
+          grep -q 'CURRENT_PROJECT_VERSION: "11"' native-ios/project.yml
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          xcodegen --version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Audit clinical interface compatibility and prepare synthetic resources
+        run: |
+          set -euo pipefail
+          npm ci --no-fund --ignore-scripts
+          node scripts/audit-n2-workspace-routing.cjs
+          node scripts/audit-n2-personal-import.cjs
+          node scripts/audit-n2-build222-backup-restore.cjs
+          node scripts/audit-n2-joint-indicator.cjs
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          test -f native-ios/App/N1sDemoResources/n2-nursing-catalog.json
+          test -f native-ios/App/N1sDemoResources/n2-approved-mappings.json
+          test ! -e native-ios/App/N1sDemoResources/n2-synthetic-clinical.json
+      - name: Generate actual SwiftUI iPhone project
+        working-directory: native-ios
+        run: |
+          set -euo pipefail
+          bash scripts/make-app-icon.sh
+          xcodegen generate --spec project.yml
+          xcodebuild -list -project DANPERNative.xcodeproj
+      - name: Build Release for iphoneos arm64 without code signing
+        working-directory: native-ios
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build-logs"
+          xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/native-device" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            build > "$GITHUB_WORKSPACE/build-logs/iphoneos-Release.log" 2>&1 || {
+              grep -nE '(error:|fatal error:|BUILD FAILED|failed)' "$GITHUB_WORKSPACE/build-logs/iphoneos-Release.log" | tail -n 100 || true
+              tail -n 80 "$GITHUB_WORKSPACE/build-logs/iphoneos-Release.log"
+              exit 1
+            }
+          grep -q 'BUILD SUCCEEDED' "$GITHUB_WORKSPACE/build-logs/iphoneos-Release.log"
+      - name: Verify app, generate unsigned IPA and double-check ZIP
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/native-device/Build/Products/Release-iphoneos/DANPERNative.app"
+          test -d "$APP"
+          test -s "$APP/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")" = 'pe.danper.saludmovil.native.preview'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")" = '0.4.1'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")" = '11'
+          test "$(lipo -archs "$APP/DANPERNative")" = 'arm64'
+          test -s "$APP/Assets.car"
+          test -f "$APP/N1sDemoResources/n1s-indicator-template-store.zip"
+          test -f "$APP/N1sDemoResources/n1s-nursing-template-store.zip"
+          test -f "$APP/N1sDemoResources/n2-nursing-catalog.json"
+          test -f "$APP/N1sDemoResources/n2-approved-mappings.json"
+          test ! -e "$APP/N1sDemoResources/n2-synthetic-clinical.json"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :UILaunchStoryboardName' "$APP/Info.plist")" = 'LaunchScreen'
+          find "$APP" -type d -name 'LaunchScreen.storyboardc' | grep -q .
+          test ! -d "$APP/_CodeSignature"
+          test ! -e "$APP/embedded.mobileprovision"
+          if codesign --verify "$APP" >/dev/null 2>&1; then
+            echo 'ERROR: unexpected signature'; exit 1
+          fi
+          if find "$APP" -type f \( -name '*.danperbackup' -o -name '*.xlsx' -o -name '*.sqlite' \) | grep -q .; then
+            echo 'ERROR: unexpected private backup or spreadsheet inside app'; exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/stage/Payload" "$GITHUB_WORKSPACE/ipa-output"
+          ditto "$APP" "$RUNNER_TEMP/stage/Payload/DANPERNative.app"
+          IPA="$GITHUB_WORKSPACE/ipa-output/DANPER_NATIVE_PREMIUM_0.4.1_11_ARM64_UNSIGNED.ipa"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/stage/Payload" "$IPA"
+          test -s "$IPA"
+          unzip -tq "$IPA"
+          unzip -Z1 "$IPA" | grep -q '^Payload/DANPERNative.app/Info.plist$'
+          mkdir -p "$RUNNER_TEMP/unpacked-ipa"
+          unzip -q "$IPA" -d "$RUNNER_TEMP/unpacked-ipa"
+          UNPACKED="$RUNNER_TEMP/unpacked-ipa/Payload/DANPERNative.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$UNPACKED/Info.plist")" = 'pe.danper.saludmovil.native.preview'
+          test "$(lipo -archs "$UNPACKED/DANPERNative")" = 'arm64'
+          if codesign --verify "$UNPACKED" >/dev/null 2>&1; then exit 1; fi
+          (cd "$GITHUB_WORKSPACE/ipa-output" && shasum -a 256 "$(basename "$IPA")" > SHA256SUMS.txt)
+          {
+            echo 'DANPER Salud Movil native SwiftUI - Premium'
+            echo "Source commit: $GITHUB_SHA"
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Branch: $GITHUB_REF_NAME"
+            echo "Actions run: $GITHUB_RUN_ID"
+            echo "UTC: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Xcode: $(xcodebuild -version | tr '\n' ' ')"
+            echo 'Platform: iphoneos; arch: arm64'
+            echo 'Bundle: pe.danper.saludmovil.native.preview'
+            echo 'Version: 0.4.1; build: 11'
+            echo 'Status: UNSIGNED; independent signing needed before installation'
+            echo 'Clinical Swift tests: consult separate workflow job; no results hidden'
+            echo 'No installation performed on an iPhone'
+          } > "$GITHUB_WORKSPACE/ipa-output/BUILD_INFO.txt"
+          cat "$GITHUB_WORKSPACE/ipa-output/SHA256SUMS.txt"
+      - name: Upload IPA, checksum and build provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_SWIFTUI_PREMIUM_IPHONEOS_ARM64_UNSIGNED
+          path: ipa-output/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload failed-build log if necessary
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_SWIFTUI_IPHONEOS_BUILD_DIAGNOSTICS
+          path: build-logs/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  clinical-regressions:
+    name: Independent Swift clinical tests (failures visible)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Generate synthetic core test data
+        run: |
+          set -euo pipefail
+          npm ci --no-fund --ignore-scripts
+          mkdir -p "$RUNNER_TEMP/clinical-fixtures"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/clinical-fixtures" >> "$GITHUB_ENV"
+          for generator in \
+            generate-native-compat-fixtures.cjs generate-n1e-clinical-fixtures.cjs \
+            generate-n1f-lossless-fixtures.cjs generate-n1h-clinical-parity.cjs \
+            generate-n1p-excel-parity.cjs generate-n1q-reconciliation-fixtures.cjs \
+            generate-n1r-stored-xlsx-template.cjs generate-n1s-official-excel-fixtures.cjs \
+            generate-n2-approved-fixture.cjs generate-n2-nursing-parity.cjs \
+            generate-n2-stock-commands-fixtures.cjs; do
+            DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/clinical-fixtures" node "scripts/$generator"
+          done
+          DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/clinical-fixtures" node scripts/generate-n2-procedure-parity.cjs
+      - name: Run Swift core XCTest suite without hiding failures
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/clinical-test-logs"
+          swift --version
+          swiftc -frontend -parse native-ios/App/*.swift
+          (cd native-ios && swift test --jobs 2) > "$GITHUB_WORKSPACE/clinical-test-logs/swift.log" 2>&1 || {
+            grep -E '(error:|failed|Fatal error|unexpected signal)' "$GITHUB_WORKSPACE/clinical-test-logs/swift.log" | tail -n 100 || true
+            exit 1
+          }
+          tail -n 25 "$GITHUB_WORKSPACE/clinical-test-logs/swift.log"
+      - name: Upload clinical test evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_SWIFT_CLINICAL_TEST_LOGS
+          path: clinical-test-logs/
+          if-no-files-found: ignore
+          retention-days: 14
