@@ -342,7 +342,7 @@ actor N2ProtectedClinicalIOSVault {
         return try protectedStore().exportVerifiedDailyNursingWorkbook(
             catalog:resource("n2-nursing-catalog"),
             template:Data(contentsOf:source),
-            date:date,shift:shift,responsible:responsible,site:site)
+            date:date,shift:shift,responsible:responsible,site:site,mappings:resource("n2-approved-mappings"))
     }
     func exportVerifiedRangeNursingWorkbook(start:String,end:String,
         responsible:String,site:String="",reconstructFromCount:Bool=false)throws->N2VerifiedNursingWorkbook.Result {

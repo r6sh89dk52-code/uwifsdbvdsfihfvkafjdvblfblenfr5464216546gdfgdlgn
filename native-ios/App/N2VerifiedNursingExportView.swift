@@ -75,7 +75,7 @@ struct N2VerifiedNursingExportView:View {
             N2Build222ExportProgress(titles:["Período","Vista previa","Compartir"])
             DanperPanel("Formato oficial de 98 productos") {
                 Label("98 productos de enfermería",systemImage:"lock.shield")
-                Text("Los 98 productos conservan su fila: sin lote aparece stock 0. El corte 9–8 puede reconstruir el saldo inicial desde el conteo posterior sin cambiar existencias físicas.")
+                Text("Los 98 productos conservan su fila. En el inventario nuevo, los saldos sin evidencia quedan sin verificar; no se convierten en ceros confirmados. Consulta las estimaciones del corte 9–8 sin alterar el conteo físico.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             DanperPanel {
@@ -121,7 +121,7 @@ struct N2VerifiedNursingExportView:View {
                 Text("El Kardex reúne ambas sedes en un solo inventario. Los productos sin lote conservan su fila y muestran saldo 0; un movimiento histórico sin conciliación puede impedir certificar un corte.")
                     .font(.caption).foregroundStyle(.secondary)
                 NavigationLink {
-                    N2NativeInventoryView()
+                    N2SimpleInventoryView()
                 } label: {
                     Label("Revisar inventario y lotes",systemImage:"shippingbox")
                 }

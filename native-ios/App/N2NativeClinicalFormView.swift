@@ -445,8 +445,18 @@ struct N2NativeClinicalFormView:View {
                         DanperPanel {
                             Image(systemName:savedLines.values.allSatisfy{$0=="Descontado"} ? "checkmark.circle.fill" : "checkmark.shield.fill").font(.system(size:48)).foregroundStyle(.green)
                             Text("Atención registrada").font(.title2.bold())
-                            LabeledContent("Consumos vinculados al Kardex",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
-                            LabeledContent("Consumos pendientes",value:String(form.items.filter{savedLines[$0.id] != "Descontado"}.count))
+                            ForEach(form.items) {med in
+                                VStack(alignment:.leading,spacing:5) {
+                                    Text(medicationName(med.code,context)).font(.headline)
+                                    Text("Cantidad clínica: \(med.quantity)").font(.caption)
+                                    if let r=savedKardex[med.id] {Text("Kardex R: \(r.formatted())").font(.caption)}
+                                    Text(savedLines[med.id] ?? "Atención conservada").font(.caption).foregroundStyle(.secondary)
+                                    if savedLines[med.id]?.hasPrefix("Incidencia de inventario:")==true {
+                                        Button("Resolver en Inventario") {showStockRegistration=true}.buttonStyle(.bordered)
+                                    }
+                                }
+                            }
+                            if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
                             Button {startAnother()} label: {Label("Nueva atención",systemImage:"plus")}
                                 .buttonStyle(DanperPrimaryButton())
                             NavigationLink {N2NativeHistoryView(useProtectedVault:true)} label: {Label("Ver historial y consumos",systemImage:"clock.arrow.circlepath")}

@@ -76,7 +76,7 @@ struct N2ClinicalWorkspaceGateView:View {
                         .buttonStyle(DanperPrimaryButton())
                         .accessibilityIdentifier("clinical-first-run-import-personal")
                         NavigationLink {
-                            N2NativeActivationView()
+                            N2SimpleRestoreView(kind:.complete).environment(\.n2WorkspaceVault,.clinical)
                         } label: {
                             Label("Restaurar copia cifrada Build 222",
                                   systemImage:"lock.doc")
@@ -287,7 +287,7 @@ struct N2ClinicalWorkspaceRootView:View {
                     DanperToolLink(title:"Importar / conciliar PERSONAL",symbol:"person.crop.rectangle.stack") {N2NativePersonalImportView()}
                 }
                 DanperPanel("Inventario y reportes") {
-                    DanperToolLink(title:"Inventario y lotes",symbol:"shippingbox") {N2NativeInventoryView()}
+                    DanperToolLink(title:"Inventario y existencias",symbol:"shippingbox") {N2SimpleInventoryView()}
                     DanperToolLink(title:"Corte del día 9 · inventario único",symbol:"calendar.badge.clock") {N2KardexCutPreviewView()}
                     DanperToolLink(title:"Kardex de enfermería",symbol:"tablecells") {N2VerifiedNursingExportView()}
                     DanperToolLink(title:"Indicador ambulatorio · Excel",symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
@@ -296,6 +296,7 @@ struct N2ClinicalWorkspaceRootView:View {
                 }
                 DanperPanel("Seguridad") {
                     DanperToolLink(title:"Respaldo cifrado",symbol:"lock.doc") {N2NativeBackupExportView()}
+                    DanperToolLink(title:"Restaurar historial sin reemplazar inventario",symbol:"clock.arrow.circlepath") {N2SimpleRestoreView(kind:.clinical)}
                     Button("Bloquear aplicación",role:.cancel) {onClose()}.buttonStyle(DanperSecondaryButton())
                 }
             }.padding(16)

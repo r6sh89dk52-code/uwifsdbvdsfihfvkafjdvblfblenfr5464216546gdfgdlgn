@@ -13,7 +13,10 @@ public enum N2VerifiedNursingWorkbook {
         public let day:String
     }
     public static func export(snapshot:Data,catalog:Data,template:Data,
-                              date:String,shift:String,responsible:String,site:String="")throws->Result {
+                              date:String,shift:String,responsible:String,site:String="",mappings:Data?=nil)throws->Result {
+        if N2SimpleInventory.isActive(snapshot) {
+            return try simple(snapshot:snapshot,catalog:catalog,template:template,start:date,end:date,shift:shift,responsible:responsible,mappings:mappings)
+        }
         let report=try N2NursingReportBuilder.daily(
             snapshot:snapshot,catalog:catalog,date:date,site:site)
         guard report.rows.count==98 else{throw Failure.incompleteOrUnreconciled}
@@ -35,6 +38,9 @@ public enum N2VerifiedNursingWorkbook {
                                    start:String,end:String,responsible:String,
                                    site:String="",mappings:Data?=nil,
                                    reconstructFromCount:Bool=false)throws->Result {
+        if N2SimpleInventory.isActive(snapshot) {
+            return try simple(snapshot:snapshot,catalog:catalog,template:template,start:start,end:end,shift:"CONSOLIDADO",responsible:responsible,mappings:mappings)
+        }
         // Retrospective count-based reconstruction is opt-in for the 9th-day
         // export only; arbitrary date ranges keep the original physical ledger.
         let report:N2NursingReport
@@ -62,5 +68,63 @@ public enum N2VerifiedNursingWorkbook {
         return Result(xlsx:book.xlsx,stockKnownRows:known,
                       stockUnknownRows:98-known,day:start)
     }
+    private static func simple(snapshot:Data,catalog:Data,template:Data,start:String,end:String,shift:String,
+                               responsible:String,mappings:Data?)throws->Result {
+        guard N2SimpleInventory.validDay(start),N2SimpleInventory.validDay(end),start<=end,
+              let official=try JSONSerialization.jsonObject(with:catalog) as? [[String:Any]],official.count==98 else {
+            throw Failure.incompleteOrUnreconciled
+        }
+        let state=try N2SimpleInventory.read(snapshot)
+        let approved=try mappings.map{try JSONSerialization.jsonObject(with:$0) as? [[String:Any]] ?? []} ?? []
+        var links=[String:Set<String>]()
+        for row in approved {
+            if let id=row["kardexCode"] as? String,let code=row["clinicalCode"] as? String {links[id,default:[]].insert(code)}
+        }
+        for link in N2UserReviewedKardexLinks.links {links[link.kardexID,default:[]].insert(link.clinicalCode)}
+        var rows=[[String:Any]](),known=0
+        for (index,officialRow) in official.enumerated() {
+            guard let id=officialRow["id"] as? String,id=="E-\(index+1)",let name=officialRow["name"] as? String,
+                  officialRow["donated"] as? Bool==false else {throw Failure.incompleteOrUnreconciled}
+            var row:[String:Any]=["code":id,"name":name,"donated":false,"stockKnown":false,
+                "initial":"NO VERIFICADO","extraordinary":NSNull(),"total":NSNull(),"consumed":NSNull(),"final":NSNull(),"expiry":"","fs":NSNull()]
+            let candidates=links[id] ?? []
+            if candidates.count==1,let code=candidates.first,
+               links.values.filter({$0.contains(code)}).count==1,
+               let product=state.products.first(where:{$0.code==code}) {
+                // Only an approved identical original unit may occupy this official row.
+                let mappedUnits=Set(approved.filter{$0["kardexCode"] as? String==id && $0["clinicalCode"] as? String==code}.compactMap{$0["clinicalUnit"] as? String})
+                let reviewed=N2UserReviewedKardexLinks.links.contains{$0.kardexID==id && $0.clinicalCode==code && $0.clinicalUnit==product.unit}
+                let originalUnit:String? = ["E-86":"FCO","E-94":"CJA","E-95":"CJA"][id] ?? (officialRow["group"] as? String=="TABLETAS" ? "UND":mappedUnits.first)
+                if originalUnit==product.unit && (mappedUnits==Set([product.unit]) || (mappedUnits.isEmpty && reviewed)) {
+                    let events=state.movements.filter{$0.code==code && N2SimpleInventory.day($0.at)<=end}
+                    let opening=events.last{N2SimpleInventory.day($0.at)<start}
+                    let inRange=events.filter{N2SimpleInventory.day($0.at)>=start}
+                    let unresolved=state.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
+                    if let final=events.last {row["final"]=final.after}
+                    if product.expiryVerified {row["expiry"]=product.expiry ?? ""}
+                    if let opening,!unresolved,inRange.allSatisfy({$0.kind != "initial"}),
+                       !state.historicalUses.contains(where:{$0.code==code}) {
+                        let receipts=inRange.filter{$0.kind=="receipt"}.reduce(0){$0+$1.delta}
+                        let uses = -inRange.filter{$0.kind=="outflow"}.reduce(0){$0+$1.delta}
+                        let adjustment=inRange.filter{$0.kind=="count"}.reduce(0){$0+$1.delta}
+                        let book=opening.after+receipts-uses
+                        if book>=0 {
+                            row["stockKnown"]=true;row["initial"]=opening.after;row["extraordinary"]=receipts
+                            row["total"]=opening.after+receipts;row["consumed"]=uses;row["final"]=book;row["fs"]=adjustment
+                            known+=1
+                        }
+                    }
+                }
+            }
+            rows.append(row)
+        }
+        let manifest:[String:Any]=["date":start,"periodEnd":start==end ? "":end,"shift":shift,
+            "responsible":responsible+" · CONSOLIDADO · SALDOS NO VERIFICADOS EN BLANCO · VENCIMIENTO REFERENCIAL",
+            "inventorySchemaVersion":2,"rows":rows]
+        let book=try N1sNursingExcelWriter.export(base:template,manifest:JSONSerialization.data(withJSONObject:manifest))
+        guard book.sheetCount==1,book.writtenRows==98 else{throw Failure.incompleteOrUnreconciled}
+        return Result(xlsx:book.xlsx,stockKnownRows:known,stockUnknownRows:98-known,day:start)
+    }
+
 }
 

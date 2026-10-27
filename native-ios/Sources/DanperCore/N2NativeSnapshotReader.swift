@@ -66,7 +66,7 @@ public enum N2NativeSnapshotReader {
         // Never mutate source visits. Apply the validated append-only clinical
         // correction ledger to the displayed history only.
         let clinical=try N2ClinicalCorrections.effectiveSnapshot(data)
-        guard let parity=try? N2VersionedSnapshotAudit.inspect(clinical,allowEmptySynthetic:true),
+        guard let parity=try? N2VersionedSnapshotAudit.inspect(N2SimpleInventory.isActive(data) ? data:clinical,allowEmptySynthetic:true),
               (try? N1fLosslessFieldGate.inspect(clinical)) != nil,
               let root=try? JSONSerialization.jsonObject(with:clinical) as? [String:Any],
               let workers=root["workers"] as? [[String:Any]],

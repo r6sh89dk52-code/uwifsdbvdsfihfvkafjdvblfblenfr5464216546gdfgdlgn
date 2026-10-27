@@ -129,7 +129,7 @@ import DanperCore
         for dark in [false,true] {
             try await capture(NavigationStack {N2NativeHistoryView(layoutProjection:model)},
                 name:"Historial-\(dark ? "oscuro":"claro")",dark:dark)
-            try await capture(NavigationStack {N2Build222KardexHub(layoutLotCount:3)},
+            try await capture(NavigationStack {N2Build222KardexHub()},
                 name:"Kardex-\(dark ? "oscuro":"claro")",dark:dark)
         }
     }

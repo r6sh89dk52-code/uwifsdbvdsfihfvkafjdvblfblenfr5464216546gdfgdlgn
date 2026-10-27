@@ -153,7 +153,7 @@ public enum N2VerifiedIndicatorWorkbook {
             throw Failure.unverifiedDelivery
         }
         let clinical=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
-        let parity=try N2VersionedSnapshotAudit.inspect(clinical)
+        let parity=try N2VersionedSnapshotAudit.inspect(N2SimpleInventory.isActive(snapshot) ? snapshot:clinical)
         _=try N1fLosslessFieldGate.inspect(clinical)
         guard let source=try? JSONSerialization.jsonObject(with:clinical)
                     as? [String:Any],
@@ -212,6 +212,15 @@ public enum N2VerifiedIndicatorWorkbook {
             else{throw Failure.unverifiedDelivery}
             let key=aid+"\u{001F}"+item
             linesByItem[key,default:0]+=quantity
+        }
+        if N2SimpleInventory.isActive(snapshot) {
+            var index=0
+            for visit in visits where string(visit["status"])=="saved" {
+                for item in visit["items"] as? [[String:Any]] ?? [] {
+                    if let value=parity.consumptionR[index] {linesByItem[string(visit["id"])+"\u{001F}"+string(item["id"])]=value}
+                    index+=1
+                }
+            }
         }
         var parityR=[String:Double?]()
         var pointer=0
@@ -429,6 +438,40 @@ public enum N2VerifiedIndicatorWorkbook {
             }
         }
         guard output.count<=10_000 else{throw Failure.invalidVisit}
+
+        if N2SimpleInventory.isActive(snapshot) {
+            let inventory=try N2SimpleInventory.read(snapshot)
+            var summary=[String:[String:Any]](),openings=0,closings=0
+            for item in catalogue {
+                let code=string(item["code"])
+                var row:[String:Any]=["code":code,"consumed":consumption[code] ?? 0,"receiptDetails":[Any]()]
+                let events=inventory.movements.filter{$0.code==code && N2SimpleInventory.day($0.at)<=end}
+                let opening=events.last{N2SimpleInventory.day($0.at)<start}
+                let within=events.filter{N2SimpleInventory.day($0.at)>=start}
+                let unresolved=inventory.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
+                let historic=inventory.historicalUses.contains{$0.code==code}
+                if let last=events.last {row["count"]=last.after;closings+=1}
+                if let opening,!unresolved,!historic,within.allSatisfy({$0.kind != "initial" && $0.kind != "count"}) {
+                    row["opening"]=opening.after;openings+=1
+                    let receipts=within.filter{$0.kind=="receipt"}
+                    // The official workbook has four receipt slots. Aggregate same-day verified entries without discarding amounts.
+                    let grouped=Dictionary(grouping:receipts,by:{N2SimpleInventory.day($0.at)})
+                    guard grouped.count<=4 else{throw Failure.invalidReconciliation}
+                    row["receiptDetails"]=grouped.keys.sorted().map {day in ["quantity":grouped[day]!.reduce(0){$0+$1.delta},"date":day,"document":"KARDEX CONSOLIDADO"] as [String:Any]}
+                    row["verifiedIncome"]=receipts.reduce(0){$0+$1.delta}
+                    row["closing"]=events.last?.after;row["difference"]=0
+                }
+                summary[code]=row
+            }
+            let provisional=allowPending || pendingLines>0 || openings<432 || closings<432
+            let manifest:[String:Any]=["schema":1,"catalog":catalogue,"byCode":summary,
+                "reviewed":!provisional,"provisional":provisional,"start":start,"end":end,
+                "subdivision":subdivision,"rows":output.count,"plan":["lines":output],"pendingNotes":pendingNotes]
+            let built=try N1sFullExcelWriter.exportIndicator(base:template,manifest:JSONSerialization.data(withJSONObject:manifest))
+            guard built.sheetCount==10,built.writtenRows==output.count else{throw Failure.invalidWorkbook}
+            return Result(xlsx:built.xlsx,provisional:provisional,pendingLines:pendingLines,rows:output.count,
+                visits:selected.count,missingOpening:432-openings,missingClosingCount:432-closings)
+        }
 
         // Events are authoritative. A review only attests the exact date cut;
         // it never supplies a fabricated opening or count for missing products.

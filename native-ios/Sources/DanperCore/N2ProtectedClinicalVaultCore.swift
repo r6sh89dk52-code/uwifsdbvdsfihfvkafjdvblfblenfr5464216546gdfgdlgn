@@ -292,13 +292,13 @@ public final class N2ProtectedClinicalVaultCore {
 
     public func exportVerifiedDailyNursingWorkbook(
         catalog:Data,template:Data,date:String,shift:String,
-        responsible:String,site:String="")throws->N2VerifiedNursingWorkbook.Result {
+        responsible:String,site:String="",mappings:Data?=nil)throws->N2VerifiedNursingWorkbook.Result {
         guard let active=try journal.recover() else {
             throw N2ProtectedStoreError.absentSource
         }
         return try N2VerifiedNursingWorkbook.export(
             snapshot:active.snapshot,catalog:catalog,template:template,
-            date:date,shift:shift,responsible:responsible,site:site)
+            date:date,shift:shift,responsible:responsible,site:site,mappings:mappings)
     }
     public func exportVerifiedRangeNursingWorkbook(
         catalog:Data,template:Data,start:String,end:String,

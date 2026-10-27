@@ -441,11 +441,12 @@ internal enum N1sNursingExcelWriter {
             // showing 0 never authorizes a physical use or an opening.
             sheet=try patch(sheet,address:"D"+n,value:row["initial"])
             sheet=try patch(sheet,address:"E"+n,value:row["extraordinary"])
+            let verifiedFormula = object["inventorySchemaVersion"] as? Int != 2 || row["stockKnown"] as? Bool==true
             sheet=try patch(sheet,address:"F"+n,value:row["total"],
-                            formula:"D"+n+"+E"+n)
+                            formula:verifiedFormula ? "D"+n+"+E"+n : nil)
             sheet=try patch(sheet,address:"G"+n,value:row["consumed"])
             sheet=try patch(sheet,address:"H"+n,value:row["final"],
-                            formula:"F"+n+"-G"+n)
+                            formula:verifiedFormula ? "F"+n+"-G"+n : nil)
             let expiry=(row["expiry"] as? String) ?? ""
             let numericExpiry:Double?
             if expiry.isEmpty {

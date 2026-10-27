@@ -147,7 +147,7 @@ struct NativeRootView:View {
                         Text("Lee la hoja PERSONAL del .xlsx y permite verificar DNIs, nombres, sexo, área y sede. Se guarda en una bóveda clínica independiente, nunca mezclada con la demostración. Requiere autenticación.")
                             .font(.caption).foregroundStyle(.secondary)
                         NavigationLink {
-                            N2NativeActivationView()
+                            N2SimpleRestoreView(kind:.complete).environment(\.n2WorkspaceVault,.clinical)
                         } label: {
                             Label("Restaurar respaldo cifrado Build 222",
                                   systemImage:"lock.doc")
@@ -213,12 +213,13 @@ struct NativeRootView:View {
                     DanperToolLink(title:"Estadísticas",symbol:"chart.bar.fill") {DanperStatisticsView()}
                 }
                 DanperPanel("Inventario y reportes") {
-                    DanperToolLink(title:"Inventario y lotes",symbol:"shippingbox") {N2NativeInventoryView()}
+                    DanperToolLink(title:"Inventario y existencias",symbol:"shippingbox") {N2SimpleInventoryView()}
                     DanperToolLink(title:"Corte del día 9 · inventario único",symbol:"calendar.badge.clock") {N2KardexCutPreviewView()}
                     DanperToolLink(title:"Kardex de enfermería",symbol:"tablecells") {N2VerifiedNursingExportView()}
                     DanperToolLink(title:"Indicador ambulatorio · Excel",symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
                     DanperToolLink(title:"Vigilancia ocupacional · Excel",symbol:"figure.walk.motion") {N2OccupationalVigilanceExportView()}
                     DanperToolLink(title:"Respaldo cifrado",symbol:"lock.doc") {N2NativeBackupExportView()}
+                    DanperToolLink(title:"Restaurar historial sin reemplazar inventario",symbol:"clock.arrow.circlepath") {N2SimpleRestoreView(kind:.clinical)}
                 }
             }
             DanperPanel("Datos reales · no se mezclan con las pruebas") {
@@ -235,7 +236,7 @@ struct NativeRootView:View {
                     .font(.caption).foregroundStyle(.orange)
                 DanperToolLink(title:"Comprobar respaldo original (solo lectura)",symbol:"doc.text.magnifyingglass") {BackupPreviewView()}
                 DisclosureGroup("Configuración avanzada",isExpanded:$showAdvanced) {
-                    DanperToolLink(title:"Importación protegida en bóveda independiente",symbol:"lock.shield") {N2NativeActivationView()}
+                    DanperToolLink(title:"Importación protegida en bóveda independiente",symbol:"lock.shield") {N2SimpleRestoreView(kind:.complete).environment(\.n2WorkspaceVault,.clinical)}
                     Text("Esta función es independiente de la demostración. No la necesitas para probar atenciones.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
