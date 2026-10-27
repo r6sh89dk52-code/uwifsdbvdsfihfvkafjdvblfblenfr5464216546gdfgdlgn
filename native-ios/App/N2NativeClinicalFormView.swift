@@ -371,7 +371,7 @@ struct N2NativeClinicalFormView:View {
                     Task {await refreshDispensing(retry:false)}
                 }) {
                     NavigationStack {
-                        N2NativeInventoryView(initialOperation:"lot")
+                        N2SimpleInventoryView(initialOperation:"lot")
                             .toolbar {
                                 ToolbarItem(placement:.topBarTrailing) {
                                     Button("Cerrar") {showStockRegistration=false}
@@ -447,104 +447,6 @@ struct N2NativeClinicalFormView:View {
                             Text("Atención registrada").font(.title2.bold())
                             LabeledContent("Consumos vinculados al Kardex",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
                             LabeledContent("Consumos pendientes",value:String(form.items.filter{savedLines[$0.id] != "Descontado"}.count))
-                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
-                                Label("Atención guardada. Los consumos pendientes no se descontaron del inventario.",systemImage:"exclamationmark.triangle")
-                                    .font(.footnote).foregroundStyle(.orange)
-                            } else if !form.items.isEmpty {
-                                Label("Kardex verificado según unidades o aperturas declaradas",systemImage:"checkmark.circle.fill")
-                                    .font(.footnote).foregroundStyle(.green)
-                            }
-                            Text(currentWorker?.name ?? form.dni).font(.headline)
-                            Text(DanperDatePresentation.displayDateTime(form.date,form.time)).font(.subheadline).foregroundStyle(.secondary)
-                            Divider()
-                            reviewValue("Diagnóstico",form.diagnosis)
-                            ForEach(form.items) {med in
-                                let result=savedLines[med.id] ?? "Pendiente de conciliar"
-                                let storedResolution=N2PendingResolution.forReason(result)
-                                let alreadyLinked = !context.products.authorizedNursingOptions(
-                                    for:med.code).isEmpty ||
-                                    context.operationalMappings.contains(where:{
-                                        $0.clinicalCode==med.code
-                                    })
-                                let resolvedStock = !context.options(for:med.code,at:form.date).isEmpty
-                                let resolution:N2PendingResolution =
-                                    storedResolution == .verifyCorrespondence && alreadyLinked
-                                    ? (resolvedStock ? .verifyPhysicalUse : .registerStock)
-                                    : storedResolution
-                                HStack(alignment:.top,spacing:10) {
-                                    Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                        .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
-                                    VStack(alignment:.leading,spacing:5) {
-                                        Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
-                                        Text("Cantidad \(med.quantity) · \(resolution == .reviewChronology ? N2PendingResolution.historicalTitle(forReason:result) : resolution.summary)")
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        if let quantity=savedKardex[med.id] {
-                                            Text("Kardex R: \(quantity.formatted())"+(quantity==0
-                                                ? " · Reutilización declarada; ninguna caja nueva descontada"
-                                                : ""))
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        }
-                                        if result != "Descontado" {
-                                            switch resolution {
-                                            case .registerStock:
-                                                Text(alreadyLinked && storedResolution == .verifyCorrespondence
-                                                     ? "Producto ya vinculado. La atención anterior aún requiere revisar stock y cronología antes de cualquier descuento."
-                                                     : "No hay existencias FEFO utilizables. Si tienes stock físico, regístralo; si no, conserva el pendiente.")
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                                Button {
-                                                    showStockRegistration=true
-                                                } label: {
-                                                    Label("Registrar existencias",systemImage:"shippingbox.fill")
-                                                }
-                                                .buttonStyle(.bordered)
-                                                .accessibilityIdentifier("pending-stock-"+med.code)
-                                            case .verifyCorrespondence:
-                                                Button {
-                                                    pendingMappingItemID=med.id
-                                                } label: {
-                                                    Label("Vincular producto",systemImage:"link")
-                                                }
-                                                .buttonStyle(.bordered)
-                                                .accessibilityIdentifier("pending-mapping-"+med.code)
-                                                .sheet(isPresented:Binding(
-                                                    get:{pendingMappingItemID==med.id},
-                                                    set:{if !$0 {pendingMappingItemID=nil}}
-                                                )) {
-                                                    N2OperationalMappingView(code:med.code,context:context,onSaved:{
-                                                        Task {await refreshDispensing(retry:false)}
-                                                    })
-                                                }
-                                            case .verifyPhysicalUse, .reviewPending:
-                                                Text("La atención clínica ya está guardada. Kardex R=0 solo se confirma si existe una caja o frasco previamente abierto en un lote FEFO vigente. El stock registrado como cerrado no se convierte automáticamente en abierto.")
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                                Button {
-                                                    showStockRegistration=true
-                                                } label: {
-                                                    Label("Ir al Kardex · revisar estado del envase",
-                                                          systemImage:"shippingbox.fill")
-                                                }
-                                                .buttonStyle(.bordered)
-                                                .accessibilityIdentifier("pending-container-stock-"+med.code)
-                                            case .reviewChronology:
-                                                Label(N2PendingResolution.historicalGuidance(forReason:result),
-                                                      systemImage:"calendar.badge.exclamationmark")
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                            case .completed:
-                                                EmptyView()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
-                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
-                                Button("Volver a comprobar pendientes") {
-                                    Task {await refreshDispensing(retry:true)}
-                                }
-                                .buttonStyle(DanperSecondaryButton())
-                                .accessibilityIdentifier("pending-recheck")
-                                .disabled(busy)
-                            }
                             Button {startAnother()} label: {Label("Nueva atención",systemImage:"plus")}
                                 .buttonStyle(DanperPrimaryButton())
                             NavigationLink {N2NativeHistoryView(useProtectedVault:true)} label: {Label("Ver historial y consumos",systemImage:"clock.arrow.circlepath")}
@@ -1004,7 +906,7 @@ struct N2NativeClinicalFormView:View {
 
     private func medicationPickerSection(_ context:N2FormContext)->some View {
         DanperPanel("Medicamentos e insumos") {
-            Text("Cada producto mantiene su propio procedimiento. Toca una fila para editar cantidades, lote o presentación.")
+            Text("Cada producto mantiene su propio procedimiento. Toca una fila para editar cantidades y declaración de consumo.")
                 .font(.caption).foregroundStyle(.secondary)
             Button {withAnimation(reduceMotion ? nil : DanperStyle.animation){chooseProduct.toggle()}} label: {
                 Label(form.items.isEmpty ? "Agregar medicamento/insumo" : "Agregar otro medicamento/insumo",systemImage:"plus")
@@ -1025,7 +927,7 @@ struct N2NativeClinicalFormView:View {
                     },onClose:{chooseProduct=false})
             }
 
-            Label("Inventario compartido · selección automática FEFO",systemImage:"shippingbox")
+            Label("Inventario compartido · conteo consolidado",systemImage:"shippingbox")
                 .font(.footnote).foregroundStyle(.secondary)
             Text("\(context.products.clinical.count) productos · selección múltiple")
                 .font(.footnote).foregroundStyle(.secondary)
@@ -1501,16 +1403,9 @@ struct N2NativeClinicalFormView:View {
     }
     private func beginContainerReview(_ context:N2FormContext) {
         guard !busy,!saved else{return}
-        containerDecisionIDs=form.items.filter{
-            isContainerMedication($0,context:context)
-        }.map(\.id)
-        containerDecisionIndex=0
-        if containerDecisionIDs.isEmpty {
-            Task {await confirm()}
-        } else {
-            showContainerDecision=true
-        }
+        Task {await confirm()}
     }
+
     private func recordContainerDecision(opened:Bool) {
         guard let context,let item=containerDecisionMedication,
               let idx=form.items.firstIndex(where:{$0.id==item.id}) else{

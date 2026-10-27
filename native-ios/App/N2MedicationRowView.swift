@@ -118,19 +118,37 @@ struct N2MedicationRowView:View {
                 .font(.caption).foregroundStyle(.secondary)
             quantityControl
             procedureControl
-            lotControl
-            if context.operationalMappings.contains(where:{$0.clinicalCode==medication.code}) {
-                Label("Correspondencia operativa verificada",systemImage:"checkmark.shield")
-                    .font(.caption)
-            } else {
-                Button("Verificar correspondencia o presentación") {showMapping=true}
-                    .font(.caption)
-            }
+            simpleInventoryControl
             Button(role:.destructive,action:onRemove) {
                 Label("Quitar producto",systemImage:"trash")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder private var simpleInventoryControl:some View {
+        if context.inventorySchemaVersion != 2 {
+            Text("La atención se conservará sin modificar el inventario anterior. Inicia el inventario desde Kardex cuando hayas confirmado tu conteo.")
+                .font(.caption).foregroundStyle(.secondary)
+        } else if let product=context.simpleProducts.first(where:{$0.code==medication.code && $0.unit==productUnit}) {
+            Text("Existencias: \(product.quantity.formatted()) \(product.unit)").font(.caption)
+            if product.mode == .presentation {
+                DanperChoiceField(title:"¿Abriste una presentación nueva?",selection:Binding(
+                    get:{medication.simpleR.map(String.init) ?? ""},
+                    set:{medication.simpleR=Int($0)}),options:["1","0"],
+                    labels:["1":"Sí — Kardex R=1","0":"No — Kardex R=0"])
+                    .accessibilityIdentifier("simple-r-"+medication.code)
+                if medication.simpleR==nil {
+                    Text("Sin declaración, la atención se guardará con una incidencia de inventario por resolver.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+            } else {
+                Text("Salida física: \(medication.quantity) \(product.unit)").font(.caption)
+            }
+        } else {
+            Text("Este producto aún no tiene conteo confirmado. La atención se conservará y podrás resolver su incidencia desde Inventario.")
+                .font(.caption).foregroundStyle(.orange)
         }
     }
 

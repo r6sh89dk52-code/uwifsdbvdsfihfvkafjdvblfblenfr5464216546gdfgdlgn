@@ -86,6 +86,7 @@ public enum N2NativeSnapshotReader {
         let searchable=roster.filter{
             !official || $0.rosterStatus=="official" || $0.rosterStatus=="verified"
         }
+        let simple=N2SimpleInventory.isActive(data) ? try N2SimpleInventory.read(data) : nil
         var pointer=0,lines:[Item]=[]
         for visit in visits {
             let status=visit["status"] as? String ?? ""
@@ -132,7 +133,7 @@ public enum N2NativeSnapshotReader {
                 status:row.status,frequency:label,
                 clinicalLines:row.physical.count,
                 confirmedPhysicalLines:row.physical.compactMap{$0}.count,
-                pendingPhysicalLines:row.physical.filter{$0==nil}.count,
+                pendingPhysicalLines:simple.map{state in state.incidents.filter{$0.visitID==row.id && $0.resolutionEventID==nil}.count} ?? row.physical.filter{$0==nil}.count,
                 consumptionR:row.physical)
             record.workerSite=row.site
             indexed.append(record)

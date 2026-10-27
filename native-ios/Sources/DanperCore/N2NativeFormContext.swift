@@ -63,6 +63,8 @@ public struct N2FormLot:Equatable,Sendable,Identifiable {
     public var needsOpening:Bool {openContainers==0 && sealed>0}
 }
 public struct N2FormContext:Sendable {
+    public var inventorySchemaVersion:Int=1
+    public var simpleProducts:[N2SimpleProduct]=[]
     public var operationalMappings:[N2OperationalMapping]=[]
     public var auxiliaryProducts:[N2NursingCatalogProduct]=[]
     public let revision:Int
@@ -195,6 +197,8 @@ public enum N2NativeFormContextReader {
         guard all.count==stock.count else{throw N2FormError.invalidProduct}
         var result=N2FormContext(revision:revision,workers:people,
                              allergies:records,lots:all,products:products)
+        result.inventorySchemaVersion=root["inventorySchemaVersion"] as? Int ?? 1
+        if result.inventorySchemaVersion==2 { result.simpleProducts=try N2SimpleInventory.state(root).products }
         result.operationalMappings=try N2OperationalMappings.read(snapshot)
         result.auxiliaryProducts=try N2AuxiliaryInventory.products(snapshot:snapshot)
         return result
@@ -211,6 +215,7 @@ public struct N2FormMedication:Equatable,Sendable,Identifiable {
     public var procedureConfirmed:Bool
     public var procedureSource:String
     public var selectedLotID:String
+    public var simpleR:Int?=nil
     public var physicalQuantity:Double
     public var approveOpening:Bool
     /// User explicitly confirmed the previously open container was exhausted.
@@ -309,7 +314,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
                 "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
             ]
-            if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
+            if context.inventorySchemaVersion != 2 && (!med.selectedLotID.isEmpty || med.physicalQuantity>0) {
                 // Preserve the operator's clinical record if stock changed
                 // while editing. The transactional engine verifies identity,
                 // availability and scope and records a pending reason instead.
@@ -323,6 +328,13 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "previousContainerExhausted":med.approveOpening && med.closePriorContainer,
                 "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
                 ] as [String:Any]
+            }
+            if context.inventorySchemaVersion==2 {
+                for key in ["confirmNewContainer","newContainers","previousContainerExhausted","reusePreviouslyOpened"] {row.removeValue(forKey:key)}
+            }
+            if let r=med.simpleR {
+                guard [0,1].contains(r) else {throw N2FormError.invalidProduct}
+                row["simpleR"]=r
             }
             lines.append(row)
         }
@@ -375,7 +387,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             if let catalog=context.products.clinical.first(where:{$0.code==med.code}) {
                 row["name"]=catalog.name;row["unit"]=catalog.unit
             }
-            if !med.selectedLotID.isEmpty || med.physicalQuantity>0 {
+            if context.inventorySchemaVersion != 2 && (!med.selectedLotID.isEmpty || med.physicalQuantity>0) {
                 row["physicalUse"]=[
                     "lotId":med.selectedLotID,"quantity":med.physicalQuantity,
                     "confirmNewContainer":med.approveOpening,"newContainers":med.approveOpening ? med.newContainers:0,
@@ -383,6 +395,10 @@ public struct N2NativeFormDraft:Equatable,Sendable {
                 "reusePreviouslyOpened":med.reusePreviouslyOpened && !med.approveOpening
                 ] as [String:Any]
             }
+            if context.inventorySchemaVersion==2 {
+                for key in ["confirmNewContainer","newContainers","previousContainerExhausted","reusePreviouslyOpened"] {row.removeValue(forKey:key)}
+            }
+            if let r=med.simpleR,[0,1].contains(r) {row["simpleR"]=r}
             return row
         }
         return try JSONSerialization.data(withJSONObject:[

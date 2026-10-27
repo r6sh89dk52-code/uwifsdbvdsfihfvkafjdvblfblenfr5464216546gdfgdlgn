@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 /// Native read-only reconstruction of draft records already stored in an
 /// authenticated N2 generation. Lossless field validation rejects malformed
@@ -70,6 +71,10 @@ public enum N2NativeDraftRecovery {
                 }
                 var med=N2FormMedication(id:itemID,code:code,quantity:quantity,
                                          procedure:procedureName)
+                if let raw=row["simpleR"] {
+                    guard let n=raw as? NSNumber,CFGetTypeID(n) != CFBooleanGetTypeID(),[0.0,1.0].contains(n.doubleValue) else {throw N2DraftRecoveryError.unsupportedDraft}
+                    med.simpleR=n.intValue
+                }
                 med.procedureConfirmed=row["procedureConfirmed"] as? Bool ?? !procedureName.isEmpty
                 med.procedureSource=row["procedureSource"] as? String ?? "manual"
                 med.approveOpening=row["confirmNewContainer"] as? Bool == true && (row["newContainers"] as? Int ?? 0)>0

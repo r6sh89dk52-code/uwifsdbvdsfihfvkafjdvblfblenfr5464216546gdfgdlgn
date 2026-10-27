@@ -450,12 +450,12 @@ struct N2VisitDispensingView:View {
     @State private var notice=""
 
     private var pendingCount:Int {
-        lines.filter{$0.result != "Descontado" &&
+        lines.filter{($0.result.hasPrefix("Incidencia de inventario:") || ($0.kardexQuantity==nil && context?.inventorySchemaVersion != 2)) &&
             !projectedClinicalLines.contains(visitID+"\u{001F}"+$0.id)
         }.count
     }
     private var reconstructedCount:Int {
-        lines.filter{$0.result != "Descontado" &&
+        lines.filter{($0.result.hasPrefix("Incidencia de inventario:") || ($0.kardexQuantity==nil && context?.inventorySchemaVersion != 2)) &&
             projectedClinicalLines.contains(visitID+"\u{001F}"+$0.id)
         }.count
     }
@@ -527,87 +527,12 @@ struct N2VisitDispensingView:View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         if line.result != "Descontado" {
-                            switch resolution {
-                            case .registerStock:
-                                Text(alreadyLinked && storedResolution == .verifyCorrespondence
-                                     ? "Producto ya vinculado al Kardex. Esta atención anterior sigue pendiente: registra únicamente stock físico real y revisa la fecha antes de conciliar."
-                                     : "No hay lote compatible con existencias utilizables. Si tienes stock físico, regístralo primero.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                if context != nil {
-                                    Button {
-                                        selectedAction = .registerStock
-                                    } label: {
-                                        Label("Registrar existencias",systemImage:"shippingbox.fill")
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .accessibilityIdentifier("history-pending-stock-"+line.id)
-                                }
-                            case .verifyCorrespondence:
-                                Text("Este código clínico no tiene correspondencia aprobada ni revisada.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                if context != nil {
-                                    Button {
-                                        selectedAction = .verifyMapping(line.code)
-                                    } label: {
-                                        Label("Vincular producto",systemImage:"link")
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .accessibilityIdentifier("history-pending-mapping-"+line.id)
-                                }
-                            case .verifyPhysicalUse, .reviewPending:
-                                Text("La atención ya está guardada. Si utilizaste un envase abierto, debe estar registrado como abierto en un lote válido; un lote con existencias cerradas no demuestra una apertura anterior.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                if context != nil {
-                                    Button {
-                                        selectedAction = .registerStock
-                                    } label: {
-                                        Label("Ir al Kardex · comprobar envase",
-                                              systemImage:"shippingbox.fill")
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .accessibilityIdentifier("history-pending-container-stock-"+line.id)
-                                }
-                            case .reviewChronology:
-                                Text(projectedInCut
-                                     ? "Este consumo ya participa del saldo reconstruido. No vuelvas a descontarlo al registrar stock actual."
-                                     : "La atención es anterior al lote o a la verificación del vínculo. No hay evidencia para descontarla retroactivamente.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                if context != nil {
-                                    Button {
-                                        selectedAction = .registerStock
-                                    } label: {
-                                        Label("Ir a Kardex · registrar stock físico actual",
-                                              systemImage:"shippingbox.fill")
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .accessibilityIdentifier("history-register-actual-stock-"+line.id)
-                                }
-                                Button {
-                                    selectedAction = .explainHistorical(line.result)
-                                } label: {
-                                    Label("Ver detalle del historial",systemImage:"info.circle")
-                                }
-                                .buttonStyle(.bordered)
-                                .accessibilityIdentifier("history-pending-chronology-"+line.id)
-                                if let context,let detail,
-                                   detail.medications.contains(where:{$0.id==line.id}) &&
-                                   context.historicalOptions(for:line.code,at:detail.date).contains(where:{
-                                       N2ContainerAccounting.isContainer(unit:$0.unit)
-                                   }) {
-                                    Text("Para un frasco o caja de una atención pasada, puedes declarar si realmente abriste uno nuevo (R=1) o reutilizaste uno abierto (R=0). Esta declaración se incluye solo en el corte reconstruido.")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                    Button {
-                                        selectedAction = .verifyPhysical(line.id)
-                                    } label: {
-                                        Label("Declarar apertura histórica (1/0)",
-                                              systemImage:"checkmark.shield")
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .accessibilityIdentifier("history-declare-opening-"+line.id)
-                                }
-                            case .completed:
-                                EmptyView()
+                            if context?.inventorySchemaVersion==2 {
+                                NavigationLink("Resolver incidencia en Inventario") {N2SimpleInventoryView()}
+                            } else {
+                                Text("Registro histórico conservado. Los pendientes del inventario anterior no se reintentan.").font(.caption).foregroundStyle(.secondary)
                             }
+
                         }
                     }
                     .frame(maxWidth:.infinity,alignment:.leading)
@@ -617,18 +542,6 @@ struct N2VisitDispensingView:View {
                 if lines.isEmpty && !failed {
                     Text("Esta atención no tiene medicamentos ni insumos registrados.")
                         .foregroundStyle(.secondary)
-                }
-                if pendingCount>0 && context != nil {
-                    Button {
-                        Task {await retryPending()}
-                    } label: {
-                        Label(busy ? "Comprobando…" : "Volver a comprobar pendientes",
-                              systemImage:"arrow.clockwise")
-                    }
-                    .buttonStyle(DanperSecondaryButton())
-                    .disabled(busy)
-                    Text("La comprobación respeta el historial y no crea otra atención.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if !notice.isEmpty {
                     Text(notice).font(.footnote).foregroundStyle(.secondary)
@@ -655,7 +568,7 @@ struct N2VisitDispensingView:View {
             switch action {
             case .registerStock:
                 NavigationStack {
-                    N2NativeInventoryView(initialOperation:"lot")
+                    N2SimpleInventoryView(initialOperation:"lot")
                         .toolbar {
                             ToolbarItem(placement:.topBarTrailing) {
                                 Button("Cerrar") {selectedAction=nil}
