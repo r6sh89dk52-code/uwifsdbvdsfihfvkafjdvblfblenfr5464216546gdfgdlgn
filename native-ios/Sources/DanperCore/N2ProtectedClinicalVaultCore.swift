@@ -186,7 +186,7 @@ public final class N2ProtectedClinicalVaultCore {
     /// Draft recovery still performs its strict validation on the same
     /// authenticated snapshot. No plaintext or derived index is persisted.
     public func dashboardCounters(today:String,weekStart:String)throws
-        ->(today:Int,week:Int,drafts:Int)? {
+        ->(today:Int,week:Int,month:Int,drafts:Int)? {
         guard today.count==10,weekStart.count==10,weekStart<=today,
               let active=try journal.recover() else{return nil}
         guard let root=try? JSONSerialization.jsonObject(
@@ -195,15 +195,17 @@ public final class N2ProtectedClinicalVaultCore {
             throw N2ProtectedStoreError.absentSource
         }
         let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot).count
-        var todayCount=0,weekCount=0
+        let monthStart=String(today.prefix(7))+"-01"
+        var todayCount=0,weekCount=0,monthCount=0
         for visit in visits where visit["status"] as? String == "saved" {
             guard let date=visit["date"] as? String else {
                 throw N2ProtectedStoreError.unsafeSource
             }
             if date==today {todayCount+=1}
             if date>=weekStart && date<=today {weekCount+=1}
+            if date>=monthStart && date<=today {monthCount+=1}
         }
-        return (today:todayCount,week:weekCount,drafts:drafts)
+        return (today:todayCount,week:weekCount,month:monthCount,drafts:drafts)
     }
     public func readDashboard()throws
         ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {

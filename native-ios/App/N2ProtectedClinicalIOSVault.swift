@@ -117,7 +117,7 @@ actor N2ProtectedClinicalIOSVault {
         try protectedStore().dispensingStatus(visitID:visitID)
     }
     func dashboardCounters(today:String,weekStart:String)throws
-        ->(today:Int,week:Int,drafts:Int)? {
+        ->(today:Int,week:Int,month:Int,drafts:Int)? {
         try protectedStore().dashboardCounters(today:today,weekStart:weekStart)
     }
     func readDashboard()throws

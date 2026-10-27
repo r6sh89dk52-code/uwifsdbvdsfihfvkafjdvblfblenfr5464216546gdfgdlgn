@@ -52,7 +52,7 @@ struct N2WorkspaceVault:Sendable {
     /// The home counter needs only three integers, not a 9k-worker
     /// history read model. Preserve demo/clinical isolation.
     func dashboardCounters(today:String,weekStart:String) async throws
-        ->(today:Int,week:Int,drafts:Int)? {
+        ->(today:Int,week:Int,month:Int,drafts:Int)? {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared
                 .dashboardCounters(today:today,weekStart:weekStart)

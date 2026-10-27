@@ -96,6 +96,9 @@ final class N2FastFormPreparationTests:XCTestCase {
         XCTAssertEqual(fast.week,visits.filter{
             $0.status=="saved" && $0.date>=weekStart && $0.date<=date
         }.count)
+        XCTAssertEqual(fast.month,visits.filter{
+            $0.status=="saved" && $0.date>="2026-10-01" && $0.date<=date
+        }.count)
         XCTAssertEqual(fast.drafts,full.drafts.count)
         XCTAssertEqual(try journal.recover()?.snapshot,source)
     }
