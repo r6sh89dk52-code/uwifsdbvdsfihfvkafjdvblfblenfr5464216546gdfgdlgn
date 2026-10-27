@@ -8,7 +8,7 @@ struct N2NativeDraftsDashboard:View {
     @State private var loadedRevision:Int?
     @State private var loading=true
     @State private var failed=false
-    @State private var message="Leyendo borradores cifrados…"
+    @State private var message="Cargando borradores…"
     @State private var selectedDeleteID:String?
     @State private var deletingID:String?
 
@@ -110,14 +110,19 @@ struct N2NativeDraftsDashboard:View {
             #endif
         }
         do {
-            // The core checks BOTH the exact revision and status=="draft".
-            // A saved attention can never be removed by this operation.
+            // Returning from a recovered draft may finish a newer autosave.
+            // Reuse the lightweight authenticated revision, never rebuild the
+            // roster. The core still atomically checks revision AND draft status.
+            let deletionRevision=try await vault.currentRevision()
+            guard deletionRevision>=expectedRevision else {
+                throw N2ProtectedStoreError.staleRevision
+            }
             let confirmed=try await vault.deleteDraft(
-                id:id,expectedRevision:expectedRevision)
+                id:id,expectedRevision:deletionRevision)
             loadedRevision=confirmed.revision
             N2DraftReminder.cancel(id:id,mode:vault.mode)
             failed=false
-            message="Borrador eliminado y confirmado en la bóveda cifrada."
+            message="Borrador eliminado."
             // Do not decrypt/audit the same 9k-worker database yet again;
             // a later visit to the screen or pull-to-refresh loads changes.
         } catch {

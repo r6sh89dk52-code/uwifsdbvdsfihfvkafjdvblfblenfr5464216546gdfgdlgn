@@ -23,7 +23,7 @@ enum DanperStyle {
             if traits.userInterfaceStyle == .dark {
                 return healthPalette
                     ? UIColor(red:0.055,green:0.095,blue:0.155,alpha:1)
-                    : UIColor(red:0.09,green:0.09,blue:0.105,alpha:1)
+                    : UIColor(red:0.018,green:0.023,blue:0.031,alpha:1)
             }
             return healthPalette
                 ? UIColor(red:0.942,green:0.979,blue:0.995,alpha:1)
@@ -35,7 +35,7 @@ enum DanperStyle {
             if traits.userInterfaceStyle == .dark {
                 return healthPalette
                     ? UIColor(red:0.095,green:0.15,blue:0.21,alpha:1)
-                    : UIColor(red:0.145,green:0.145,blue:0.16,alpha:1)
+                    : UIColor(red:0.073,green:0.083,blue:0.102,alpha:1)
             }
             return .white
         })
@@ -55,7 +55,7 @@ struct DanperBrandHeader:View {
     // The bundled 316px square includes a pure-red background. Derive alpha
     // from the green channel: zero for that red and full for white lettering.
     // This reuses the authentic brand lettering without exporting/editing PNGs.
-    private static let wordmark:UIImage? = {
+    static let wordmark:UIImage? = {
         guard let original=UIImage(named:"BrandLogo"),
               let image=CIImage(image:original),
               let filter=CIFilter(name:"CIColorMatrix") else{return UIImage(named:"BrandLogo")}
@@ -67,10 +67,11 @@ struct DanperBrandHeader:View {
     }()
     var body:some View {
         HStack(spacing:9) {
-            Image(uiImage:Self.wordmark ?? UIImage())
+            Image(uiImage:Self.wordmark ?? UIImage()).renderingMode(.template)
                 .resizable()
                 .scaledToFill()
                 .frame(width:160,height:54)
+                .foregroundStyle(.white)
                 .clipped()
                 .accessibilityLabel("Danper")
             Text("SALUD MÓVIL")
@@ -95,7 +96,7 @@ struct DanperBrandHeader:View {
         .frame(maxWidth:.infinity)
         .frame(height:65)
         .background(
-            Color(red:0.90,green:0.07,blue:0.16)
+            LinearGradient(colors:[Color(red:0.98,green:0.025,blue:0.15),Color(red:0.64,green:0.01,blue:0.13)],startPoint:.topLeading,endPoint:.bottomTrailing)
                 .ignoresSafeArea(edges:.top))
         .accessibilityElement(children:.contain)
         .accessibilityIdentifier("danper-brand-header")

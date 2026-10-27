@@ -17,6 +17,8 @@ struct NativeRootView:View {
     private var layoutOnly=false
     @State private var tab=0
     @State private var newlyRegisteredWorkerDNI:String?
+    @State private var showNewAttention=false
+    @State private var homeCounts:DanperHomeCounts?
     @State private var summary:N2ProtectedStoreSummary?
     @State private var loading=true
     @State private var preparing=false
@@ -31,51 +33,67 @@ struct NativeRootView:View {
 
     private var isReady:Bool { summary != nil || layoutOnly }
     var body:some View {
-        TabView(selection:$tab) {
-            NavigationStack { home }
-                .tabItem { Label("Inicio",systemImage:"house.fill") }.tag(0)
-            NavigationStack {
-                if isReady {
-                    N2NativeClinicalFormView(initialWorkerDNI:newlyRegisteredWorkerDNI)
-                        .id(newlyRegisteredWorkerDNI ?? "new-attention")
-                } else {
-                    lockedTab(title:"Registrar",symbol:"cross.case")
-                }
-            }
-            .tabItem { Label("Registrar",systemImage:"plus.circle.fill") }.tag(1)
-            NavigationStack {
-                if isReady {
-                    N2NativeHistoryView(useProtectedVault:true)
-                        .toolbar {
-                            ToolbarItem(placement:.topBarTrailing) {
-                                NavigationLink {
-                                    N2NativeWorkerEditorView(onSaved:{dni in
-                                        newlyRegisteredWorkerDNI=dni
-                                        tab=1
-                                    })
-                                } label: {
-                                    Label("Nuevo trabajador",systemImage:"person.badge.plus")
+        VStack(spacing:0) {
+            DanperBrandHeader {tab=3}
+            Text("DEMO · Datos ficticios").font(.caption2.weight(.semibold))
+                .foregroundStyle(DanperStyle.red).padding(.vertical,4)
+                .frame(maxWidth:.infinity).background(DanperStyle.surface)
+                .accessibilityIdentifier("premium-demo-banner")
+            TabView(selection:$tab) {
+                NavigationStack {home.toolbar(.hidden,for:.tabBar)}
+                    .toolbar(.hidden,for:.tabBar)
+                    .tabItem { Label("Inicio",systemImage:"house.fill") }.tag(0)
+                NavigationStack {
+                    if isReady {
+                        N2NativeHistoryView(useProtectedVault:true)
+                        .toolbar(.hidden,for:.tabBar)
+                            .toolbar {
+                                ToolbarItem(placement:.topBarTrailing) {
+                                    NavigationLink {
+                                        N2NativeWorkerEditorView(onSaved:{dni in
+                                            newlyRegisteredWorkerDNI=dni;showNewAttention=true
+                                        })
+                                    } label: {Label("Nuevo trabajador",systemImage:"person.badge.plus")}
                                 }
                             }
-                        }
-                } else {
-                    lockedTab(title:"Historial",symbol:"clipboard")
-                }
+                    } else {lockedTab(title:"Historial",symbol:"clipboard")}
+                }.toolbar(.hidden,for:.tabBar)
+                    .tabItem {Label("Historial",systemImage:"list.clipboard.fill")}.tag(1)
+                NavigationStack {
+                    if isReady {N2NativeDraftsDashboard()}
+                    else {lockedTab(title:"Borradores",symbol:"doc.badge.clock")}
+                }.toolbar(.hidden,for:.tabBar)
+                    .tabItem {Label("Borradores",systemImage:"doc.text.fill")}.tag(2)
+                NavigationStack {toolsTab.toolbar(.hidden,for:.tabBar)}
+                    .toolbar(.hidden,for:.tabBar)
+                    .tabItem {Label("Ajustes",systemImage:"gearshape.fill")}.tag(3)
             }
-            .tabItem { Label("Historial",systemImage:"list.clipboard.fill") }.tag(2)
-            NavigationStack { toolsTab }
-                .tabItem { Label("Ajustes",systemImage:"gearshape.fill") }.tag(3)
+            .toolbar(.hidden,for:.tabBar)
+            .safeAreaInset(edge:.bottom,spacing:0) {DanperFloatingTabs(selection:$tab)}
         }
-        .tint(visualPalette=="salud" ? Color(red:0.04,green:0.43,blue:0.80) : DanperStyle.red)
+        .background(DanperStyle.canvas)
+        .tint(DanperStyle.red)
         .environment(\.n2WorkspaceVault,.demo)
         .environment(\.locale,Locale(identifier:"es_PE"))
-        .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
-        .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
-        .task(id:tab) {await refresh()}
-        .onChange(of:tab) {previous,newTab in
-            if previous == 1 && newTab != 1 {
-                newlyRegisteredWorkerDNI=nil
-            }
+        .task(id:tab) {if tab==0 {await refresh()}}
+        .sheet(isPresented:$showNewAttention,onDismiss:{
+            newlyRegisteredWorkerDNI=nil
+            Task {await refresh()}
+        }) {
+            NavigationStack {
+                N2NativeClinicalFormView(initialWorkerDNI:newlyRegisteredWorkerDNI)
+                    .safeAreaInset(edge:.top,spacing:0) {
+                        Text("DEMO · Datos ficticios").font(.caption2.weight(.semibold))
+                            .foregroundStyle(DanperStyle.red).padding(.vertical,5)
+                            .frame(maxWidth:.infinity).background(DanperStyle.surface)
+                    }
+                    .toolbar {
+                        ToolbarItem(placement:.cancellationAction) {
+                            Button("Cerrar") {showNewAttention=false}
+                                .accessibilityIdentifier("premium-close-attention")
+                        }
+                    }
+            }.presentationDragIndicator(.visible)
         }
         .onChange(of:scenePhase) {_,phase in
             if phase == .active {Task {await refresh()}}
@@ -84,117 +102,11 @@ struct NativeRootView:View {
 
     private var home:some View {
         ScrollView {
-            VStack(alignment:.leading,spacing:20) {
-                HStack(spacing:12) {
-                    Image("BrandLogo").resizable().scaledToFit()
-                        .frame(width:43,height:43)
-                        .clipShape(RoundedRectangle(cornerRadius:11))
-                    VStack(alignment:.leading,spacing:1) {
-                        Text("DANPER").font(.system(.headline,design:.rounded,weight:.heavy))
-                        Text("SALUD MÓVIL").font(.caption2.weight(.bold))
-                            .tracking(1.3).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button {tab=3} label: {
-                        Image(systemName:"gearshape")
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .frame(width:44,height:44)
-                    }
-                    .accessibilityLabel("Ajustes")
-                }
-                VStack(alignment:.leading,spacing:8) {
-                    Text("DEPARTAMENTO DE SALUD")
-                        .font(.caption2.weight(.bold)).tracking(1.5)
-                        .foregroundStyle(DanperStyle.red)
-                    HStack(alignment:.center,spacing:10) {
-                        Text("Bienvenido, Felipe")
-                            .font(.system(.title,design:.rounded,weight:.bold))
-                        Spacer()
-                        Image(systemName:"waveform.path.ecg")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(DanperStyle.red)
-                            .frame(width:52,height:52)
-                            .background(DanperStyle.red.opacity(0.09),
-                                        in:RoundedRectangle(cornerRadius:17))
-                    }
-                    Text("Departamento de Salud · Registro ambulatorio local")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth:.infinity,alignment:.leading)
-                .padding(.horizontal,2)
-                .padding(.vertical,3)
-                DisclosureGroup {
-                    Text("Esta versión utiliza una bóveda de ensayo independiente. No introduzcas datos clínicos reales hasta validar la migración y las pruebas en iPhone.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .padding(.top,6)
-                } label: {
-                    Label("Modo de prueba · Solo datos ficticios",
-                          systemImage:"exclamationmark.shield")
-                        .font(.footnote.weight(.semibold)).foregroundStyle(.orange)
-                }
-                .padding(14)
-                .background(DanperStyle.red.opacity(0.07),
-                            in:RoundedRectangle(cornerRadius:16))
-                .overlay(RoundedRectangle(cornerRadius:16)
-                    .strokeBorder(DanperStyle.red.opacity(0.17)))
-                .accessibilityIdentifier("clinical-demo-mode-warning")
-                if visualPalette=="salud" {
-                    HStack(spacing:8) {
-                        VStack(alignment:.leading,spacing:5) {
-                            Label("SALUD OCUPACIONAL",systemImage:"cross.case.fill")
-                                .font(.caption2.weight(.bold))
-                                .tracking(0.9)
-                            Text("Prevención y cuidado en cada atención")
-                                .font(.subheadline.weight(.semibold))
-                                .fixedSize(horizontal:false,vertical:true)
-                            Text("Tu espacio de enfermería, ahora en SwiftUI.")
-                                .font(.caption)
-                                .opacity(0.85)
-                        }
-                        .foregroundStyle(.white)
-                        Spacer(minLength:0)
-                        N2HealthMascot().frame(width:112,height:112)
-                    }
-                    .padding(.leading,16)
-                    .padding(.trailing,6)
-                    .frame(maxWidth:.infinity,minHeight:124)
-                    .background(
-                        LinearGradient(colors:[
-                            Color(red:0.02,green:0.38,blue:0.78),
-                            Color(red:0.01,green:0.69,blue:0.89)],
-                            startPoint:.leading,endPoint:.trailing),
-                        in:RoundedRectangle(cornerRadius:20))
-                }
+            VStack(alignment:.leading,spacing:12) {
+                DanperHomeWelcome(isDemo:true)
                 if isReady {
-                    Button {tab=1} label: {
-                        HStack {
-                            VStack(alignment:.leading,spacing:7) {
-                                Text("ACCESO RÁPIDO").font(.caption.weight(.bold))
-                                Text("Nueva atención").font(.system(.title,design:.rounded,weight:.bold))
-                                Text("Evaluación, tratamiento y consumo").font(.subheadline)
-                            }
-                            Spacer()
-                            Image(systemName:"plus").font(.title.weight(.semibold))
-                        }.foregroundStyle(.white).padding(20)
-                            .frame(maxWidth:.infinity,minHeight:130,alignment:.leading)
-                            .background(DanperStyle.gradient,in:RoundedRectangle(cornerRadius:23))
-                            .shadow(color:DanperStyle.red.opacity(0.18),radius:13,y:7)
-                    }.buttonStyle(.plain)
-                    if let metrics {
-                        ViewThatFits(in:.horizontal) {
-                            HStack(spacing:10) {
-                                metric("Hoy",metrics.today,"sun.max.fill")
-                                metric("Esta semana",metrics.week,"calendar")
-                                metric("Borradores",metrics.drafts,"doc.text.fill")
-                            }
-                            VStack(spacing:10) {
-                                metric("Hoy",metrics.today,"sun.max.fill")
-                                metric("Esta semana",metrics.week,"calendar")
-                                metric("Borradores",metrics.drafts,"doc.text.fill")
-                            }
-                        }
-                    }
+                    DanperNewAttentionCard(action:{showNewAttention=true},identifier:"demo-home-new-attention")
+                    DanperHomeMetricRow(counts:homeCounts ?? metrics.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)})
                 }
                 if !isReady {
                     DanperPanel("¿Cómo deseas comenzar?") {
@@ -257,85 +169,31 @@ struct NativeRootView:View {
                         .accessibilityIdentifier("start-restore-build222")
                     }
                 }
-                VStack(alignment:.leading,spacing:12) {
-                    Text("Herramientas").font(.title3.weight(.bold))
-                    LazyVGrid(columns:[GridItem(.flexible(),spacing:12),
-                                       GridItem(.flexible(),spacing:12)],spacing:12) {
-                        shortcut("Historial","Consultar atenciones","list.clipboard.fill") {
-                            N2NativeHistoryView(useProtectedVault:true)
-                        }
-                        shortcut("Trabajadores","Registrar o buscar personal","person.badge.plus") {
-                            N2NativeHistoryView(useProtectedVault:true)
-                        }
-                        shortcut("Pendientes","Recuperar borradores","doc.badge.clock") {
-                            N2NativeDraftsDashboard()
-                        }
-                        shortcut("Alergias","Revisar antes del tratamiento","cross.vial.fill") {
-                            N2NativeClinicalFormView()
-                        }
-                        shortcut("Kardex","Inventario y reportes","shippingbox.fill") {
-                            N2Build222KardexHub()
-                        }
-                        shortcut("Exportar","Indicador ambulatorio · 10 hojas","tablecells.fill") {
-                            N2VerifiedIndicatorExportView()
-                        }
-                    }
+
+                HStack {
+                    Text("Herramientas").font(.title2.weight(.bold))
+                    Spacer()
+                    Button("Ver todas",systemImage:"chevron.right") {tab=3}
+                        .font(.caption.weight(.semibold))
                 }
-                if isReady {
-                    HStack(spacing:12) {
-                        NavigationLink {N2NativeInventoryView()} label: {
-                            Label("Inventario",systemImage:"shippingbox.fill")
-                        }.buttonStyle(DanperSecondaryButton())
-                        NavigationLink {N2VerifiedIndicatorExportView()} label: {
-                            Label("Excel",systemImage:"tablecells.fill")
-                        }.buttonStyle(DanperSecondaryButton())
+                LazyVGrid(columns:[GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
+                    shortcut("Trabajadores","Registrar o buscar personal","person.badge.plus") {
+                        N2NativeHistoryView(useProtectedVault:true,showWorkers:true)
                     }
+                    shortcut("Kardex","Inventario y movimientos","shippingbox.fill") {N2Build222KardexHub()}
+                    shortcut("Estadísticas","Reportes e indicadores","chart.bar.fill") {DanperStatisticsView()}
+                    shortcut("Indicadores","Exportaciones de salud","list.clipboard.fill") {DanperExportsView()}
                 }
-            }
-            .padding(.horizontal,16)
-            .padding(.vertical,18)
-            .frame(maxWidth:.infinity,alignment:.leading)
-        }
-        .background(Color(uiColor:.systemGroupedBackground))
-        .navigationTitle("Inicio")
-        .navigationBarTitleDisplayMode(.inline)
+            }.padding(14)
+        }.background(DanperStyle.canvas)
+            .navigationTitle("Inicio").toolbar(.hidden,for:.navigationBar)
     }
-    private func metric(_ title:String,_ count:Int,_ symbol:String)->some View {
-        VStack(alignment:.leading,spacing:8) {
-            Image(systemName:symbol).foregroundStyle(DanperStyle.red)
-            Text(count.formatted()).font(.system(.title,design:.rounded,weight:.bold)).monospacedDigit()
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
-            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:18))
-            .accessibilityElement(children:.combine)
-    }
-    private func shortcut<Destination:View>(
-        _ title:String,_ description:String,_ symbol:String,
-        @ViewBuilder destination:()->Destination
-    )->some View {
+    private func shortcut<Destination:View>(_ title:String,_ description:String,_ symbol:String,
+        @ViewBuilder destination:()->Destination)->some View {
         NavigationLink(destination:destination) {
-            VStack(alignment:.leading,spacing:9) {
-                Image(systemName:symbol)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(DanperStyle.red)
-                    .frame(width:43,height:43)
-                    .background(DanperStyle.red.opacity(0.09),
-                                in:RoundedRectangle(cornerRadius:12))
-                Text(title).font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                Text(description).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal:false,vertical:true)
-                Spacer(minLength:0)
-            }
-            .padding(14)
-            .frame(maxWidth:.infinity,minHeight:124,alignment:.topLeading)
-            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:18))
-            .overlay(RoundedRectangle(cornerRadius:18)
-                .strokeBorder(Color.secondary.opacity(0.10),lineWidth:1))
-        }
-        .buttonStyle(.plain)
-        .disabled(!isReady)
-        .accessibilityLabel(title+": "+description)
+            DanperToolCard(title:title,subtitle:description,symbol:symbol)
+        }.buttonStyle(.plain).disabled(!isReady)
+            .accessibilityLabel(title+": "+description)
     }
     private func lockedTab(title:String,symbol:String)->some View {
         ContentUnavailableView {
@@ -352,18 +210,25 @@ struct NativeRootView:View {
     private var toolsTab:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
+            DanperVersionPanel()
             DanperPanel {
-                Label(isReady ? "Herramientas disponibles" :
+                Label(isReady ? "DEMO · Solo datos ficticios" :
                     "Inicia la práctica desde Inicio",systemImage:"info.circle")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
             if isReady {
+                DanperPanel("Personal y atenciones") {
+                    DanperToolLink(title:"Trabajadores",symbol:"person.2") {N2NativeHistoryView(useProtectedVault:true,showWorkers:true)}
+                    DanperToolLink(title:"Alergias",symbol:"cross.vial") {N2NativeClinicalFormView()}
+                    DanperToolLink(title:"Estadísticas",symbol:"chart.bar.fill") {DanperStatisticsView()}
+                }
                 DanperPanel("Inventario y reportes") {
                     DanperToolLink(title:"Inventario y lotes",symbol:"shippingbox") {N2NativeInventoryView()}
                     DanperToolLink(title:"Corte del día 9 · inventario único",symbol:"calendar.badge.clock") {N2KardexCutPreviewView()}
                     DanperToolLink(title:"Kardex de enfermería",symbol:"tablecells") {N2VerifiedNursingExportView()}
                     DanperToolLink(title:"Indicador ambulatorio · Excel",symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
+                    DanperToolLink(title:"Vigilancia ocupacional · Excel",symbol:"figure.walk.motion") {N2OccupationalVigilanceExportView()}
                     DanperToolLink(title:"Respaldo cifrado",symbol:"lock.doc") {N2NativeBackupExportView()}
                 }
             }
@@ -372,12 +237,12 @@ struct NativeRootView:View {
                                 symbol:"doc.badge.plus") {
                      N2NativePersonalImportView()
                  }
-                 Text("Importación local de la hoja PERSONAL a la bóveda clínica independiente. Antes de usar datos de empleados reales, valida el importador y la seguridad en el iPhone.")
+                 Text("Revisa los datos antes de confirmar la importación. No se mezclarán con esta DEMO.")
                      .font(.caption).foregroundStyle(.secondary)
                 DanperToolLink(title:"Acceso al espacio clínico independiente",symbol:"cross.case.fill") {
                     N2ClinicalWorkspaceGateView()
                 }
-                Text("Acceso mediante autenticación adicional y fuente clínica cifrada. Continúa en validación; no usar con pacientes reales.")
+                Text("Requiere autenticación. Los datos clínicos permanecen separados de la DEMO.")
                     .font(.caption).foregroundStyle(.orange)
                 DanperToolLink(title:"Comprobar respaldo original (solo lectura)",symbol:"doc.text.magnifyingglass") {BackupPreviewView()}
                 DisclosureGroup("Configuración avanzada",isExpanded:$showAdvanced) {
@@ -402,7 +267,7 @@ struct NativeRootView:View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.red)
                 }
-                Text("Solo elimina registros creados en la demostración B11. Las fuentes clínicas y la build 222 no se tocan. Se exige confirmación escrita y autenticación.")
+                Text("Elimina solo los datos DEMO. Tus datos clínicos se conservan. Requiere confirmación escrita y autenticación.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             DanperPanel("Identidad visual") {
@@ -429,7 +294,7 @@ struct NativeRootView:View {
                 LabeledContent("DNI del responsable",value:N2ClinicianIdentity.dni)
             }
             DanperPanel {
-                Text("Versión beta SwiftUI · uso con información ficticia. No sustituye la build 222.")
+                Text("DEMO · Utiliza únicamente información ficticia.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
           }.padding(16)
@@ -445,11 +310,9 @@ struct NativeRootView:View {
         defer{loading=false}
         do {
             summary=try await N2SyntheticTrialIOSVault.shared.inspect()
-            if let model=try await N2SyntheticTrialIOSVault.shared.readHistory() {
-                metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())
-            } else {
-                metrics=nil
-            }
+            let period=N2HomeCalendarPeriod(now:Date())
+            let counters=try await N2SyntheticTrialIOSVault.shared.dashboardCounters(today:period.today,weekStart:period.weekStart)
+            homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
             problem=""
         }catch {
             summary=nil
@@ -473,11 +336,9 @@ struct NativeRootView:View {
                 }
             }
             summary=result
-            if let model=try await N2SyntheticTrialIOSVault.shared.readHistory() {
-                metrics=N2DashboardMetrics.calculate(visits:model.visits,now:Date())
-            } else {
-                metrics=nil
-            }
+            let period=N2HomeCalendarPeriod(now:Date())
+            let counters=try await N2SyntheticTrialIOSVault.shared.dashboardCounters(today:period.today,weekStart:period.weekStart)
+            homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
             problem=""
         } catch {
             summary=nil

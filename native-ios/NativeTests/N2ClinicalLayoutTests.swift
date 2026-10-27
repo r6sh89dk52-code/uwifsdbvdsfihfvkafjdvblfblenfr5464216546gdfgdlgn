@@ -20,7 +20,7 @@ import DanperCore
             nursing:resource("n2-nursing-catalog"),approvedMappings:resource("n2-approved-mappings"))
         return try N2NativeFormContextReader.read(snapshot:resource("n2-synthetic-clinical"),revision:1,products:catalog)
     }
-    private func capture<V:View>(_ view:V,name:String,dark:Bool,large:Bool=false) async throws {
+    private func capture<V:View>(_ view:V,name:String,dark:Bool,large:Bool=false,size:CGSize=CGSize(width:393,height:852)) async throws {
         let host=UIHostingController(rootView:view
             .preferredColorScheme(dark ? .dark : .light)
             .environment(\.colorScheme,dark ? .dark : .light)
@@ -29,7 +29,7 @@ import DanperCore
             .environment(\.dynamicTypeSize,large ? .accessibility3 : .large))
         let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
         let window=UIWindow(windowScene:scene)
-        window.frame=CGRect(x:0,y:0,width:393,height:852)
+        window.frame=CGRect(origin:.zero,size:size)
         window.windowLevel = .alert + 1
         window.overrideUserInterfaceStyle=dark ? .dark : .light
         host.overrideUserInterfaceStyle=dark ? .dark : .light
@@ -151,4 +151,15 @@ import DanperCore
                 validationMessage:"Selecciona un trabajador. Confirma la revisión de alergias.")
         },name:"Validacion",dark:false)
     }
+    func testPremiumStatisticsVersionAndAccessibleHome() async throws {
+        let version=DanperAppVersion()
+        XCTAssertEqual(version.version,Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String)
+        XCTAssertEqual(version.build,Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String)
+        for dark in [false,true] {
+            try await capture(NavigationStack {DanperStatisticsView()},name:"Premium-estadisticas-\(dark ? "oscuro":"claro")",dark:dark)
+            try await capture(N2ClinicalWorkspaceRootView(layoutCounts:(0,0,0),layoutTab:3),name:"Premium-ajustes-\(dark ? "oscuro":"claro")",dark:dark)
+        }
+        try await capture(N2ClinicalWorkspaceRootView(layoutCounts:(0,0,0)),name:"Premium-Inicio-SE-letra-grande",dark:true,large:true,size:CGSize(width:375,height:667))
+    }
+
 }

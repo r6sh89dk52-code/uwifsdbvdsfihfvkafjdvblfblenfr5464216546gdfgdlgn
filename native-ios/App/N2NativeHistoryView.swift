@@ -160,7 +160,7 @@ struct N2NativeHistoryView: View {
                     }
                   }.padding(16)
                 }
-                .searchable(text:$query,prompt:showWorkers
+                .searchable(text:$query,placement:.navigationBarDrawer(displayMode:.always),prompt:showWorkers
                     ? "Buscar DNI, nombres o área"
                     : "Buscar trabajador, DNI, diagnóstico o fecha")
                 .task(id:query) {

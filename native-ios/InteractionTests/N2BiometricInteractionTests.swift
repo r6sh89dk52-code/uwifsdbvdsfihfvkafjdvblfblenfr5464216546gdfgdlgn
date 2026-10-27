@@ -42,13 +42,13 @@ final class N2BiometricInteractionTests:XCTestCase {
         Thread.sleep(forTimeInterval:2)
         biometric("match")
         let source=app.buttons["clinical-first-run-import-personal"]
-        XCTAssertTrue(source.waitForExistence(timeout:5) || app.tabBars.firstMatch.waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertTrue(source.waitForExistence(timeout:5) || app.buttons["premium-tab-home"].waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Autenticacion-simulada-aceptada-seleccion-fuente")
         XCUIDevice.shared.press(.home)
         app.activate()
         XCTAssertTrue(checking.waitForExistence(timeout:10),app.debugDescription)
         Thread.sleep(forTimeInterval:2)
         biometric("match")
-        XCTAssertTrue(source.waitForExistence(timeout:5) || app.tabBars.firstMatch.waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertTrue(source.waitForExistence(timeout:5) || app.buttons["premium-tab-home"].waitForExistence(timeout:10),app.debugDescription)
     }
 }

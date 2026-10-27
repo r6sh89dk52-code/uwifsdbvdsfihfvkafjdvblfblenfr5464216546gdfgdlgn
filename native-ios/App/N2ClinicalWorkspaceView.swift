@@ -199,321 +199,168 @@ struct N2ClinicalWorkspaceGateView:View {
     }
 }
 
-/// All children inherit a FIXED clinical environment. The independently
-/// mounted demo application's tabs keep their default .demo environment.
+/// Clinical and DEMO shells share presentation; their vault environments stay fixed.
 struct N2ClinicalWorkspaceRootView:View {
     init(onClose:@escaping ()->Void){self.onClose=onClose}
     #if DEBUG
-    init(layoutCounts:(today:Int,week:Int,drafts:Int)) {
-        onClose={}
-        layoutOnly=true
-        _homeCounts=State(initialValue:layoutCounts)
+    init(layoutCounts:(today:Int,week:Int,month:Int),layoutTab:Int=0) {
+        onClose={};layoutOnly=true
+        _homeCounts=State(initialValue:DanperHomeCounts(today:layoutCounts.today,week:layoutCounts.week,month:layoutCounts.month))
+        _tab=State(initialValue:layoutTab)
     }
     #endif
     private var layoutOnly=false
     let onClose:()->Void
     @Environment(\.n2WorkspaceVault) private var vault
-    @State private var homeCounts:(today:Int,week:Int,drafts:Int)?
-
     @Environment(\.scenePhase) private var scenePhase
+    @State private var homeCounts:DanperHomeCounts?
+    @State private var countError=false
     @State private var tab=0
     @State private var registeredDNI:String?
+    @State private var showNewAttention=false
     @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @AppStorage("danper.appearance") private var appearance="system"
-    @AppStorage("danper.haptics.enabled") private var haptics=true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body:some View {
         VStack(spacing:0) {
-            DanperBrandHeader {
-                withAnimation(reduceMotion ? nil : DanperStyle.animation){tab=3}
-            }
+            DanperBrandHeader {tab=3}
             TabView(selection:$tab) {
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment:.leading,spacing:18) {
-                        VStack(alignment:.leading,spacing:8) {
-                            Text("DEPARTAMENTO DE SALUD")
-                                .font(.caption2.weight(.bold)).tracking(1.4)
-                                .foregroundStyle(DanperStyle.red)
-                            HStack(alignment:.center,spacing:12) {
-                                VStack(alignment:.leading,spacing:6) {
-                                    Text("Bienvenido")
-                                        .font(.system(.largeTitle,design:.rounded,weight:.bold))
-                                        .foregroundStyle(.primary)
-                                    Text("Departamento de Salud · Registro ambulatorio local")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer(minLength:0)
-                                Image(systemName:"waveform.path.ecg")
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundStyle(DanperStyle.red)
-                                    .frame(width:50,height:50)
-                                    .background(DanperStyle.red.opacity(0.09),
-                                                in:RoundedRectangle(cornerRadius:16))
+                NavigationStack {home.toolbar(.hidden,for:.tabBar)}
+                    .toolbar(.hidden,for:.tabBar)
+                    .tabItem {Label("Inicio",systemImage:"house.fill")}.tag(0)
+                NavigationStack {
+                    N2NativeHistoryView(useProtectedVault:true)
+                        .toolbar(.hidden,for:.tabBar)
+                        .toolbar {
+                            ToolbarItem(placement:.topBarTrailing) {
+                                NavigationLink {
+                                    N2NativeWorkerEditorView(onSaved:{dni in
+                                        registeredDNI=dni;showNewAttention=true
+                                    })
+                                } label: {Label("Nuevo trabajador",systemImage:"person.badge.plus")}
                             }
                         }
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                        HStack(spacing:10) {
-                            Image(systemName:"lock.shield")
-                                .foregroundStyle(DanperStyle.red)
-                            Text("Fuente clínica protegida")
-                                .font(.footnote.weight(.semibold))
-                        }
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                        .padding(14)
-                        .background(DanperStyle.red.opacity(0.06),
-                                    in:RoundedRectangle(cornerRadius:16))
-                        if visualPalette=="salud" {
-                            HStack(spacing:8) {
-                                VStack(alignment:.leading,spacing:6) {
-                                    Label("SALUD OCUPACIONAL",
-                                          systemImage:"cross.case.fill")
-                                        .font(.caption2.weight(.bold))
-                                    Text("Prevención, atención y seguimiento")
-                                        .font(.subheadline.weight(.semibold))
-                                    Text("Un mismo registro para ambas sedes.")
-                                        .font(.caption).opacity(0.9)
-                                }.foregroundStyle(.white)
-                                Spacer(minLength:0)
-                                N2HealthMascot().frame(width:112,height:112)
-                            }
-                            .padding(.leading,16).padding(.trailing,6)
-                            .frame(maxWidth:.infinity,minHeight:124)
-                            .background(
-                                LinearGradient(colors:[
-                                    Color(red:0.02,green:0.38,blue:0.78),
-                                    Color(red:0.01,green:0.69,blue:0.89)],
-                                    startPoint:.leading,endPoint:.trailing),
-                                in:RoundedRectangle(cornerRadius:20))
-                        }
-                        Button {
-                            withAnimation(reduceMotion ? nil : DanperStyle.animation){tab=1}
-                        } label: {
-                            HStack(alignment:.center,spacing:8) {
-                                VStack(alignment:.leading,spacing:9) {
-                                    Text("ACCESO RÁPIDO")
-                                        .font(.caption2.weight(.bold))
-                                        .tracking(1.4)
-                                        .foregroundStyle(.white.opacity(0.92))
-                                    Text("Nueva atención")
-                                        .font(.system(.title,design:.rounded,weight:.bold))
-                                        .foregroundStyle(.white)
-                                    Text("Registra con menos pasos")
-                                        .font(.subheadline).foregroundStyle(.white.opacity(0.82))
-                                }
-                                Spacer(minLength:4)
-                                Image(systemName:"plus")
-                                    .font(.system(size:32,weight:.light))
-                                    .foregroundStyle(.white)
-                            }
-                            .padding(21)
-                            .frame(maxWidth:.infinity,minHeight:126,alignment:.leading)
-                            .background(DanperStyle.gradient,
-                                        in:RoundedRectangle(cornerRadius:22))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("clinical-home-new-attention")
-                        HStack(spacing:10) {
-                            homeMetric(homeCounts.map{String($0.today)} ?? "—","Hoy")
-                            homeMetric(homeCounts.map{String($0.week)} ?? "—","Esta semana")
-                            NavigationLink {
-                                N2NativeDraftsDashboard()
-                            } label: {
-                                homeMetric(homeCounts.map{String($0.drafts)} ?? "—","Borradores")
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("clinical-home-draft-count-link")
-                        }
-
-                        Text("Herramientas")
-                            .font(.title3.weight(.bold))
-                            .frame(maxWidth:.infinity,alignment:.leading)
-                        LazyVGrid(columns:[GridItem(.flexible(),spacing:12),
-                                           GridItem(.flexible(),spacing:12)],
-                                  spacing:12) {
-                            homeTile("Trabajadores","Registrar o buscar personal",
-                                     symbol:"person.badge.plus") {
-                                N2NativeHistoryView(useProtectedVault:true,showWorkers:true)
-                            }
-                            homeTile("Kardex","Inventario y movimientos",
-                                     symbol:"shippingbox.fill") {
-                                N2Build222KardexHub()
-                            }
-                            homeTile("Indicador","Excel · 10 hojas",
-                                     symbol:"tablecells") {
-                                N2VerifiedIndicatorExportView()
-                            }
-                            homeTile("Historial","Consultar atenciones",
-                                     symbol:"list.clipboard.fill") {
-                                N2NativeHistoryView(useProtectedVault:true)
-                            }
-                            homeTile("Borradores","Registros pendientes",
-                                     symbol:"doc.text.fill") {
-                                N2NativeDraftsDashboard()
-                            }
-                            homeTile("Respaldo","Copia cifrada",
-                                     symbol:"lock.doc") {
-                                N2NativeBackupExportView()
-                            }
-                        }
-                        #if DEBUG
-                        Label("Acceso protegido. Validar restauración, Kardex y Excel en el dispositivo antes de usar registros de pacientes reales.",
-                              systemImage:"lock.shield")
-                            .font(.caption).foregroundStyle(.secondary)
-                        #endif
-                        Button("Cerrar espacio clínico",role:.cancel) {onClose()}
-                            .buttonStyle(DanperSecondaryButton())
-                    }
-                    .padding(16)
-                }
-                .navigationTitle("Inicio")
-                .toolbar(.hidden,for:.navigationBar)
+                }.toolbar(.hidden,for:.tabBar)
+                    .tabItem {Label("Historial",systemImage:"list.clipboard.fill")}.tag(1)
+                NavigationStack {N2NativeDraftsDashboard().toolbar(.hidden,for:.tabBar)}
+                    .toolbar(.hidden,for:.tabBar)
+                    .tabItem {Label("Borradores",systemImage:"doc.text.fill")}.tag(2)
+                NavigationStack {settings.toolbar(.hidden,for:.tabBar)}
+                    .toolbar(.hidden,for:.tabBar)
+                    .tabItem {Label("Ajustes",systemImage:"gearshape.fill")}.tag(3)
             }
-            .tabItem {Label("Inicio",systemImage:"house.fill")}.tag(0)
-            NavigationStack {
-                N2NativeClinicalFormView(initialWorkerDNI:registeredDNI)
-                    .id(registeredDNI ?? "clinical-attention")
-            }
-            .tabItem {Label("Registrar",systemImage:"plus.circle.fill")}.tag(1)
-            NavigationStack {
-                N2NativeHistoryView(useProtectedVault:true)
-                    .toolbar {
-                        ToolbarItem(placement:.topBarTrailing) {
-                            NavigationLink {
-                                N2NativeWorkerEditorView(onSaved:{dni in
-                                    registeredDNI=dni
-                                    tab=1
-                                })
-                            } label: {
-                                Label("Nuevo trabajador",systemImage:"person.badge.plus")
-                            }
-                        }
-                    }
-            }
-            .tabItem {Label("Historial",systemImage:"list.clipboard.fill")}.tag(2)
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment:.leading,spacing:14) {
-                        DanperPanel {
-                            Label("Fuente clínica cifrada",
-                                  systemImage:"lock.shield.fill")
-                                .font(.headline)
-                            Text("No se mezclan padrones, inventarios o atenciones de otras fuentes sin verificación.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                        DanperPanel("Apariencia") {
-                            Picker("Colores",selection:$visualPalette) {
-                                Text("DANPER rojo").tag("danper")
-                                Text("Salud azul").tag("salud")
-                            }
-                            .pickerStyle(.segmented)
-                            Picker("Modo",selection:$appearance) {
-                                Text("Sistema").tag("system")
-                                Text("Claro").tag("light")
-                                Text("Oscuro").tag("dark")
-                            }.pickerStyle(.segmented)
-                        }
-                        DanperToolLink(title:"Importar / conciliar PERSONAL",
-                                       symbol:"person.crop.rectangle.stack") {N2NativePersonalImportView()}
-                        DanperToolLink(title:"Inventario y lotes",
-                                       symbol:"shippingbox") {N2NativeInventoryView()}
-                        DanperToolLink(title:"Corte del día 9 · inventario único",
-                                       symbol:"calendar.badge.clock") {N2KardexCutPreviewView()}
-                        DanperToolLink(title:"Kardex de enfermería",
-                                       symbol:"tablecells") {N2VerifiedNursingExportView()}
-                        DanperToolLink(title:"Indicador ambulatorio · Excel",
-                                       symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
-                        DanperToolLink(title:"Vigilancia ocupacional · Excel",
-                                       symbol:"figure.walk.motion") {N2OccupationalVigilanceExportView()}
-                        DanperToolLink(title:"Respaldo cifrado",
-                                       symbol:"lock.doc") {N2NativeBackupExportView()}
-                        Button("Cerrar espacio clínico",role:.cancel) {onClose()}
-                            .buttonStyle(DanperSecondaryButton())
-                    }.padding(16)
-                }
-                .navigationTitle("Ajustes · Clínica")
-                .toolbar(.hidden,for:.navigationBar)
-            }
-            .tabItem {Label("Ajustes",systemImage:"gearshape.fill")}.tag(3)
+            .toolbar(.hidden,for:.tabBar)
+            .safeAreaInset(edge:.bottom,spacing:0) {DanperFloatingTabs(selection:$tab)}
         }
-        }
+        .background(DanperStyle.canvas)
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
-        .preferredColorScheme(appearance=="system" ? nil :
-                             appearance=="dark" ? .dark : .light)
-        .animation(reduceMotion ? nil : DanperStyle.animation,value:tab)
-        .sensoryFeedback(.selection,trigger:tab) {_,_ in haptics}
+        .preferredColorScheme(appearance=="system" ? nil : appearance=="dark" ? .dark : .light)
         .task(id:tab) {if tab==0 {await refreshHomeCounts()}}
+        .sheet(isPresented:$showNewAttention,onDismiss:{
+            registeredDNI=nil
+            Task {await refreshHomeCounts()}
+        }) {
+            NavigationStack {
+                N2NativeClinicalFormView(initialWorkerDNI:registeredDNI)
+                    .toolbar {
+                        ToolbarItem(placement:.cancellationAction) {
+                            Button("Cerrar") {showNewAttention=false}
+                                .accessibilityIdentifier("premium-close-attention")
+                        }
+                    }
+            }
+            .presentationDragIndicator(.visible)
+        }
         .opacity(scenePhase == .active ? 1 : 0)
         .accessibilityHidden(scenePhase != .active)
         .allowsHitTesting(scenePhase == .active)
-        .onChange(of:tab) {old,current in
-            if old==1 && current != 1 {registeredDNI=nil}
-        }
         .onChange(of:scenePhase) {_,phase in
             if phase == .background {onClose()}
         }
     }
+    private var home:some View {
+        ScrollView {
+            VStack(alignment:.leading,spacing:12) {
+                DanperHomeWelcome()
+                DanperNewAttentionCard {showNewAttention=true}
+                DanperHomeMetricRow(counts:homeCounts)
+                if countError {
+                    DanperErrorState(message:"No se pudieron actualizar las cifras.",retry:{Task {await refreshHomeCounts()}})
+                } else if homeCounts==nil {
+                    DanperLoadingState(title:"Actualizando cifras…")
+                }
+                HStack {
+                    Text("Herramientas").font(.title2.weight(.bold))
+                    Spacer()
+                    Button("Ver todas",systemImage:"chevron.right") {tab=3}
+                        .font(.caption.weight(.semibold))
+                }.padding(.top,3)
+                LazyVGrid(columns:[GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
+                    homeTile("Trabajadores","Registrar o buscar personal",symbol:"person.badge.plus") {
+                        N2NativeHistoryView(useProtectedVault:true,showWorkers:true)
+                    }
+                    homeTile("Kardex","Inventario y movimientos",symbol:"shippingbox.fill") {N2Build222KardexHub()}
+                    homeTile("Estadísticas","Reportes e indicadores",symbol:"chart.bar.fill") {DanperStatisticsView()}
+                    homeTile("Indicadores","Exportaciones de salud",symbol:"list.clipboard.fill") {DanperExportsView()}
+                }
+            }.padding(14)
+        }
+        .navigationTitle("Inicio").toolbar(.hidden,for:.navigationBar)
+        .background(DanperStyle.canvas)
+        .refreshable {await refreshHomeCounts()}
+    }
     @MainActor private func refreshHomeCounts() async {
         guard !layoutOnly else{return}
         do {
-            var calendar=Calendar(identifier:.gregorian)
-            calendar.timeZone=TimeZone(identifier:"America/Lima")!
-            calendar.firstWeekday=2
-            let now=Date()
-            let formatter=DateFormatter()
-            formatter.locale=Locale(identifier:"en_US_POSIX")
-            formatter.timeZone=calendar.timeZone
-            formatter.dateFormat="yyyy-MM-dd"
-            let today=formatter.string(from:now)
-            let weekStart=formatter.string(
-                from:calendar.dateInterval(of:.weekOfYear,for:now)?.start ?? now)
-            let counters=try await vault.dashboardCounters(
-                today:today,weekStart:weekStart)
-            homeCounts=counters.map {
-                (today:$0.today,week:$0.week,drafts:$0.drafts)
-            }
+            let period=N2HomeCalendarPeriod(now:Date())
+            let counters=try await vault.dashboardCounters(today:period.today,weekStart:period.weekStart)
+            homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
+            countError=false
         }catch {
-            homeCounts=nil
+            homeCounts=nil;countError=true
         }
     }
-    private func homeMetric(_ count:String,_ label:String)->some View {
-        VStack(spacing:5) {
-            Text(count).font(.title2.weight(.bold)).monospacedDigit()
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth:.infinity,minHeight:70)
-        .background(DanperStyle.surface,
-                    in:RoundedRectangle(cornerRadius:15))
-    }
-    private func homeTile<Destination:View>(
-        _ title:String,_ subtitle:String,symbol:String,
+    private func homeTile<Destination:View>(_ title:String,_ subtitle:String,symbol:String,
         @ViewBuilder destination:()->Destination)->some View {
-        NavigationLink {
-            destination()
-        } label: {
-            VStack(alignment:.leading,spacing:9) {
-                Image(systemName:symbol)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(DanperStyle.red)
-                    .frame(width:43,height:43)
-                    .background(DanperStyle.red.opacity(0.09),
-                                in:RoundedRectangle(cornerRadius:13))
-                Text(title).font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                Text(subtitle).font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal:false,vertical:true)
-                Spacer(minLength:0)
-            }
-            .frame(maxWidth:.infinity,minHeight:119,alignment:.topLeading)
-            .padding(13)
-            .background(DanperStyle.surface,
-                        in:RoundedRectangle(cornerRadius:17))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("clinical-home-tool-"+title.lowercased())
+        NavigationLink(destination:destination) {
+            DanperToolCard(title:title,subtitle:subtitle,symbol:symbol)
+        }.buttonStyle(.plain)
+            .accessibilityLabel(title+": "+subtitle)
+            .accessibilityIdentifier("clinical-home-tool-"+title.lowercased())
     }
-
+    private var settings:some View {
+        ScrollView {
+            VStack(alignment:.leading,spacing:15) {
+                DanperVersionPanel()
+                DanperPanel("Apariencia") {
+                    Picker("Colores",selection:$visualPalette) {
+                        Text("DANPER rojo").tag("danper");Text("Salud azul").tag("salud")
+                    }.pickerStyle(.segmented)
+                    Picker("Modo",selection:$appearance) {
+                        Text("Sistema").tag("system");Text("Claro").tag("light");Text("Oscuro").tag("dark")
+                    }.pickerStyle(.segmented)
+                }
+                DanperPanel("Personal y atenciones") {
+                    DanperToolLink(title:"Trabajadores",symbol:"person.2") {N2NativeHistoryView(useProtectedVault:true,showWorkers:true)}
+                    DanperToolLink(title:"Borradores",symbol:"doc.badge.clock") {N2NativeDraftsDashboard()}
+                    DanperToolLink(title:"Revisión de alergias",symbol:"cross.vial") {N2NativeClinicalFormView()}
+                    DanperToolLink(title:"Importar / conciliar PERSONAL",symbol:"person.crop.rectangle.stack") {N2NativePersonalImportView()}
+                }
+                DanperPanel("Inventario y reportes") {
+                    DanperToolLink(title:"Inventario y lotes",symbol:"shippingbox") {N2NativeInventoryView()}
+                    DanperToolLink(title:"Corte del día 9 · inventario único",symbol:"calendar.badge.clock") {N2KardexCutPreviewView()}
+                    DanperToolLink(title:"Kardex de enfermería",symbol:"tablecells") {N2VerifiedNursingExportView()}
+                    DanperToolLink(title:"Indicador ambulatorio · Excel",symbol:"doc.richtext") {N2VerifiedIndicatorExportView()}
+                    DanperToolLink(title:"Vigilancia ocupacional · Excel",symbol:"figure.walk.motion") {N2OccupationalVigilanceExportView()}
+                    DanperToolLink(title:"Estadísticas",symbol:"chart.bar.fill") {DanperStatisticsView()}
+                }
+                DanperPanel("Seguridad") {
+                    DanperToolLink(title:"Respaldo cifrado",symbol:"lock.doc") {N2NativeBackupExportView()}
+                    Button("Cerrar espacio clínico",role:.cancel) {onClose()}.buttonStyle(DanperSecondaryButton())
+                }
+            }.padding(16)
+        }.navigationTitle("Ajustes").navigationBarTitleDisplayMode(.inline)
+            .background(DanperStyle.canvas)
+    }
 }

@@ -1,35 +1,26 @@
 import XCTest
 
-/// Build 222 shell contract, exercised without patient data, Keychain or Face ID.
-/// Launches the DEBUG-only SwiftUI dashboard fixture rather than the clinical UI.
+/// Presentation harness only: no clinical vault, credentials or patient data.
 final class N2Build222ShellTests:XCTestCase {
     func testFourTabsAndHomeToolsMatchBuild222() {
-        let app=XCUIApplication()
-        app.launchArguments=["--danper-shell-probe"]
+        let app=XCUIApplication();app.launchArguments=["--danper-shell-probe"]
         app.launch()
-
-        let tabBar=app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout:10))
-
-        let names=["Inicio","Registrar","Historial","Ajustes"]
-        for name in names {
-            XCTAssertTrue(tabBar.buttons[name].exists,"Falta la pestaña \(name)")
+        XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:10))
+        XCTAssertFalse(app.tabBars.firstMatch.exists,"La cápsula no debe duplicar una barra nativa")
+        for (id,label) in [("home","Inicio"),("history","Historial"),("drafts","Borradores"),("settings","Ajustes")] {
+            let button=app.buttons["premium-tab-"+id]
+            XCTAssertTrue(button.exists);XCTAssertEqual(button.label,label)
         }
-        XCTAssertEqual(tabBar.buttons.count,4,
-                       "La Build 222 tiene exactamente cuatro pestañas")
-
-        XCTAssertTrue(app.staticTexts["Bienvenido, Felipe"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.staticTexts["Herramientas"].exists)
-
-        let shortcuts=["Historial","Trabajadores","Pendientes","Alergias","Kardex","Exportar"]
+        XCTAssertTrue(app.staticTexts["Bienvenido"].exists)
+        XCTAssertTrue(app.descendants(matching:.any)["premium-metric-month"].exists)
+        XCTAssertTrue(app.buttons["demo-home-new-attention"].exists)
         let scroll=app.scrollViews.firstMatch
-        for name in shortcuts {
-            let action=app.buttons.matching(
-                NSPredicate(format:"label BEGINSWITH %@",name+":")
-            ).firstMatch
-            if !action.exists {scroll.swipeUp()}
-            XCTAssertTrue(action.waitForExistence(timeout:3),
-                          "No aparece el acceso \(name)")
+        for name in ["Trabajadores","Kardex","Estadísticas","Indicadores"] {
+            let action=app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",name+":")).firstMatch
+            if !action.isHittable {scroll.swipeUp()}
+            XCTAssertTrue(action.waitForExistence(timeout:3),"Falta el acceso \(name)")
         }
+        app.buttons["premium-tab-settings"].tap()
+        XCTAssertTrue(app.otherElements["premium-app-version"].exists || app.staticTexts["DANPER Salud Móvil"].exists)
     }
 }

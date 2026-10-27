@@ -57,7 +57,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
     }
     private func authenticate(_ app:XCUIApplication) {
         XCTAssertTrue(app.staticTexts["Verificando identidad…"].waitForExistence(timeout:15),app.debugDescription)
-        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        XCTAssertFalse(app.buttons["premium-tab-home"].exists)
         Thread.sleep(forTimeInterval:2);match()
     }
     private func addMedication(_ app:XCUIApplication,query:String,code:String) {
@@ -102,7 +102,10 @@ final class N3ClinicalJourneyTests:XCTestCase {
         if let expectedCount {XCTAssertEqual(declarations,expectedCount,app.debugDescription)}
     }
     private func inventory(_ app:XCUIApplication) {
-        tap(app.tabBars.buttons["Ajustes"],in:app)
+        if app.buttons["premium-close-attention"].exists {
+            tap(app.buttons["premium-close-attention"],in:app)
+        }
+        tap(app.buttons["premium-tab-settings"],in:app)
         if !app.staticTexts["Medicamentos y existencias"].exists {
             tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Inventario y lotes")).firstMatch,in:app)
         }
@@ -193,7 +196,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
             capture(app,"Fuente-clinica-creada")
             tap(app.buttons["Volver para entrar a DANPER"],in:app)
         }
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
         capture(app,"Inicio-clinico-protegido")
         inventory(app)
         addLot(app,code:"E-22",query:"Paracetamol",reference:"N3-PARA-A",quantity:"3",expiry:"201030")
@@ -203,7 +206,8 @@ final class N3ClinicalJourneyTests:XCTestCase {
             let seconds=Calendar.current.component(.second,from:Date())
             Thread.sleep(forTimeInterval:Double(61-seconds))
         }
-        tap(app.tabBars.buttons["Registrar"],in:app)
+        tap(app.buttons["premium-tab-home"],in:app)
+        tap(app.buttons["clinical-home-new-attention"],in:app)
         enter(app.textFields["attention-worker-dni"],"00000031",in:app)
         tap(app.buttons["Siguiente"],in:app)
         tap(app.buttons["choice-Revisión de alergias"],in:app)
@@ -247,13 +251,13 @@ final class N3ClinicalJourneyTests:XCTestCase {
         registerContainerUse(app,opened:false)
         inventory(app)
         capture(app,"Inventario-despues-de-conciliar")
-        tap(app.tabBars.buttons["Historial"],in:app)
+        tap(app.buttons["premium-tab-history"],in:app)
         XCTAssertTrue(app.staticTexts["PRUEBA CLINICA FICTICIA N3"].firstMatch.waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Historial-persistido")
         app.terminate()
         app.launchArguments += ["-danper.appearance","dark"]
         app.launch();authenticate(app)
-        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
         capture(app,"Persistencia-tras-relanzar")
         inventory(app)
         let alcoholLot=app.descendants(matching:.any)["inventory-lot-N3-ALCOHOL"].firstMatch
@@ -266,7 +270,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         capture(app,"Declaracion-manual-estado-envase")
         tap(app.buttons["Cancelar"],in:app)
         capture(app,"Envase-abierto-persistido")
-        tap(app.tabBars.buttons["Inicio"],in:app)
+        tap(app.buttons["premium-tab-home"],in:app)
         tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Kardex")).firstMatch,in:app)
         XCTAssertTrue(app.staticTexts["Corte mensual · del día 9 al día 8"].waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Kardex-real-y-corte-mensual")

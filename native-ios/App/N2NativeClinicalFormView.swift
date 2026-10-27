@@ -818,8 +818,7 @@ struct N2NativeClinicalFormView:View {
                 if form.system=="OSTEOMUSCULAR" {
                     DanperChoiceField(title:"Segmento osteomuscular",
                         selection:segmentChoice,
-                        options:N2OsteomuscularSegments.options +
-                                [N2OsteomuscularSegments.custom],
+                        options:N2OsteomuscularSegments.options + [N2OsteomuscularSegments.custom],
                         openRequest:highlightedField=="clinical-segment" ? choiceOpenCounter : 0,
                         highlighted:highlightedField=="clinical-segment")
                         .accessibilityIdentifier("clinical-osteomuscular-segment-choice")
@@ -1409,13 +1408,13 @@ struct N2NativeClinicalFormView:View {
                 let patch=try version.makeDraftPatch(context:context,stage:step)
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
-                let result=try await vault.saveDraft(
+                _=try await vault.saveDraft(
                     id:version.id,changes:patch,at:timestamp,
                     expectedRevision:latestRevision)
                 guard !Task.isCancelled,!saved,!busy else{return}
                 lastAutosaveTimestamp=timestamp
                 await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
-                status="Borrador cifrado · revisión \(result.revision)."
+                status="Borrador guardado."
             }catch{
                 if !Task.isCancelled && !saved {
                     fault=true
@@ -1566,13 +1565,13 @@ struct N2NativeClinicalFormView:View {
         do {
             let fresh=try await vault.clinicalFormContext()
             let raw=try form.makeSavedVisit(context:fresh)
-            let outcome=try await vault.saveAttention(
+            _=try await vault.saveAttention(
                 raw,at:now,expectedRevision:fresh.revision)
             saved=true
             fault=false
             drafts.removeAll(where:{$0.id==form.id})
             N2DraftReminder.cancel(id:form.id,mode:vault.mode)
-            status="Atención guardada correctamente · revisión \(outcome.revision)."
+            status="Atención guardada correctamente."
             // A single read provides BOTH physical status and R. Avoid four
             // consecutive decryptions of a 9,000+ worker clinical vault.
             do {
