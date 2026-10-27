@@ -144,7 +144,7 @@ struct DanperAccessView:View {
     }
     var body:some View {
         GeometryReader { geometry in
-            let heroHeight=min(max(geometry.size.height * 0.48,280),420)
+            let heroHeight:CGFloat=typeSize.isAccessibilitySize ? 430 : min(max(geometry.size.height * 0.48,280),420)
             ScrollView {
                 VStack(spacing:0) {
                     hero(height:heroHeight,topInset:geometry.safeAreaInsets.top)
@@ -254,7 +254,7 @@ struct DanperAccessView:View {
                 Text("Cuidamos lo más importante, nuestra gente")
                     .font(typeSize.isAccessibilitySize ? .headline : .title3.weight(.semibold))
                     .foregroundStyle(.white).shadow(color:.black.opacity(0.8),radius:5)
-                    .frame(maxWidth:205,alignment:.leading)
+                    .frame(maxWidth:typeSize.isAccessibilitySize ? .infinity : 205,alignment:.leading)
                     .fixedSize(horizontal:false,vertical:true)
                     .padding(.bottom,60)
             }.padding(.horizontal,24).padding(.top,8)

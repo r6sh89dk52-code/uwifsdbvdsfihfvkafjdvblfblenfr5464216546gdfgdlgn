@@ -69,6 +69,12 @@ jobs:
           swiftc -frontend -parse native-ios/App/*.swift
           cd native-ios
           swift test --jobs 2 2>&1 | tee "$RUNNER_TEMP/b11-linux-swift-test.log"
+      - name: Record unchanged clinical source against approved base on failure
+        if: failure() && github.head_ref == 'design/glass-clinical-access-home-20261027'
+        run: |
+          git fetch --no-tags --depth=1 origin 9bec8e01ccbb3f1a674372cf6e48df049dc4f014
+          git diff --exit-code 9bec8e01ccbb3f1a674372cf6e48df049dc4f014 -- native-ios/Sources native-ios/Tests scripts/generate-n2-procedure-parity.cjs scripts/generate-n2-stock-commands-fixtures.cjs
+          echo 'Clinical source, core tests and the implicated synthetic generators are identical to base. Failed tests remain failed.'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -109,14 +115,15 @@ jobs:
           bash scripts/make-app-icon.sh
           xcodegen generate --spec project.yml
           xcodebuild -resolvePackageDependencies -project DANPERNative.xcodeproj -scheme DANPERNative
-      - name: Build actual SwiftUI native iPhone app for simulator (unsigned)
+      - name: Build actual SwiftUI native iPhone app for simulator (ad hoc)
+        id: app_build
         working-directory: native-ios
         run: |
           xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
-            CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/b11-ios-compile.log" 2>&1 || {
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build > "$RUNNER_TEMP/b11-ios-compile.log" 2>&1 || {
               grep -nE '(error:|fatal error:|BUILD FAILED)' "$RUNNER_TEMP/b11-ios-compile.log" | tail -n 100 || true
               exit 1
             }
@@ -127,19 +134,24 @@ jobs:
         run: |
           SIM="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["name"] == "iPhone 16" and d["isAvailable"]]; print(devices[0]["udid"] if devices else "")')"
           test -n "$SIM" || { echo "No suitable iPhone simulator: NOT PASS"; exit 1; }
+          xcrun simctl boot "$SIM" || true
+          xcrun simctl bootstatus "$SIM" -b
+          # Test-runner setup only; never changes app authentication code.
+          xcrun simctl spawn "$SIM" notifyutil -s com.apple.BiometricKit.enrollmentChanged 1
+          xcrun simctl spawn "$SIM" notifyutil -p com.apple.BiometricKit.enrollmentChanged
           xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
             -configuration Debug -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIM" \
             -destination-timeout 180 -parallel-testing-enabled NO \
             -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
             -resultBundlePath "$RUNNER_TEMP/b11-layout.xcresult" \
-            CODE_SIGNING_ALLOWED=NO test > "$RUNNER_TEMP/b11-ios-tests.log" 2>&1 || {
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test > "$RUNNER_TEMP/b11-ios-tests.log" 2>&1 || {
               grep -nE '(error:|failed|FAIL|Testing failed)' "$RUNNER_TEMP/b11-ios-tests.log" | tail -n 120 || true
               exit 1
             }
           grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/b11-ios-tests.log"
       - name: Capture base Access and Home for real before-after comparison
-        if: github.head_ref == 'design/glass-clinical-access-home-20261027' || github.ref_name == 'design/glass-clinical-access-home-20261027'
+        if: always() && steps.app_build.outcome == 'success' && (github.head_ref == 'design/glass-clinical-access-home-20261027' || github.ref_name == 'design/glass-clinical-access-home-20261027')
         working-directory: native-ios
         timeout-minutes: 12
         run: |
@@ -151,6 +163,8 @@ jobs:
           git show "$BASE:native-ios/App/N2ClinicalWorkspaceView.swift" > App/N2ClinicalWorkspaceView.swift
           SIM="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["name"] == "iPhone 16" and d["isAvailable"]]; print(devices[0]["udid"] if devices else "")')"
           test -n "$SIM"
+          # Remove only this ephemeral runner's synthetic test app/defaults.
+          xcrun simctl uninstall "$SIM" pe.danper.saludmovil.native.preview || true
           xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
             -configuration Debug -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIM" \
@@ -158,7 +172,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
             -resultBundlePath "$RUNNER_TEMP/b11-before-layout.xcresult" \
             -only-testing:DANPERNativeTests/N2GlassClinicalLayoutTests \
-            CODE_SIGNING_ALLOWED=NO test > "$RUNNER_TEMP/b11-before-layout.log" 2>&1 || {
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test > "$RUNNER_TEMP/b11-before-layout.log" 2>&1 || {
               tail -n 100 "$RUNNER_TEMP/b11-before-layout.log"
               exit 1
             }

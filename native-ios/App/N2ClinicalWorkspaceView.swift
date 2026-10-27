@@ -231,7 +231,7 @@ struct N2ClinicalWorkspaceRootView:View {
             TabView(selection:$tab) {
             NavigationStack {
                 ScrollView {
-                    VStack(alignment:.leading,spacing:14) {
+                    VStack(alignment:.leading,spacing:12) {
                         HStack(spacing:12) {
                             Image(systemName:"person.crop.circle.fill")
                                 .font(.system(size:44)).foregroundStyle(.secondary)
@@ -243,15 +243,15 @@ struct N2ClinicalWorkspaceRootView:View {
                                 Text("Departamento de Salud").font(.subheadline).foregroundStyle(.secondary)
                             }
                         }
-                        VStack(alignment:.leading,spacing:12) {
+                        VStack(alignment:.leading,spacing:8) {
                             HStack(spacing:12) {
-                                VStack(alignment:.leading,spacing:5) {
+                                VStack(alignment:.leading,spacing:3) {
                                     Text("DEPARTAMENTO DE SALUD")
                                         .font(.caption2.weight(.bold)).tracking(0.8)
                                         .foregroundStyle(GlassClinical.red)
                                     Text("Panel de inicio").font(.title2.weight(.bold))
                                     Text("Registro ambulatorio local")
-                                        .font(.subheadline).foregroundStyle(.secondary)
+                                        .font(.footnote).foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength:0)
                                 Image(systemName:"waveform.path.ecg")
@@ -266,10 +266,10 @@ struct N2ClinicalWorkspaceRootView:View {
                                 Text("Fuente clínica protegida").font(.footnote.weight(.semibold))
                             }
                             .frame(maxWidth:.infinity,alignment:.leading)
-                            .padding(11)
+                            .padding(8)
                             .background(GlassClinical.red.opacity(0.06),in:RoundedRectangle(cornerRadius:13))
                         }
-                        .padding(14).modifier(GlassClinicalSurface())
+                        .padding(12).modifier(GlassClinicalSurface())
                         if visualPalette=="salud" {
                             HStack(spacing:8) {
                                 VStack(alignment:.leading,spacing:6) {
@@ -303,7 +303,7 @@ struct N2ClinicalWorkspaceRootView:View {
                                         .tracking(1.4)
                                         .foregroundStyle(.white.opacity(0.92))
                                     Text("Nueva atención")
-                                        .font(.system(.title,design:.rounded,weight:.bold))
+                                        .font(.system(.title2,design:.rounded,weight:.bold))
                                         .foregroundStyle(.white)
                                     Text("Registra con menos pasos")
                                         .font(.subheadline).foregroundStyle(.white.opacity(0.82))
@@ -316,8 +316,8 @@ struct N2ClinicalWorkspaceRootView:View {
                                     .background(.white.opacity(0.13),in:Circle())
                                     .accessibilityHidden(true)
                             }
-                            .padding(18)
-                            .frame(maxWidth:.infinity,minHeight:108,alignment:.leading)
+                            .padding(14)
+                            .frame(maxWidth:.infinity,minHeight:98,alignment:.leading)
                             .background(GlassClinical.gradient,
                                         in:RoundedRectangle(cornerRadius:22))
                         }
@@ -490,16 +490,16 @@ struct N2ClinicalWorkspaceRootView:View {
         }
     }
     private func homeMetric(_ count:String,_ label:String)->some View {
-        VStack(alignment:.leading,spacing:5) {
+        VStack(alignment:.leading,spacing:4) {
             Image(systemName:label == "Hoy" ? "calendar" : label == "Esta semana" ? "chart.bar.fill" : "doc.text")
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(label == "Hoy" ? GlassClinical.red : Color.secondary)
                 .accessibilityHidden(true)
-            Text(count).font(.title2.weight(.bold)).monospacedDigit().foregroundStyle(.primary)
+            Text(count).font(.title3.weight(.bold)).monospacedDigit().foregroundStyle(.primary)
             Text(label).font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal:false,vertical:true)
         }
-        .padding(12).frame(maxWidth:.infinity,minHeight:92,alignment:.leading)
+        .padding(10).frame(maxWidth:.infinity,minHeight:80,alignment:.leading)
         .modifier(GlassClinicalSurface(radius:17))
         .accessibilityElement(children:.combine)
     }

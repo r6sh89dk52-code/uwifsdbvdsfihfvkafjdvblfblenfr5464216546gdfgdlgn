@@ -47,3 +47,16 @@ Pending physical iPhone checks: automatic Face ID, cancel/retry, iOS passcode fa
 ## Asset derivation prompt
 
 Built-in image editing mode. Preserve the male nurse from the supplied board: same face, gaze, pose, surgical cap, blue mask, red scrub uniform and stethoscope. Deliver only a clean portrait with a dark blurred clinical background and empty upper-left/lower-left space. Reconstruct obscured background/clothes; remove text, logos, controls, phone and red UI overlays. No different person, woman or added subject. Full prompt is in the work conversation.
+
+## GitHub findings during validation
+
+Run `40516590929` compiled the actual app with Xcode 16.4 and rendered iPhone 16 PNGs. All 11 layout tests passed (6 existing clinical-layout, 3 new Glass Clinical, 2 welcome/expiry). Manual inspection identified oversized accessibility slogan wrapping and excessive Home spacing; the following visual iteration expands only the accessibility hero and compacts Home typography/spacing.
+
+The complete gates did **not** pass:
+
+- Linux: `N2ParityDeliveryAndProvisionalTests.testPendingClinicalQuantityExportsOnlyAsMarkedProvisionalTenSheetWorkbook`; `N3DeclaredContainerTests.testPendingContainerDoesNotInventOpeningInProvisionalIndicator`; `N3DeclaredContainerTests.testSaveTimeExplicitNewOpeningClosesOneVerifiedPreviousWithoutSecondDebit` (followed by an out-of-range access inside the test). Clinical source, core tests and implicated generators are byte-identical to base. These failures remain visible; no clinical assertions or engine code are changed to conceal them.
+- Simulator backup activation: `keychainStatus(-34018)` while the workflow forcibly disabled signing. The existing `check-b11-clinical-p0-macos.sh` already uses ad-hoc simulator signing. CI now uses that same signing configuration without modifying app entitlements, Keychain or vault code.
+- Biometric interaction: the runtime displayed the native device-passcode screen, so the test could not find the expected Face ID cancel button. CI now enrolls simulated Face ID in its disposable runner before tests, using simulator notification state plus post. This is test setup, not an authentication bypass or a physical-device claim.
+- The clinical-journey test also failed to reach the clinical tab bar; the app's source-creation code is unchanged. It is rerun with simulator signing/enrollment prepared.
+
+The base-image capture is allowed after a failed full UI gate when app compilation succeeded, so unrelated failures cannot suppress before/after visual evidence. It installs only into the ephemeral GitHub simulator and restores the checked-out source after capture. No IPA or archive is created.
