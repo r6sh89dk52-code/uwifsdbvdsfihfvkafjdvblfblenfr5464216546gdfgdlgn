@@ -1,0 +1,77 @@
+name: DANPER native XCTest evidence review
+on:
+  push:
+    branches: [ci/premium-native-ipa-work-20261027]
+    paths: ['.github/workflows/native-premium-evidence-review.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: macos-15-intel
+    timeout-minutes: 18
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 65994d5ecb3a9c15f74fe950cfc16fe07844bc40
+      - name: Read existing evidence without rebuilding or running tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/review"
+          echo "REVIEW_DIR=$RUNNER_TEMP/review" >> "$GITHUB_ENV"
+          gh run download 40532104867 -n C_XCTEST_EVIDENCE_40532104867 -D "$RUNNER_TEMP/evidence"
+          xcodebuild -version | tee "$RUNNER_TEMP/review/toolchain.txt"
+          cp "$RUNNER_TEMP/evidence/logs/runtimes.json" "$RUNNER_TEMP/review/runtimes.json"
+          cat "$RUNNER_TEMP/review/runtimes.json"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,re,json
+          root=Path(os.environ['RUNNER_TEMP'])/'evidence'
+          out=Path(os.environ['RUNNER_TEMP'])/'review'
+          rows=[]
+          for p in sorted((root/'logs').glob('*.log')):
+              s=p.read_text(errors='replace')
+              cases=re.findall(r"Test Case '(.+?)' (passed|failed|skipped)[^\n]*",s)
+              rows.append({'file':p.name,'cases':cases,'tail':s.splitlines()[-20:]})
+              print(p.name, json.dumps(cases,ensure_ascii=False))
+          (out/'test-log-summary.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
+          PY
+          for result in "$RUNNER_TEMP/evidence/results/"*.xcresult; do
+            test -d "$result" || continue
+            label=$(basename "$result" .xcresult)
+            xcrun xcresulttool get test-results summary --path "$result" > "$RUNNER_TEMP/review/$label-summary.json" 2>&1 || true
+            cat "$RUNNER_TEMP/review/$label-summary.json"
+            xcrun xcresulttool export attachments --path "$result" --output-path "$RUNNER_TEMP/review/$label-attachments" > "$RUNNER_TEMP/review/$label-export.log" 2>&1 || true
+          done
+      - name: Examine biometric daemon diagnostics from existing simulator archive
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'evidence/results'
+          out=Path(os.environ['REVIEW_DIR'])
+          predicate='process == "coreauthd" OR process == "biometrickitd" OR subsystem CONTAINS[c] "LocalAuthentication" OR eventMessage CONTAINS[c] "biometr" OR eventMessage CONTAINS[c] "passcode"'
+          for archive in root.glob('*Biometric*.logarchive'):
+              p=out/'biometric-system.log'
+              try:
+                  r=subprocess.run(['/usr/bin/log','show','--archive',str(archive),'--style','compact','--info','--debug','--predicate',predicate],capture_output=True,text=True,timeout=180)
+                  p.write_text(r.stdout+'\nSTDERR\n'+r.stderr)
+                  lines=r.stdout.splitlines()
+                  relevant=[x for x in lines if any(k in x.lower() for k in ['error','failed','not available','not set','denied','enroll','policy','evaluate'])]
+                  print('\n'.join(relevant[-160:]))
+                  print('log show exit code',r.returncode)
+              except subprocess.TimeoutExpired:
+                  p.write_text('BLOCKED: diagnostic log extraction exceeded 180 seconds\n')
+                  print(p.read_text())
+          PY
+      - name: Preserve compact diagnostic report and exported attachments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NATIVE_XCTEST_DIAGNOSIS_40532104867
+          path: ${{ runner.temp }}/review
+          if-no-files-found: error
+          retention-days: 14
