@@ -123,7 +123,10 @@ public enum N2ContainerAccounting {
             after["declaredOpenContainers"]=before["declaredOpenContainers"]
             after["updatedAt"]=before["updatedAt"]
             after["volumeTrackingEnabled"]=before["volumeTrackingEnabled"]
-            return NSDictionary(dictionary:after).isEqual(to:before)
+            // Strict portable JSON equality also works with Linux Foundation.
+            guard let expectedData=try? JSONSerialization.data(withJSONObject:before,options:.sortedKeys),
+                  let afterData=try? JSONSerialization.data(withJSONObject:after,options:.sortedKeys) else{return false}
+            return expectedData==afterData
         }
         guard movement["kind"] as? String=="use",integer(movement["containerAccountingVersion"]) == 1,
               let before=movement["before"] as? [String:Any],
