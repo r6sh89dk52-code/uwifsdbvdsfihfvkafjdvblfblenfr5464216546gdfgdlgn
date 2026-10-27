@@ -56,3 +56,15 @@ No se modifican producción SwiftUI, reglas FEFO, Kardex, cifrado, Keychain, gru
 ## Actualización posterior segura
 
 El IPA sigue necesitando firma. Mantener `pe.danper.saludmovil.native.preview` no garantiza acceso a la clave de la instalación actual: también deben coincidir el prefijo App ID/Team y grupos Keychain de la firma efectiva. Antes de cualquier reemplazo, disponer de respaldo cifrado exportado y verificado, contraseña conservada y ruta de recuperación comprobada. No se recomienda uso clínico de un candidato sin completar D. La instalación física queda fuera de esta misión.
+
+## Capacidad de runners comprobada en la interfaz de GitHub
+
+La página del run 40522185478 informa «The job was not acquired by Runner of type hosted even after multiple attempts» e «Internal server error», con avisos de capacidad macOS arm64. La del run 40526585973 confirma cancelación por @r6sh89dk52-code. La primera ejecución de esta reparación (40530815394, SHA 3fc9753e3f9b76d4a1473c8706f07594e3d1c157) también dejó el trabajo macos-15 en cola.
+
+Se selecciona el runner estándar macos-15-intel, documentado por GitHub, con Xcode 16.4 y compilación cruzada iphoneos ARCHS=arm64. La arquitectura del host no cambia la del IPA, verificada por Mach-O y lipo. Los simuladores de prueba usan la arquitectura del host. No se solicitan runners grandes ni cambios de facturación.
+
+El grupo de concurrencia de esta reparación conserva únicamente la revisión más reciente (cancel-in-progress: true). Su finalidad es sustituir explícitamente la revisión en cola por esta corrección de capacidad, sin dos compilaciones macOS simultáneas. Las cancelaciones que produzca este grupo son intencionadas y trazables al push del nuevo SHA. Las ramas protegidas no pertenecen a este grupo.
+
+`diagnose-foundation-equality.swift` registra en ambos entornos la igualdad Foundation y la igualdad JSON de un lote completamente sintético; es diagnóstico, no un cambio de reglas o un bypass de las pruebas.
+
+Referencias de runner: https://github.com/actions/runner-images/blob/main/README.md y https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md.

@@ -12,7 +12,7 @@ permissions:
   actions: read
 concurrency:
   group: danper-premium-native-distribution
-  cancel-in-progress: false
+  cancel-in-progress: true
 defaults:
   run:
     shell: bash
@@ -21,7 +21,7 @@ env:
 jobs:
   build:
     name: A - Release iphoneos ARM64 and unsigned candidate
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
     name: B - JavaScript and macOS clinical Swift tests
     needs: build
     if: ${{ always() && !cancelled() }}
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +143,7 @@ jobs:
     name: C - Native XCTest and isolated iPhone 16 journeys
     needs: [build, clinical]
     if: ${{ always() && !cancelled() }}
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

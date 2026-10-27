@@ -7,4 +7,5 @@ for generator in generate-native-compat-fixtures generate-n1e-clinical-fixtures 
 done
 if [[ "${1:-}" == fixtures-only ]]; then exit 0; fi
 swift --version | tee "$BUILD_DIR/logs/swift-toolchain.txt"
+swift scripts/diagnose-foundation-equality.swift 2>&1 | tee "$BUILD_DIR/logs/foundation-portability.log"
 swift test --package-path native-ios --force-resolved-versions --jobs 3 2>&1 | tee "$BUILD_DIR/logs/swift-core.log"
