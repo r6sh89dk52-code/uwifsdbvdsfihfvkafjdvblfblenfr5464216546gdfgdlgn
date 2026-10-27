@@ -70,8 +70,8 @@ struct NativeRootView:View {
                     .tabItem {Label("Ajustes",systemImage:"gearshape.fill")}.tag(3)
             }
             .toolbar(.hidden,for:.tabBar)
-            .safeAreaInset(edge:.bottom,spacing:0) {DanperFloatingTabs(selection:$tab)}
         }
+        .danperFloatingNavigation(selection:$tab)
         .background(DanperStyle.canvas)
         .tint(DanperStyle.red)
         .environment(\.n2WorkspaceVault,.demo)
@@ -81,20 +81,8 @@ struct NativeRootView:View {
             newlyRegisteredWorkerDNI=nil
             Task {await refresh()}
         }) {
-            NavigationStack {
-                N2NativeClinicalFormView(initialWorkerDNI:newlyRegisteredWorkerDNI)
-                    .safeAreaInset(edge:.top,spacing:0) {
-                        Text("DEMO · Datos ficticios").font(.caption2.weight(.semibold))
-                            .foregroundStyle(DanperStyle.red).padding(.vertical,5)
-                            .frame(maxWidth:.infinity).background(DanperStyle.surface)
-                    }
-                    .toolbar {
-                        ToolbarItem(placement:.cancellationAction) {
-                            Button("Cerrar") {showNewAttention=false}
-                                .accessibilityIdentifier("premium-close-attention")
-                        }
-                    }
-            }.presentationDragIndicator(.visible)
+            DanperAttentionEditor(initialWorkerDNI:newlyRegisteredWorkerDNI)
+
         }
         .onChange(of:scenePhase) {_,phase in
             if phase == .active {Task {await refresh()}}
@@ -221,7 +209,7 @@ struct NativeRootView:View {
             if isReady {
                 DanperPanel("Personal y atenciones") {
                     DanperToolLink(title:"Trabajadores",symbol:"person.2") {N2NativeHistoryView(useProtectedVault:true,showWorkers:true)}
-                    DanperToolLink(title:"Alergias",symbol:"cross.vial") {N2NativeClinicalFormView()}
+                    DanperAttentionLauncher(title:"Alergias",symbol:"cross.vial")
                     DanperToolLink(title:"Estadísticas",symbol:"chart.bar.fill") {DanperStatisticsView()}
                 }
                 DanperPanel("Inventario y reportes") {

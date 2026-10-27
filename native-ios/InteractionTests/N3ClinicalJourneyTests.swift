@@ -12,6 +12,10 @@ final class N3ClinicalJourneyTests:XCTestCase {
         attachment.name="N3-"+name;attachment.lifetime = .keepAlways;add(attachment)
     }
     private func tap(_ element:XCUIElement,in app:XCUIApplication) {
+        if !element.exists && app.keyboards.firstMatch.exists {
+            let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
+            if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
+        }
         XCTAssertTrue(element.waitForExistence(timeout:10),app.debugDescription)
         if element.elementType == .switch,app.keyboards.firstMatch.exists {
             let dismiss=app.buttons["danper-dismiss-keyboard"].firstMatch
@@ -20,7 +24,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         for _ in 0..<10 {
             let content=element.identifier.hasPrefix("choice-") || element.identifier.hasPrefix("medication-row-") ||
                 element.identifier=="add-clinical-product" || element.label=="Declarar agotado, cerrado o descartado" || element.elementType == .textField || element.elementType == .textView ||
-                (element.elementType == .button && element.frame.width>300 && element.identifier != "inventory-save-lot")
+                (element.elementType == .button && element.frame.width>300 && element.identifier != "inventory-save-lot" && element.identifier != "attention-step-actions")
             let footer=app.buttons["Anterior"]
             let tab=app.buttons["premium-tab-home"]
             let bottom=footer.exists && footer.isHittable ? footer.frame.minY-12 :
@@ -56,6 +60,9 @@ final class N3ClinicalJourneyTests:XCTestCase {
         element.typeText(text)
     }
     private func authenticate(_ app:XCUIApplication) {
+        let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+        let permission=springboard.alerts.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
+        if permission.waitForExistence(timeout:5) {permission.tap()}
         XCTAssertTrue(app.staticTexts["Verificando identidad…"].waitForExistence(timeout:15),app.debugDescription)
         XCTAssertFalse(app.buttons["premium-tab-home"].exists)
         Thread.sleep(forTimeInterval:2);match()
@@ -255,10 +262,29 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertTrue(app.staticTexts["PRUEBA CLINICA FICTICIA N3"].firstMatch.waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Historial-persistido")
         app.terminate()
-        app.launchArguments += ["-danper.appearance","dark"]
+        // Existing data must bypass onboarding even if its old preference is absent.
+        app.launchArguments=["-danper.native.onboarding.v1.finished","NO","-danper.appearance","dark"]
         app.launch();authenticate(app)
         XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertFalse(app.staticTexts["clinical-empty-setup"].exists)
+        XCTAssertFalse(app.buttons["clinical-first-run-manual-worker"].exists)
         capture(app,"Persistencia-tras-relanzar")
+        verifyPersistentInventoryAndKardex(app)
+    }
+    /// Uses the synthetic N3 source created by the preceding protected journey.
+    func testRelaunchExistingClinicalSourceWithoutSetup() {
+        #if !targetEnvironment(simulator)
+        XCTFail("Prueba exclusiva de un Simulator aislado con los registros ficticios N3")
+        return
+        #endif
+        continueAfterFailure=false
+        let app=XCUIApplication()
+        app.launchArguments=["-danper.native.onboarding.v1.finished","NO","-danper.appearance","dark"]
+        app.launch();authenticate(app)
+        XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertFalse(app.staticTexts["clinical-empty-setup"].exists)
+        XCTAssertFalse(app.buttons["clinical-first-run-manual-worker"].exists)
+        capture(app,"Fuente-existente-con-onboarding-desactivado")
         verifyPersistentInventoryAndKardex(app)
     }
     private func verifyPersistentInventoryAndKardex(_ app:XCUIApplication) {

@@ -31,4 +31,13 @@ assert.throws(()=>run((file,s)=>file==='N2WorkspaceVault.swift'
 assert.throws(()=>run((file,s)=>file==='N2WorkspaceVault.swift'
  ?s.replace(/(N2SyntheticTrialIOSVault\.shared\s*\.\s*)(readDrafts|readHistory)\(/g,
   (_,prefix,method)=>prefix+(method==='readDrafts'?'readHistory':'readDrafts')+'('):s),/Incorrect DEMO route/);
+
+for(const [file,marker] of [
+ ['DANPERNativeApp.swift','.allowsHitTesting(authenticated && scenePhase == .active)'],
+ ['DANPERNativeApp.swift','else if onboardingFinished || hasClinicalSource {'],
+ ['N2ClinicalWorkspaceView.swift','invalidSource=summary == nil && evidence'],
+ ['N2ClinicalWorkspaceView.swift','guard accepted,cycle==gateCycle,scenePhase == .active']]) {
+ assert.throws(()=>run((name,source)=>name===file?source.replace(marker,'REMOVED_PROTECTION'):source),
+  undefined,'Must reject removed protection: '+marker);
+}
 console.log('PASS: routing audit accepts multiline member access and rejects missing, duplicate, unrouted and cross-wired operations.');

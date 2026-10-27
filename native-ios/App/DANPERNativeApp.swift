@@ -10,6 +10,10 @@ private enum Brand {
 struct DANPERNativeApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("danper.appearance") private var appearance="system"
+    @State private var hasClinicalSource=false
+    @State private var sourceResolved=false
+    @State private var sessionStarted=false
+    @State private var automaticUnlockScheduled=false
     @State private var authCycle=UUID()
     @State private var activeContext:LAContext?
     @State private var access=N2AccessSession()
@@ -69,12 +73,13 @@ struct DANPERNativeApp: App {
                     #if DEBUG && targetEnvironment(simulator)
                     DanperAccessView(unlocking:false,canRetry:false,error:"",onUnlock:{})
                     #endif
-                } else if onboardingFinished {
-                    if authenticated {
-                        NavigationStack {
-                            N2ClinicalWorkspaceGateView(authenticatedLaunch:true)
-                                .id(authCycle)
-                        }
+                } else if !sourceResolved {
+                    DanperLoadingState(title:"Preparando DANPER…")
+                        .frame(maxWidth:.infinity,maxHeight:.infinity)
+                        .background(DanperStyle.canvas)
+                } else if onboardingFinished || hasClinicalSource {
+                    if authenticated || sessionStarted {
+                        N2ClinicalWorkspaceGateView(authenticatedLaunch:true,sessionUnlocked:authenticated,onLock:lockAccess)
                             .opacity(authenticated && scenePhase == .active ? 1 : 0)
                             .accessibilityHidden(!authenticated || scenePhase != .active)
                             .allowsHitTesting(authenticated && scenePhase == .active)
@@ -91,39 +96,65 @@ struct DANPERNativeApp: App {
                     .transition(.opacity)
                 }
             }
+            .environment(\.danperAuthenticatedSession,authenticated)
             .preferredColorScheme(appearance=="dark" ? .dark : appearance=="light" ? .light : nil)
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     authCycle=UUID()
+                    automaticUnlockScheduled=false
                     activeContext?.invalidate()
                     activeContext=nil
                     access.lock()
                     manualRetryAvailable = false
+                } else if phase == .inactive,automaticUnlockScheduled,!unlocking {
+                    authCycle=UUID();automaticUnlockScheduled=false
                 } else if phase == .active {
                     attemptAutomaticUnlock()
                 }
             }
+            .onChange(of:sourceResolved) {_,ready in
+                if ready {attemptAutomaticUnlock()}
+            }
             .onChange(of: onboardingFinished) { _, finished in
                 if finished { attemptAutomaticUnlock() }
             }
-            .task { attemptAutomaticUnlock() }
+            .onChange(of:authenticated) {_,value in if value {sessionStarted=true}}
+            .task {
+                if !interactionProbe && !shellProbe && !redesignDemoProbe && !redesignAccessProbe {
+                    let exists=await N2ProtectedClinicalIOSVault.shared.hasStoredClinicalSource()
+                    hasClinicalSource=exists
+                    if exists {onboardingFinished=true}
+                }
+                sourceResolved=true
+                attemptAutomaticUnlock()
+            }
         }
     }
 
+    private func lockAccess() {
+        authCycle=UUID();automaticUnlockScheduled=false;activeContext?.invalidate();activeContext=nil
+        access.lock();manualRetryAvailable=true;authError=""
+    }
+
     private func attemptAutomaticUnlock() {
-        guard !interactionProbe,!shellProbe,!redesignDemoProbe,!redesignAccessProbe,onboardingFinished, scenePhase == .active,
-              access.reserveAutomatic() else { return }
-        // One automatic attempt per foreground entry avoids Face ID cancellation loops.
+        guard !interactionProbe,!shellProbe,!redesignDemoProbe,!redesignAccessProbe,(onboardingFinished || hasClinicalSource), scenePhase == .active,
+              !automaticUnlockScheduled,!manualRetryAvailable,!authenticated,!unlocking,
+              !access.automaticAttempted else {return}
+        // Reserve only after the window settles. A transient inactive phase must
+        // not consume the foreground's single automatic authentication attempt.
+        automaticUnlockScheduled=true
         let cycle=authCycle
         Task { @MainActor in
             try? await Task.sleep(for:.milliseconds(350))
-            guard cycle==authCycle,scenePhase == .active,!manualRetryAvailable else{return}
+            guard cycle==authCycle else{return}
+            automaticUnlockScheduled=false
+            guard scenePhase == .active,!manualRetryAvailable,access.reserveAutomatic() else{return}
             authenticate()
         }
     }
 
     private func authenticate() {
-        guard onboardingFinished,scenePhase == .active,access.begin() else { return }
+        guard (onboardingFinished || hasClinicalSource),scenePhase == .active,access.begin() else { return }
         manualRetryAvailable = false
         authError = ""
         let context = LAContext()
@@ -165,12 +196,12 @@ struct DanperAccessView:View {
         GeometryReader {geo in
             ScrollView {
                 VStack(spacing:0) {
-                    hero(width:geo.size.width,height:max(225,min(330,geo.size.height*0.40)))
-                    VStack(spacing:15) {
+                    hero(width:geo.size.width,height:max(250,min(350,geo.size.height*0.43)))
+                    VStack(spacing:13) {
                         Image(systemName:"faceid")
-                            .font(.system(size:44,weight:.light))
+                            .font(.system(size:40,weight:.light))
                             .foregroundStyle(DanperStyle.red)
-                            .frame(width:88,height:88)
+                            .frame(width:80,height:80)
                             .background(DanperStyle.red.opacity(0.12),in:RoundedRectangle(cornerRadius:25))
                             .overlay(RoundedRectangle(cornerRadius:25).strokeBorder(DanperStyle.red.opacity(0.15)))
                             .accessibilityHidden(true)
@@ -220,7 +251,7 @@ struct DanperAccessView:View {
                         Text(version.compact).font(.caption2).foregroundStyle(.secondary)
                             .accessibilityIdentifier("premium-access-version")
                     }
-                    .padding(.horizontal,26).padding(.top,5).padding(.bottom,22)
+                    .padding(.horizontal,24).padding(.top,-8).padding(.bottom,22)
                     .frame(maxWidth:520).frame(maxWidth:.infinity)
                 }.frame(minHeight:geo.size.height,alignment:.top)
             }.background(background.ignoresSafeArea())

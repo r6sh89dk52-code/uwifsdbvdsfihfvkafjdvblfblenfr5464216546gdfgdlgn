@@ -292,7 +292,7 @@ assert(!indicator.includes('N2ReconciliationView()'),
 must(indicator,'if !allowed {selectConfirmed()}',
   'Modo provisional no debe agregar todas las atenciones pendientes sin permiso');
 
-must(app,'N2ClinicalWorkspaceGateView(authenticatedLaunch:true)','inicio cifrado tras autenticación con importación PERSONAL');
+must(app,'N2ClinicalWorkspaceGateView(authenticatedLaunch:true,sessionUnlocked:authenticated','inicio cifrado tras autenticación con importación PERSONAL');
 assert(!app.includes('NativeRootView()'),'No puede abrirse el modo ficticio en inicio normal');
 must(clinicalHome,'clinical-first-run-import-personal','importar PERSONAL como acción principal');
 must(clinicalHome,'clinical-first-run-restore-222','restauración opcional Build222');
@@ -457,9 +457,9 @@ for(const name of ['Inicio','Historial','Borradores','Ajustes'])
   must(home,`Label("${name}"`,'pestaña nativa');
 must(home,'DanperNewAttentionCard(action:{showNewAttention=true}', 'acceso a nueva atención');
 for(const shell of [home,clinicalHome]) {
-  must(shell,'DanperFloatingTabs(selection:$tab)','cápsula compartida');
+  must(shell,'danperFloatingNavigation(selection:$tab)','cápsula compartida');
   must(shell,'.toolbar(.hidden,for:.tabBar)','sin segunda barra nativa');
-  must(shell,'N2NativeClinicalFormView(initialWorkerDNI:','registro clínico conservado');
+  must(shell,'DanperAttentionEditor(initialWorkerDNI:','registro clínico conservado');
 }
 
 for(const term of ['attention-browse-workers','attention-add-worker','attention-worker-dni',

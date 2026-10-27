@@ -4,6 +4,7 @@ import DanperCore
 /// First-class encrypted N2 draft tab, never uses N1g demo drafts.
 struct N2NativeDraftsDashboard:View {
     @Environment(\.n2WorkspaceVault) private var vault
+    @State private var editor:DanperAttentionRoute?
     @State private var records=[N2RecoverableDraft]()
     @State private var loadedRevision:Int?
     @State private var loading=true
@@ -28,9 +29,7 @@ struct N2NativeDraftsDashboard:View {
                 }
                 ForEach(records) { draft in
                     HStack(alignment:.center,spacing:8) {
-                        NavigationLink {
-                            N2NativeClinicalFormView(requestedDraftID:draft.id)
-                        } label: {
+                        Button {editor=DanperAttentionRoute(draftID:draft.id)} label: {
                             VStack(alignment:.leading,spacing:5) {
                                 Text(draft.workerName.isEmpty ?
                                     "Trabajador por seleccionar":draft.workerName)
@@ -61,15 +60,16 @@ struct N2NativeDraftsDashboard:View {
                 }
             }
             DanperPanel {
-                NavigationLink {
-                    N2NativeClinicalFormView()
-                } label: {
+                Button {editor=DanperAttentionRoute()} label: {
                     Label("Nueva atención",systemImage:"cross.case.fill")
                 }
                 Text("Puedes eliminar cada borrador desde el icono de papelera, sin abrir la atención. Se solicitará confirmación y no se tocarán atenciones guardadas.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
           }.padding(16)
+        }
+        .sheet(item:$editor,onDismiss:{Task {await load()}}) {route in
+            DanperAttentionEditor(requestedDraftID:route.draftID)
         }
         .navigationTitle("Borradores")
         .danperFormChrome()
@@ -144,6 +144,8 @@ struct N2NativeDraftsDashboard:View {
         #if DEBUG
         let started=ProcessInfo.processInfo.systemUptime
         #endif
+        if let loadedRevision,!failed,
+           let revision=try? await vault.currentRevision(),revision==loadedRevision {return}
         loading=true
         defer {
             loading=false

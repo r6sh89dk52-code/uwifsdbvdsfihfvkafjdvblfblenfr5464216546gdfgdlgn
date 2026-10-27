@@ -9,10 +9,9 @@ for(const file of ['NativeRootView.swift','N2ClinicalWorkspaceView.swift']) {
  const source=read('native-ios/App/'+file);
  const labels=[...source.matchAll(/\.tabItem\s*\{\s*Label\("([^"]+)"/g)].map(m=>m[1]);
  assert.deepEqual(labels,['Inicio','Historial','Borradores','Ajustes'],file+' navigation order');
- assert(source.includes('DanperFloatingTabs(selection:$tab)'));
- assert(source.includes('.safeAreaInset(edge:.bottom,spacing:0)'));
+ assert(source.includes('danperFloatingNavigation(selection:$tab)'));
  assert(source.includes('.toolbar(.hidden,for:.tabBar)'));
- assert(source.includes('N2NativeClinicalFormView(initialWorkerDNI:'));
+ assert(source.includes('DanperAttentionEditor(initialWorkerDNI:'));
  assert(source.includes('DanperStatisticsView()'));
  assert(source.includes('dashboardCounters('));
  assert(!source.includes('.shared.readHistory()'),'Home must not rebuild the worker index');
@@ -32,4 +31,19 @@ const stats=ui.slice(ui.indexOf('struct DanperStatisticsView'),ui.indexOf('struc
 assert(stats.includes('Resumen aún no disponible'));
 assert(!/1,248|1248|\+12%|352|278/.test(stats),'No mock clinical totals or trends');
 assert(!/N2ProtectedClinicalIOSVault|N2SyntheticTrialIOSVault/.test(stats),'Statistics is presentation only');
+
+const presentation=read('native-ios/App/DanperPremiumPresentation.swift');
+const form=read('native-ios/App/N2NativeClinicalFormView.swift');
+const drafts=read('native-ios/App/N2NativeDraftsDashboard.swift');
+for(const marker of ['VStack(spacing:0)', 'content.frame(maxWidth:.infinity,maxHeight:.infinity)',
+ 'if !keyboard.visible', 'DanperFloatingTabs(selection:$selection)',
+ 'struct DanperAttentionEditor', 'NavigationStack {',
+ 'N2NativeClinicalFormView(requestedDraftID:requestedDraftID,initialWorkerDNI:initialWorkerDNI)',
+ 'premium-close-attention', 'shape.fill(.ultraThinMaterial)', 'accessibilityReduceTransparency',
+ 'accessibilityReduceMotion'])assert(presentation.includes(marker),marker);
+assert(form.includes('if !saved && !keyboard.visible'));
+assert(drafts.includes('DanperAttentionEditor(requestedDraftID:route.draftID)'));
+assert(!drafts.includes('NavigationLink {N2NativeClinicalFormView'));
+
+assert(presentation.includes('if phase == .background {dismiss()}'),'Every new or resumed editor closes behind the app lock');
 console.log('PASS: premium four-tab navigation, safe floating capsule, optimized real counters, bundle version, secure automatic authentication and honest statistics placeholders.');

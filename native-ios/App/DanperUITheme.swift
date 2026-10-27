@@ -85,8 +85,8 @@ struct DanperBrandHeader:View {
                     .font(.system(size:22,weight:.semibold))
                     .foregroundStyle(.white)
                     .frame(width:45,height:45)
-                    .background(.white.opacity(0.13),
-                                in:RoundedRectangle(cornerRadius:14))
+                    .background(.ultraThinMaterial,in:RoundedRectangle(cornerRadius:14))
+                    .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(.white.opacity(0.16),lineWidth:0.5))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Ajustes")
@@ -150,6 +150,7 @@ struct DanperFormChrome:ViewModifier {
                     .accessibilityIdentifier("danper-dismiss-keyboard")
                 }
             }
+            .toolbarBackground(.ultraThinMaterial,for:.navigationBar)
             .scrollContentBackground(.hidden)
             .background(DanperStyle.canvas)
             .tint(DanperStyle.red)
@@ -247,7 +248,7 @@ struct DanperPanel<Content:View>:View {
         }
         .frame(maxWidth:.infinity,alignment:.leading)
         .padding(16)
-        .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:20))
+        .danperGlassSurface(cornerRadius:20)
         .overlay(RoundedRectangle(cornerRadius:20).strokeBorder(Color.secondary.opacity(0.16)).allowsHitTesting(false))
     }
 }

@@ -34,6 +34,7 @@ struct N2NativeClinicalFormView:View {
     private let categories=N2ClinicalFormOptions.categories
     private let systems=N2ClinicalFormOptions.systems
     private let procedures=N2ProcedureRules.procedures
+    @State private var workersByDNI=[String:N2FormWorker]()
     @State private var context:N2FormContext?
     @State private var pendingMappingItemID:String?
     @State private var pendingPhysicalItemID:String?
@@ -42,6 +43,7 @@ struct N2NativeClinicalFormView:View {
     @State private var containerDecisionIndex=0
     @State private var showContainerDecision=false
     @State private var form=N2NativeFormDraft()
+    @StateObject private var keyboard=DanperKeyboardState()
     @State private var step=0
     @State private var busy=false
     @FocusState private var focusedField:String?
@@ -134,7 +136,7 @@ struct N2NativeClinicalFormView:View {
         return(date,formatter.string(from:Date()))
     }
     private var currentWorker:N2FormWorker? {
-        context?.workers.first(where:{$0.dni==form.dni})
+        workersByDNI[form.dni] ?? context?.workers.first(where:{$0.dni==form.dni})
     }
     private var nameSuggestions:[N2FormWorker] {
         let query=workerNameInput.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -191,158 +193,24 @@ struct N2NativeClinicalFormView:View {
         }
     }
     var body:some View {
+        editorBody
+            .onChange(of:form) {old,new in
+                if let context {formChanged(old,new,context)}
+            }
+            .onChange(of:context?.revision) {_,_ in
+                if let context {indexWorkers(context)}
+            }
+            .onChange(of:keyboard.visible) {_,visible in
+                if visible && focusedField=="diagnosis" {
+                    scrollIssueRequest=DanperScrollRequest(fieldID:"clinical-diagnosis")
+                }
+            }
+    }
+    private var editorBody:some View {
         Group {
             if let context {
                 DanperScrollView(jumpRequest:scrollIssueRequest) {
-                  VStack(alignment:.leading,spacing:16) {
-                    if fault {
-                        DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
-                    } else if !saved && !layoutDetailOnly {
-                        VStack(alignment:.leading,spacing:4) {
-                            Text("REGISTRO AMBULATORIO")
-                                .font(.caption2.weight(.bold))
-                                .tracking(1.25)
-                                .foregroundStyle(DanperStyle.red)
-                            Text("Nueva atención")
-                                .font(.system(.title2,design:.rounded,weight:.bold))
-                            Label(lastAutosaveTimestamp>0
-                                  ? "Borrador protegido · autoguardado activo"
-                                  : "Autoguardado activo · aviso de borradores",
-                                  systemImage:"checkmark.shield")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                    }
-                    if !saved && !drafts.isEmpty {
-                        DanperPanel("Registros pendientes") {
-                            Button {
-                                chooseDraft=true
-                            } label: {
-                                Label("Retomar borrador cifrado (\(drafts.count))",
-                                      systemImage:"arrow.uturn.backward.doc")
-                            }
-                        }
-                    }
-                    if saved {
-                        DanperPanel {
-                            Image(systemName:savedLines.values.allSatisfy{$0=="Descontado"} ? "checkmark.circle.fill" : "checkmark.shield.fill").font(.system(size:48)).foregroundStyle(.green)
-                            Text("Atención registrada").font(.title2.bold())
-                            LabeledContent("Consumos vinculados al Kardex",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
-                            LabeledContent("Consumos pendientes",value:String(form.items.filter{savedLines[$0.id] != "Descontado"}.count))
-                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
-                                Label("Atención guardada. Los consumos pendientes no se descontaron del inventario.",systemImage:"exclamationmark.triangle")
-                                    .font(.footnote).foregroundStyle(.orange)
-                            } else if !form.items.isEmpty {
-                                Label("Kardex verificado según unidades o aperturas declaradas",systemImage:"checkmark.circle.fill")
-                                    .font(.footnote).foregroundStyle(.green)
-                            }
-                            Text(currentWorker?.name ?? form.dni).font(.headline)
-                            Text(DanperDatePresentation.displayDateTime(form.date,form.time)).font(.subheadline).foregroundStyle(.secondary)
-                            Divider()
-                            reviewValue("Diagnóstico",form.diagnosis)
-                            ForEach(form.items) {med in
-                                let result=savedLines[med.id] ?? "Pendiente de conciliar"
-                                let storedResolution=N2PendingResolution.forReason(result)
-                                let alreadyLinked = !context.products.authorizedNursingOptions(
-                                    for:med.code).isEmpty ||
-                                    context.operationalMappings.contains(where:{
-                                        $0.clinicalCode==med.code
-                                    })
-                                let resolvedStock = !context.options(for:med.code,at:form.date).isEmpty
-                                let resolution:N2PendingResolution =
-                                    storedResolution == .verifyCorrespondence && alreadyLinked
-                                    ? (resolvedStock ? .verifyPhysicalUse : .registerStock)
-                                    : storedResolution
-                                HStack(alignment:.top,spacing:10) {
-                                    Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                        .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
-                                    VStack(alignment:.leading,spacing:5) {
-                                        Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
-                                        Text("Cantidad \(med.quantity) · \(resolution == .reviewChronology ? N2PendingResolution.historicalTitle(forReason:result) : resolution.summary)")
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        if let quantity=savedKardex[med.id] {
-                                            Text("Kardex R: \(quantity.formatted())"+(quantity==0
-                                                ? " · Reutilización declarada; ninguna caja nueva descontada"
-                                                : ""))
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        }
-                                        if result != "Descontado" {
-                                            switch resolution {
-                                            case .registerStock:
-                                                Text(alreadyLinked && storedResolution == .verifyCorrespondence
-                                                     ? "Producto ya vinculado. La atención anterior aún requiere revisar stock y cronología antes de cualquier descuento."
-                                                     : "No hay existencias FEFO utilizables. Si tienes stock físico, regístralo; si no, conserva el pendiente.")
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                                Button {
-                                                    showStockRegistration=true
-                                                } label: {
-                                                    Label("Registrar existencias",systemImage:"shippingbox.fill")
-                                                }
-                                                .buttonStyle(.bordered)
-                                                .accessibilityIdentifier("pending-stock-"+med.code)
-                                            case .verifyCorrespondence:
-                                                Button {
-                                                    pendingMappingItemID=med.id
-                                                } label: {
-                                                    Label("Vincular producto",systemImage:"link")
-                                                }
-                                                .buttonStyle(.bordered)
-                                                .accessibilityIdentifier("pending-mapping-"+med.code)
-                                                .sheet(isPresented:Binding(
-                                                    get:{pendingMappingItemID==med.id},
-                                                    set:{if !$0 {pendingMappingItemID=nil}}
-                                                )) {
-                                                    N2OperationalMappingView(code:med.code,context:context,onSaved:{
-                                                        Task {await refreshDispensing(retry:false)}
-                                                    })
-                                                }
-                                            case .verifyPhysicalUse, .reviewPending:
-                                                Text("La atención clínica ya está guardada. Kardex R=0 solo se confirma si existe una caja o frasco previamente abierto en un lote FEFO vigente. El stock registrado como cerrado no se convierte automáticamente en abierto.")
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                                Button {
-                                                    showStockRegistration=true
-                                                } label: {
-                                                    Label("Ir al Kardex · revisar estado del envase",
-                                                          systemImage:"shippingbox.fill")
-                                                }
-                                                .buttonStyle(.bordered)
-                                                .accessibilityIdentifier("pending-container-stock-"+med.code)
-                                            case .reviewChronology:
-                                                Label(N2PendingResolution.historicalGuidance(forReason:result),
-                                                      systemImage:"calendar.badge.exclamationmark")
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                            case .completed:
-                                                EmptyView()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
-                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
-                                Button("Volver a comprobar pendientes") {
-                                    Task {await refreshDispensing(retry:true)}
-                                }
-                                .buttonStyle(DanperSecondaryButton())
-                                .accessibilityIdentifier("pending-recheck")
-                                .disabled(busy)
-                            }
-                            Button {startAnother()} label: {Label("Nueva atención",systemImage:"plus")}
-                                .buttonStyle(DanperPrimaryButton())
-                            NavigationLink {N2NativeHistoryView(useProtectedVault:true)} label: {Label("Ver historial y consumos",systemImage:"clock.arrow.circlepath")}
-                                .buttonStyle(DanperSecondaryButton())
-                        }
-                    } else {
-                        if !layoutDetailOnly {stepHeading}
-                        if step==0 {workerSection(context)}
-                        if step==1 {clinicalSection()}
-                        if step==2 {treatmentSection(context)}
-                        if step==3 {reviewSection(context)}
-                        if dynamicTypeSize.isAccessibilitySize {
-                            DanperPanel {Button("Guardar borrador") {scheduleDraft(immediate:true)}}
-                        }
-                    }
-                  }.padding(16)
+                    formContents(context)
                 }
                 .id("\(step)-\(saved)")
                 .navigationTitle(saved ? "Atención registrada" : "Nueva atención")
@@ -359,8 +227,11 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
                 .safeAreaInset(edge:.bottom,spacing:0) {
-                    if !saved {actions(context)}
+                    if !saved && !keyboard.visible {actions(context)
+                        .accessibilityIdentifier("attention-step-actions")
+                        .transition(.move(edge:.bottom).combined(with:.opacity))}
                 }
+                .animation(reduceMotion ? nil : DanperStyle.animation,value:keyboard.visible)
                 .animation(reduceMotion ? nil : DanperStyle.animation,value:step)
                 .sensoryFeedback(.selection,trigger:step) {_,_ in haptics}
                 .sensoryFeedback(.selection,trigger:form.procedures.count) {_,_ in haptics}
@@ -519,15 +390,6 @@ struct N2NativeClinicalFormView:View {
                         ? "Alergias revisadas" : ""
                 }
                 .onChange(of:step) {_,_ in scheduleDraft() }
-                .onChange(of:form) {_,_ in
-                    if highlightedField != nil {
-                        // Never resign first responder while the user fixes the field.
-                        highlightedField=nil
-                    }
-                    if !form.blueBandage {form.returned=false}
-                    form.refreshProcedureSuggestions(catalog:context.products)
-                    scheduleDraft()
-                }
                 .alert("Faltan datos para continuar",isPresented:$showValidation) {
                     Button("Ir al campo") {focusFirstMissing(context)}
                     Button("Cerrar",role:.cancel){}
@@ -549,6 +411,165 @@ struct N2NativeClinicalFormView:View {
         .tint(brand)
     }
 
+    @ViewBuilder private func formContents(_ context:N2FormContext)->some View {
+                  VStack(alignment:.leading,spacing:16) {
+                    if fault {
+                        DanperStatusBanner(symbol:"exclamationmark.shield.fill",title:"Revisa el registro",detail:status)
+                    } else if !saved && !layoutDetailOnly {
+                        VStack(alignment:.leading,spacing:4) {
+                            Text("REGISTRO AMBULATORIO")
+                                .font(.caption2.weight(.bold))
+                                .tracking(1.25)
+                                .foregroundStyle(DanperStyle.red)
+                            Text("Nueva atención")
+                                .font(.system(.title2,design:.rounded,weight:.bold))
+                            Label(lastAutosaveTimestamp>0
+                                  ? "Borrador protegido · autoguardado activo"
+                                  : "Autoguardado activo · aviso de borradores",
+                                  systemImage:"checkmark.shield")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth:.infinity,alignment:.leading)
+                    }
+                    if !saved && !drafts.isEmpty {
+                        DanperPanel("Registros pendientes") {
+                            Button {
+                                chooseDraft=true
+                            } label: {
+                                Label("Retomar borrador cifrado (\(drafts.count))",
+                                      systemImage:"arrow.uturn.backward.doc")
+                            }
+                        }
+                    }
+                    if saved {
+                        DanperPanel {
+                            Image(systemName:savedLines.values.allSatisfy{$0=="Descontado"} ? "checkmark.circle.fill" : "checkmark.shield.fill").font(.system(size:48)).foregroundStyle(.green)
+                            Text("Atención registrada").font(.title2.bold())
+                            LabeledContent("Consumos vinculados al Kardex",value:String(form.items.filter{savedLines[$0.id]=="Descontado"}.count))
+                            LabeledContent("Consumos pendientes",value:String(form.items.filter{savedLines[$0.id] != "Descontado"}.count))
+                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
+                                Label("Atención guardada. Los consumos pendientes no se descontaron del inventario.",systemImage:"exclamationmark.triangle")
+                                    .font(.footnote).foregroundStyle(.orange)
+                            } else if !form.items.isEmpty {
+                                Label("Kardex verificado según unidades o aperturas declaradas",systemImage:"checkmark.circle.fill")
+                                    .font(.footnote).foregroundStyle(.green)
+                            }
+                            Text(currentWorker?.name ?? form.dni).font(.headline)
+                            Text(DanperDatePresentation.displayDateTime(form.date,form.time)).font(.subheadline).foregroundStyle(.secondary)
+                            Divider()
+                            reviewValue("Diagnóstico",form.diagnosis)
+                            ForEach(form.items) {med in
+                                let result=savedLines[med.id] ?? "Pendiente de conciliar"
+                                let storedResolution=N2PendingResolution.forReason(result)
+                                let alreadyLinked = !context.products.authorizedNursingOptions(
+                                    for:med.code).isEmpty ||
+                                    context.operationalMappings.contains(where:{
+                                        $0.clinicalCode==med.code
+                                    })
+                                let resolvedStock = !context.options(for:med.code,at:form.date).isEmpty
+                                let resolution:N2PendingResolution =
+                                    storedResolution == .verifyCorrespondence && alreadyLinked
+                                    ? (resolvedStock ? .verifyPhysicalUse : .registerStock)
+                                    : storedResolution
+                                HStack(alignment:.top,spacing:10) {
+                                    Image(systemName:result=="Descontado" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                        .foregroundStyle(result=="Descontado" ? Color.green : Color.orange)
+                                    VStack(alignment:.leading,spacing:5) {
+                                        Text(medicationName(med.code,context)).font(.subheadline.weight(.semibold))
+                                        Text("Cantidad \(med.quantity) · \(resolution == .reviewChronology ? N2PendingResolution.historicalTitle(forReason:result) : resolution.summary)")
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        if let quantity=savedKardex[med.id] {
+                                            Text("Kardex R: \(quantity.formatted())"+(quantity==0
+                                                ? " · Reutilización declarada; ninguna caja nueva descontada"
+                                                : ""))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        if result != "Descontado" {
+                                            switch resolution {
+                                            case .registerStock:
+                                                Text(alreadyLinked && storedResolution == .verifyCorrespondence
+                                                     ? "Producto ya vinculado. La atención anterior aún requiere revisar stock y cronología antes de cualquier descuento."
+                                                     : "No hay existencias FEFO utilizables. Si tienes stock físico, regístralo; si no, conserva el pendiente.")
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                                Button {
+                                                    showStockRegistration=true
+                                                } label: {
+                                                    Label("Registrar existencias",systemImage:"shippingbox.fill")
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .accessibilityIdentifier("pending-stock-"+med.code)
+                                            case .verifyCorrespondence:
+                                                Button {
+                                                    pendingMappingItemID=med.id
+                                                } label: {
+                                                    Label("Vincular producto",systemImage:"link")
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .accessibilityIdentifier("pending-mapping-"+med.code)
+                                                .sheet(isPresented:Binding(
+                                                    get:{pendingMappingItemID==med.id},
+                                                    set:{if !$0 {pendingMappingItemID=nil}}
+                                                )) {
+                                                    N2OperationalMappingView(code:med.code,context:context,onSaved:{
+                                                        Task {await refreshDispensing(retry:false)}
+                                                    })
+                                                }
+                                            case .verifyPhysicalUse, .reviewPending:
+                                                Text("La atención clínica ya está guardada. Kardex R=0 solo se confirma si existe una caja o frasco previamente abierto en un lote FEFO vigente. El stock registrado como cerrado no se convierte automáticamente en abierto.")
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                                Button {
+                                                    showStockRegistration=true
+                                                } label: {
+                                                    Label("Ir al Kardex · revisar estado del envase",
+                                                          systemImage:"shippingbox.fill")
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .accessibilityIdentifier("pending-container-stock-"+med.code)
+                                            case .reviewChronology:
+                                                Label(N2PendingResolution.historicalGuidance(forReason:result),
+                                                      systemImage:"calendar.badge.exclamationmark")
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                            case .completed:
+                                                EmptyView()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if !form.procedures.isEmpty {reviewValue("Procedimientos",form.procedures.map{$0.capitalized}.joined(separator:", "))}
+                            if form.items.contains(where:{savedLines[$0.id] != "Descontado"}) {
+                                Button("Volver a comprobar pendientes") {
+                                    Task {await refreshDispensing(retry:true)}
+                                }
+                                .buttonStyle(DanperSecondaryButton())
+                                .accessibilityIdentifier("pending-recheck")
+                                .disabled(busy)
+                            }
+                            Button {startAnother()} label: {Label("Nueva atención",systemImage:"plus")}
+                                .buttonStyle(DanperPrimaryButton())
+                            NavigationLink {N2NativeHistoryView(useProtectedVault:true)} label: {Label("Ver historial y consumos",systemImage:"clock.arrow.circlepath")}
+                                .buttonStyle(DanperSecondaryButton())
+                        }
+                    } else {
+                        if !layoutDetailOnly {stepHeading}
+                        if step==0 {workerSection(context)}
+                        if step==1 {clinicalSection()}
+                        if step==2 {treatmentSection(context)}
+                        if step==3 {reviewSection(context)}
+                        if dynamicTypeSize.isAccessibilitySize {
+                            DanperPanel {Button("Guardar borrador") {scheduleDraft(immediate:true)}}
+                        }
+                    }
+                  }.padding(16)
+    }
+    private func formChanged(_ old:N2NativeFormDraft,_ new:N2NativeFormDraft,_ context:N2FormContext) {
+        if highlightedField != nil {highlightedField=nil}
+        if !form.blueBandage {form.returned=false}
+        if old.items != new.items || old.procedures != new.procedures {
+            form.refreshProcedureSuggestions(catalog:context.products)
+        }
+        scheduleDraft()
+    }
     private var stepHeading:some View {
         VStack(alignment:.leading,spacing:12) {
             HStack(alignment:.firstTextBaseline) {
@@ -1306,12 +1327,16 @@ struct N2NativeClinicalFormView:View {
             status="Atención conservada. Consumos verificados nuevamente; revisa los pendientes."
         } catch {status="No se pudo conciliar. La atención original permanece registrada; revisa los datos físicos y la cronología."}
     }
+    private func indexWorkers(_ context:N2FormContext) {
+        workersByDNI=Dictionary(context.workers.map{($0.dni,$0)},uniquingKeysWith:{first,_ in first})
+    }
     @MainActor private func load() async {
         do {
             let prepared=try await vault.prepareClinicalForm()
             // Consistent one-revision view; avoids reopening/decrypting
             // and validating the whole clinical database for drafts.
             context=prepared.context
+            indexWorkers(prepared.context)
             drafts=prepared.drafts
             if let requestedDraftID {
                 guard let recovered=drafts.first(where:{$0.id==requestedDraftID}) else {

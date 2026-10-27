@@ -180,7 +180,7 @@ struct DanperHomeMetricRow:View {
             Text(title).font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal:false,vertical:true)
         }.padding(11).frame(maxWidth:.infinity,minHeight:76,alignment:.topLeading)
-            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:19))
+            .danperGlassSurface(cornerRadius:19)
             .overlay(RoundedRectangle(cornerRadius:19).strokeBorder(Color.primary.opacity(0.05)))
             .accessibilityElement(children:.ignore)
             .accessibilityLabel(title).accessibilityValue(value.map{String($0)} ?? "No disponible")
@@ -207,7 +207,7 @@ struct DanperToolCard:View {
             }
             Spacer(minLength:0)
         }.padding(12).frame(maxWidth:.infinity,minHeight:92,alignment:.topLeading)
-            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:21))
+            .danperGlassSurface(cornerRadius:21)
             .overlay(RoundedRectangle(cornerRadius:21).strokeBorder(Color.primary.opacity(0.05)))
             .contentShape(RoundedRectangle(cornerRadius:21))
     }

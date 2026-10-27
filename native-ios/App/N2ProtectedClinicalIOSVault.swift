@@ -21,6 +21,9 @@ actor N2ProtectedClinicalIOSVault {
          kSecAttrAccount as String:account,
          kSecAttrSynchronizable as String:kCFBooleanFalse as Any]
     }
+    func hasStoredClinicalSource()->Bool {hasClinicalFiles()}
+
+    private var resourceCache=[String:Data]()
     private func hasClinicalFiles()->Bool {
         guard let base=FileManager.default.urls(
             for:.applicationSupportDirectory,in:.userDomainMask).first else {
@@ -135,11 +138,14 @@ actor N2ProtectedClinicalIOSVault {
         return try N2ProtectedClinicalVaultCore(keyData:secret)
     }
     private func resource(_ name:String)throws->Data {
+        if let cached=resourceCache[name] {return cached}
         guard let source=Bundle.main.url(forResource:name,withExtension:"json",
                    subdirectory:"N1sDemoResources") else{
             throw Failure.blockedMigration
         }
-        return try Data(contentsOf:source)
+        let data=try Data(contentsOf:source)
+        resourceCache[name]=data
+        return data
     }
     func registerWorker(_ worker:Data,at:Int64,expectedRevision:Int)
         throws->N2ProtectedStoreSummary {

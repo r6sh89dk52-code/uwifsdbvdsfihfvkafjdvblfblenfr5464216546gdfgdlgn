@@ -21,10 +21,9 @@ final class N2BiometricInteractionTests:XCTestCase {
         app.launch()
         let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
         let checking=app.staticTexts["Verificando identidad…"]
+        let permission=springboard.alerts.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
+        if permission.waitForExistence(timeout:8) {permission.tap()}
         XCTAssertTrue(checking.waitForExistence(timeout:15),app.debugDescription)
-        for label in ["OK","Allow","Permitir"] {
-            if springboard.alerts.buttons[label].exists {springboard.alerts.buttons[label].tap()}
-        }
         capture(app,"Autenticacion-automatica-sin-tocar-ingresar")
         Thread.sleep(forTimeInterval:2)
         biometric("nomatch")

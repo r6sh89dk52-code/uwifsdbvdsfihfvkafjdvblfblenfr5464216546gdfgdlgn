@@ -7,50 +7,63 @@ import DanperCore
 /// this workspace's lifetime. Demo tabs beneath never hold clinical references.
 struct N2ClinicalWorkspaceGateView:View {
     var authenticatedLaunch=false
+    var sessionUnlocked=true
+    var onLock:()->Void={}
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.danperAuthenticatedSession) private var inheritedAuthentication
     @State private var summary:N2ProtectedStoreSummary?
+    @State private var checked=false
     @State private var busy=false
-    @State private var showWorkspace=false
-    @State private var automaticallyEntered=false
+    @State private var invalidSource=false
+    @State private var authorized=false
     @State private var gateContext:LAContext?
     @State private var gateCycle=UUID()
-    @State private var message="Verificando la bóveda clínica independiente…"
-    @State private var invalidSource=false
+    @State private var message=""
 
     var body:some View {
+        Group {
+            if !checked {
+                DanperLoadingState(title:"Preparando DANPER…")
+                    .frame(maxWidth:.infinity,maxHeight:.infinity)
+                    .accessibilityIdentifier("clinical-source-loading")
+            } else if invalidSource {
+                DanperErrorState(message:message,retry:{Task {await refresh()}})
+                    .padding(24).accessibilityIdentifier("clinical-source-error")
+            } else if summary != nil {
+                if authenticatedLaunch || authorized || inheritedAuthentication {
+                    N2ClinicalWorkspaceRootView(onClose:onLock)
+                        .environment(\.n2WorkspaceVault,.clinical)
+                        .environment(\.danperAuthenticatedSession,sessionUnlocked)
+                } else {
+                    DanperAccessView(unlocking:busy,canRetry:!busy,error:message,
+                        onUnlock:{Task {await authorize()}})
+                        .task {await authorize()}
+                }
+            } else {
+                NavigationStack {
+                    initialSetup.onAppear {Task {await refresh()}}
+                }
+            }
+        }
+        .background(DanperStyle.canvas)
+        .task {if !checked {await refresh()}}
+        .onChange(of:sessionUnlocked) {_,unlocked in
+            if unlocked && summary != nil {Task {await verifyRevision()}}
+        }
+        .onChange(of:scenePhase) {_,phase in
+            if phase == .background {
+                gateCycle=UUID();gateContext?.invalidate();gateContext=nil
+                if !authenticatedLaunch {authorized=false}
+            }
+        }
+    }
+    private var initialSetup:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:16) {
-                DanperPanel("Espacio clínico independiente") {
-                    Label("Fuente clínica separada",systemImage:"lock.shield.fill")
-                        .font(.headline)
-                    Text("Puedes importar PERSONAL, restaurar una copia cifrada de Build 222 o comenzar con un primer trabajador manual. No se precargan registros.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                    #if DEBUG
-                    Label("EN VALIDACIÓN: todavía no está aprobada para atención de pacientes reales.",
-                          systemImage:"exclamationmark.triangle.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal:false,vertical:true)
-                    #endif
-                }
+                Text("Configura DANPER").font(.title2.bold())
+                    .accessibilityIdentifier("clinical-empty-setup")
                 DanperPanel("Verificar la fuente") {
-                    if let summary {
-                        NavigationLink {
-                            N2NativePersonalImportView()
-                        } label: {
-                            Label("Importar o conciliar Excel PERSONAL",systemImage:"person.2.arrow.trianglehead.counterclockwise")
-                        }
-                        .buttonStyle(DanperSecondaryButton())
-                        LabeledContent("Trabajadores",value:String(summary.workers))
-                        LabeledContent("Atenciones",value:String(summary.attentions))
-                        LabeledContent("Movimientos físicos",value:String(summary.physicalMovements))
-                        LabeledContent("Pendientes",value:String(summary.pendingClinicalLines))
-                        Label("Bóveda clínica cifrada identificada",
-                              systemImage:"checkmark.shield.fill")
-                        Text("Ya existe una fuente cifrada. Importar de nuevo PERSONAL conciliará el padrón sin borrar atenciones, consumos ni lotes. Para restaurar otro respaldo se necesita una base independiente.")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .foregroundStyle(.green)
-                    } else {
+
                         Text("Elige una sola fuente inicial: restaurar Build 222, importar PERSONAL o registrar manualmente el primer trabajador. Ninguna opción precarga atenciones ni lotes.")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -80,122 +93,45 @@ struct N2ClinicalWorkspaceGateView:View {
                         .accessibilityIdentifier("clinical-first-run-manual-worker")
                         Text("Si no dispones de Excel ni respaldo, podrás comenzar registrando manualmente el primer trabajador. No se crean empleados, atenciones ni lotes de muestra. Si necesitas conservar información de Build 222, restaura su respaldo primero.")
                             .font(.footnote).foregroundStyle(.secondary)
-                    }
-                    Button {
-                        Task {await refresh()}
-                    } label: {
-                        Label("Comprobar bóveda clínica",systemImage:"arrow.clockwise")
-                    }
-                    .buttonStyle(DanperSecondaryButton())
-                    .disabled(busy)
-                }
-                DanperPanel("Acceso de evaluación") {
-                    Button {
-                        Task {await openWithAuthentication()}
-                    } label: {
-                        HStack(spacing:10) {
-                            if busy {ProgressView().tint(.white)}
-                            Label("Entrar al espacio clínico",systemImage:"faceid")
-                        }
-                    }
-                    .buttonStyle(DanperPrimaryButton())
-                    .disabled(summary == nil || busy || scenePhase != .active)
-                    Text(message).font(.footnote)
-                        .foregroundStyle(invalidSource ? Color.orange : Color.secondary)
-                    Text("Requiere autenticación adicional. El espacio se cierra cuando la aplicación deja de estar activa y no permite cambiar de fuente dentro de una atención.")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(16)
         }
-        .navigationTitle("Acceso clínico")
+        .navigationTitle("Comenzar")
         .danperFormChrome()
-        .task {await refresh()}
-        .onChange(of:summary?.revision) {_,_ in enterVerifiedWorkspaceIfReady()}
-        // Returning from PERSONAL import must refresh the gate's source count.
-        .onAppear {
-            if scenePhase == .active {Task {await refresh()}}
-        }
-        .onChange(of:scenePhase) {_,phase in
-            if phase == .active {enterVerifiedWorkspaceIfReady()}
-            else if phase == .background {
-                gateCycle=UUID()
-                gateContext?.invalidate()
-                gateContext=nil
-                showWorkspace=false
-                busy=false
-                summary=nil
-            }
-        }
-        .fullScreenCover(isPresented:$showWorkspace) {
-            N2ClinicalWorkspaceRootView {
-                showWorkspace=false
-            }
-            .environment(\.n2WorkspaceVault,.clinical)
-        }
     }
-
-    @MainActor private func enterVerifiedWorkspaceIfReady() {
-        guard authenticatedLaunch,summary != nil,scenePhase == .active,
-              !invalidSource,!automaticallyEntered else{return}
-        automaticallyEntered=true
-        showWorkspace=true
-    }
-
     @MainActor private func refresh() async {
         guard !busy else{return}
         busy=true
-        defer {busy=false}
+        defer {busy=false;checked=true}
         do {
             summary=try await N2ProtectedClinicalIOSVault.shared.inspect()
-            invalidSource=false
-            message=summary == nil
-                ? "No se encontró una fuente clínica independiente."
-                : "Fuente encontrada. Necesitas autenticarte para abrir este espacio."
+            let evidence=await N2ProtectedClinicalIOSVault.shared.hasStoredClinicalSource()
+            invalidSource=summary == nil && evidence
+            message=invalidSource ? "No se pudo verificar la fuente protegida. Tus registros se conservan." : ""
         } catch {
-            summary=nil
             invalidSource=true
-            message="La bóveda clínica no superó la verificación. Acceso bloqueado; no se han modificado sus registros."
+            message="No se pudo verificar la fuente protegida. Tus registros se conservan. Vuelve a intentarlo."
         }
     }
-
-    @MainActor private func openWithAuthentication() async {
-        guard !busy,scenePhase == .active,summary != nil else{return}
-        busy=true
-        defer {busy=false}
+    @MainActor private func verifyRevision() async {
         do {
-            if authenticatedLaunch {
-                guard let verified=try await N2ProtectedClinicalIOSVault.shared.inspect(),
-                      verified.revision>0,scenePhase == .active else{return}
-                summary=verified
-                showWorkspace=true
-                return
-            }
-            let context=LAContext()
-            gateContext=context
-            let cycle=gateCycle
-            guard try await context.evaluatePolicy(.deviceOwnerAuthentication,
-                    localizedReason:"Entrar al espacio clínico independiente de DANPER") else {
-                message="Autenticación no autorizada."
-                return
-            }
-            guard cycle==gateCycle,scenePhase == .active else{return}
-            gateContext=nil
-            // Re-read AFTER authentication; an old cached count never grants
-            // permission to access a missing or otherwise invalid source.
-            guard let verified=try await N2ProtectedClinicalIOSVault.shared.inspect(),
-                  verified.revision>0,scenePhase == .active else {
-                summary=nil
-                invalidSource=true
-                message="No se pudo verificar nuevamente la fuente clínica."
-                return
-            }
-            summary=verified
-            invalidSource=false
-            showWorkspace=true
-        } catch {
-            invalidSource=true
-            message="Autenticación o verificación fallida. La bóveda permanece cerrada."
+            _=try await N2ProtectedClinicalIOSVault.shared.currentRevision()
+        }catch {
+            invalidSource=true;message="No se pudo verificar la fuente protegida. Tus registros se conservan."
         }
+    }
+    @MainActor private func authorize() async {
+        guard !busy,scenePhase == .active else{return}
+        busy=true;defer{busy=false}
+        let context=LAContext();gateContext=context
+        let cycle=gateCycle
+        do {
+            let accepted=try await context.evaluatePolicy(.deviceOwnerAuthentication,
+                localizedReason:"Acceder a DANPER Salud Móvil")
+            guard accepted,cycle==gateCycle,scenePhase == .active else{return}
+            _=try await N2ProtectedClinicalIOSVault.shared.currentRevision()
+            authorized=true;message="";gateContext=nil
+        }catch {message="No se pudo verificar tu identidad. Intenta nuevamente."}
     }
 }
 
@@ -211,8 +147,11 @@ struct N2ClinicalWorkspaceRootView:View {
     #endif
     private var layoutOnly=false
     let onClose:()->Void
+    @Environment(\.danperAuthenticatedSession) private var sessionAuthenticated
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.scenePhase) private var scenePhase
+    @State private var homeRevision:Int?
+    @State private var homeDay=""
     @State private var homeCounts:DanperHomeCounts?
     @State private var countError=false
     @State private var tab=0
@@ -251,33 +190,29 @@ struct N2ClinicalWorkspaceRootView:View {
                     .tabItem {Label("Ajustes",systemImage:"gearshape.fill")}.tag(3)
             }
             .toolbar(.hidden,for:.tabBar)
-            .safeAreaInset(edge:.bottom,spacing:0) {DanperFloatingTabs(selection:$tab)}
         }
+        .danperFloatingNavigation(selection:$tab)
         .background(DanperStyle.canvas)
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .preferredColorScheme(appearance=="system" ? nil : appearance=="dark" ? .dark : .light)
         .task(id:tab) {if tab==0 {await refreshHomeCounts()}}
+        .onChange(of:sessionAuthenticated) {_,active in
+            if active {Task {await refreshHomeCounts()}}
+        }
         .sheet(isPresented:$showNewAttention,onDismiss:{
             registeredDNI=nil
             Task {await refreshHomeCounts()}
         }) {
-            NavigationStack {
-                N2NativeClinicalFormView(initialWorkerDNI:registeredDNI)
-                    .toolbar {
-                        ToolbarItem(placement:.cancellationAction) {
-                            Button("Cerrar") {showNewAttention=false}
-                                .accessibilityIdentifier("premium-close-attention")
-                        }
-                    }
-            }
-            .presentationDragIndicator(.visible)
+            DanperAttentionEditor(initialWorkerDNI:registeredDNI)
+
         }
         .opacity(scenePhase == .active ? 1 : 0)
         .accessibilityHidden(scenePhase != .active)
         .allowsHitTesting(scenePhase == .active)
         .onChange(of:scenePhase) {_,phase in
-            if phase == .background {onClose()}
+            if phase == .background {showNewAttention=false}
+            else if phase == .active {Task {await refreshHomeCounts()}}
         }
     }
     private var home:some View {
@@ -312,10 +247,13 @@ struct N2ClinicalWorkspaceRootView:View {
         .refreshable {await refreshHomeCounts()}
     }
     @MainActor private func refreshHomeCounts() async {
-        guard !layoutOnly else{return}
+        guard !layoutOnly,sessionAuthenticated else{return}
         do {
             let period=N2HomeCalendarPeriod(now:Date())
+            let revision=try await vault.currentRevision()
+            if revision==homeRevision,homeDay==period.today,homeCounts != nil {return}
             let counters=try await vault.dashboardCounters(today:period.today,weekStart:period.weekStart)
+            homeRevision=revision;homeDay=period.today
             homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
             countError=false
         }catch {
@@ -345,7 +283,7 @@ struct N2ClinicalWorkspaceRootView:View {
                 DanperPanel("Personal y atenciones") {
                     DanperToolLink(title:"Trabajadores",symbol:"person.2") {N2NativeHistoryView(useProtectedVault:true,showWorkers:true)}
                     DanperToolLink(title:"Borradores",symbol:"doc.badge.clock") {N2NativeDraftsDashboard()}
-                    DanperToolLink(title:"Revisión de alergias",symbol:"cross.vial") {N2NativeClinicalFormView()}
+                    DanperAttentionLauncher(title:"Revisión de alergias",symbol:"cross.vial")
                     DanperToolLink(title:"Importar / conciliar PERSONAL",symbol:"person.crop.rectangle.stack") {N2NativePersonalImportView()}
                 }
                 DanperPanel("Inventario y reportes") {
@@ -358,7 +296,7 @@ struct N2ClinicalWorkspaceRootView:View {
                 }
                 DanperPanel("Seguridad") {
                     DanperToolLink(title:"Respaldo cifrado",symbol:"lock.doc") {N2NativeBackupExportView()}
-                    Button("Cerrar espacio clínico",role:.cancel) {onClose()}.buttonStyle(DanperSecondaryButton())
+                    Button("Bloquear aplicación",role:.cancel) {onClose()}.buttonStyle(DanperSecondaryButton())
                 }
             }.padding(16)
         }.navigationTitle("Ajustes").navigationBarTitleDisplayMode(.inline)

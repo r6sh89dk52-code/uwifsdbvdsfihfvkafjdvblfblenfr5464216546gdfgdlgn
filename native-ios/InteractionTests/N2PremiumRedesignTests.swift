@@ -2,7 +2,7 @@ import XCTest
 
 final class N2PremiumRedesignTests:XCTestCase {
     private func capture(_ app:XCUIApplication,_ name:String) {
-        let attachment=XCTAttachment(screenshot:app.screenshot())
+        let attachment=XCTAttachment(screenshot:XCUIScreen.main.screenshot())
         attachment.name="Premium-"+name;attachment.lifetime = .keepAlways;add(attachment)
     }
     private func reveal(_ element:XCUIElement,in app:XCUIApplication) {
@@ -29,6 +29,10 @@ final class N2PremiumRedesignTests:XCTestCase {
         XCTAssertTrue(app.textFields["attention-worker-dni"].waitForExistence(timeout:10),app.debugDescription)
         app.textFields["attention-worker-dni"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5))
+        XCTAssertGreaterThan(app.keyboards.firstMatch.frame.height,150,"Validar con teclado en pantalla")
+        let hiddenNew=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["Siguiente"])
+        XCTAssertEqual(XCTWaiter.wait(for:[hiddenNew],timeout:5),.completed,"El teclado debe ocultar la barra de pasos")
+        XCTAssertFalse(app.buttons["premium-tab-home"].exists && app.buttons["premium-tab-home"].isHittable,"La cápsula no debe interferir con el editor")
         capture(app,"Nueva-atencion-teclado")
         app.buttons["premium-close-attention"].tap()
         app.buttons["premium-tab-history"].tap()
@@ -44,8 +48,28 @@ final class N2PremiumRedesignTests:XCTestCase {
         let diagnosis=app.descendants(matching:.any)["clinical-diagnosis-input"]
         XCTAssertTrue(diagnosis.waitForExistence(timeout:10),app.debugDescription)
         XCTAssertEqual(diagnosis.value as? String,"BORRADOR FICTICIO REDISENO")
+        XCTAssertTrue(app.buttons["premium-close-attention"].exists,"Borradores y Nueva atención comparten el mismo contenedor")
+        diagnosis.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5))
+        XCTAssertGreaterThan(app.keyboards.firstMatch.frame.height,150,"Validar con teclado en pantalla")
+        let hiddenDraft=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["Siguiente"])
+        XCTAssertEqual(XCTWaiter.wait(for:[hiddenDraft],timeout:5),.completed)
+        XCTAssertFalse(app.buttons["Anterior"].exists)
+        diagnosis.typeText(" CORREGIDO")
+        XCTAssertTrue((diagnosis.value as? String)?.hasSuffix(" CORREGIDO") == true)
+        capture(app,"Borrador-teclado-sin-barras")
+        app.buttons["danper-dismiss-keyboard"].tap()
+        XCTAssertTrue(app.buttons["Siguiente"].waitForExistence(timeout:5))
         capture(app,"Borrador-recuperado")
-        app.navigationBars.buttons["Borradores"].tap()
+        XCTAssertFalse(app.buttons["premium-tab-drafts"].exists && app.buttons["premium-tab-drafts"].isHittable)
+        let next=app.buttons["Siguiente"]
+        XCTAssertTrue(next.isHittable)
+        XCTAssertLessThanOrEqual(next.frame.maxY,app.frame.maxY)
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        let dismissed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["premium-close-attention"])
+        XCTAssertEqual(XCTWaiter.wait(for:[dismissed],timeout:5),.completed,"El editor compartido se cierra al pasar a segundo plano")
+
         XCTAssertTrue(delete.waitForExistence(timeout:10))
         delete.tap()
         app.buttons["Eliminar borrador"].tap()
