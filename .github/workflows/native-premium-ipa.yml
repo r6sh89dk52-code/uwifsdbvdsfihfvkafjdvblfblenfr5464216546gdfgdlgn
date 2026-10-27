@@ -1,0 +1,130 @@
+name: DANPER Native Premium - verified unsigned iPhone IPA
+run-name: Native Premium IPA · ${{ github.sha }}
+
+on:
+  push:
+    branches: [build/native-premium-ipa-20261027]
+    paths:
+      - '.github/workflows/native-premium-ipa.yml'
+      - 'ci/native-ipa-request.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-premium-ipa-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  native-ipa:
+    runs-on: macos-15
+    timeout-minutes: 55
+    env:
+      BUILD_DIR: ${{ runner.temp }}/danper-native-ipa
+      DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/danper-native-fixtures
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Record source and installed Apple toolchain
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/build/native-premium-ipa-20261027
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p "$BUILD_DIR/logs" "$DANPER_N1_FIXTURE_DIR"
+          xcodebuild -version | tee "$BUILD_DIR/logs/toolchain.txt"
+          xcrun --sdk iphoneos --show-sdk-version | tee -a "$BUILD_DIR/logs/toolchain.txt"
+          xcode-select -p | tee -a "$BUILD_DIR/logs/toolchain.txt"
+          swift --version | tee -a "$BUILD_DIR/logs/toolchain.txt"
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          xcodegen --version | tee -a "$BUILD_DIR/logs/toolchain.txt"
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run JavaScript regression and native presentation gates
+        run: |
+          set -euo pipefail
+          npm run test:logic 2>&1 | tee "$BUILD_DIR/logs/javascript.log"
+          for gate in audit-n2-workspace-routing audit-n2-personal-import audit-n2-build222-backup-restore audit-n2-joint-indicator test-n2-workspace-routing test-n2-build222-ui-parity test-n2-premium-redesign; do
+            node "scripts/$gate.cjs" 2>&1 | tee -a "$BUILD_DIR/logs/javascript.log"
+          done
+      - name: Generate synthetic fixtures and run all Swift core tests
+        run: |
+          set -euo pipefail
+          for generator in generate-native-compat-fixtures generate-n1e-clinical-fixtures generate-n1f-lossless-fixtures generate-n1h-clinical-parity generate-n1p-excel-parity generate-n1q-reconciliation-fixtures generate-n1r-stored-xlsx-template generate-n1s-official-excel-fixtures generate-n2-approved-fixture generate-n2-nursing-parity generate-n2-procedure-parity generate-n2-stock-commands-fixtures; do
+            node "scripts/$generator.cjs" >> "$BUILD_DIR/logs/fixtures.log" 2>&1
+          done
+          swift test --package-path native-ios --jobs 3 2>&1 | tee "$BUILD_DIR/logs/swift-core.log"
+      - name: Prepare sanitized app resources and Xcode project
+        run: |
+          set -euo pipefail
+          node scripts/prepare-n1s-ios-demo-resources.cjs 2>&1 | tee "$BUILD_DIR/logs/resources.log"
+          bash native-ios/scripts/make-app-icon.sh
+          xcodegen generate --spec native-ios/project.yml
+          xcodebuild -resolvePackageDependencies -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative >> "$BUILD_DIR/logs/toolchain.txt" 2>&1
+      - name: Compile Release for physical iPhone ARM64 with signing disabled
+        run: |
+          set -euo pipefail
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$BUILD_DIR/device" ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' \
+            build 2>&1 | tee "$BUILD_DIR/logs/iphone-release.log"
+      - name: Run native and interaction XCTest on an isolated iPhone 16 simulator
+        timeout-minutes: 22
+        run: |
+          set -euo pipefail
+          SIM_ID=$(python3 - <<'PY'
+          import json, subprocess
+          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))['devices']
+          candidates=[d for group in devices.values() for d in group if d['name']=='iPhone 16' and d.get('isAvailable')]
+          if not candidates: raise SystemExit('No available iPhone 16 simulator; validation cannot pass.')
+          print(candidates[-1]['udid'])
+          PY
+          )
+          # Ad-hoc simulator signing preserves real Keychain entitlements.
+          # The device Release build above remains completely unsigned.
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -destination-timeout 180 -parallel-testing-enabled NO \
+            -derivedDataPath "$BUILD_DIR/simulator" -resultBundlePath "$BUILD_DIR/Acceptance.xcresult" \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test \
+            2>&1 | tee "$BUILD_DIR/logs/ios-tests.log"
+      - name: Package and independently inspect the unsigned IPA
+        run: bash scripts/package-native-premium-ipa.sh
+      - name: Publish verified IPA, SHA-256 and build provenance
+        id: ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_NATIVE_PREMIUM_UNSIGNED_${{ github.run_id }}
+          path: ${{ runner.temp }}/danper-native-ipa/deliverables/*
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+      - name: Publish compiler logs and XCTest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_NATIVE_VALIDATION_${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/danper-native-ipa/logs
+            ${{ runner.temp }}/danper-native-ipa/Acceptance.xcresult
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Write download link to the run summary
+        if: success()
+        env:
+          ARTIFACT_URL: ${{ steps.ipa.outputs.artifact-url }}
+        run: |
+          {
+            echo '### DANPER SwiftUI native · unsigned iPhone IPA'
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo "[Download IPA, checksum and provenance]($ARTIFACT_URL)"
+            cat "$BUILD_DIR/deliverables/SHA256SUMS.txt"
+            echo 'Signing is required before installation. No device was modified by this workflow.'
+          } >> "$GITHUB_STEP_SUMMARY"
