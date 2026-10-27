@@ -13,7 +13,6 @@ import UIKit
         let host=UIHostingController(rootView:view
             .environment(\.scenePhase,.active)
             .environment(\.colorScheme,dark ? .dark : .light)
-            .environment(\.accessibilityReduceMotion,true)
             .environment(\.dynamicTypeSize,accessible ? .accessibility3 : .large)
             .preferredColorScheme(dark ? .dark : .light))
         let window=UIWindow(windowScene:scene)

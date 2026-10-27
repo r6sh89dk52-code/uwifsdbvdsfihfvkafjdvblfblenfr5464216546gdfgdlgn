@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - fix/b10-trabajadores-exportacion-ux-20261018
-      - design/glass-clinical-access-home-20261027
     paths:
       - 'native-ios/**'
       - 'scripts/**'
@@ -62,9 +61,10 @@ jobs:
             generate-n2-stock-commands-fixtures.cjs; do
             DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node "scripts/$generator"
           done
-          node scripts/generate-n2-procedure-parity.cjs
+          DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node scripts/generate-n2-procedure-parity.cjs
       - name: Swift 6 Linux syntax of iOS views + all core XCTest suites
         run: |
+          set -euo pipefail
           swift --version
           swiftc -frontend -parse native-ios/App/*.swift
           cd native-ios
@@ -138,11 +138,39 @@ jobs:
               exit 1
             }
           grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/b11-ios-tests.log"
+      - name: Capture base Access and Home for real before-after comparison
+        if: github.head_ref == 'design/glass-clinical-access-home-20261027' || github.ref_name == 'design/glass-clinical-access-home-20261027'
+        working-directory: native-ios
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          BASE=9bec8e01ccbb3f1a674372cf6e48df049dc4f014
+          git fetch --no-tags --depth=1 origin "$BASE"
+          trap 'git restore -- App/DANPERNativeApp.swift App/N2ClinicalWorkspaceView.swift' EXIT
+          git show "$BASE:native-ios/App/DANPERNativeApp.swift" > App/DANPERNativeApp.swift
+          git show "$BASE:native-ios/App/N2ClinicalWorkspaceView.swift" > App/N2ClinicalWorkspaceView.swift
+          SIM="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["name"] == "iPhone 16" and d["isAvailable"]]; print(devices[0]["udid"] if devices else "")')"
+          test -n "$SIM"
+          xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIM" \
+            -destination-timeout 180 -parallel-testing-enabled NO \
+            -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
+            -resultBundlePath "$RUNNER_TEMP/b11-before-layout.xcresult" \
+            -only-testing:DANPERNativeTests/N2GlassClinicalLayoutTests \
+            CODE_SIGNING_ALLOWED=NO test > "$RUNNER_TEMP/b11-before-layout.log" 2>&1 || {
+              tail -n 100 "$RUNNER_TEMP/b11-before-layout.log"
+              exit 1
+            }
+          grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/b11-before-layout.log"
       - name: Export real iPhone 16 layout evidence
         if: always()
         run: |
           if test -d "$RUNNER_TEMP/b11-layout.xcresult"; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/b11-layout.xcresult" --output-path "$RUNNER_TEMP/b11-layout-png"
+          fi
+          if test -d "$RUNNER_TEMP/b11-before-layout.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/b11-before-layout.xcresult" --output-path "$RUNNER_TEMP/b11-before-layout-png"
           fi
       - name: Reassert zero release artifacts and existing build222 isolation
         run: |
@@ -159,5 +187,8 @@ jobs:
             ${{ runner.temp }}/b11-ios-tests.log
             ${{ runner.temp }}/b11-layout.xcresult
             ${{ runner.temp }}/b11-layout-png
+            ${{ runner.temp }}/b11-before-layout.log
+            ${{ runner.temp }}/b11-before-layout.xcresult
+            ${{ runner.temp }}/b11-before-layout-png
           retention-days: 7
           if-no-files-found: warn
