@@ -2,7 +2,7 @@
 set -euo pipefail
 : "${BUILD_DIR:?}"
 mkdir -p "$BUILD_DIR/logs" "$DANPER_N1_FIXTURE_DIR"
-test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+test "$(git rev-parse HEAD)" = "${DANPER_SOURCE_SHA:-$GITHUB_SHA}"
 # Fix the audited Apple toolchain; fail visibly if this image drops it.
 export DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer
 test -d "$DEVELOPER_DIR"

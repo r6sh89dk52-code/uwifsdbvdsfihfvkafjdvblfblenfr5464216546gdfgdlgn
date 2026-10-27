@@ -1,0 +1,111 @@
+name: DANPER exact-source XCTest recovery and conditional promotion
+run-name: XCTest recovery for 65994d5ecb3a · recipe ${{ github.sha }}
+on:
+  push:
+    branches: [ci/premium-native-ipa-work-20261027]
+    paths:
+      - '.github/workflows/native-premium-ui-recovery.yml'
+      - 'ci/native-ui-request.txt'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: danper-exact-source-xctest-recovery
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+env:
+  DANPER_SOURCE_SHA: 65994d5ecb3a9c15f74fe950cfc16fe07844bc40
+  DANPER_RECIPE_SHA: ${{ github.sha }}
+jobs:
+  acceptance:
+    runs-on: macos-15-intel
+    timeout-minutes: 100
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Preserve CI recipe separately from application source
+        run: |
+          mkdir -p "$RUNNER_TEMP/ci-recipe"
+          cp scripts/ci-native-*.sh scripts/select-native-simulator-runtime.py "$RUNNER_TEMP/ci-recipe/"
+          echo "BUILD_DIR=$RUNNER_TEMP/acceptance" >> "$GITHUB_ENV"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/fixtures" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DANPER_SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify exact application source and prepare fixtures
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$DANPER_SOURCE_SHA"
+          bash "$RUNNER_TEMP/ci-recipe/ci-native-prepare.sh"
+          bash "$RUNNER_TEMP/ci-recipe/ci-native-clinical.sh" fixtures-only
+      - name: Execute unchanged XCTest on SDK-matched isolated iPhone 16 clones
+        timeout-minutes: 85
+        run: bash "$RUNNER_TEMP/ci-recipe/ci-native-ui.sh"
+      - name: Preserve actual summaries, xcresult, screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: EXACT_SOURCE_XCTEST_${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/acceptance/logs
+            ${{ runner.temp }}/acceptance/results
+            ${{ runner.temp }}/acceptance/TEST_RESULTS.jsonl
+            ${{ runner.temp }}/acceptance/ui-methods.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+  validate:
+    needs: acceptance
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Preserve independent promotion verifier
+        run: cp scripts/validate-native-recovery.py "$RUNNER_TEMP/validate-native-recovery.py"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DANPER_SOURCE_SHA }}
+      - name: Retrieve actual prior gates and unchanged candidate
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$DANPER_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40532104867" > "$RUNNER_TEMP/prior-run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40532104867/jobs?per_page=100" > "$RUNNER_TEMP/prior-jobs.json"
+          gh run download 40532104867 -n "CANDIDATE_UNSIGNED_NOT_CLINICALLY_VALIDATED_$DANPER_SOURCE_SHA" -D "$RUNNER_TEMP/candidate"
+          gh run download "$GITHUB_RUN_ID" -n "EXACT_SOURCE_XCTEST_$GITHUB_RUN_ID" -D "$RUNNER_TEMP/acceptance"
+      - name: Promote only real complete results for the exact compiled source
+        run: |
+          python3 "$RUNNER_TEMP/validate-native-recovery.py" \
+            --candidate "$RUNNER_TEMP/candidate" --acceptance "$RUNNER_TEMP/acceptance" \
+            --prior-run "$RUNNER_TEMP/prior-run.json" --prior-jobs "$RUNNER_TEMP/prior-jobs.json" \
+            --output "$RUNNER_TEMP/final"
+      - uses: actions/upload-artifact@v4
+        id: final
+        with:
+          name: VALIDATED_UNSIGNED_65994d5ecb3a9c15f74fe950cfc16fe07844bc40
+          path: ${{ runner.temp }}/final/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Publish validated delivery link
+        env:
+          ARTIFACT_URL: ${{ steps.final.outputs.artifact-url }}
+        run: |
+          echo "[Validated unsigned IPA]($ARTIFACT_URL)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Compiled and tested source: $DANPER_SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "CI recipe: $DANPER_RECIPE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/final/SHA256SUMS.txt" >> "$GITHUB_STEP_SUMMARY"

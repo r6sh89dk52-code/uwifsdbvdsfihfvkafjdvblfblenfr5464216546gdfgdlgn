@@ -76,3 +76,24 @@ Run 40530815394: las 383 pruebas terminaron sin crash. Fallaron dos métodos N3 
 Run 40531480755, job Linux 122285182820: el diagnóstico sintético imprimió `FoundationDictionarySelfEqual=false`, `FoundationReconstructedEqual=false`, `CanonicalJSONEqual=true`. Es evidencia directa de una comparación Foundation no portable. La ruta común a ambos fallos es `N2ContainerAccounting.validMovement`, que usaba esa comparación tras reconstruir los campos permitidos del evento containerState.
 
 Se sustituye exclusivamente esa igualdad por serialización JSON sortedKeys con guardas de error, coherente con las otras rutas del mismo validador. No se cambian cantidades, FEFO, autorizaciones de apertura, R=1/R=0, marcas de tiempo, cifrado o estructura persistida. Se añade `testContainerClosureRoundTripRejectsUnrelatedLotMutations`: un cierre legítimo sobrevive al recorrido JSON y rechaza cambios en sellados, capacidad, nombre, lote y sustitución de 0 por false. El nuevo SHA requiere reconstrucción y suites completas; los resultados previos no lo certifican.
+
+## Corrección tras revisar los diagnósticos reales de XCTest
+
+La revisión 40547348936 (commit f0b4867ccf052b619b12a54a7c6ec4915141ef7b) completó PASS la lectura del artefacto C_XCTEST_EVIDENCE_40532104867. No ejecutó pruebas nuevas. Su resultado no equivale a validar la aplicación.
+
+Los xcresult confirman que el selector anterior tomó iOS **26.2**, aunque el proyecto se construyó con **Xcode 16.4 / SDK 18.5**. El script elegía el mayor runtime disponible en vez de uno del SDK seleccionado; fue un error de configuración de esta reparación. Los registros de coreauthd muestran biometría disponible (BiometryType=2) y `UI activation timed out after 5 seconds`, código -1000, al presentar la interfaz de LocalAuthentication. No hay evidencia para cambiar la autenticación de producción, sus claves o su cifrado.
+
+En 40532104867: 15/15 XCTest nativos PASS; una prueba de interacción FAIL (N2BiometricInteractionTests, comprobación inicial de estado de autenticación, línea 26). Los otros seis métodos de interacción NOT RUN: el límite de 48 minutos se alcanzó durante la migración inicial de otro simulador. El job terminó CANCELLED y D no se ejecutó. Se conservaron 427 MB de evidencia.
+
+Correcciones exclusivamente de CI:
+
+- Selección obligatoria de runtime iOS con el mismo major/minor que el SDK del Xcode seleccionado, con seis casos locales de verificación. No se permite elegir iOS 26 para SDK 18.5; el selector falla explícitamente.
+- Un dispositivo base nuevo termina sus migraciones sin DANPER instalada; se apaga y se clona para cada método. La base nunca ejecuta pruebas. Las apps, bóvedas, borradores y Keychain de una prueba no se comparten con otra. Solo se eliminan UUID creados por este job.
+- Activación de Simulator y estabilización de SpringBoard antes de inscribir biometría. Ningún bypass en producción.
+- Arquitectura de compilación de pruebas limitada a la del host; la IPA física ARM64 ya publicada permanece intacta.
+- Recolección de resultados basada en JSON real de xcresulttool: pruebas omitidas, resultados ausentes o número incorrecto impiden PASS. No se modifican las aserciones XCTest.
+- La nueva ejecución `native-premium-ui-recovery.yml` repite únicamente XCTest nativo/de interfaz, con runtime 18.5, sobre el SHA **65994d5ecb3a9c15f74fe950cfc16fe07844bc40** exacto del IPA. No recompila el IPA ni repite JavaScript o las 384 pruebas Swift de cada plataforma.
+- El verificador de promoción exige las conclusiones reales de A, B y B2 del run original, 15 pruebas nativas, siete de interacción y un fixture adicional, todos satisfactorios y sin omisiones, además de volver a verificar el IPA y su checksum. Código de aplicación y receta CI se registran con SHA separados. Solo entonces publica VALIDATED_UNSIGNED con los mismos bytes del candidato.
+- El workflow completo conserva su disparador por `ci/native-ipa-request.txt`; editar únicamente la receta no dispara otra compilación completa. La recuperación tiene su propio disparador y no compite con otra compilación macOS.
+
+Candidato existente (sin nueva firma ni instalación): artifact 12745669311 del run 40532104867, SHA-256 del IPA `45ac34dcb0166efd114b800d285a052ad9a62826cdbee530d3587be17503e558`. Hasta que las nuevas pruebas terminen, la validación integral permanece BLOCKED.

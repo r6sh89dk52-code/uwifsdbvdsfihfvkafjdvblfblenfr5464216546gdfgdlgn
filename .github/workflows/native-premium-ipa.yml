@@ -4,7 +4,6 @@ on:
   push:
     branches: [ci/premium-native-ipa-work-20261027]
     paths:
-      - '.github/workflows/native-premium-ipa.yml'
       - 'ci/native-ipa-request.txt'
   workflow_dispatch:
 permissions:
@@ -144,7 +143,7 @@ jobs:
     needs: [build, clinical]
     if: ${{ always() && !cancelled() }}
     runs-on: macos-15-intel
-    timeout-minutes: 60
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
         with:
@@ -174,7 +173,7 @@ jobs:
             echo 'Historical artifact download BLOCKED' > "$BUILD_DIR/logs/historical-export.log"
           fi
       - name: Execute every native and interaction test, isolated by method
-        timeout-minutes: 48
+        timeout-minutes: 85
         run: bash scripts/ci-native-ui.sh
       - name: Preserve xcresult, screenshots and device logs even on failure
         if: always()
@@ -186,6 +185,7 @@ jobs:
             ${{ runner.temp }}/interaction/results
             ${{ runner.temp }}/interaction/historical-attachments
             ${{ runner.temp }}/interaction/ui-methods.txt
+            ${{ runner.temp }}/interaction/TEST_RESULTS.jsonl
           retention-days: 14
 
   validate:
