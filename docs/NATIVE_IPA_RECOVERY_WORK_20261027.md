@@ -68,3 +68,11 @@ El grupo de concurrencia de esta reparación conserva únicamente la revisión m
 `diagnose-foundation-equality.swift` registra en ambos entornos la igualdad Foundation y la igualdad JSON de un lote completamente sintético; es diagnóstico, no un cambio de reglas o un bypass de las pruebas.
 
 Referencias de runner: https://github.com/actions/runner-images/blob/main/README.md y https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md.
+
+## Diagnóstico Linux confirmado y corrección mínima separada
+
+Run 40530815394: las 383 pruebas terminaron sin crash. Fallaron dos métodos N3 con cinco fallos, uno inesperado: cierre previo al abrir un envase nuevo y cierre explícito posterior a uso por volumen. `testPendingContainerDoesNotInventOpeningInProvisionalIndicator` PASS en esta base Premium. No hay diferencias del motor clínico entre la rama independiente y Premium; la diferencia observada es de entorno (Apple Swift 6.1.2 / Linux Swift 6.4).
+
+Run 40531480755, job Linux 122285182820: el diagnóstico sintético imprimió `FoundationDictionarySelfEqual=false`, `FoundationReconstructedEqual=false`, `CanonicalJSONEqual=true`. Es evidencia directa de una comparación Foundation no portable. La ruta común a ambos fallos es `N2ContainerAccounting.validMovement`, que usaba esa comparación tras reconstruir los campos permitidos del evento containerState.
+
+Se sustituye exclusivamente esa igualdad por serialización JSON sortedKeys con guardas de error, coherente con las otras rutas del mismo validador. No se cambian cantidades, FEFO, autorizaciones de apertura, R=1/R=0, marcas de tiempo, cifrado o estructura persistida. Se añade `testContainerClosureRoundTripRejectsUnrelatedLotMutations`: un cierre legítimo sobrevive al recorrido JSON y rechaza cambios en sellados, capacidad, nombre, lote y sustitución de 0 por false. El nuevo SHA requiere reconstrucción y suites completas; los resultados previos no lo certifican.

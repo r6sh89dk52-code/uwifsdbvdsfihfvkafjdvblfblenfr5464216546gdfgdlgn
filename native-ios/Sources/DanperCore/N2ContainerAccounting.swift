@@ -123,7 +123,13 @@ public enum N2ContainerAccounting {
             after["declaredOpenContainers"]=before["declaredOpenContainers"]
             after["updatedAt"]=before["updatedAt"]
             after["volumeTrackingEnabled"]=before["volumeTrackingEnabled"]
-            return NSDictionary(dictionary:after).isEqual(to:before)
+            // swift-corelibs-foundation can report false even when a JSON
+            // dictionary is compared to itself. Use the same strict JSON
+            // representation as the other movement validation paths.
+            guard let expectedData=try? JSONSerialization.data(withJSONObject:before,options:.sortedKeys),
+                  let afterData=try? JSONSerialization.data(withJSONObject:after,options:.sortedKeys)
+                  else{return false}
+            return expectedData==afterData
         }
         guard movement["kind"] as? String=="use",integer(movement["containerAccountingVersion"]) == 1,
               let before=movement["before"] as? [String:Any],

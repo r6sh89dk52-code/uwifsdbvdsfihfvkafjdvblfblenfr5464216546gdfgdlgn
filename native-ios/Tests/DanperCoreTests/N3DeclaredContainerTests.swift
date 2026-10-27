@@ -349,6 +349,25 @@ final class N3DeclaredContainerTests:XCTestCase {
         XCTAssertThrowsError(try N2ContainerAccounting.close(snapshot:accepted.snapshot,lotID:"declared-bottles",count:2,
             disposition:"descartado",operatorName:"OPERADOR FICTICIO",reason:"Declaración inválida de prueba",at:time("2026-11-09")))
     }
+    func testContainerClosureRoundTripRejectsUnrelatedLotMutations()throws {
+        let opened=try save(source(),id:"portable-closure",day:"2026-11-08",openings:1)
+        let closed=try N2ContainerAccounting.close(snapshot:opened.snapshot,lotID:"declared-bottles",count:1,
+            disposition:"agotado",operatorName:"OPERADOR FICTICIO",reason:"Cierre sintético de portabilidad",at:time("2026-11-09"))
+        let root=try object(closed)
+        let movements=try XCTUnwrap(root["stockMovements"] as? [[String:Any]])
+        let event=try XCTUnwrap(movements.first{$0["kind"] as? String=="containerState"})
+        XCTAssertTrue(N2ContainerAccounting.validMovement(event))
+        let after=try XCTUnwrap(event["after"] as? [String:Any])
+        let alterations:[(String,Any)]=[("sealedContainers",99),("unitsPerContainer",2),
+            ("name","PRODUCTO ADULTERADO"),("lot","LOTE ADULTERADO"),("looseUnits",false)]
+        for (key,value) in alterations {
+            var forged=event,changed=after
+            changed[key]=value;forged["after"]=changed
+            XCTAssertFalse(N2ContainerAccounting.validMovement(try object(bytes(forged))),
+                           "Un cierre no autoriza alterar \(key)")
+        }
+        XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(closed).consumptionR.compactMap{$0},[1])
+    }
     func testAllVerifiedContainerUnitsUseTheSameExplicitPlan()throws {
         let raw=try lot(source(capacity:100))
         for unit in ["FCO","CJA","PAQ","BLISTER","ENV"] {
