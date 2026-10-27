@@ -19,7 +19,9 @@ assert(builder.includes('guard receipts.count<=4'));
 assert(writer.includes('"LA VENTUROSA","PLVENTUROSA","AMBAS"'));
 assert(writer.includes('selected.allSatisfy'));
 assert(writer.includes('rowSite==site'));
-assert(view.includes('options:["AMBAS","LA VENTUROSA","PLVENTUROSA"]'));
+// The current UI fixes the joint scope instead of exposing a per-site selector.
+assert(view.includes('@State private var site="AMBAS"'));
+assert(view.includes('LabeledContent("Ámbito",value:"Fundo y Planta La Venturosa")'));
 assert(view.includes('site=="AMBAS"'));
 assert(tests.includes('testJointFundoAndPlantaIndicatorRequiresBothReconciledPeriods'));
 console.log('PASS: joint 10-sheet workbook source gates: two independent reviews, site-specific totals, no unknown-source rows, no truncated receipts.');

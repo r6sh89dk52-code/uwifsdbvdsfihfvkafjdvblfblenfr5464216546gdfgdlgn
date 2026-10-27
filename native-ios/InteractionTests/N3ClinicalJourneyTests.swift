@@ -19,10 +19,10 @@ final class N3ClinicalJourneyTests:XCTestCase {
         }
         for _ in 0..<10 {
             let content=element.identifier.hasPrefix("choice-") || element.identifier.hasPrefix("medication-row-") ||
-                element.identifier=="add-clinical-product" || element.elementType == .textField || element.elementType == .textView ||
+                element.identifier=="add-clinical-product" || element.label=="Declarar agotado, cerrado o descartado" || element.elementType == .textField || element.elementType == .textView ||
                 (element.elementType == .button && element.frame.width>300 && element.identifier != "inventory-save-lot")
             let footer=app.buttons["Anterior"]
-            let tab=app.tabBars.firstMatch
+            let tab=app.buttons["premium-tab-home"]
             let bottom=footer.exists && footer.isHittable ? footer.frame.minY-12 :
                 (tab.exists && tab.isHittable ? tab.frame.minY-12:app.frame.maxY-60)
             let visible = !content || (element.frame.minY>140 && element.frame.maxY<bottom)
@@ -259,13 +259,19 @@ final class N3ClinicalJourneyTests:XCTestCase {
         app.launch();authenticate(app)
         XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
         capture(app,"Persistencia-tras-relanzar")
+        verifyPersistentInventoryAndKardex(app)
+    }
+    private func verifyPersistentInventoryAndKardex(_ app:XCUIApplication) {
         inventory(app)
-        let alcoholLot=app.descendants(matching:.any)["inventory-lot-N3-ALCOHOL"].firstMatch
+        // DisclosureGroup flattens its children in the accessibility tree.
+        // Verify the unique fixture's visible lot and its persisted opening.
+        let alcoholLot=app.staticTexts["Lote: N3-ALCOHOL"]
         if !alcoholLot.exists {
-            tap(app.descendants(matching:.any)["inventory-group-E-86"].firstMatch,in:app)
+            tap(app.buttons["inventory-group-E-86"].firstMatch,in:app)
         }
-        XCTAssertTrue(alcoholLot.staticTexts["Abiertos: 1"].waitForExistence(timeout:10),app.debugDescription)
-        tap(alcoholLot.buttons["Declarar agotado, cerrado o descartado"].firstMatch,in:app)
+        XCTAssertTrue(alcoholLot.waitForExistence(timeout:10),app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Abiertos: 1"].waitForExistence(timeout:10),app.debugDescription)
+        tap(app.buttons["Declarar agotado, cerrado o descartado"].firstMatch,in:app)
         XCTAssertTrue(app.navigationBars["Estado de envases"].waitForExistence(timeout:5))
         capture(app,"Declaracion-manual-estado-envase")
         tap(app.buttons["Cancelar"],in:app)

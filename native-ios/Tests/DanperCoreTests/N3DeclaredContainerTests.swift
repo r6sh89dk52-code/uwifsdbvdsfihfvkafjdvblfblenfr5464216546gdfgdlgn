@@ -367,9 +367,21 @@ final class N3DeclaredContainerTests:XCTestCase {
         XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(snapshot:pending.snapshot,products:products,
             mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
             start:"2026-11-09",end:"2026-12-08",subdivision:"LA VENTUROSA",
-            selectedVisitIDs:["pending-container"],allowPending:true)) {
+            selectedVisitIDs:["pending-container"])) {
             XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,.unverifiedDelivery)
         }
+        let provisional=try N2VerifiedIndicatorWorkbook.export(snapshot:pending.snapshot,products:products,
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-11-09",end:"2026-12-08",subdivision:"LA VENTUROSA",
+            selectedVisitIDs:["pending-container"],allowPending:true)
+        XCTAssertTrue(provisional.provisional)
+        XCTAssertEqual(provisional.pendingLines,1)
+        let parts=try N1rStoredZip.unpack(provisional.xlsx)
+        let consumos=String(decoding:try XCTUnwrap(parts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,as:UTF8.self)
+        XCTAssertNotNil(consumos.range(of:#"<c\b[^>]*\br="R2"[^>]*/>"#,options:.regularExpression))
+        let notes=String(decoding:try XCTUnwrap(parts.first{$0.name=="xl/worksheets/sheet6.xml"}).data,as:UTF8.self)
+        XCTAssertTrue(notes.contains("BORRADOR PROVISIONAL"))
+        XCTAssertTrue(notes.contains("R PENDIENTE"))
         XCTAssertEqual(pending.physicalMovementsAdded,0)
     }
     func testDeclaredMultipleOpeningsSplitByFEFOWithoutInventingVolumeOrSkippingEarlierLot()throws {

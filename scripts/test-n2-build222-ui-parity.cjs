@@ -5,6 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(root,'src/main.tsx'),'utf8');
+const premium=fs.readFileSync(path.join(root,'native-ios/App/DanperPremiumUI.swift'),'utf8');
 const home=fs.readFileSync(path.join(root,'native-ios/App/NativeRootView.swift'),'utf8');
 const form=fs.readFileSync(path.join(root,'native-ios/App/N2NativeClinicalFormView.swift'),'utf8');
 const osteomuscular=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2OsteomuscularSegments.swift'),'utf8');
@@ -26,7 +27,9 @@ for(const marker of [
 for(const marker of [
   'draft-dashboard-delete-','Button(role:.destructive)',
   'selectedDeleteID=draft.id',
-  'id:id,expectedRevision:expectedRevision)',
+  'id:id,expectedRevision:deletionRevision)',
+  'let deletionRevision=try await vault.currentRevision()',
+  'deletionRevision>=expectedRevision',
   'N2DraftReminder.cancel(id:id,mode:vault.mode)',
   'confirmationDialog("¿Eliminar este borrador?"'
 ]) assert(draftDashboard.includes(marker),
@@ -207,7 +210,7 @@ for(const filePath of [
 // but Home must call the newer direct counters instead of rebuilding a full
 // roster/visit projection. Scope the guard to Home's refresh function.
 const homeRefreshStart=clinicalHome.indexOf('private func refreshHomeCounts() async {');
-const homeRefreshEnd=clinicalHome.indexOf('    private func homeMetric(',homeRefreshStart);
+const homeRefreshEnd=clinicalHome.indexOf('    private func homeTile',homeRefreshStart);
 assert(homeRefreshStart>=0 && homeRefreshEnd>homeRefreshStart,
   'No se pudo delimitar la actualización de contadores de Inicio');
 const homeRefresh=clinicalHome.slice(homeRefreshStart,homeRefreshEnd);
@@ -294,9 +297,11 @@ assert(!app.includes('NativeRootView()'),'No puede abrirse el modo ficticio en i
 must(clinicalHome,'clinical-first-run-import-personal','importar PERSONAL como acción principal');
 must(clinicalHome,'clinical-first-run-restore-222','restauración opcional Build222');
 must(clinicalHome,'clinical-first-run-manual-worker','inicio manual sin Excel');
-for(const phrase of ['DanperBrandHeader {','Bienvenido',
-  'ACCESO RÁPIDO','Nueva atención','homeMetric('])
-  must(clinicalHome,phrase,'cabecera y estructura de Inicio Build222');
+for(const phrase of ['DanperBrandHeader {','DanperHomeWelcome()',
+  'DanperNewAttentionCard','DanperHomeMetricRow'])
+  must(clinicalHome,phrase,'composición reutilizable de Inicio');
+for(const phrase of ['Bienvenido','ACCESO RÁPIDO','Nueva atención','Este mes'])
+  must(premium,phrase,'Inicio aprobado y contadores de atenciones');
 for(const phrase of ['UIImage(named:"BrandLogo")',
   'Image(uiImage:Self.wordmark ?? UIImage())','danper-brand-header',
   'ignoresSafeArea(edges:.top)','Text("SALUD MÓVIL")'])
@@ -423,13 +428,13 @@ assert(!firstWorker.includes('#if targetEnvironment(simulator)'),
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
 
-for(const label of ['DEPARTAMENTO DE SALUD','Text("Bienvenido")',
-  'clinical-home-new-attention','clinical-home-tool-','N2HealthMascot()'])
-  must(clinicalHome,label,'portada nativa 222');
+for(const label of ['DEPARTAMENTO DE SALUD','Text("Bienvenido")','clinical-home-new-attention'])
+  must(premium,label,'portada premium');
+must(clinicalHome,'clinical-home-tool-','herramientas conservadas');
 for(const label of ['@AppStorage("danper.haptics.enabled")',
-  '.sensoryFeedback(.selection,trigger:tab)',
-  '.animation(reduceMotion ? nil : DanperStyle.animation,value:tab)'])
-  must(clinicalHome,label,'hápticos y navegación de la portada');
+  '.sensoryFeedback(.selection,trigger:selection)',
+  'withAnimation(reduceMotion ? nil'])
+  must(premium,label,'hápticos y movimiento accesible de la cápsula');
 for(const label of ['private var medicationGroupNames',
   'collapsedMedicationGroups','medication-procedure-group-',
   'ForEach(medicationGroupNames,id:\\.self)'])
@@ -448,9 +453,15 @@ must(kardex,'vault.clinicalFormContext()','lectura de lotes sin estimaciones');
 
 for(const term of ['Buscar en padrón','Nuevo trabajador','REGISTRO AMBULATORIO','registerSteps'])
   must(source,term,'referencia Build 222');
-for(const name of ['Inicio','Registrar','Historial','Ajustes'])
+for(const name of ['Inicio','Historial','Borradores','Ajustes'])
   must(home,`Label("${name}"`,'pestaña nativa');
-must(home,'Button {tab=1} label: {','acceso a nueva atención');
+must(home,'DanperNewAttentionCard(action:{showNewAttention=true}', 'acceso a nueva atención');
+for(const shell of [home,clinicalHome]) {
+  must(shell,'DanperFloatingTabs(selection:$tab)','cápsula compartida');
+  must(shell,'.toolbar(.hidden,for:.tabBar)','sin segunda barra nativa');
+  must(shell,'N2NativeClinicalFormView(initialWorkerDNI:','registro clínico conservado');
+}
+
 for(const term of ['attention-browse-workers','attention-add-worker','attention-worker-dni',
  'attention-worker-name-query','attention-worker-suggestions','attention-edit-worker-profile',
  'Alergias del trabajador','editingDNI:editingWorkerDNI',
@@ -485,7 +496,7 @@ for(const code of codes) {
 }
 assert.equal(codes.length,12,'Catálogo inesperadamente distinto: revisar manualmente');
 must(home,'danper-visual-palette','selector de paleta de salud');
-must(home,'N2HealthMascot()','mascota SwiftUI');
+must(home,'DanperHomeWelcome(isDemo:true)','identificación inequívoca de DEMO');
 must(palette,'danper.visual.palette','tema nativo');
 for (const value of [
   'inventory-select-product','inventory-single-quantity','inventory-save-',
@@ -921,7 +932,8 @@ for(const needle of [
   'history-request-edit-'
 ]) must(history,needle,'Historial de atenciones paginado con acceso directo y confirmación');
 for(const needle of [
-  'clinical-home-draft-count-link',
+  'N2NativeDraftsDashboard()',
+  'Label("Borradores",systemImage:"doc.text.fill")',
   'N2NativeHistoryView(useProtectedVault:true,showWorkers:true)'
 ]) must(clinicalHome,needle,'Borradores pulsables y directorio separado');
 for(const needle of [

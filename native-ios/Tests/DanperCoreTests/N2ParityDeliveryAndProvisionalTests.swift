@@ -60,7 +60,12 @@ final class N2ParityDeliveryAndProvisionalTests:XCTestCase {
         let notes=String(decoding:try XCTUnwrap(parts.first{$0.name=="xl/worksheets/sheet6.xml"}).data,as:UTF8.self)
         XCTAssertTrue(notes.contains("BORRADOR PROVISIONAL"))
         XCTAssertTrue(notes.contains("pending-stock"))
-        XCTAssertTrue(notes.contains("sin salida física"))
+        // This fixture is an individual tablet, not a box or bottle. The
+        // explicit provisional export retains declared R=1000 and identifies
+        // the unconfirmed delivery; it never becomes an official deduction.
+        XCTAssertTrue(notes.contains("R clínico declarado=1000 sin entrega física confirmada"))
+        XCTAssertTrue(notes.contains("NO equivale a salida física"))
+        XCTAssertNotNil(consumos.range(of:#"<c\b[^>]*\br="R2"[^>]*><v>1000</v></c>"#,options:.regularExpression))
         // Export is pure and cannot change a single physical movement.
         XCTAssertEqual(snapshot,try fixture("n1e-clinical-stock.json"))
     }
