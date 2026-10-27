@@ -224,6 +224,11 @@ struct DanperAccessView:View {
                     .frame(maxWidth:520).frame(maxWidth:.infinity)
                 }.frame(minHeight:geo.size.height,alignment:.top)
             }.background(background.ignoresSafeArea())
+                .overlay(alignment:.top) {
+                    DanperStyle.red.frame(height:geo.safeAreaInsets.top)
+                        .offset(y:-geo.safeAreaInsets.top)
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                }
                 .scrollIndicators(.hidden)
         }
     }
