@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - fix/b10-trabajadores-exportacion-ux-20261018
+      - design/glass-clinical-access-home-20261027
     paths:
       - 'native-ios/**'
       - 'scripts/**'
@@ -41,6 +42,8 @@ jobs:
           node scripts/audit-n2-personal-import.cjs
           node scripts/audit-n2-build222-backup-restore.cjs
           node scripts/audit-n2-joint-indicator.cjs
+          node scripts/test-n2-workspace-routing.cjs
+          node scripts/test-n2-build222-ui-parity.cjs
       - name: Generate synthetic fixture source only (never personal data)
         run: |
           mkdir -p "$RUNNER_TEMP/danper-b11-fixtures"
@@ -103,6 +106,7 @@ jobs:
       - name: Generate Xcode project
         working-directory: native-ios
         run: |
+          bash scripts/make-app-icon.sh
           xcodegen generate --spec project.yml
           xcodebuild -resolvePackageDependencies -project DANPERNative.xcodeproj -scheme DANPERNative
       - name: Build actual SwiftUI native iPhone app for simulator (unsigned)
@@ -121,18 +125,25 @@ jobs:
         working-directory: native-ios
         timeout-minutes: 20
         run: |
-          SIM="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([0-9A-F-]{36})\).*/\1/p' | head -n 1)"
+          SIM="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["name"] == "iPhone 16" and d["isAvailable"]]; print(devices[0]["udid"] if devices else "")')"
           test -n "$SIM" || { echo "No suitable iPhone simulator: NOT PASS"; exit 1; }
           xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
             -configuration Debug -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIM" \
             -destination-timeout 180 -parallel-testing-enabled NO \
             -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
+            -resultBundlePath "$RUNNER_TEMP/b11-layout.xcresult" \
             CODE_SIGNING_ALLOWED=NO test > "$RUNNER_TEMP/b11-ios-tests.log" 2>&1 || {
               grep -nE '(error:|failed|FAIL|Testing failed)' "$RUNNER_TEMP/b11-ios-tests.log" | tail -n 120 || true
               exit 1
             }
           grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/b11-ios-tests.log"
+      - name: Export real iPhone 16 layout evidence
+        if: always()
+        run: |
+          if test -d "$RUNNER_TEMP/b11-layout.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/b11-layout.xcresult" --output-path "$RUNNER_TEMP/b11-layout-png"
+          fi
       - name: Reassert zero release artifacts and existing build222 isolation
         run: |
           grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview' native-ios/project.yml
@@ -146,5 +157,7 @@ jobs:
           path: |
             ${{ runner.temp }}/b11-ios-compile.log
             ${{ runner.temp }}/b11-ios-tests.log
+            ${{ runner.temp }}/b11-layout.xcresult
+            ${{ runner.temp }}/b11-layout-png
           retention-days: 7
           if-no-files-found: warn

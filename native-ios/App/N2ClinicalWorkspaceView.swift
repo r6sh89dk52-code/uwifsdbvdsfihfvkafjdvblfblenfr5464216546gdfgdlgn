@@ -215,6 +215,7 @@ struct N2ClinicalWorkspaceRootView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     @State private var homeCounts:(today:Int,week:Int,drafts:Int)?
 
+    @Environment(\.dynamicTypeSize) private var homeTypeSize
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab=0
     @State private var registeredDNI:String?
@@ -230,39 +231,45 @@ struct N2ClinicalWorkspaceRootView:View {
             TabView(selection:$tab) {
             NavigationStack {
                 ScrollView {
-                    VStack(alignment:.leading,spacing:18) {
-                        VStack(alignment:.leading,spacing:8) {
-                            Text("DEPARTAMENTO DE SALUD")
-                                .font(.caption2.weight(.bold)).tracking(1.4)
-                                .foregroundStyle(DanperStyle.red)
-                            HStack(alignment:.center,spacing:12) {
-                                VStack(alignment:.leading,spacing:6) {
-                                    Text("Bienvenido")
-                                        .font(.system(.largeTitle,design:.rounded,weight:.bold))
-                                        .foregroundStyle(.primary)
-                                    Text("Departamento de Salud · Registro ambulatorio local")
-                                        .font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment:.leading,spacing:14) {
+                        HStack(spacing:12) {
+                            Image(systemName:"person.crop.circle.fill")
+                                .font(.system(size:44)).foregroundStyle(.secondary)
+                                .frame(width:50,height:50)
+                                .background(GlassClinical.red.opacity(0.08),in:Circle())
+                                .accessibilityHidden(true)
+                            VStack(alignment:.leading,spacing:3) {
+                                Text("Bienvenido").font(.title2.weight(.bold))
+                                Text("Departamento de Salud").font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                        VStack(alignment:.leading,spacing:12) {
+                            HStack(spacing:12) {
+                                VStack(alignment:.leading,spacing:5) {
+                                    Text("DEPARTAMENTO DE SALUD")
+                                        .font(.caption2.weight(.bold)).tracking(0.8)
+                                        .foregroundStyle(GlassClinical.red)
+                                    Text("Panel de inicio").font(.title2.weight(.bold))
+                                    Text("Registro ambulatorio local")
+                                        .font(.subheadline).foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength:0)
                                 Image(systemName:"waveform.path.ecg")
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundStyle(DanperStyle.red)
-                                    .frame(width:50,height:50)
-                                    .background(DanperStyle.red.opacity(0.09),
-                                                in:RoundedRectangle(cornerRadius:16))
+                                    .font(.title.weight(.medium))
+                                    .foregroundStyle(GlassClinical.red)
+                                    .frame(width:54,height:58)
+                                    .background(GlassClinical.red.opacity(0.10),in:RoundedRectangle(cornerRadius:17))
+                                    .accessibilityHidden(true)
                             }
+                            HStack(spacing:10) {
+                                Image(systemName:"lock.shield").foregroundStyle(GlassClinical.red)
+                                Text("Fuente clínica protegida").font(.footnote.weight(.semibold))
+                            }
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                            .padding(11)
+                            .background(GlassClinical.red.opacity(0.06),in:RoundedRectangle(cornerRadius:13))
                         }
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                        HStack(spacing:10) {
-                            Image(systemName:"lock.shield")
-                                .foregroundStyle(DanperStyle.red)
-                            Text("Fuente clínica protegida")
-                                .font(.footnote.weight(.semibold))
-                        }
-                        .frame(maxWidth:.infinity,alignment:.leading)
-                        .padding(14)
-                        .background(DanperStyle.red.opacity(0.06),
-                                    in:RoundedRectangle(cornerRadius:16))
+                        .padding(14).modifier(GlassClinicalSurface())
                         if visualPalette=="salud" {
                             HStack(spacing:8) {
                                 VStack(alignment:.leading,spacing:6) {
@@ -305,10 +312,13 @@ struct N2ClinicalWorkspaceRootView:View {
                                 Image(systemName:"plus")
                                     .font(.system(size:32,weight:.light))
                                     .foregroundStyle(.white)
+                                    .frame(width:54,height:54)
+                                    .background(.white.opacity(0.13),in:Circle())
+                                    .accessibilityHidden(true)
                             }
-                            .padding(21)
-                            .frame(maxWidth:.infinity,minHeight:126,alignment:.leading)
-                            .background(DanperStyle.gradient,
+                            .padding(18)
+                            .frame(maxWidth:.infinity,minHeight:108,alignment:.leading)
+                            .background(GlassClinical.gradient,
                                         in:RoundedRectangle(cornerRadius:22))
                         }
                         .buttonStyle(.plain)
@@ -328,8 +338,9 @@ struct N2ClinicalWorkspaceRootView:View {
                         Text("Herramientas")
                             .font(.title3.weight(.bold))
                             .frame(maxWidth:.infinity,alignment:.leading)
-                        LazyVGrid(columns:[GridItem(.flexible(),spacing:12),
-                                           GridItem(.flexible(),spacing:12)],
+                        LazyVGrid(columns:homeTypeSize.isAccessibilitySize
+                                  ? [GridItem(.flexible())]
+                                  : [GridItem(.flexible(),spacing:12),GridItem(.flexible(),spacing:12)],
                                   spacing:12) {
                             homeTile("Trabajadores","Registrar o buscar personal",
                                      symbol:"person.badge.plus") {
@@ -366,6 +377,7 @@ struct N2ClinicalWorkspaceRootView:View {
                     }
                     .padding(16)
                 }
+                .background(GlassClinical.canvas)
                 .navigationTitle("Inicio")
                 .toolbar(.hidden,for:.navigationBar)
             }
@@ -478,14 +490,18 @@ struct N2ClinicalWorkspaceRootView:View {
         }
     }
     private func homeMetric(_ count:String,_ label:String)->some View {
-        VStack(spacing:5) {
-            Text(count).font(.title2.weight(.bold)).monospacedDigit()
+        VStack(alignment:.leading,spacing:5) {
+            Image(systemName:label == "Hoy" ? "calendar" : label == "Esta semana" ? "chart.bar.fill" : "doc.text")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(label == "Hoy" ? GlassClinical.red : Color.secondary)
+                .accessibilityHidden(true)
+            Text(count).font(.title2.weight(.bold)).monospacedDigit().foregroundStyle(.primary)
             Text(label).font(.caption2).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+                .fixedSize(horizontal:false,vertical:true)
         }
-        .frame(maxWidth:.infinity,minHeight:70)
-        .background(DanperStyle.surface,
-                    in:RoundedRectangle(cornerRadius:15))
+        .padding(12).frame(maxWidth:.infinity,minHeight:92,alignment:.leading)
+        .modifier(GlassClinicalSurface(radius:17))
+        .accessibilityElement(children:.combine)
     }
     private func homeTile<Destination:View>(
         _ title:String,_ subtitle:String,symbol:String,
@@ -493,24 +509,23 @@ struct N2ClinicalWorkspaceRootView:View {
         NavigationLink {
             destination()
         } label: {
-            VStack(alignment:.leading,spacing:9) {
+            HStack(alignment:.top,spacing:9) {
                 Image(systemName:symbol)
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(DanperStyle.red)
-                    .frame(width:43,height:43)
-                    .background(DanperStyle.red.opacity(0.09),
-                                in:RoundedRectangle(cornerRadius:13))
-                Text(title).font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                Text(subtitle).font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal:false,vertical:true)
-                Spacer(minLength:0)
+                    .foregroundStyle(GlassClinical.red)
+                    .frame(width:34,height:40)
+                    .background(GlassClinical.red.opacity(0.09),in:RoundedRectangle(cornerRadius:11))
+                    .accessibilityHidden(true)
+                VStack(alignment:.leading,spacing:5) {
+                    Text(title).font(.subheadline.weight(.bold)).foregroundStyle(.primary)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal:false,vertical:true)
+                .frame(maxWidth:.infinity,alignment:.leading)
             }
-            .frame(maxWidth:.infinity,minHeight:119,alignment:.topLeading)
-            .padding(13)
-            .background(DanperStyle.surface,
-                        in:RoundedRectangle(cornerRadius:17))
+            .frame(maxWidth:.infinity,minHeight:65,alignment:.leading)
+            .padding(12)
+            .modifier(GlassClinicalSurface(radius:17))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("clinical-home-tool-"+title.lowercased())
