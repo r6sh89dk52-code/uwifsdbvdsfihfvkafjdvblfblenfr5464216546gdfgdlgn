@@ -47,6 +47,7 @@ struct DanperFloatingTabs:View {
                                 Image(systemName:symbols[index]).font(.system(size:21,weight:.semibold))
                                     .symbolVariant(selection==index ? .fill : .none)
                                 Text(titles[index]).font(.caption2.weight(selection==index ? .semibold : .medium))
+                                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                                     .lineLimit(1).minimumScaleFactor(0.65)
                             }
                             .foregroundStyle(selection==index ? DanperStyle.red : Color.secondary)
@@ -57,6 +58,7 @@ struct DanperFloatingTabs:View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(titles[index])
+                        .accessibilityShowsLargeContentViewer()
                         .accessibilityAddTraits(selection==index ? .isSelected : [])
                         .accessibilityIdentifier("premium-tab-"+identifiers[index])
                     }
@@ -81,6 +83,7 @@ struct DanperFloatingTabs:View {
 
 struct DanperHomeWelcome:View {
     var isDemo=false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {
         VStack(alignment:.leading,spacing:12) {
             HStack(alignment:.top,spacing:14) {
@@ -93,13 +96,18 @@ struct DanperHomeWelcome:View {
                         .fixedSize(horizontal:false,vertical:true)
                 }
                 Spacer(minLength:0)
-                Image(systemName:"waveform.path.ecg").font(.system(size:27,weight:.semibold))
-                    .foregroundStyle(DanperStyle.red).frame(width:54,height:58)
-                    .background(DanperStyle.red.opacity(0.10),in:RoundedRectangle(cornerRadius:17))
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Image(systemName:"waveform.path.ecg").font(.system(size:27,weight:.semibold))
+                        .foregroundStyle(DanperStyle.red).frame(width:54,height:58)
+                        .background(DanperStyle.red.opacity(0.10),in:RoundedRectangle(cornerRadius:17))
+                        .accessibilityHidden(true)
+                }
             }
             HStack(spacing:11) {
-                Image(systemName:isDemo ? "testtube.2" : "lock.shield.fill")
-                    .font(.title2).foregroundStyle(DanperStyle.red)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Image(systemName:isDemo ? "testtube.2" : "lock.shield.fill")
+                        .font(.title2).foregroundStyle(DanperStyle.red).accessibilityHidden(true)
+                }
                 VStack(alignment:.leading,spacing:3) {
                     Text(isDemo ? "DEMO · Solo datos ficticios" : "Fuente clínica protegida")
                         .font(.subheadline.weight(.semibold))
@@ -150,8 +158,11 @@ struct DanperNewAttentionCard:View {
 
 struct DanperHomeMetricRow:View {
     let counts:DanperHomeCounts?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {
-        HStack(spacing:9) {
+        let layout=dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing:9)):AnyLayout(HStackLayout(spacing:9))
+        layout {
             metric("Hoy",counts?.today,"calendar",id:"today")
             metric("Esta semana",counts?.week,"chart.bar.fill",id:"week")
             metric("Este mes",counts?.month,"person.3.fill",id:"month")

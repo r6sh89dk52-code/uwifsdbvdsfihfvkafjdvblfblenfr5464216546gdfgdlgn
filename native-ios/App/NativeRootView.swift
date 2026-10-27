@@ -27,6 +27,7 @@ struct NativeRootView:View {
     @State private var metrics:N2DashboardMetrics?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("danper.appearance") private var appearance="system"
     @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @AppStorage("danper.haptics.enabled") private var haptics=true
@@ -176,7 +177,7 @@ struct NativeRootView:View {
                     Button("Ver todas",systemImage:"chevron.right") {tab=3}
                         .font(.caption.weight(.semibold))
                 }
-                LazyVGrid(columns:[GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
+                LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
                     shortcut("Trabajadores","Registrar o buscar personal","person.badge.plus") {
                         N2NativeHistoryView(useProtectedVault:true,showWorkers:true)
                     }

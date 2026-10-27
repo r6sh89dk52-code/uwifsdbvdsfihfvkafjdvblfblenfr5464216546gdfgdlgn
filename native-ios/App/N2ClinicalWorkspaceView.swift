@@ -221,6 +221,7 @@ struct N2ClinicalWorkspaceRootView:View {
     @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @AppStorage("danper.appearance") private var appearance="system"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {
         VStack(spacing:0) {
             DanperBrandHeader {tab=3}
@@ -296,7 +297,7 @@ struct N2ClinicalWorkspaceRootView:View {
                     Button("Ver todas",systemImage:"chevron.right") {tab=3}
                         .font(.caption.weight(.semibold))
                 }.padding(.top,3)
-                LazyVGrid(columns:[GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
+                LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
                     homeTile("Trabajadores","Registrar o buscar personal",symbol:"person.badge.plus") {
                         N2NativeHistoryView(useProtectedVault:true,showWorkers:true)
                     }
