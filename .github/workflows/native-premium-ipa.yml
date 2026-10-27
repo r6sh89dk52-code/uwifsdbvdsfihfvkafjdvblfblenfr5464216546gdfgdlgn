@@ -24,10 +24,11 @@ jobs:
   native-ipa:
     runs-on: macos-15
     timeout-minutes: 55
-    env:
-      BUILD_DIR: ${{ runner.temp }}/danper-native-ipa
-      DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/danper-native-fixtures
     steps:
+      - name: Initialize isolated runner directories
+        run: |
+          echo "BUILD_DIR=$RUNNER_TEMP/danper-native-ipa" >> "$GITHUB_ENV"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-native-fixtures" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
