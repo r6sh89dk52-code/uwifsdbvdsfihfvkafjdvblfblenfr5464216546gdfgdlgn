@@ -55,7 +55,16 @@ final class N2PremiumRedesignTests:XCTestCase {
         let hiddenDraft=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["Siguiente"])
         XCTAssertEqual(XCTWaiter.wait(for:[hiddenDraft],timeout:5),.completed)
         XCTAssertFalse(app.buttons["Anterior"].exists)
-        diagnosis.typeText(" CORREGIDO")
+        let original=diagnosis.value as? String ?? ""
+        XCTAssertEqual(original,"BORRADOR FICTICIO REDISENO")
+        diagnosis.press(forDuration:1.2)
+        let selectAllPredicate=NSPredicate(format:"label IN %@",["Select All","Seleccionar todo"])
+        let menu=app.menuItems.matching(selectAllPredicate).firstMatch
+        let button=app.buttons.matching(selectAllPredicate).firstMatch
+        if menu.waitForExistence(timeout:2) {menu.tap()}
+        else {XCTAssertTrue(button.waitForExistence(timeout:3),app.debugDescription);button.tap()}
+        diagnosis.typeText(original+" CORREGIDO")
+        XCTAssertEqual(diagnosis.value as? String,original+" CORREGIDO")
         XCTAssertTrue((diagnosis.value as? String)?.hasSuffix(" CORREGIDO") == true)
         capture(app,"Borrador-teclado-sin-barras")
         app.buttons["danper-dismiss-keyboard"].tap()
@@ -66,6 +75,7 @@ final class N2PremiumRedesignTests:XCTestCase {
         XCTAssertTrue(next.isHittable)
         XCTAssertLessThanOrEqual(next.frame.maxY,app.frame.maxY)
         XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for:.runningBackground,timeout:10),"La prueba debe atravesar segundo plano real antes de regresar")
         app.activate()
         let dismissed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["premium-close-attention"])
         XCTAssertEqual(XCTWaiter.wait(for:[dismissed],timeout:5),.completed,"El editor compartido se cierra al pasar a segundo plano")

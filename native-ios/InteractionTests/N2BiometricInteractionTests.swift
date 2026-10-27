@@ -44,6 +44,7 @@ final class N2BiometricInteractionTests:XCTestCase {
         XCTAssertTrue(source.waitForExistence(timeout:5) || app.buttons["premium-tab-home"].waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Autenticacion-simulada-aceptada-seleccion-fuente")
         XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for:.runningBackground,timeout:10))
         app.activate()
         XCTAssertTrue(checking.waitForExistence(timeout:10),app.debugDescription)
         Thread.sleep(forTimeInterval:2)
