@@ -252,13 +252,13 @@ actor N2ProtectedClinicalIOSVault {
     }
     func saveAttention(_ attention:Data,at:Int64,expectedRevision:Int)
         throws->N2ProtectedStoreSummary {
-        try protectedStore().saveAttention(attention,
+        try protectedStore().saveAttentionWithoutLegacyInventory(attention,
             approvedCatalog:resource("n2-approved-mappings"),
             at:at,expectedRevision:expectedRevision)
     }
     func previewAttention(_ attention:Data,visitID:String,at:Int64,
                           expectedRevision:Int)throws->[String:String] {
-        let result=try protectedStore().previewAttention(attention,
+        let result=try protectedStore().previewAttentionWithoutLegacyInventory(attention,
             approvedCatalog:resource("n2-approved-mappings"),
             at:at,expectedRevision:expectedRevision)
         let root=try JSONSerialization.jsonObject(with:result.snapshot) as? [String:Any]
@@ -365,6 +365,57 @@ actor N2ProtectedClinicalIOSVault {
         let source=try N2ProtectedClinicalVaultCore(keyData:secret)
             .sourceForEncryptedBackup()
         return try N2NativePortableBackupMaker.createVerified(
-            snapshot:source,password:password)
+            snapshot:source,password:password,domain:.clinical)
+    }
+}
+
+extension N2ProtectedClinicalIOSVault {
+    private func simpleCatalog()throws->N2NativeCatalogIndex {
+        try N2NativeCatalogLoader.load(products:resource("n2-ambulatory-products"),
+            nursing:resource("n2-nursing-catalog"),approvedMappings:resource("n2-approved-mappings"))
+    }
+    func simpleInventoryContext()throws->N2SimpleInventoryContext {
+        try protectedStore().simpleInventoryContext(products:resource("n2-ambulatory-products"),
+            nursing:resource("n2-nursing-catalog"),mappings:resource("n2-approved-mappings"))
+    }
+    func inspectSimpleBackup(_ archive:Data,password:String)throws->N2SimpleBackupReview {
+        let proof=try N2InventoryBackupCodec.verify(archive:archive,password:password)
+        guard proof.domain != .demo else{throw Failure.blockedMigration}
+        return N2SimpleBackupReview(proof)
+    }
+    func activateSimpleInventory(archive:Data,password:String,request:N2SimpleActivation,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let proof=try N2InventoryBackupCodec.verify(archive:archive,password:password)
+        try Task.checkCancellation()
+        return try protectedStore().activateSimpleInventory(backup:proof,request:request,
+            catalog:simpleCatalog(),expectedRevision:expectedRevision)
+    }
+    func applySimpleInventoryCommand(_ command:N2SimpleInventoryCommand,
+        expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try protectedStore().applySimpleInventoryCommand(command,catalog:simpleCatalog(),expectedRevision:expectedRevision)
+    }
+    func restoreSimpleClinical(archive:Data,password:String,eventID:String,operatorName:String,
+        at:Int64,confirmed:Bool,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let proof=try N2InventoryBackupCodec.verify(archive:archive,password:password)
+        try Task.checkCancellation()
+        return try protectedStore().restoreSimpleClinical(backup:proof,eventID:eventID,
+            operatorName:operatorName,at:at,confirmed:confirmed,expectedRevision:expectedRevision)
+    }
+    func recoverPortableSource(archive:Data,password:String,confirmed:Bool)throws->N2ProtectedStoreSummary {
+        guard confirmed else{throw Failure.blockedMigration}
+        let proof=try N2InventoryBackupCodec.verify(archive:archive,password:password)
+        guard proof.domain != .demo else{throw Failure.blockedMigration}
+        try Task.checkCancellation()
+        guard let secret=try deviceKey(create:true) else{throw Failure.unavailableKeychain}
+        return try N2ProtectedClinicalVaultCore(keyData:secret).recoverPortableSource(backup:proof,confirmed:confirmed)
+    }
+}
+
+extension N2ProtectedClinicalIOSVault {
+    func simpleInventoryCut(code:String,through:String,archive:Data?,password:String?)throws->N2SimpleCutPreview {
+        let proof: N2VerifiedInventoryBackup?
+        if let archive,let password {proof=try N2InventoryBackupCodec.verify(archive:archive,password:password)}
+        else {proof=nil}
+        return try protectedStore().simpleInventoryCut(code:code,through:through,catalog:simpleCatalog(),backup:proof)
     }
 }

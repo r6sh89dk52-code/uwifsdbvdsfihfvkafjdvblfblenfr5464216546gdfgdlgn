@@ -7,7 +7,9 @@ import CommonCrypto
 
 /// Proof can only be obtained by authenticating/decrypting an actual archive.
 /// No password/key is retained and no clinical content is returned to UI summaries.
+public enum N2InventoryBackupDomain:String,Codable,Sendable {case clinical,demo,unspecified}
 public struct N2VerifiedInventoryBackup:Sendable {
+    public let domain:N2InventoryBackupDomain
     public let archiveSHA256:String
     public let sourceSHA256:String
     public let schemaVersion:Int
@@ -82,14 +84,22 @@ public enum N2InventoryBackupCodec {
             report=try N2VersionedSnapshotAudit.inspect(raw,allowEmptySynthetic:true)
             _=try N1fLosslessFieldGate.inspect(raw)
         }catch{throw Failure.payload}
-        return N2VerifiedInventoryBackup(archiveSHA256:N2SimpleInventory.digest(archive),
+        let domain:N2InventoryBackupDomain
+        if let raw=root["sourceDomain"] {
+            guard let name=raw as? String,let value=N2InventoryBackupDomain(rawValue:name) else {throw Failure.payload}
+            domain=value
+        } else {
+            guard e.version==1 else {throw Failure.payload}
+            domain = .unspecified
+        }
+        return N2VerifiedInventoryBackup(domain:domain,archiveSHA256:N2SimpleInventory.digest(archive),
             sourceSHA256:try N2SimpleInventory.fingerprint(raw),schemaVersion:e.version,report:report,snapshot:raw)
     }
-    public static func createVerified(snapshot:Data,password:String)throws->Data {
+    public static func createVerified(snapshot:Data,password:String,domain:N2InventoryBackupDomain = .unspecified)throws->Data {
         _=try N2VersionedSnapshotAudit.inspect(snapshot,allowEmptySynthetic:true)
         _=try N1fLosslessFieldGate.inspect(snapshot)
         let version=N2SimpleInventory.isActive(snapshot) ? 2:1
-        let plain=try N2SimpleInventory.bytes(["schema":version,
+        let plain=try N2SimpleInventory.bytes(["schema":version,"sourceDomain":domain.rawValue,
             "exportedAt":ISO8601DateFormatter().string(from:Date()),"snapshot":try N2SimpleInventory.object(snapshot)])
         guard plain.count<=30*1024*1024 else{throw Failure.oversize}
         let salt=SymmetricKey(size:.bits128).withUnsafeBytes{Data($0)}

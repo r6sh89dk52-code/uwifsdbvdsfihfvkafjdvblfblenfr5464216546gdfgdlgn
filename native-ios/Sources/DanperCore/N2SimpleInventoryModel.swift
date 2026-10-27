@@ -340,10 +340,37 @@ public enum N2SimpleInventory {
             throw N2SimpleInventoryError.invalidClinicalLink
         }
         let historical=Dictionary(uniqueKeysWithValues:s.historicalUses.map{(key($0.visitID,$0.itemID),$0.verifiedR)})
-        let quantities:[Double?]=ordered.map{uses[$0] ?? historical[$0] ?? nil}
+        var covered=[String:Double]()
+        for incident in s.incidents where incident.resolutionEventID != nil {
+            covered[key(incident.visitID,incident.itemID)] = products[incident.code]?.mode == .presentation ? incident.resolvedR.map(Double.init) : incident.clinicalQuantity
+        }
+        let quantities:[Double?]=ordered.map{uses[$0] ?? covered[$0] ?? historical[$0] ?? nil}
         return N1eClinicalParityReport(sourceSHA256:digest(snapshot),workers:workers.count,attentions:visits.count,
             savedClinicalItems:ordered.count,linkedClinicalItems:quantities.compactMap{$0}.count,
             pendingClinicalItems:s.incidents.filter{$0.resolutionEventID==nil}.count,splitDeliveries:0,
             physicalMovements:s.movements.count,stockLots:0,consumptionR:quantities)
+    }
+}
+
+public struct N2SimpleInventoryContext:Sendable {
+    public let revision:Int
+    public let state:N2SimpleInventoryState?
+    public let catalog:N2NativeCatalogIndex
+    public let clinicalVisits:Int
+    public init(revision:Int,state:N2SimpleInventoryState?,catalog:N2NativeCatalogIndex,clinicalVisits:Int) {
+        self.revision=revision;self.state=state;self.catalog=catalog;self.clinicalVisits=clinicalVisits
+    }
+}
+
+public struct N2SimpleBackupReview:Sendable {
+    public let schemaVersion:Int
+    public let sourceSHA256:String
+    public let archiveSHA256:String
+    public let workers:Int
+    public let attentions:Int
+    public let domain:N2InventoryBackupDomain
+    public init(_ proof:N2VerifiedInventoryBackup) {
+        schemaVersion=proof.schemaVersion;sourceSHA256=proof.sourceSHA256;archiveSHA256=proof.archiveSHA256
+        workers=proof.report.workers;attentions=proof.report.attentions;domain=proof.domain
     }
 }

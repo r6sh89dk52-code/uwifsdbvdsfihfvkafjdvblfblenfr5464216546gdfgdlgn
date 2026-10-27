@@ -51,7 +51,7 @@ extension N2SimpleInventory {
         let report=try N2VersionedSnapshotAudit.inspect(snapshot,allowEmptySynthetic:true)
         guard try fingerprint(snapshot)==backup.sourceSHA256,backup.schemaVersion==1,
               UUID(uuidString:request.id) != nil,validTime(request.at),text(request.operatorName),
-              request.initialProducts.count<=1000,
+              !request.initialProducts.isEmpty,request.initialProducts.count<=1000,
               Set(request.initialProducts.map(\.code)).count==request.initialProducts.count else {
             throw N2SimpleInventoryError.sourceChanged
         }

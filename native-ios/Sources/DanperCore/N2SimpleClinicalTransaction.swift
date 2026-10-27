@@ -94,3 +94,50 @@ extension N2SimpleInventory {
             pendingReasons:reasons,physicalMovementsAdded:linked)
     }
 }
+
+/// Until the user authorizes the new regime, clinical recording remains usable
+/// but this app never executes another operation in the retired FEFO inventory.
+public enum N2PreSimpleClinicalTransaction {
+    public static func save(snapshot:Data,visit:Data,at:Int64)throws->N2ClinicalResult {
+        guard !N2SimpleInventory.isActive(snapshot) else{throw N2SimpleInventoryError.legacyOperation}
+        _=try N2VersionedSnapshotAudit.inspect(snapshot,allowEmptySynthetic:true)
+        _=try N1fLosslessFieldGate.inspect(snapshot)
+        var root=try N2SimpleInventory.object(snapshot)
+        let request=try N2SimpleInventory.object(visit)
+        guard N2SimpleInventory.validTime(at),var visits=root["attentions"] as? [[String:Any]],
+              let workers=root["workers"] as? [[String:Any]],let id=request["id"] as? String,
+              N2SimpleInventory.text(id),request["status"] as? String=="saved",
+              let worker=request["worker"] as? [String:Any],let dni=worker["dni"] as? String,
+              workers.contains(where:{$0["dni"] as? String==dni && $0["name"] as? String==worker["name"] as? String}),
+              let date=request["date"] as? String,N2SimpleInventory.validDay(date),
+              let time=request["time"] as? String,time.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression) != nil,
+              ["diagnosis","category","system","responsible"].allSatisfy({(request[$0] as? String).map(N2SimpleInventory.text) ?? false}),
+              let items=request["items"] as? [[String:Any]] else{throw N2ClinicalError.invalidVisit}
+        if let previous=visits.first(where:{$0["id"] as? String==id}),previous["status"] as? String=="saved" {
+            guard request.allSatisfy({key,value in
+                guard let old=previous[key],let a=try? JSONSerialization.data(withJSONObject:old,options:[.sortedKeys,.fragmentsAllowed]),
+                      let b=try? JSONSerialization.data(withJSONObject:value,options:[.sortedKeys,.fragmentsAllowed]) else{return false}
+                return a==b
+            }) else{throw N2ClinicalError.duplicateVisit}
+            return N2ClinicalResult(snapshot:snapshot,linked:0,pending:0,alreadyLinked:items.count,pendingReasons:[],physicalMovementsAdded:0)
+        }
+        var saved=request
+        if let draft=visits.first(where:{$0["id"] as? String==id}) {
+            guard draft["status"] as? String=="draft",draft["originId"]==nil else{throw N2ClinicalError.duplicateVisit}
+            saved=draft.merging(request,uniquingKeysWith:{_,new in new})
+        }
+        var outcomes=[String:String]()
+        for item in items {
+            guard let iid=item["id"] as? String else{throw N2ClinicalError.invalidVisit}
+            outcomes[iid]="Inventario nuevo pendiente de activar; sin movimiento físico"
+        }
+        saved["nativeDispensing"]=outcomes;saved["recordedBeforeSimpleInventory"]=true
+        if let i=visits.firstIndex(where:{$0["id"] as? String==id}) {visits[i]=saved}else{visits.append(saved)}
+        root["attentions"]=visits
+        let next=try N2SimpleInventory.bytes(root)
+        _=try N2VersionedSnapshotAudit.inspect(next,allowEmptySynthetic:true)
+        _=try N1fLosslessFieldGate.inspect(next)
+        return N2ClinicalResult(snapshot:next,linked:0,pending:items.count,alreadyLinked:0,
+            pendingReasons:items.map{_ in "Inventario nuevo pendiente de activar; sin movimiento físico"},physicalMovementsAdded:0)
+    }
+}

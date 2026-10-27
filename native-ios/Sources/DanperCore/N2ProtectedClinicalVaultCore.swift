@@ -153,6 +153,26 @@ public final class N2ProtectedClinicalVaultCore {
               let movements=root["stockMovements"] as? [[String:Any]] else {
             throw N2ProtectedStoreError.absentSource
         }
+        if N2SimpleInventory.isActive(active.snapshot) {
+            let state=try N2SimpleInventory.read(active.snapshot)
+            let audit=try N2VersionedSnapshotAudit.inspect(active.snapshot)
+            var offset=0
+            for saved in visits where saved["status"] as? String=="saved" {
+                let rows=saved["items"] as? [[String:Any]] ?? []
+                if saved["id"] as? String==visitID {
+                    return rows.enumerated().map { index,item in
+                        let id=item["id"] as? String ?? ""
+                        let incident=state.incidents.first{$0.visitID==visitID && $0.itemID==id}
+                        let historical=state.historicalUses.contains{$0.visitID==visitID && $0.itemID==id}
+                        let result=incident.map{$0.resolutionEventID==nil ? "Incidencia de inventario: \($0.reason)" : "Consumo verificado; conteo o salida confirmado"}
+                            ?? (historical ? "Histórico conservado; sin descuento en el inventario actual" : "Consumo verificado")
+                        return N2DispensingLine(id:id,name:item["name"] as? String ?? "",code:item["code"] as? String ?? "",
+                            quantity:(item["quantity"] as? NSNumber)?.doubleValue ?? 0,result:result,kardexQuantity:audit.consumptionR[offset+index])
+                    }
+                }
+                offset+=rows.count
+            }
+        }
         let outcomes=visit["nativeDispensing"] as? [String:String] ?? [:]
         return items.map { item in
             let id=item["id"] as? String ?? ""
@@ -615,3 +635,94 @@ public final class N2ProtectedClinicalVaultCore {
     }
 }
 
+
+extension N2ProtectedClinicalVaultCore {
+    private func verifySimpleBackupDomain(_ proof:N2VerifiedInventoryBackup)throws {
+        if directory.lastPathComponent=="DANPER-N2-CLINICAL-VAULT",proof.domain == .demo {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        if directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT",proof.domain != .demo {
+            throw N2ProtectedStoreError.unsafeSource
+        }
+    }
+    public func simpleInventoryContext(products:Data,nursing:Data,mappings:Data)throws->N2SimpleInventoryContext {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        let root=try N2SimpleInventory.object(active.snapshot)
+        let catalog=try N2NativeCatalogLoader.load(products:products,nursing:nursing,approvedMappings:mappings)
+        return N2SimpleInventoryContext(revision:active.revision,
+            state:N2SimpleInventory.isActive(active.snapshot) ? try N2SimpleInventory.state(root):nil,
+            catalog:catalog,clinicalVisits:(root["attentions"] as? [[String:Any]] ?? []).filter{$0["status"] as? String=="saved"}.count)
+    }
+    public func activateSimpleInventory(backup:N2VerifiedInventoryBackup,request:N2SimpleActivation,
+        catalog:N2NativeCatalogIndex,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try verifySimpleBackupDomain(backup)
+        return try modify(expectedRevision:expectedRevision) {
+            try Task.checkCancellation()
+            return try N2SimpleInventory.activate(snapshot:$0,backup:backup,request:request,catalog:catalog)
+        }
+    }
+    public func applySimpleInventoryCommand(_ command:N2SimpleInventoryCommand,catalog:N2NativeCatalogIndex,
+                                             expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try modify(expectedRevision:expectedRevision) {
+            try N2SimpleInventory.apply(command,to:$0,catalog:catalog)
+        }
+    }
+    public func restoreSimpleClinical(backup:N2VerifiedInventoryBackup,eventID:String,operatorName:String,
+        at:Int64,confirmed:Bool,expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        try verifySimpleBackupDomain(backup)
+        return try modify(expectedRevision:expectedRevision) {
+            try Task.checkCancellation()
+            return try N2SimpleInventory.restoreClinical(snapshot:$0,backup:backup,eventID:eventID,
+                operatorName:operatorName,at:at,confirmed:confirmed)
+        }
+    }
+    /// Full recovery is an explicit EMPTY-target operation. It never replaces
+    /// an active v2 inventory; use selective clinical restoration in that case.
+    public func recoverPortableSource(backup:N2VerifiedInventoryBackup,confirmed:Bool)throws->N2ProtectedStoreSummary {
+        guard confirmed else{throw N2SimpleInventoryError.confirmationRequired}
+        try verifySimpleBackupDomain(backup)
+        guard try journal.recover()==nil,
+              try FileManager.default.contentsOfDirectory(at:directory,includingPropertiesForKeys:nil).isEmpty else {
+            throw N2ProtectedStoreError.targetNotEmpty
+        }
+        if backup.domain == .unspecified,directory.lastPathComponent=="DANPER-N2-CLINICAL-VAULT" {
+            let audit=try N1lRealSnapshotGate.audit(backup.snapshot,destination:.verifiedEmpty)
+            guard audit.isStructurallyEligibleForReview,audit.obviousDemoWorkerMarkers==0,
+                  audit.obviousDemoClinicalMarkers==0,audit.missingRosterReferences==0,
+                  audit.danglingCorrections==0 else{throw N2ProtectedStoreError.unsafeSource}
+        }
+        try Task.checkCancellation()
+        let revision=try journal.commit(backup.snapshot,expectedRevision:0)
+        guard let active=try journal.recover(),active.revision==revision,
+              active.snapshot==backup.snapshot else{throw N2ProtectedStoreError.unsafeSource}
+        return try summary(active)
+    }
+    public func previewAttentionWithoutLegacyInventory(_ visit:Data,approvedCatalog:Data,at:Int64,
+                                                       expectedRevision:Int)throws->N2ClinicalResult {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        guard active.revision==expectedRevision else{throw N2ProtectedStoreError.staleRevision}
+        if N2SimpleInventory.isActive(active.snapshot) {
+            return try N2SimpleInventory.saveVisit(snapshot:active.snapshot,visit:visit,at:at)
+        }
+        return try N2PreSimpleClinicalTransaction.save(snapshot:active.snapshot,visit:visit,at:at)
+    }
+    public func saveAttentionWithoutLegacyInventory(_ visit:Data,approvedCatalog:Data,at:Int64,
+                                                    expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        if N2SimpleInventory.isActive(active.snapshot) {
+            return try saveAttention(visit,approvedCatalog:approvedCatalog,at:at,expectedRevision:expectedRevision)
+        }
+        return try modify(expectedRevision:expectedRevision) {
+            try N2PreSimpleClinicalTransaction.save(snapshot:$0,visit:visit,at:at).snapshot
+        }
+    }
+}
+
+extension N2ProtectedClinicalVaultCore {
+    public func simpleInventoryCut(code:String,through:String,catalog:N2NativeCatalogIndex,
+                                   backup:N2VerifiedInventoryBackup?=nil)throws->N2SimpleCutPreview {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        if let backup {try verifySimpleBackupDomain(backup)}
+        return try N2SimpleInventory.cutPreview(snapshot:active.snapshot,code:code,through:through,catalog:catalog,archive:backup)
+    }
+}

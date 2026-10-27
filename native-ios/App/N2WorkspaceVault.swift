@@ -297,3 +297,37 @@ extension EnvironmentValues {
         set {self[N2WorkspaceVaultEnvironmentKey.self]=newValue}
     }
 }
+
+extension N2WorkspaceVault {
+    func simpleInventoryContext() async throws->N2SimpleInventoryContext {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.simpleInventoryContext()}
+        return try await N2SyntheticTrialIOSVault.shared.simpleInventoryContext()
+    }
+    func inspectSimpleBackup(_ archive:Data,password:String) async throws->N2SimpleBackupReview {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.inspectSimpleBackup(archive,password:password)}
+        return try await N2SyntheticTrialIOSVault.shared.inspectSimpleBackup(archive,password:password)
+    }
+    func activateSimpleInventory(archive:Data,password:String,request:N2SimpleActivation,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.activateSimpleInventory(archive:archive,password:password,request:request,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.activateSimpleInventory(archive:archive,password:password,request:request,expectedRevision:expectedRevision)
+    }
+    func applySimpleInventoryCommand(_ command:N2SimpleInventoryCommand,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.applySimpleInventoryCommand(command,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.applySimpleInventoryCommand(command,expectedRevision:expectedRevision)
+    }
+    func restoreSimpleClinical(archive:Data,password:String,eventID:String,operatorName:String,at:Int64,confirmed:Bool,expectedRevision:Int) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.restoreSimpleClinical(archive:archive,password:password,eventID:eventID,operatorName:operatorName,at:at,confirmed:confirmed,expectedRevision:expectedRevision)}
+        return try await N2SyntheticTrialIOSVault.shared.restoreSimpleClinical(archive:archive,password:password,eventID:eventID,operatorName:operatorName,at:at,confirmed:confirmed,expectedRevision:expectedRevision)
+    }
+    func recoverPortableSource(archive:Data,password:String,confirmed:Bool) async throws->N2ProtectedStoreSummary {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.recoverPortableSource(archive:archive,password:password,confirmed:confirmed)}
+        return try await N2SyntheticTrialIOSVault.shared.recoverPortableSource(archive:archive,password:password,confirmed:confirmed)
+    }
+}
+
+extension N2WorkspaceVault {
+    func simpleInventoryCut(code:String,through:String,archive:Data?,password:String?) async throws->N2SimpleCutPreview {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.simpleInventoryCut(code:code,through:through,archive:archive,password:password)}
+        return try await N2SyntheticTrialIOSVault.shared.simpleInventoryCut(code:code,through:through,archive:archive,password:password)
+    }
+}
