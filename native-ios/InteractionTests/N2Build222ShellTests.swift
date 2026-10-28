@@ -11,7 +11,8 @@ final class N2Build222ShellTests:XCTestCase {
             let button=app.buttons["premium-tab-"+id]
             XCTAssertTrue(button.exists);XCTAssertEqual(button.label,label)
         }
-        XCTAssertTrue(app.staticTexts["Bienvenido"].exists)
+        XCTAssertTrue(app.staticTexts["Hola"].exists)
+        XCTAssertFalse(app.staticTexts["Bienvenido"].exists)
         XCTAssertTrue(app.descendants(matching:.any)["premium-metric-month"].exists)
         XCTAssertTrue(app.buttons["demo-home-new-attention"].exists)
         let scroll=app.scrollViews.firstMatch

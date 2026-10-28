@@ -25,10 +25,10 @@ import DanperCore
         let password="FICTICIO-Diseno-Kardex-2026"
         let archive=try N2InventoryBackupCodec.createVerified(snapshot:source,password:password,domain:.demo)
         let proof=try N2InventoryBackupCodec.verify(archive:archive,password:password)
-        let products=try [("16000182",70.0),("16000025",12.0)].map {code,quantity in
+        let products=try [("16000182",70.0,"2027-12-10",true),("16000025",12.0,"2026-10-30",true),("16000148",0.0,"2026-01-01",true),("16000235",20.0,"2027-01-01",false)].map {code,quantity,expiry,verified in
             let p=try XCTUnwrap(catalog.clinical.first{$0.code==code})
             return N2SimpleProduct(code:p.code,name:p.name,unit:p.unit,mode:N2SimpleInventory.suggestedMode(unit:p.unit)!,quantity:quantity,
-                expiry:"2027-02-10",expiryVerified:true)
+                expiry:expiry,expiryVerified:verified)
         }
         let migrated=try N2SimpleInventory.activate(snapshot:source,backup:proof,request:N2SimpleActivation(id:UUID().uuidString,
             at:Int64(Date().timeIntervalSince1970*1000),operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,initialProducts:products),catalog:catalog)
@@ -174,6 +174,29 @@ import DanperCore
             try await capture(N2ClinicalWorkspaceRootView(layoutCounts:(0,0,0),layoutTab:3),name:"Premium-ajustes-\(dark ? "oscuro":"claro")",dark:dark)
         }
         try await capture(N2ClinicalWorkspaceRootView(layoutCounts:(0,0,0)),name:"Premium-Inicio-SE-letra-grande",dark:true,large:true,size:CGSize(width:375,height:667))
+    }
+
+    func testGlassKardexFiltersSearchExpiryAndAccessibility() async throws {
+        let context=try consolidatedContext()
+        for dark in [false,true] {
+            for filter in N2InventoryFilter.allCases {
+                try await capture(NavigationStack {N2SimpleInventoryView(layoutContext:context,layoutFilter:filter)},
+                    name:"Glass-Kardex-\(filter.rawValue)-\(dark ? "oscuro":"claro")",dark:dark)
+            }
+            try await capture(NavigationStack {N2SimpleInventoryView(layoutContext:context,layoutQuery:"FCO")},
+                name:"Glass-Kardex-busqueda-FCO-\(dark ? "oscuro":"claro")",dark:dark)
+            try await capture(ScrollView {
+                VStack(spacing:12) {
+                    Text("DEMO · Referencias ficticias").font(.caption)
+                    ForEach(context.state!.products) {N2GlassInventoryRow(product:$0,catalog:context.catalog)}
+                }.padding(16)
+            }.background(DanperBackdrop()).environment(\.colorScheme,.dark),
+                name:"Glass-cuatro-estados-vencimiento-\(dark ? "oscuro":"claro")",dark:dark)
+        }
+        try await capture(NavigationStack {N2SimpleInventoryView(layoutContext:context)},
+            name:"Glass-Kardex-SE-letra-grande",dark:true,large:true,size:CGSize(width:375,height:667))
+        try await capture(DanperAccessView(unlocking:false,canRetry:true,error:"",onUnlock:{}),
+            name:"Glass-Acceso-SE-letra-grande",dark:true,large:true,size:CGSize(width:375,height:667))
     }
 
 }

@@ -300,12 +300,12 @@ must(clinicalHome,'clinical-first-run-manual-worker','inicio manual sin Excel');
 for(const phrase of ['DanperBrandHeader {','DanperHomeWelcome()',
   'DanperNewAttentionCard','DanperHomeMetricRow'])
   must(clinicalHome,phrase,'composición reutilizable de Inicio');
-for(const phrase of ['Bienvenido','ACCESO RÁPIDO','Nueva atención','Este mes'])
+for(const phrase of ['Hola','ClinicalAvatar','ACCESO RÁPIDO','Nueva atención','Este mes'])
   must(premium,phrase,'Inicio aprobado y contadores de atenciones');
 for(const phrase of ['UIImage(named:"BrandLogo")',
   'Image(uiImage:Self.wordmark ?? UIImage())','danper-brand-header',
-  'ignoresSafeArea(edges:.top)','Text("SALUD MÓVIL")'])
-  must(theme,phrase,'cabecera roja con logo oficial');
+  'danperGlassSurface(cornerRadius:20)','Text("SALUD MÓVIL")'])
+  must(theme,phrase,'cabecera glass oscura con logo oficial');
 for(const phrase of ['N2WorkerSearchSheet(workers:context.workers',
   'showWorkerSearch=true','attention-browse-workers','onSelect:{worker in'])
   must(form,phrase,'búsqueda real desde Paso 1');
@@ -426,7 +426,7 @@ assert(!firstWorker.includes('#if targetEnvironment(simulator)'),
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
 
-for(const label of ['DEPARTAMENTO DE SALUD','Text("Bienvenido")','clinical-home-new-attention'])
+for(const label of ['Departamento de Salud','Text("Hola")','clinical-home-new-attention'])
   must(premium,label,'portada premium');
 must(clinicalHome,'clinical-home-tool-','herramientas conservadas');
 for(const label of ['@AppStorage("danper.haptics.enabled")',
