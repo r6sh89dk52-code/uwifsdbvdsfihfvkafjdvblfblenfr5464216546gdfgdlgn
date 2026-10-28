@@ -36,10 +36,6 @@ struct NativeRootView:View {
     var body:some View {
         VStack(spacing:0) {
             DanperBrandHeader {tab=3}
-            Text("DEMO · Datos ficticios").font(.caption2.weight(.semibold))
-                .foregroundStyle(DanperStyle.red).padding(.vertical,4)
-                .frame(maxWidth:.infinity).background(DanperStyle.surface)
-                .accessibilityIdentifier("premium-demo-banner")
             TabView(selection:$tab) {
                 NavigationStack {home.toolbar(.hidden,for:.tabBar)}
                     .toolbar(.hidden,for:.tabBar)

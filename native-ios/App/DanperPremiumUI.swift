@@ -100,7 +100,11 @@ struct DanperHomeWelcome:View {
                     .fixedSize(horizontal:false,vertical:true)
                 Text("Departamento de Salud").font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal:false,vertical:true)
-                if !isDemo {
+                if isDemo {
+                    Label("DEMO · Datos ficticios",systemImage:"testtube.2")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("premium-demo-banner")
+                } else {
                     Label("Fuente clínica protegida",systemImage:"lock.shield")
                         .font(.caption2).foregroundStyle(.secondary)
                         .accessibilityIdentifier("premium-protected-source")
