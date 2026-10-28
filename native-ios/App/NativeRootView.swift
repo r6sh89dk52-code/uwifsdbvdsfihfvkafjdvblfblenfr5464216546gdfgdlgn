@@ -276,7 +276,7 @@ struct NativeRootView:View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             DanperPanel("Preferencias") {
-                Picker("Apariencia",selection:$appearance) {
+                Picker("Hoja de compartir",selection:$appearance) {
                     Text("Sistema").tag("system")
                     Text("Claro").tag("light")
                     Text("Oscuro").tag("dark")

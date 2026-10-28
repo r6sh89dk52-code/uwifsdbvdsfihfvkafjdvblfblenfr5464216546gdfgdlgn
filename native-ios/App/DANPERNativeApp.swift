@@ -97,7 +97,7 @@ struct DANPERNativeApp: App {
                 }
             }
             .environment(\.danperAuthenticatedSession,authenticated)
-            .preferredColorScheme(appearance=="dark" ? .dark : appearance=="light" ? .light : nil)
+            .preferredColorScheme(.dark)
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     authCycle=UUID()

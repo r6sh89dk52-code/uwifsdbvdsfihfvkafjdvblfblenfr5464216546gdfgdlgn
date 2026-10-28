@@ -22,6 +22,16 @@ enum DanperStyle {
     // appearance preference still controls system presentations and keyboards.
     static let canvas=Color(red:0.022,green:0.027,blue:0.037)
     static let surface=Color(red:0.085,green:0.092,blue:0.11)
+    /// Glass clinical content always requests dark chrome (including the
+    /// status indicators). Preserve the existing user preference in native
+    /// share sheets, without changing clinical/export behavior.
+    static var sharingAppearance:UIUserInterfaceStyle {
+        switch UserDefaults.standard.string(forKey:"danper.appearance") {
+        case "light":return .light
+        case "dark":return .dark
+        default:return UIScreen.main.traitCollection.userInterfaceStyle
+        }
+    }
     static let animation=Animation.easeInOut(duration:0.22)
     static var gradient:LinearGradient {
         LinearGradient(colors:[red.opacity(0.88),deepRed.opacity(0.58)],

@@ -196,7 +196,7 @@ struct N2ClinicalWorkspaceRootView:View {
         .background(DanperBackdrop())
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
-        .preferredColorScheme(appearance=="system" ? nil : appearance=="dark" ? .dark : .light)
+        .preferredColorScheme(.dark)
         .task(id:tab) {if tab==0 {await refreshHomeCounts()}}
         .onChange(of:sessionAuthenticated) {_,active in
             if active {Task {await refreshHomeCounts()}}
@@ -278,7 +278,7 @@ struct N2ClinicalWorkspaceRootView:View {
                     Picker("Colores",selection:$visualPalette) {
                         Text("DANPER rojo").tag("danper");Text("Salud azul").tag("salud")
                     }.pickerStyle(.segmented)
-                    Picker("Modo",selection:$appearance) {
+                    Picker("Hoja de compartir",selection:$appearance) {
                         Text("Sistema").tag("system");Text("Claro").tag("light");Text("Oscuro").tag("dark")
                     }.pickerStyle(.segmented)
                 }

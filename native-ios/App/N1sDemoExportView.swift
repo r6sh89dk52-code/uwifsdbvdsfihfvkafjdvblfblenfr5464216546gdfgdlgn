@@ -32,7 +32,9 @@ private struct N1sShareController: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        let controller=UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        controller.overrideUserInterfaceStyle=DanperStyle.sharingAppearance
+        return controller
     }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }

@@ -13,7 +13,9 @@ private struct N2SecureBackupShare: Identifiable {
 private struct N2SecureBackupActivity: UIViewControllerRepresentable {
     let file:URL
     func makeUIViewController(context:Context)->UIActivityViewController {
-        UIActivityViewController(activityItems:[file],applicationActivities:nil)
+        let controller=UIActivityViewController(activityItems:[file],applicationActivities:nil)
+        controller.overrideUserInterfaceStyle=DanperStyle.sharingAppearance
+        return controller
     }
     func updateUIViewController(_ controller:UIActivityViewController,context:Context) {}
 }

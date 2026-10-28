@@ -10,7 +10,9 @@ private struct N2VigilanceShare:Identifiable {
 private struct N2VigilanceActivity:UIViewControllerRepresentable {
     let file:URL
     func makeUIViewController(context:Context)->UIActivityViewController {
-        UIActivityViewController(activityItems:[file],applicationActivities:nil)
+        let controller=UIActivityViewController(activityItems:[file],applicationActivities:nil)
+        controller.overrideUserInterfaceStyle=DanperStyle.sharingAppearance
+        return controller
     }
     func updateUIViewController(_ vc:UIActivityViewController,context:Context){}
 }
