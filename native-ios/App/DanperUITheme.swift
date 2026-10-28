@@ -134,6 +134,7 @@ struct DanperFormChrome:ViewModifier {
                 }
             }
             .toolbarBackground(.ultraThinMaterial,for:.navigationBar)
+            .toolbarBackground(.visible,for:.navigationBar)
             .scrollContentBackground(.hidden)
             .background(DanperBackdrop())
             .environment(\.colorScheme,.dark)

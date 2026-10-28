@@ -116,7 +116,7 @@ struct N2SimpleInventoryView:View {
             HStack(spacing:10) {
                 Image(systemName:"magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
                 TextField("Nombre, presentación o código",text:$query,
-                    prompt:Text("Nombre, presentación o código").foregroundStyle(.secondary))
+                    prompt:Text("Nombre, presentación o código").foregroundStyle(Color.white.opacity(0.70)))
                     .font(.subheadline).autocorrectionDisabled()
                     .accessibilityLabel("Buscar medicamento o insumo")
                     .accessibilityIdentifier("simple-inventory-search")

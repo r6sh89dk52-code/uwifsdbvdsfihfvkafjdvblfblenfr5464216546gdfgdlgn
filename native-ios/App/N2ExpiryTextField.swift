@@ -7,7 +7,11 @@ struct N2ExpiryTextField:UIViewRepresentable {
     func makeCoordinator()->Coordinator {Coordinator(self)}
     func makeUIView(context:Context)->UITextField {
         let field=UITextField()
-        field.placeholder="DD/MM/AA (ej. 20/10/30)"
+        field.overrideUserInterfaceStyle = .dark
+        field.textColor = .white
+        field.tintColor = UIColor(DanperStyle.red)
+        field.attributedPlaceholder=NSAttributedString(string:"DD/MM/AA (ej. 20/10/30)",
+            attributes:[.foregroundColor:UIColor.white.withAlphaComponent(0.70)])
         field.keyboardType = .numberPad
         field.font = .preferredFont(forTextStyle:.body)
         field.adjustsFontForContentSizeCategory=true
