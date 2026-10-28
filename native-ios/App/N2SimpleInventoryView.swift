@@ -261,6 +261,7 @@ struct N2GlassInventoryRow:View {
             VStack(alignment:.trailing,spacing:3) {
                 Text(product.quantity.formatted()).font(.system(.largeTitle,design:.rounded,weight:.semibold))
                     .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                    .accessibilityLabel(product.quantity.formatted()+" "+product.unit)
                     .accessibilityIdentifier("simple-stock-"+product.code)
                 Text(product.unit).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Image(systemName:"chevron.right").font(.caption2).foregroundStyle(.secondary).padding(.top,5).accessibilityHidden(true)
