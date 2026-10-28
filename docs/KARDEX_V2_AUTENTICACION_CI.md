@@ -17,4 +17,6 @@ Se incorpora de la recuperación remota la selección explícita de todo el diag
 
 `LAContext` continúa perteneciendo a cada intento; se invalida al bloquear o entrar en segundo plano. El UUID del ciclo descarta callbacks tardíos. `.inactive` oculta contenido y bloquea interacción, sin invalidar el propio diálogo del sistema. Los nuevos flujos de respaldo/restauración invalidan contexto, cancelan tareas y borran credenciales al entrar en segundo plano.
 
-Pendiente de aceptación final: repetir los tests reforzados y el recorrido v2, comprobar persistencia del borrador y auditar CI iOS 18.5 con Work. No se declara equivalencia entre versiones de simulador a partir de una sola ejecución local.
+Aceptación local: las siete pruebas de interfaz del recorrido consolidado, biometría, menús y Premium pasaron juntas. Una octava prueba conserva por separado la creación de una fuente clínica protegida y su relanzamiento sin onboarding: pasó con autenticación real simulada. El primer intento de esta octava prueba confirmó el rechazo de «PERSONA FICTICIA», marcador DEMO del validador; se utilizó después el mismo nombre inventado válido del recorrido anterior, sin modificar producción. La persistencia del borrador y el cierre del editor fueron comprobados.
+
+CI iOS 18.5 queda para Work sobre el código publicado con autorización. No se declara equivalencia entre versiones de simulador a partir de la ejecución local. Las aserciones protegidas no se eliminan al sustituir el recorrido operativo FEFO.

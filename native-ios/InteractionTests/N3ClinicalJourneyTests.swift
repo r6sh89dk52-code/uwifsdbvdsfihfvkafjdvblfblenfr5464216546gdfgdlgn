@@ -307,4 +307,46 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertTrue(app.staticTexts["Corte mensual · del día 9 al día 8"].waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Kardex-real-y-corte-mensual")
     }
+    private func authenticateProtectedSource(_ app:XCUIApplication) {
+        let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+        let permission=springboard.alerts.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
+        if permission.waitForExistence(timeout:5) {permission.tap()}
+        XCTAssertTrue(app.staticTexts["Verificando identidad…"].waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertFalse(app.buttons["premium-tab-home"].exists)
+        Thread.sleep(forTimeInterval:2)
+        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),CFNotificationName(rawValue:"com.apple.BiometricKit_Sim.pearl.match" as CFString),nil,nil,true)
+    }
+    /// Preserve the former protected-source assertions independently of the
+    /// replaced FEFO journey. This uses actual LocalAuthentication, not DEMO.
+    func testProtectedClinicalSourceCreationAndRelaunch() {
+        #if !targetEnvironment(simulator)
+        XCTFail("Requires isolated Simulator without real clinical data")
+        return
+        #endif
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["-danper.native.onboarding.v1.finished","YES"]
+        app.launch();authenticateProtectedSource(app)
+        let manual=app.buttons["clinical-first-run-manual-worker"]
+        if manual.waitForExistence(timeout:5) {
+            tap(manual,in:app)
+            enter(app.textFields["first-manual-worker-dni"],"00000031",in:app)
+            enter(app.textFields["first-manual-worker-name"],"PERSONAL AUTORIZADO DE PRUEBA N3",in:app)
+            tap(app.buttons["choice-Sede verificada"],in:app);tap(app.buttons["Fundo La Venturosa"],in:app)
+            tap(app.buttons["first-manual-worker-activate"],in:app)
+            tap(app.buttons["Crear e ingresar primer trabajador"],in:app)
+            Thread.sleep(forTimeInterval:2)
+            CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),CFNotificationName(rawValue:"com.apple.BiometricKit_Sim.pearl.match" as CFString),nil,nil,true)
+            XCTAssertTrue(app.buttons["Volver para entrar a DANPER"].waitForExistence(timeout:15),app.debugDescription)
+            tap(app.buttons["Volver para entrar a DANPER"],in:app)
+        }
+        XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertFalse(app.staticTexts["clinical-empty-setup"].exists)
+        capture(app,"Fuente-clinica-protegida-ficticia")
+        app.terminate();app.launchArguments=["-danper.native.onboarding.v1.finished","NO"]
+        app.launch();authenticateProtectedSource(app)
+        XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
+        XCTAssertFalse(app.buttons["clinical-first-run-manual-worker"].exists)
+        capture(app,"Fuente-protegida-tras-relanzar")
+    }
+
 }
