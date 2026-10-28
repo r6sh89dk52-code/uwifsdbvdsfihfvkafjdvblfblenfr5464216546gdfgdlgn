@@ -21,6 +21,7 @@ final class N2PremiumDemoFixtureTests:XCTestCase {
         }
         let before=try await vault.inspect()
         var draft=N2NativeFormDraft(id:"premium-ui-draft")
+        draft.responsible="OPERADOR FICTICIO";draft.responsibleDni="00000091"
         draft.dni="00000071";draft.date=N2HomeCalendarPeriod(now:Date()).today
         draft.time="09:30";draft.diagnosis="BORRADOR FICTICIO REDISENO"
         _=try await vault.saveDraft(id:draft.id,changes:draft.makeDraftPatch(context:context,stage:1),

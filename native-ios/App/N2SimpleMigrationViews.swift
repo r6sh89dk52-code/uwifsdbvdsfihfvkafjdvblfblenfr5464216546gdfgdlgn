@@ -105,10 +105,14 @@ struct N2SimpleMigrationSetup:View {
     }
     private var backup:some View {
         DanperPanel("2 · Respaldo cifrado previo") {
-            SecureField("Contraseña nueva (mínimo 14 caracteres)",text:$password).textContentType(.newPassword)
-                .accessibilityIdentifier("simple-migration-password")
-            SecureField("Repetir contraseña",text:$confirmation).textContentType(.newPassword)
-                .accessibilityIdentifier("simple-migration-password-confirm")
+            DanperField(title:"Contraseña nueva · mínimo 14 caracteres") {
+                SecureField("Contraseña nueva",text:$password).textContentType(.newPassword)
+                    .accessibilityIdentifier("simple-migration-password")
+            }
+            DanperField(title:"Repetir contraseña") {
+                SecureField("Repetir contraseña",text:$confirmation).textContentType(.newPassword)
+                    .accessibilityIdentifier("simple-migration-password-confirm")
+            }
             Text("Guarda la contraseña por tu cuenta. No se incluye en el archivo ni se conserva en la app.")
                 .font(.caption).foregroundStyle(.secondary)
             Button(busy ? "Verificando…":"Crear respaldo y guardar en Archivos") {work=Task {await createBackup()}}

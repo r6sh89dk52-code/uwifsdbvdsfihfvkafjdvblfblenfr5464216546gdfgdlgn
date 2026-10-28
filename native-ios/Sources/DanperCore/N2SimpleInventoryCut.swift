@@ -21,6 +21,9 @@ extension N2SimpleInventory {
         guard validDay(through) else{throw N2SimpleInventoryError.invalidDate}
         let s=try read(snapshot),root=try object(snapshot),period=try N2KardexCutPreview.period(for:through)
         guard let p=s.products.first(where:{$0.code==code}) else{throw N2SimpleInventoryError.invalidProduct}
+        if let archive {
+            guard archive.sourceSHA256==s.regime.sourceSHA256 || s.clinicalImports.contains(where:{$0.sourceSHA256==archive.sourceSHA256}) else {throw N2SimpleInventoryError.sourceChanged}
+        }
         let all=s.movements.filter{$0.code==code && day($0.at)<=through}
         guard let count=all.last(where:{["initial","count"].contains($0.kind)}) else {
             throw N2SimpleInventoryError.invalidEvent
@@ -44,16 +47,23 @@ extension N2SimpleInventory {
         if preceding != nil && !historical.isEmpty {incomplete=true}
         for incident in relevantIncidents where incident.resolutionEventID != nil {
             if let event=s.movements.first(where:{$0.id==incident.resolutionEventID}),["initial","count"].contains(event.kind) {
-                if p.mode == .presentation,let r=incident.resolvedR {used+=Double(r)}
-                else if p.mode == .units {used+=incident.clinicalQuantity}
-                else {incomplete=true}
+                let debit:Double?
+                if p.mode == .presentation {debit=incident.resolvedR.map(Double.init)}
+                else {debit=incident.clinicalQuantity}
+                if let debit {
+                    used+=debit
+                    // The physical count already contains this older consumption.
+                    // Reclassify its known part only in this read-only preview;
+                    // it must not be counted again as an unexplained adjustment.
+                    if event.kind=="count",day(event.at)>=period.start,event.at<=count.at {adjusted+=debit}
+                }else {incomplete=true}
             }
         }
         if preceding==nil,let archive {
             guard archive.sourceSHA256==s.regime.sourceSHA256 || s.clinicalImports.contains(where:{$0.sourceSHA256==archive.sourceSHA256}) else {
                 throw N2SimpleInventoryError.sourceChanged
             }
-            incomplete=historical.contains{$0.verifiedR==nil} || relevantIncidents.contains{$0.resolutionEventID==nil}
+            incomplete=historical.contains{$0.verifiedR==nil || $0.sourceSHA256 != archive.sourceSHA256} || relevantIncidents.contains{$0.resolutionEventID==nil}
             used+=historical.compactMap(\.verifiedR).reduce(0,+)
             let old=try object(archive.snapshot)
             if isActive(archive.snapshot) {

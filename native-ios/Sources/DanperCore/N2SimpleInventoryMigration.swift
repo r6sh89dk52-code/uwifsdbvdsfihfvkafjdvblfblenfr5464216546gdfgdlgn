@@ -76,9 +76,11 @@ extension N2SimpleInventory {
         }
         // Only obsolete operational data is retired. Clinical dictionaries and
         // all unknown clinical extensions remain semantically byte-for-byte.
-        for name in ["stockLots","stockMovements","deliveryIncidents","nativePendingDispensingEvidence",
+        for name in ["stockLots","stockMovements","ambulatoryReconciliation","deliveryIncidents","nativePendingDispensingEvidence",
                      "nativeStockSiteVerifications","nativeLotMetadataCorrections"] {root[name]=[Any]()}
-        return try putting(s,in:root)
+        let next=try putting(s,in:root)
+        _=try N2ClinicalCorrections.pendingDiscrepancies(next)
+        return next
     }
     public static func restoreClinical(snapshot:Data,backup:N2VerifiedInventoryBackup,
                                        eventID:String,operatorName:String,at:Int64,confirmed:Bool)throws->Data {
@@ -124,7 +126,7 @@ extension N2SimpleInventory {
         root["workers"]=workers;root["attentions"]=visits;root["allergies"]=allergies
         // Approved correspondences and clinical correction histories are retained.
         // Conflicting immutable IDs or nonidentical same-key dictionaries fail closed.
-        let operational:Set<String>=["workers","attentions","allergies","stockLots","stockMovements","deliveryIncidents",
+        let operational:Set<String>=["workers","attentions","allergies","stockLots","stockMovements","ambulatoryReconciliation","deliveryIncidents",
             "nativePendingDispensingEvidence","nativeStockSiteVerifications","nativeLotMetadataCorrections",
             "inventorySchemaVersion","simpleInventory","notifications"]
         for name in source.keys.sorted() where !operational.contains(name) {
@@ -153,6 +155,8 @@ extension N2SimpleInventory {
         s.historicalUses.append(contentsOf:historical.filter{addedVisitIDs.contains($0.visitID)})
         s.clinicalImports.append(N2SimpleClinicalImport(id:eventID,sourceSHA256:backup.sourceSHA256,at:at,
             operatorName:operatorName,workersAdded:workers.count-initialWorkers,visitsAdded:visits.count-initialVisits))
-        return try putting(s,in:root)
+        let next=try putting(s,in:root)
+        _=try N2ClinicalCorrections.pendingDiscrepancies(next)
+        return next
     }
 }

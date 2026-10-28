@@ -173,12 +173,12 @@ public enum N2VerifiedIndicatorWorkbook {
             return (code,p)
         })
         guard productMap.count==432 else{throw Failure.invalidCatalog}
-        let operational=try N2OperationalMappings.read(clinical)
+        let operational=try N2OperationalMappings.read(snapshot)
         let stock=source["stockLots"] as? [[String:Any]] ?? []
         // A declaration made after an old attention is accounting evidence
         // (R=1 or R=0), not an invented physical delivery. It is eligible
         // only in an explicitly PROVISIONAL workbook.
-        let historicalDeclarations=try N2PendingDispensingEvidence.read(snapshot:clinical)
+        let historicalDeclarations=try N2PendingDispensingEvidence.read(snapshot:snapshot)
         let disputed=try hasIncidentInSelectedVisits(
             incidents,movements:movement,selectedVisitIDs:selectedVisitIDs)
         guard !disputed else{throw Failure.unverifiedDelivery}
@@ -332,6 +332,9 @@ public enum N2VerifiedIndicatorWorkbook {
                         // contradiction, not merely an absent delivery.
                         // Never silently reclassify such a line as pending.
                         throw Failure.unverifiedDelivery
+                    } else if allowPending,N2SimpleInventory.isActive(snapshot) {
+                        pendingLines+=1
+                        pendingNotes.append("\(aid) / \(code): R PENDIENTE; consumo físico no verificado en el régimen consolidado. Sin salida inventada ni descuento retroactivo.")
                     } else if allowPending,
                               let historical=historicalDeclarations.last(where:{
                                   $0.visitID==aid && $0.itemID==itemID
@@ -450,7 +453,9 @@ public enum N2VerifiedIndicatorWorkbook {
                 let within=events.filter{N2SimpleInventory.day($0.at)>=start}
                 let unresolved=inventory.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
                 let historic=inventory.historicalUses.contains{$0.code==code}
-                if let last=events.last {row["count"]=last.after;closings+=1}
+                if let last=events.last,["initial","count"].contains(last.kind),N2SimpleInventory.day(last.at)==end {
+                    row["count"]=last.after;closings+=1
+                }
                 if let opening,!unresolved,!historic,within.allSatisfy({$0.kind != "initial" && $0.kind != "count"}) {
                     row["opening"]=opening.after;openings+=1
                     let receipts=within.filter{$0.kind=="receipt"}
@@ -463,7 +468,8 @@ public enum N2VerifiedIndicatorWorkbook {
                 }
                 summary[code]=row
             }
-            let provisional=allowPending || pendingLines>0 || openings<432 || closings<432
+            let allSavedIDs=Set(visits.filter{string($0["status"])=="saved" && string($0["date"])>=start && string($0["date"])<=end}.map{string($0["id"])})
+            let provisional=allowPending || pendingLines>0 || openings<432 || closings<432 || subdivision != "AMBAS" || selectedVisitIDs != allSavedIDs
             let manifest:[String:Any]=["schema":1,"catalog":catalogue,"byCode":summary,
                 "reviewed":!provisional,"provisional":provisional,"start":start,"end":end,
                 "subdivision":subdivision,"rows":output.count,"plan":["lines":output],"pendingNotes":pendingNotes]

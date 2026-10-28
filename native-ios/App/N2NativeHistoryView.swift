@@ -507,6 +507,11 @@ struct N2VisitDispensingView:View {
                         Text(line.name).font(.subheadline.weight(.semibold))
                         Text("Cantidad clínica: "+line.quantity.formatted())
                             .font(.caption).foregroundStyle(.secondary)
+                        if context?.inventorySchemaVersion==2 {
+                            let pending=line.result.hasPrefix("Incidencia de inventario:")
+                            Label(line.result,systemImage:pending ? "exclamationmark.circle":"checkmark.shield")
+                                .font(.caption).foregroundStyle(pending ? Color.orange:Color.secondary)
+                        } else {
                         Label(projectedInCut && line.result != "Descontado"
                               ? "Contabilizado en el corte 9–8 · sin salida física verificada"
                               : (resolution == .reviewChronology
@@ -517,7 +522,8 @@ struct N2VisitDispensingView:View {
                             .font(.caption)
                             .foregroundStyle(resolution == .completed || projectedInCut
                                              ? Color.green : Color.orange)
-                        if projectedInCut && line.result != "Descontado" {
+                        }
+                        if context?.inventorySchemaVersion != 2 && projectedInCut && line.result != "Descontado" {
                             Label("Registro clínico incorporado una sola vez al cálculo del período. No se está creando un movimiento ni descontando stock actual.",
                                   systemImage:"calendar.badge.checkmark")
                                 .font(.caption).foregroundStyle(.secondary)
@@ -528,7 +534,9 @@ struct N2VisitDispensingView:View {
                         }
                         if line.result != "Descontado" {
                             if context?.inventorySchemaVersion==2 {
-                                NavigationLink("Resolver incidencia en Inventario") {N2SimpleInventoryView()}
+                                if line.result.hasPrefix("Incidencia de inventario:") {
+                                    NavigationLink("Resolver incidencia en Inventario") {N2SimpleInventoryView()}
+                                }
                             } else {
                                 Text("Registro histórico conservado. Los pendientes del inventario anterior no se reintentan.").font(.caption).foregroundStyle(.secondary)
                             }
@@ -648,6 +656,11 @@ struct N2VisitDispensingView:View {
         } catch {
             context=nil
             notice="Las acciones están temporalmente no disponibles. La atención permanece guardada."
+            return
+        }
+        if context?.inventorySchemaVersion==2 {
+            projectedClinicalLines=[]
+            detail=try? await vault.readCorrectionDetail(visitID:visitID)
             return
         }
         // Do not turn a period projection into an actual FEFO movement.

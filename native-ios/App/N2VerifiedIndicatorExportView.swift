@@ -136,7 +136,7 @@ struct N2VerifiedIndicatorExportView:View {
                     .font(.caption).foregroundStyle(.secondary)
                 DanperToolLink(title:"Revisar inventario único y corte 9–8",
                                symbol:"calendar.badge.checkmark") {
-                    N2KardexCutPreviewView()
+                    N2SimpleCutView()
                 }
                 Text("El cierre es único para Fundo y Planta. DANPER comprobará correspondencias de productos, saldos y consumos del período completo. Si faltan datos, conservará el reporte como provisional sin inventar cantidades.")
                     .font(.caption).foregroundStyle(.secondary)

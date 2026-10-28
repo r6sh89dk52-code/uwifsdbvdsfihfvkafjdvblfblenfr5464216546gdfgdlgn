@@ -338,9 +338,7 @@ must(medicationRow,'expandedID==medication.id','medicamentos compactos por defec
 assert(!medicationRow.includes('expandedID==medication.id || medication.procedure.isEmpty'),
   'un medicamento nuevo no debe desplegar todos los controles');
 must(form,'expandedMedication=nil','inserción compacta de nuevo producto');
-for(const key of ['kardex-register-current-stock','kardex-ninth-cut-preview',
- 'N2NativeInventoryView(initialOperation:"lot")','N2KardexCutPreviewView()'])
-  must(kardex,key,'alta visible de stock y corte mensual');
+must(kardex,'N2SimpleInventoryView()','Kardex cotidiano consolidado');
 for(const key of ['public static func period(for day:String)',
  'public static func calculate(asOf:String','verifiedUsed','laterReceipts',
  'signedAdjustments','requiresOperatorReconciliation'])
@@ -446,11 +444,6 @@ for(const label of ['private let stepTitles=["Trabajador","Evaluación","Tratami
 const allergyIndex=form.indexOf('DanperPanel("Alergias del trabajador")');
 assert(allergyIndex>form.indexOf('private func clinicalSection()'),
   'La revisión de alergias debe estar en Evaluación, como Build 222');
-must(kardex,'label:"Lotes registrados"','contador de lotes que conserva los agotados');
-must(kardex,'lotCount=context.lots.count','conteo real sin ocultar lotes agotados');
-must(kardex,'vault.clinicalFormContext()','lectura de lotes sin estimaciones');
-
-
 for(const term of ['Buscar en padrón','Nuevo trabajador','REGISTRO AMBULATORIO','registerSteps'])
   must(source,term,'referencia Build 222');
 for(const name of ['Inicio','Historial','Borradores','Ajustes'])
@@ -472,9 +465,7 @@ for(const term of ['worker-registration-dni','worker-save','worker-continue-atte
  'DanperPanel("Datos laborales")','DanperPanel("Datos personales")'])
   must(editor,term,'editor SwiftUI');
 assert.equal((form.match(/private func workerSection\(/g)||[]).length,1);
-for(const term of ['kardex-route-','Registrar ingreso','Conciliar existencias',
- 'Kardex de Enfermeras','Indicador Ambulatorio'])
-  must(kardex,term,'hub único sin menús duplicados');
+must(kardex,'N2SimpleInventoryView()','hub único del inventario consolidado');
 must(inventory,'init(initialOperation:String?=nil)','acción física de inventario');
 for(const view of [indicator,nursing])
   for(const term of ['N2Build222ExportProgress','N2Build222StageHeading(step:1',
@@ -546,15 +537,8 @@ assert(!clinicalTx.includes('verifiedSites[l['),
        'FEFO no debe filtrar lotes según sede');
 assert(!nursing.includes('let scoped=lots.filter'),
        'El Kardex de Enfermeras no debe segregar stock por sede');
-for(const key of [
-  'case .registerStock:','case .verifyCorrespondence:',
-  'case .verifyPhysicalUse, .reviewPending:',
-  'case .reviewChronology:','showStockRegistration=true',
-  'N2NativeInventoryView(initialOperation:"lot")',
-  'Label("Registrar existencias",systemImage:"shippingbox.fill")',
-  'Label("Vincular producto",systemImage:"link")',
-  'pending-container-stock-','"Volver a comprobar pendientes"'
-]) must(form,key,'resolución contextual y única de consumos pendientes');
+must(form,'Resolver en Inventario','incidencia separada de atención conservada');
+assert(!form.includes('Volver a comprobar pendientes'),'no reintentar FEFO desde atención');
 for(const key of [
   'case registerStock','case verifyCorrespondence','case verifyPhysicalUse',
   'case reviewChronology',
@@ -567,14 +551,7 @@ assert(!form.includes('Button("Verificar cantidad y apertura pendiente")'),
 assert(!form.includes('Button("Resolver correspondencia")'),
        'No mostrar vinculación redundante cuando el motivo real es stock');
 
-for (const key of [
-  'committedQuery=query',
-  '.task(id:query)',
-  'Contabilizado en el corte 9–8 · sin salida física verificada',
-  'history-register-actual-stock-',
-  'reconstructedCount',
-  'Registro clínico incorporado una sola vez al cálculo'
-]) must(history,key,'historial muestra reconstrucción sin inventar movimiento');
+must(history,'committedQuery=query','búsqueda clínica conservada');
 for (const key of [
   'private var clinicalOnlyMatches:',
   'context.products.authorizedNursingOptions(for:product.code).isEmpty',
@@ -613,56 +590,8 @@ for(const phrase of ['address:"D"+n,value:row["initial"]',
   must(officialWriter,phrase,'exportar 0 numérico sin crear lotes');
 console.log('PASS: revisión masiva confirmada y stock sin lote expresado como 0.');
 
-for (const key of [
-  'N2PendingResolution.forReason(line.result)',
-  'Label(projectedInCut && line.result != "Descontado"',
-  'Label("Registrar existencias",systemImage:"shippingbox.fill")',
-  'Label("Vincular producto",systemImage:"link")',
-  'N2NativeInventoryView(initialOperation:"lot")',
-  'N2OperationalMappingView(code:code,context:context',
-  'N2PendingDispensingView(',
-  'readCorrectionDetail(visitID:visitID)',
-  'retryDispensing(visitID:visitID',
-  'navigationTitle("Consumos")',
-  'navigationBarBackButtonHidden(true)',
-  'Label("Volver",systemImage:"chevron.left")',
-  'case .reviewChronology:'
-]) must(history,key,'historial con resolución contextual de consumos');
-assert(!history.includes('Label(line.result,systemImage:'),
-       'Historial no debe mostrar mensajes crudos FEFO en la vista principal');
-assert(!history.includes('navigationTitle("Consumos de la atención")'),
-       'Título de consumos no debe truncarse con cabecera grande');
-must(history,'Text("Kardex R: \\(quantity.formatted())" +',
-     'detalle del Kardex concatena mediante operador infijo Swift');
-console.log('PASS: historial muestra causas comprensibles y acciones por estado, sin duplicación de atención.');
-for(const fragment of [
-  'storedResolution == .verifyCorrespondence && alreadyLinked',
-  'context?.products.authorizedNursingOptions(',
-  'Producto ya vinculado al Kardex',
-  'history-pending-container-stock-'
-]) must(history,fragment,'historial no reabre vinculación ya revisada');
-for(const fragment of [
-  'storedResolution == .verifyCorrespondence && alreadyLinked',
-  'context.products.authorizedNursingOptions(',
-  'Producto ya vinculado.',
-  'pending-container-stock-'
-]) must(form,fragment,'resultado evita vinculación ya confirmada');
-console.log('PASS: enlaces confirmados en bloque omiten modal repetido incluso para pendientes previos.');
-for(const fragment of [
-  'N2PendingResolution.historicalTitle(forReason:line.result)',
-  'N2PendingResolution.historicalGuidance(forReason:reason)',
-  'Label("Ver detalle del historial",systemImage:"info.circle")',
-  'case .explainHistorical(let reason):',
-  'La atención ya está guardada. Agregar existencias ahora no demuestra el saldo anterior.',
-  'Contabilizado en el corte 9–8 · sin salida física verificada',
-  'Ir a Kardex · registrar stock físico actual'
-]) must(history,fragment,'historial actual distingue reconstrucción del corte y salida física auditada');
-for(const phrase of [
-  'N2PendingResolution.historicalTitle(forReason:result)',
-  'N2PendingResolution.historicalGuidance(forReason:result)'
-]) must(form,phrase,'resultado de atención histórica contextual');
-console.log('PASS: pendiente histórico indica causa específica y ofrece explicación segura.');
-
+must(history,'Resolver incidencia en Inventario','resolver salidas v2');
+must(history,'Los pendientes del inventario anterior no se reintentan.','retiro de pendientes FEFO');
 const autoCut=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2AutomaticCutAccounting.swift'),'utf8');
 const nursingBuilder=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NursingReportBuilder.swift'),'utf8');
 const nursingBook=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2VerifiedNursingWorkbook.swift'),'utf8');
@@ -688,7 +617,7 @@ for(const source of [nursingBook,nursingCore,clinicalVault,syntheticVault,vaultS
 }
 must(nursing,'reconstructFromCount:reportMode=="cut"','solo corte 9–8 reconstruido');
 must(indicatorBook,'for link in N2UserReviewedKardexLinks.links','10 hojas admiten vínculos revisados');
-must(history,'cut.projectedClinicalLines','historial distingue inclusión al corte de salida física');
+must(history,'cut.projectedClinicalLines','compatibilidad de consulta histórica sin activar FEFO');
 console.log('PASS: corte 9–8 reconstruido y vinculado con 98 filas, 92 relaciones sin inventar movimientos.');
 
 for(const fragment of [
@@ -697,12 +626,6 @@ for(const fragment of [
   'historical.newContainers ??',
   'projectedClinicalLines.insert(id)'
 ]) must(autoCut,fragment,'apertura 1/0 histórica declarada sin alterar stock actual');
-for(const fragment of [
-  'Label("Declarar apertura histórica (1/0)",',
-  'context.historicalOptions(for:line.code,at:detail.date)',
-  'Registro clínico incorporado una sola vez al cálculo del período.',
-  'cut.projectedClinicalLines'
-]) must(history,fragment,'declaración histórica y estado contable separados de FEFO');
 for(const fragment of [
   'let projectedCut:N2AutomaticCutAccounting.Result?',
   'isWholePeriod && periodStart==start',
@@ -768,14 +691,6 @@ must(indicatorBook,'string(visit["responsibleDni"]),string(visit["responsible"])
      'DNI en AB y nombre en AC del Excel oficial');
 
 
-must(history,'context.historicalOptions(for:line.code,at:detail.date)',
-  'historial permite seleccionar apertura histórica de un lote agotado');
-must(pendingView,'return historicalAccountingOnly || date<formatter.string(from:Date())',
-  'atenciones anteriores del mismo día usan declaración histórica cuando corresponde');
-must(history,'historicalAccountingOnly:',
-  'historial selecciona conciliación contable en lugar de forzar FEFO actual');
-console.log('PASS: lotes agotados se pueden documentar retrospectivamente sin habilitar FEFO agotado.');
-
 const stockChoice=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2StockRegistrationChoice.swift'),'utf8');
 for(const key of [
   '.alert("¿Qué representa esta cantidad?"',
@@ -840,12 +755,6 @@ for(const key of [
   'movements.append(contentsOf:pendingClosures)'
 ]) must(clinicalTx,key,'transición atómica de apertura nueva y agotamiento previo');
 for(const needle of [
-  'form.items[idx].physicalQuantity=0',
-  'reusePreviouslyOpened = !opened',
-  'available.first(where:{$0.openContainers>0})',
-  'pending-container-stock-'
-]) must(form,needle,'reutilización automática FEFO con R0 y sin modal redundante');
-for(const needle of [
   'reusePreviouslyOpened:Bool=false',
   '"reusePreviouslyOpened":med.reusePreviouslyOpened'
 ]) must(formData,needle,'declaración explícita de envase abierto');
@@ -861,11 +770,6 @@ for(const needle of [
   'selectedForAccounting',
   'movements.append(contentsOf:pendingClosures)'
 ]) must(clinicalTx,needle,'FEFO apertura previa con actual R0');
-for(const needle of [
-  'history-pending-container-stock-',
-  'Ir al Kardex · comprobar envase'
-]) must(history,needle,'pendiente vincula al inventario y no a cantidad física duplicada');
-
 console.log('PASS: alertas 1/0 por cada envase, cierre anterior auditable sin doble descuento.');
 
 
@@ -894,7 +798,7 @@ for(const text of [
 ]) must(surveillanceUI,text,'pantalla y compartir vigilancia');
 for(const component of [clinicalSource,clinicalSourceIO,demoSourceIO,vaultSource])
   must(component,'exportOccupationalVigilance(','flujo de bóveda para tercer Excel');
-must(kardex,'N2OccupationalVigilanceExportView()','tercer enlace en Kardex');
+must(fs.readFileSync(path.join(root,'native-ios/App/N2SimpleInventoryView.swift'),'utf8'),'N2OccupationalVigilanceExportView()','vigilancia conservada en Kardex');
 for(const name of [
   'testOnlyOsteomuscularSavedVisitsAndOneSheet',
   'testOnlySelectedDateAndNoDuplicateClinicalRows',

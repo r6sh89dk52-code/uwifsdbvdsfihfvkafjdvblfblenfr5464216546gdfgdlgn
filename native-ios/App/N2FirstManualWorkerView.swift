@@ -34,11 +34,11 @@ struct N2FirstManualWorkerView:View {
                     Label("Primer trabajador · registro manual",
                           systemImage:"person.badge.plus")
                         .font(.headline)
-                    Text("No se cargarán registros de prueba. Se creará una fuente cifrada únicamente con los datos que introduzcas y apruebes aquí. Inicialmente habrá 0 atenciones, 0 lotes y 0 consumos.")
+                    Text("No se cargarán registros de prueba. Se creará una fuente cifrada únicamente con los datos que introduzcas y apruebes aquí. Inicialmente habrá 0 atenciones y ningún inventario iniciado.")
                         .font(.footnote).foregroundStyle(.secondary)
                     Text("Para pruebas con empleados ficticios, regresa a Inicio → Empezar con una base vacía (DEMO). Este formulario crea una fuente CLÍNICA independiente y requiere Face ID o el código del dispositivo.")
                         .font(.footnote.weight(.semibold)).foregroundStyle(.orange)
-                    Text("Si tienes atenciones o Kardex antiguos en la Build 222, restaura su copia cifrada en lugar de crear esta fuente. No puedes fusionar posteriormente dos bases distintas.")
+                    Text("Si tienes historial anterior, conserva su respaldo cifrado. Después de iniciar el inventario nuevo podrás restaurar el historial clínico sin reemplazar existencias. La recuperación completa se reserva para una fuente vacía.")
                         .font(.footnote.weight(.semibold)).foregroundStyle(.orange)
                 }
                 if !finished {
@@ -91,7 +91,7 @@ struct N2FirstManualWorkerView:View {
                             .foregroundStyle(.green)
                         LabeledContent("Trabajadores", value:"1")
                         LabeledContent("Atenciones", value:"0")
-                        LabeledContent("Lotes", value:"0")
+                        LabeledContent("Inventario", value:"Pendiente de activar")
                         Button("Volver para entrar a DANPER") {dismiss()}
                             .buttonStyle(DanperPrimaryButton())
                     }

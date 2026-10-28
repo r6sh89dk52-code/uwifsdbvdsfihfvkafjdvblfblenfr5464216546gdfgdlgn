@@ -62,12 +62,13 @@ final class N2SimpleInventoryTests:XCTestCase {
     }
     func testActivationPreservesEveryClinicalDictionaryAndRetiresOldOperations()throws {
         let old=try source(),next=try active(),a=try object(old),b=try object(next)
-        for key in ["workers","attentions","allergies","catalogMappings","ambulatoryReconciliation"] {
+        for key in ["workers","attentions","allergies","catalogMappings"] {
             XCTAssertEqual(try JSONSerialization.data(withJSONObject:a[key]!,options:.sortedKeys),
                            try JSONSerialization.data(withJSONObject:b[key]!,options:.sortedKeys),key)
         }
         XCTAssertTrue((b["stockLots"] as! [Any]).isEmpty)
         XCTAssertTrue((b["stockMovements"] as! [Any]).isEmpty)
+        XCTAssertTrue((b["ambulatoryReconciliation"] as! [Any]).isEmpty)
         XCTAssertEqual(try N2SimpleInventory.read(next).products.first?.quantity,70)
         XCTAssertEqual(try N2SimpleInventory.read(next).incidents.count,0)
         XCTAssertEqual(try N2VersionedSnapshotAudit.inspect(next).pendingClinicalItems,0)
@@ -109,6 +110,9 @@ final class N2SimpleInventoryTests:XCTestCase {
         let s=try N2SimpleInventory.read(second.snapshot)
         XCTAssertEqual(s.products.first{$0.code=="16000025"}?.quantity,11)
         XCTAssertEqual(s.movements.filter{$0.visitID != nil}.compactMap(\.declaredR),[1,0])
+        let values=try N2VersionedSnapshotAudit.inspect(second.snapshot).consumptionR
+        XCTAssertEqual(try XCTUnwrap(values.last ?? nil).sign,.plus,"R=0 nunca debe mostrarse como -0")
+        XCTAssertEqual(N2SimpleInventory.round(-0.0).sign,.plus)
         XCTAssertTrue((try object(second.snapshot)["stockLots"] as! [Any]).isEmpty)
         XCTAssertEqual(s.movements.filter{$0.kind=="containerState"}.count,0)
     }
@@ -232,4 +236,165 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertEqual(recovered?.revision,2);XCTAssertEqual(recovered?.snapshot,next)
         XCTAssertEqual(try N2SimpleInventory.read(XCTUnwrap(recovered).snapshot).products.first?.quantity,70)
     }
+    func testNinthDayFormulaUsesVerifiedEventsAndNeverChangesCount()throws {
+        let old=try source(empty:true)
+        var raw=try N2SimpleInventory.activate(snapshot:old,backup:proof(old),request:N2SimpleActivation(
+            id:regimeID,at:at("2026-11-08"),operatorName:"OPERADOR FICTICIO",confirmed:true,
+            backupAvailable:true,initialProducts:[product(quantity:72)]),catalog:catalog())
+        raw=try N2SimpleInventory.apply(command(.receipt,quantity:2,time:at("2026-11-10")),to:raw,catalog:catalog())
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,visit:visit(raw,quantity:4,day:"2026-11-11"),at:at("2026-11-11")).snapshot
+        raw=try N2SimpleInventory.apply(command(.count,quantity:70,time:at("2026-11-15")),to:raw,catalog:catalog())
+        let original=raw,cut=try N2SimpleInventory.cutPreview(snapshot:raw,code:"16000182",through:"2026-11-15",catalog:catalog())
+        XCTAssertEqual(cut.period.start,"2026-11-09");XCTAssertEqual(cut.period.end,"2026-12-08")
+        XCTAssertEqual(cut.counted,70);XCTAssertEqual(cut.verifiedOutflows,4);XCTAssertEqual(cut.receipts,2)
+        XCTAssertEqual(cut.estimatedOpening,72);XCTAssertEqual(cut.confirmedOpening,72)
+        XCTAssertFalse(cut.requiresVerification);XCTAssertEqual(cut.currentStock,70);XCTAssertEqual(raw,original)
+    }
+    func testUnknownOpeningIsNeverCertifiedAndInvalidDatesFailClosed()throws {
+        let raw=try active(source:source(empty:true))
+        let cut=try N2SimpleInventory.cutPreview(snapshot:raw,code:"16000182",through:"2026-11-16",catalog:catalog())
+        XCTAssertTrue(cut.requiresVerification);XCTAssertNil(cut.confirmedOpening);XCTAssertNil(cut.estimatedOpening)
+        XCTAssertEqual(cut.currentStock,70)
+        for date in ["2026-02-30","2026-13-01","2026-11-08"] {
+            XCTAssertThrowsError(try N2SimpleInventory.cutPreview(snapshot:raw,code:"16000182",through:date,catalog:catalog()))
+        }
+    }
+    func testClinicalOnlyBeforeActivationDoesNotMutateLegacyStock()throws {
+        let old=try source(),before=try object(old)
+        let next=try N2PreSimpleClinicalTransaction.save(snapshot:old,visit:visit(old),at:at("2026-11-16")).snapshot
+        let after=try object(next)
+        for key in ["stockLots","stockMovements"] {
+            XCTAssertEqual(try bytes([key:before[key]!]),try bytes([key:after[key]!]))
+        }
+        XCTAssertEqual((after["attentions"] as? [Any])?.count,(before["attentions"] as? [Any])!.count+1)
+    }
+    func testNursingExportLeavesUnknownBalancesWithoutZeroFormulas()throws {
+        let raw=try active(source:source(empty:true)),n=try object(fixture("n2-nursing-parity.json"))
+        let result=try N2VerifiedNursingWorkbook.exportRange(snapshot:raw,catalog:JSONSerialization.data(withJSONObject:n["catalog"]!),
+            template:fixture("n1s-nursing-template-store.zip"),start:"2026-11-09",end:"2026-11-16",responsible:"OPERADOR FICTICIO",mappings:fixture("n2-reviewed-approved.json"))
+        XCTAssertEqual(result.stockKnownRows,0);XCTAssertEqual(result.stockUnknownRows,98)
+        let entries=try N1rStoredZip.unpack(result.xlsx)
+        let sheet=String(data:try XCTUnwrap(entries.first{$0.name=="xl/worksheets/sheet1.xml" || $0.name=="xl/worksheets/sheet2.xml"}).data,encoding:.utf8)!
+        XCTAssertTrue(sheet.contains("NO VERIFICADO"));XCTAssertFalse(sheet.contains("<f>D7+E7</f>"))
+        XCTAssertEqual(try N2SimpleInventory.read(raw).products.first?.quantity,70)
+    }
+    func testFormDraftRecoversExplicitRWithoutAnyLegacyPhysicalSelection()throws {
+        let raw=try active(source:source(empty:true)),context=try N2NativeFormContextReader.read(snapshot:raw,revision:1,products:catalog())
+        XCTAssertEqual(context.inventorySchemaVersion,2)
+        var draft=N2NativeFormDraft(id:"draft-r-ficticio")
+        var med=N2FormMedication(code:"16000025",procedure:"CURACION DE HERIDA")
+        med.simpleR=0;med.selectedLotID="NO-DEBE-SERIALIZARSE";med.physicalQuantity=99
+        draft.items=[med]
+        let patch=try object(draft.makeDraftPatch(context:context)),item=try XCTUnwrap((patch["items"] as? [[String:Any]])?.first)
+        XCTAssertEqual(item["simpleR"] as? Int,0);XCTAssertNil(item["physicalUse"]);XCTAssertNil(item["confirmNewContainer"])
+    }
+
+    func testVaultResetRevisionAndSelectiveRestoreNeverAllowFullOverwrite()throws {
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-v2-api-"+UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:folder)}
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:81,count:32))
+        let old=try source(),verified=try proof(old)
+        _=try journal.commit(old,expectedRevision:0)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let created=try store.activateSimpleInventory(backup:verified,request:activation(products:[product()]),catalog:catalog(),expectedRevision:1)
+        XCTAssertEqual(created.revision,2)
+        let before=try XCTUnwrap(journal.recover()).snapshot
+        XCTAssertThrowsError(try store.applySimpleInventoryCommand(command(.receipt,quantity:2),catalog:catalog(),expectedRevision:1))
+        XCTAssertThrowsError(try store.recoverPortableSource(backup:verified,confirmed:true))
+        XCTAssertEqual(try journal.recover()?.snapshot,before)
+        let merged=try store.restoreSimpleClinical(backup:verified,eventID:UUID().uuidString,operatorName:"OPERADOR FICTICIO",at:at("2026-11-17"),confirmed:true,expectedRevision:2)
+        let repeatImport=try store.restoreSimpleClinical(backup:verified,eventID:UUID().uuidString,operatorName:"OPERADOR FICTICIO",at:at("2026-11-18"),confirmed:true,expectedRevision:merged.revision)
+        XCTAssertEqual(repeatImport.revision,merged.revision)
+        let reopened=try XCTUnwrap(journal.recover()).snapshot
+        XCTAssertEqual(try N2SimpleInventory.read(reopened).products.first?.quantity,70)
+        XCTAssertEqual((try object(reopened)["attentions"] as? [Any])?.count,(try object(old)["attentions"] as? [Any])?.count)
+    }
+    func testEmptyTargetRecoveryRequiresConsentAndPreservesExactEncryptedPayload()throws {
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-v2-recovery-"+UUID().uuidString)
+        defer {try? FileManager.default.removeItem(at:folder)}
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:82,count:32))
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder),old=try source(),verified=try proof(old)
+        XCTAssertThrowsError(try store.recoverPortableSource(backup:verified,confirmed:false))
+        XCTAssertNil(try journal.recover())
+        _=try store.recoverPortableSource(backup:verified,confirmed:true)
+        XCTAssertEqual(try journal.recover()?.snapshot,verified.snapshot)
+        XCTAssertEqual(try N2SimpleInventory.fingerprint(XCTUnwrap(journal.recover()).snapshot),verified.sourceSHA256)
+        XCTAssertThrowsError(try store.recoverPortableSource(backup:verified,confirmed:true))
+    }
+
+    func testCountCoveredConsumptionIsNotAlsoAnUnexplainedAdjustmentAndExportsVerifiedR()throws {
+        let old=try source(empty:true)
+        var raw=try N2SimpleInventory.activate(snapshot:old,backup:proof(old),request:N2SimpleActivation(id:regimeID,
+            at:at("2026-11-08"),operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,
+            initialProducts:[product(quantity:10)]),catalog:catalog())
+        raw=try N2SimpleInventory.apply(command(.count,quantity:9,time:at("2026-11-11")),to:raw,catalog:catalog())
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,visit:visit(raw,quantity:1,day:"2026-11-10"),at:at("2026-11-12")).snapshot
+        let incident=try XCTUnwrap(N2SimpleInventory.read(raw).incidents.first)
+        raw=try N2SimpleInventory.apply(command(.resolveIncident,time:at("2026-11-13"),incident:incident.id),to:raw,catalog:catalog())
+        let state=try N2SimpleInventory.read(raw),cut=try N2SimpleInventory.cutPreview(snapshot:raw,code:"16000182",through:"2026-11-13",catalog:catalog())
+        XCTAssertEqual(state.movements.count,2);XCTAssertEqual(state.products.first?.quantity,9)
+        XCTAssertEqual(cut.verifiedOutflows,1);XCTAssertEqual(cut.netAdjustments,0);XCTAssertEqual(cut.confirmedOpening,10)
+        XCTAssertEqual(try N2VersionedSnapshotAudit.inspect(raw).consumptionR,[1])
+        let nursing=try object(fixture("n2-nursing-parity.json"))
+        let result=try N2VerifiedNursingWorkbook.exportRange(snapshot:raw,catalog:JSONSerialization.data(withJSONObject:nursing["catalog"]!),
+            template:fixture("n1s-nursing-template-store.zip"),start:"2026-11-09",end:"2026-11-13",responsible:"OPERADOR FICTICIO",mappings:fixture("n2-reviewed-approved.json"))
+        XCTAssertEqual(result.stockKnownRows,1)
+        let sheet=String(data:try XCTUnwrap(N1rStoredZip.unpack(result.xlsx).first{$0.name=="xl/worksheets/sheet2.xml"}).data,encoding:.utf8)!
+        XCTAssertNotNil(sheet.range(of:#"<c r="G28"[^>]*><v>1</v></c>"#,options:.regularExpression))
+        XCTAssertNotNil(sheet.range(of:#"<c r="J28"[^>]*><v>0</v></c>"#,options:.regularExpression))
+    }
+    func testAmbulatoryV2KeepsVerifiedRAndDoesNotGuessMissingPresentationR()throws {
+        var raw=try active(source:source(empty:true))
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,visit:visit(raw,id:"VERIFICADO",code:"16000025",r:1),at:at("2026-11-16")).snapshot
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,visit:visit(raw,id:"SIN-R",code:"16000025",day:"2026-11-17"),at:at("2026-11-17")).snapshot
+        let plan=try object(fixture("n1s-indicator-plan.json"))
+        let result=try N2VerifiedIndicatorWorkbook.export(snapshot:raw,products:JSONSerialization.data(withJSONObject:plan["catalog"]!),
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-11-09",end:"2026-12-08",subdivision:"LA VENTUROSA",selectedVisitIDs:["VERIFICADO","SIN-R"],allowPending:true)
+        XCTAssertTrue(result.provisional);XCTAssertEqual(result.pendingLines,1);XCTAssertEqual(result.rows,2)
+        let sheet=String(data:try XCTUnwrap(N1rStoredZip.unpack(result.xlsx).first{$0.name=="xl/worksheets/sheet5.xml"}).data,encoding:.utf8)!
+        XCTAssertNotNil(sheet.range(of:#"<c r="R2"[^>]*><v>1</v></c>"#,options:.regularExpression))
+        XCTAssertNotNil(sheet.range(of:#"<c r="R3"[^>]*/>"#,options:.regularExpression))
+        XCTAssertEqual(try N2SimpleInventory.read(raw).products.first{$0.code=="16000025"}?.quantity,11)
+    }
+
+    func testOfficialExportsNeverLabelCalculatedStockAsPhysicalCountOrUseFutureExpiry()throws {
+        let old=try source(empty:true)
+        var raw=try N2SimpleInventory.activate(snapshot:old,backup:proof(old),request:N2SimpleActivation(id:regimeID,
+            at:at("2026-11-08"),operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,
+            initialProducts:[product(quantity:10)]),catalog:catalog())
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,visit:visit(raw,quantity:1,day:"2026-11-10"),at:at("2026-11-10")).snapshot
+        raw=try N2SimpleInventory.apply(command(.expiry,time:at("2026-11-18"),expiry:"2028-01-01",verified:true),to:raw,catalog:catalog())
+        let nursing=try object(fixture("n2-nursing-parity.json"))
+        let report=try N2VerifiedNursingWorkbook.exportRange(snapshot:raw,catalog:JSONSerialization.data(withJSONObject:nursing["catalog"]!),
+            template:fixture("n1s-nursing-template-store.zip"),start:"2026-11-09",end:"2026-11-16",responsible:"OPERADOR FICTICIO",mappings:fixture("n2-reviewed-approved.json"))
+        let nurseSheet=String(data:try XCTUnwrap(N1rStoredZip.unpack(report.xlsx).first{$0.name=="xl/worksheets/sheet2.xml"}).data,encoding:.utf8)!
+        XCTAssertEqual(report.stockKnownRows,1)
+        XCTAssertNotNil(nurseSheet.range(of:#"<c r="J28"[^>]*/>"#,options:.regularExpression),"Sin conteo no se certifica F/S=0")
+        let expiry=try XCTUnwrap(DanperDatePresentation.numericExcelDate("2027-02-10"))
+        XCTAssertTrue(nurseSheet.contains("<v>\(Int(expiry))</v>"))
+        let plan=try object(fixture("n1s-indicator-plan.json"))
+        let result=try N2VerifiedIndicatorWorkbook.export(snapshot:raw,products:JSONSerialization.data(withJSONObject:plan["catalog"]!),
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),start:"2026-11-09",end:"2026-11-16",
+            subdivision:"LA VENTUROSA",selectedVisitIDs:["SIMPLE-FICTICIO"],allowPending:true)
+        let countSheet=String(data:try XCTUnwrap(N1rStoredZip.unpack(result.xlsx).first{$0.name=="xl/worksheets/sheet2.xml"}).data,encoding:.utf8)!
+        let row=try XCTUnwrap(countSheet.components(separatedBy:"</row>").first{$0.contains("16000182")})
+        XCTAssertNotNil(row.range(of:#"<c r="D[0-9]+"[^>]*/>"#,options:.regularExpression),"Saldo calculado 9 no equivale a un conteo realizado al cierre")
+        XCTAssertEqual(try N2SimpleInventory.read(raw).products.first?.quantity,9)
+    }
+
+    func testOneArchiveCannotCertifyEvidenceImportedFromAnotherSource()throws {
+        let old=try source(empty:true),originalProof=try proof(old)
+        let importedBase=try N2SimpleInventory.activate(snapshot:old,backup:originalProof,request:N2SimpleActivation(id:UUID().uuidString,
+            at:at("2026-11-08"),operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,initialProducts:[product(quantity:10)]),catalog:catalog())
+        let incoming=try N2SimpleInventory.saveVisit(snapshot:importedBase,visit:visit(importedBase,quantity:1,day:"2026-11-10"),at:at("2026-11-10")).snapshot
+        let importedProof=try proof(incoming)
+        let current=try active(source:old)
+        let restored=try N2SimpleInventory.restoreClinical(snapshot:current,backup:importedProof,eventID:UUID().uuidString,
+            operatorName:"OPERADOR FICTICIO",at:at("2026-11-16"),confirmed:true)
+        let cut=try N2SimpleInventory.cutPreview(snapshot:restored,code:"16000182",through:"2026-11-16",catalog:catalog(),archive:originalProof)
+        XCTAssertTrue(cut.requiresVerification);XCTAssertNil(cut.estimatedOpening);XCTAssertNil(cut.confirmedOpening)
+        XCTAssertEqual(cut.currentStock,70);XCTAssertEqual(try N2SimpleInventory.read(restored).products.first?.quantity,70)
+    }
+
 }

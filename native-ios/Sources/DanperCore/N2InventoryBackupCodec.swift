@@ -83,6 +83,7 @@ public enum N2InventoryBackupCodec {
         do {
             report=try N2VersionedSnapshotAudit.inspect(raw,allowEmptySynthetic:true)
             _=try N1fLosslessFieldGate.inspect(raw)
+            _=try N2ClinicalCorrections.pendingDiscrepancies(raw)
         }catch{throw Failure.payload}
         let domain:N2InventoryBackupDomain
         if let raw=root["sourceDomain"] {

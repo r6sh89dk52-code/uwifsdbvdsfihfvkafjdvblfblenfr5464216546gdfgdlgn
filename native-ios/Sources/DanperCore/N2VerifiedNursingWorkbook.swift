@@ -101,16 +101,21 @@ public enum N2VerifiedNursingWorkbook {
                     let inRange=events.filter{N2SimpleInventory.day($0.at)>=start}
                     let unresolved=state.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
                     if let final=events.last {row["final"]=final.after}
-                    if product.expiryVerified {row["expiry"]=product.expiry ?? ""}
+                    if let reference=state.metadataEvents.last(where:{$0.code==code && N2SimpleInventory.day($0.at)<=end}),reference.verified {row["expiry"]=reference.next}
                     if let opening,!unresolved,inRange.allSatisfy({$0.kind != "initial"}),
                        !state.historicalUses.contains(where:{$0.code==code}) {
                         let receipts=inRange.filter{$0.kind=="receipt"}.reduce(0){$0+$1.delta}
-                        let uses = -inRange.filter{$0.kind=="outflow"}.reduce(0){$0+$1.delta}
-                        let adjustment=inRange.filter{$0.kind=="count"}.reduce(0){$0+$1.delta}
+                        var uses = -inRange.filter{$0.kind=="outflow"}.reduce(0){$0+$1.delta}
+                        for incident in state.incidents where incident.code==code && incident.resolutionEventID != nil && N2SimpleInventory.day(incident.clinicalAt)>=start && N2SimpleInventory.day(incident.clinicalAt)<=end {
+                            if let event=state.movements.first(where:{$0.id==incident.resolutionEventID}),["initial","count"].contains(event.kind) {
+                                uses += product.mode == .presentation ? Double(incident.resolvedR ?? 0):incident.clinicalQuantity
+                            }
+                        }
                         let book=opening.after+receipts-uses
                         if book>=0 {
                             row["stockKnown"]=true;row["initial"]=opening.after;row["extraordinary"]=receipts
-                            row["total"]=opening.after+receipts;row["consumed"]=uses;row["final"]=book;row["fs"]=adjustment
+                            row["total"]=opening.after+receipts;row["consumed"]=uses;row["final"]=book
+                            if inRange.contains(where:{$0.kind=="count"}) {row["fs"]=(events.last?.after ?? book)-book}
                             known+=1
                         }
                     }

@@ -1242,6 +1242,11 @@ struct N2NativeClinicalFormView:View {
     private func indexWorkers(_ context:N2FormContext) {
         workersByDNI=Dictionary(context.workers.map{($0.dni,$0)},uniquingKeysWith:{first,_ in first})
     }
+    private func blankForm()->N2NativeFormDraft {
+        var result=N2NativeFormDraft()
+        if !vault.isClinical {result.responsible="OPERADOR FICTICIO";result.responsibleDni="00000091"}
+        return result
+    }
     @MainActor private func load() async {
         do {
             let prepared=try await vault.prepareClinicalForm()
@@ -1261,6 +1266,7 @@ struct N2NativeClinicalFormView:View {
                 status="Borrador recuperado."
             } else {
                 let (date,time)=limaClock()
+                if !vault.isClinical {form.responsible="OPERADOR FICTICIO";form.responsibleDni="00000091"}
                 form.date=date
                 form.time=time
                 status="Formulario preparado."
@@ -1546,8 +1552,9 @@ struct N2NativeClinicalFormView:View {
             context=prepared.context
             if form.id==id {
                 autosaveTask?.cancel()
-                form=N2NativeFormDraft()
+                form=blankForm()
                 let (date,time)=limaClock()
+                if !vault.isClinical {form.responsible="OPERADOR FICTICIO";form.responsibleDni="00000091"}
                 form.date=date
                 form.time=time
                 step=0
@@ -1566,7 +1573,7 @@ struct N2NativeClinicalFormView:View {
         notFoundDNI=""
         saved=false
         fault=false
-        form=N2NativeFormDraft()
+        form=blankForm()
         collapsedMedicationGroups.removeAll()
         expandedMedication=nil
         let (date,time)=limaClock()

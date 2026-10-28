@@ -26,6 +26,10 @@ struct N2SimpleCutView:View {
                     if let context,let state=context.state {
                         DanperChoiceField(title:"Producto",selection:$code,options:state.products.map(\.code),
                             labels:Dictionary(uniqueKeysWithValues:state.products.map{($0.code,$0.name)}))
+                    } else if context != nil {
+                        Text("Primero confirma el conteo e inicia el inventario nuevo para consultar sus cortes.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        NavigationLink("Registrar inventario") {N2SimpleInventoryView()}
                     }
                     DanperDateField(title:"Consultar hasta",selection:$through)
                     Button("Consultar saldo") {Task {await calculate()}}.buttonStyle(DanperPrimaryButton()).disabled(code.isEmpty || busy)

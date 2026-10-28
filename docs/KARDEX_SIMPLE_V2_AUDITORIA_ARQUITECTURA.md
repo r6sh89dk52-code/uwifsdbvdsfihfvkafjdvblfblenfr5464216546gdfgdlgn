@@ -51,3 +51,11 @@ Commits independientes para auditoría, núcleo consolidado, reinicio/restauraci
 Primero pruebas puras con snapshots ficticios y diario cifrado temporal: preservación de árbol clínico, conteo exacto, aislamiento histórico, duplicados, R, stock insuficiente, eventos repetidos, edición de vencimiento, fórmula 9–8, migración interrumpida, contraseña/archivo corruptos y restauración selectiva repetida. Después integración de actor/formulario/exportaciones y XCTest en un simulador nuevo. Las pruebas v1 permanecen como compatibilidad; las pruebas operativas v2 reemplazan expectativas de FEFO en el flujo nuevo.
 
 La autorización de esta misión permite desarrollar y probar el mecanismo, no reiniciar una fuente clínica real. El diálogo de reinicio en producto sigue exigiendo respaldo disponible y consentimiento explícito del usuario.
+
+## Implementación de la retirada operativa
+
+El snapshot v2 exige vacíos `stockLots`, `stockMovements`, `deliveryIncidents`, `ambulatoryReconciliation` y las evidencias antiguas de dispensación, sede y metadatos de lotes. Las correspondencias y cadenas clínicas se conservan; una restauración selectiva tampoco importa conciliaciones ambulatorias del régimen anterior. El respaldo completo previo y las generaciones cifradas anteriores conservan el origen.
+
+Las cadenas de rectificación se validan al verificar un respaldo y al terminar una mezcla selectiva. La proyección clínica corregida se consulta por separado de la evidencia física original: corregir una dosis no vuelve a ejecutar su salida. Los reportes no presentan un saldo derivado como conteo físico, ni F/S=0 sin conteo, ni vencimientos editados después del período consultado.
+
+La aceptación final distingue suite completa, pruebas nuevas, comprobaciones estáticas, XCTest nativo y recorrido de interfaz. Los logs de intentos fallidos se conservan para trazabilidad; el informe identifica las ejecuciones finales y no suma reintentos como pruebas distintas.

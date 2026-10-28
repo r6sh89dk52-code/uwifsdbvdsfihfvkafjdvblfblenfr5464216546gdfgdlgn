@@ -2,7 +2,7 @@ import Foundation
 import CoreFoundation
 
 extension N2SimpleInventory {
-    private static func clinicalMoment(_ visit:[String:Any],at:Int64)throws->Int64 {
+    static func clinicalMoment(_ visit:[String:Any],at:Int64)throws->Int64 {
         guard let date=visit["date"] as? String,validDay(date),let time=visit["time"] as? String,
               time.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression) != nil else {
             throw N2ClinicalError.invalidVisit
@@ -113,6 +113,17 @@ public enum N2PreSimpleClinicalTransaction {
               let time=request["time"] as? String,time.range(of:#"^([01]\d|2[0-3]):[0-5]\d$"#,options:.regularExpression) != nil,
               ["diagnosis","category","system","responsible"].allSatisfy({(request[$0] as? String).map(N2SimpleInventory.text) ?? false}),
               let items=request["items"] as? [[String:Any]] else{throw N2ClinicalError.invalidVisit}
+        _=try N2SimpleInventory.clinicalMoment(request,at:at)
+        guard id.count<=120,items.count<=100,let clinician=request["responsibleDni"] as? String,
+              clinician.range(of:#"^\d{8}$"#,options:.regularExpression) != nil else {throw N2ClinicalError.invalidVisit}
+        var lineIDs=Set<String>()
+        for item in items {
+            guard let iid=item["id"] as? String,N2SimpleInventory.text(iid),lineIDs.insert(iid).inserted,
+                  let quantity=item["quantity"] as? NSNumber,CFGetTypeID(quantity) != CFBooleanGetTypeID(),
+                  quantity.doubleValue>0,quantity.doubleValue.rounded()==quantity.doubleValue,
+                  N2SimpleInventory.validQuantity(quantity.doubleValue),
+                  ["code","name","unit","procedure"].allSatisfy({(item[$0] as? String).map(N2SimpleInventory.text) ?? false}) else {throw N2ClinicalError.invalidVisit}
+        }
         if let previous=visits.first(where:{$0["id"] as? String==id}),previous["status"] as? String=="saved" {
             guard request.allSatisfy({key,value in
                 guard let old=previous[key],let a=try? JSONSerialization.data(withJSONObject:old,options:[.sortedKeys,.fragmentsAllowed]),

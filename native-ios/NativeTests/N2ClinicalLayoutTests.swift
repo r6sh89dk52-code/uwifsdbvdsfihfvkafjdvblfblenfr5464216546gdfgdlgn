@@ -20,6 +20,20 @@ import DanperCore
             nursing:resource("n2-nursing-catalog"),approvedMappings:resource("n2-approved-mappings"))
         return try N2NativeFormContextReader.read(snapshot:resource("n2-synthetic-clinical"),revision:1,products:catalog)
     }
+    private func consolidatedContext()throws->N2SimpleInventoryContext {
+        let catalog=try context().products,source=try resource("n2-synthetic-clinical")
+        let password="FICTICIO-Diseno-Kardex-2026"
+        let archive=try N2InventoryBackupCodec.createVerified(snapshot:source,password:password,domain:.demo)
+        let proof=try N2InventoryBackupCodec.verify(archive:archive,password:password)
+        let products=try [("16000182",70.0),("16000025",12.0)].map {code,quantity in
+            let p=try XCTUnwrap(catalog.clinical.first{$0.code==code})
+            return N2SimpleProduct(code:p.code,name:p.name,unit:p.unit,mode:N2SimpleInventory.suggestedMode(unit:p.unit)!,quantity:quantity,
+                expiry:"2027-02-10",expiryVerified:true)
+        }
+        let migrated=try N2SimpleInventory.activate(snapshot:source,backup:proof,request:N2SimpleActivation(id:UUID().uuidString,
+            at:Int64(Date().timeIntervalSince1970*1000),operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,initialProducts:products),catalog:catalog)
+        return N2SimpleInventoryContext(revision:1,state:try N2SimpleInventory.read(migrated),catalog:catalog,clinicalVisits:proof.report.attentions)
+    }
     private func capture<V:View>(_ view:V,name:String,dark:Bool,large:Bool=false,size:CGSize=CGSize(width:393,height:852)) async throws {
         let host=UIHostingController(rootView:view
             .preferredColorScheme(dark ? .dark : .light)
@@ -110,26 +124,26 @@ import DanperCore
         },name:"Resumen-DynamicType",dark:false,large:true)
     }
     func testAccessInventoryAndReconciliationLayouts() async throws {
-        let context=try context()
+        let context=try consolidatedContext(),product=try XCTUnwrap(context.state?.products.first)
         for dark in [false,true] {
             try await capture(DanperAccessView(unlocking:false,canRetry:false,error:"",onUnlock:{}),
                 name:"Acceso-\(dark ? "oscuro" : "claro")",dark:dark)
-            try await capture(NavigationStack {N2NativeInventoryView(layoutContext:context)},
-                name:"Inventario-inicio-\(dark ? "oscuro" : "claro")",dark:dark)
-            try await capture(NavigationStack {N2NativeInventoryView(layoutContext:context,operation:"lot")},
-                name:"Inventario-lote-\(dark ? "oscuro" : "claro")",dark:dark)
-            try await capture(NavigationStack {N2ReconciliationView(layoutContext:context)},
-                name:"Conciliacion-\(dark ? "oscuro" : "claro")",dark:dark)
+            try await capture(NavigationStack {N2SimpleInventoryView(layoutContext:context)},
+                name:"Inventario-consolidado-\(dark ? "oscuro" : "claro")",dark:dark)
+            try await capture(NavigationStack {N2SimpleProductEditor(context:context,operation:.count,product:product)},
+                name:"Conteo-consolidado-\(dark ? "oscuro" : "claro")",dark:dark)
+            try await capture(NavigationStack {N2SimpleProductEditor(context:context,operation:.expiry,product:product)},
+                name:"Vencimiento-referencial-\(dark ? "oscuro" : "claro")",dark:dark)
             try await capture(NavigationStack {N2VerifiedNursingExportView()},
                 name:"Kardex-exportar-\(dark ? "oscuro" : "claro")",dark:dark)
         }
     }
     func testHistoryAndKardexLayouts() async throws {
-        let model=try N2NativeSnapshotReader.read(resource("n2-synthetic-clinical"))
+        let model=try N2NativeSnapshotReader.read(resource("n2-synthetic-clinical")),simple=try consolidatedContext()
         for dark in [false,true] {
             try await capture(NavigationStack {N2NativeHistoryView(layoutProjection:model)},
                 name:"Historial-\(dark ? "oscuro":"claro")",dark:dark)
-            try await capture(NavigationStack {N2Build222KardexHub()},
+            try await capture(NavigationStack {N2SimpleInventoryView(layoutContext:simple)},
                 name:"Kardex-\(dark ? "oscuro":"claro")",dark:dark)
         }
     }

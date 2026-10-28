@@ -49,15 +49,12 @@ assert(!gate.includes('N2SyntheticTrialIOSVault.shared'));
 assert(core.includes('guard try journal.recover() == nil'));
 assert(core.includes('N2ProtectedStoreError.targetNotEmpty'));
 assert(core.includes('active.snapshot==plaintext'));
-for (const [destination, identifier] of [
- ['N2NativeActivationView', 'clinical-first-run-restore-222'],
- ['N2NativePersonalImportView', 'clinical-first-run-import-personal']
-]) {
- const route = new RegExp('NavigationLink\\s*\\{\\s*' + destination +
-  '\\(\\)\\s*\\}\\s*label:\\s*\\{[\\s\\S]*?\\}\\s*' +
-  '\\.buttonStyle\\([^\\n]+\\)\\s*\\.accessibilityIdentifier\\("' + identifier + '"\\)');
- assert(route.test(workspace), 'Missing first-run route: ' + identifier);
-}
+assert(workspace.includes('N2SimpleRestoreView(kind:.complete).environment(\\.n2WorkspaceVault,.clinical)'));
+assert(workspace.includes('clinical-first-run-restore-222'));
+assert(workspace.includes('N2NativePersonalImportView()'));
+const restore=read('native-ios/App/N2SimpleMigrationViews.swift');
+for(const key of ['inspectSimpleBackup','recoverPortableSource','restoreSimpleClinical','SHA256.hash(data:archive)','evaluatePolicy','clearSecrets()']) assert(restore.includes(key),key);
+for(const key of ['targetNotEmpty','verifySimpleBackupDomain','N1lRealSnapshotGate.audit']) assert(core.includes(key),key);
 assert(tests.includes('testBuild222EncryptedSourceReviewCannotBeChangedBeforeRestore'));
 assert(tests.includes('testFullSyntheticClinicalBackupPreservesPhysicalHistoryAcrossReview'));
 console.log('PASS: contrato cifrado build 222 compatible con lector B11; vista previa independiente, SHA, fuente vacía, contadores y recuperación segura.');

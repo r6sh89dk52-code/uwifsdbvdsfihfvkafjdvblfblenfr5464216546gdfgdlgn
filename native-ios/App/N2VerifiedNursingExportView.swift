@@ -128,7 +128,7 @@ struct N2VerifiedNursingExportView:View {
                 .buttonStyle(DanperSecondaryButton())
                 if reportMode=="cut" {
                     NavigationLink {
-                        N2KardexCutPreviewView()
+                        N2SimpleCutView()
                     } label: {
                         Label("Ver stock inicial reconstruido del día 9",
                               systemImage:"calendar.badge.clock")

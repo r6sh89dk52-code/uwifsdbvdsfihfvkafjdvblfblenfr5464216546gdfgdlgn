@@ -9,6 +9,10 @@ const root=path.resolve(__dirname,'..');
 const app=path.join(root,'native-ios','App');
 const views=[
 'N2NativeHistoryView.swift',
+'N2SimpleInventoryView.swift',
+'N2SimpleProductEditor.swift',
+'N2SimpleMigrationViews.swift',
+'N2SimpleCutView.swift',
 'N2ClinicalCorrectionView.swift',
 'N2NativeWorkerEditorView.swift',
 'N2NativeClinicalFormView.swift',

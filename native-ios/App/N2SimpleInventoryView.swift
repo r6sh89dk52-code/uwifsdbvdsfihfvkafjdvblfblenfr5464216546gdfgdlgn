@@ -43,6 +43,7 @@ private struct N2SimpleEditorRoute:Identifiable {
     var incident:N2SimpleIncident?
 }
 struct N2SimpleInventoryView:View {
+    var layoutContext:N2SimpleInventoryContext?=nil
     var initialOperation:String?=nil
     @Environment(\.n2WorkspaceVault) private var vault
     @State private var context:N2SimpleInventoryContext?
@@ -62,7 +63,7 @@ struct N2SimpleInventoryView:View {
             }.padding(16)
         }
         .navigationTitle("Inventario").navigationBarTitleDisplayMode(.inline).danperFormChrome()
-        .task {await load()}.refreshable {await load()}
+        .task {if let layoutContext {context=layoutContext;loading=false}else{await load()}}.refreshable {await load()}
         .sheet(item:$editor,onDismiss:{Task {await load()}}) {route in
             if let context {
                 NavigationStack {N2SimpleProductEditor(context:context,operation:route.operation,
@@ -80,8 +81,10 @@ struct N2SimpleInventoryView:View {
         }
         Button {editor=N2SimpleEditorRoute(operation:.register)} label:{Label("Registrar inventario",systemImage:"plus")}
             .buttonStyle(DanperPrimaryButton()).accessibilityIdentifier("simple-register-product")
-        TextField("Buscar medicamento o insumo",text:$query)
-            .textFieldStyle(.roundedBorder).accessibilityIdentifier("simple-inventory-search")
+        DanperField(title:"Buscar medicamento o insumo") {
+            TextField("Nombre o código",text:$query,prompt:Text("Nombre o código").foregroundStyle(.secondary))
+                .accessibilityIdentifier("simple-inventory-search")
+        }
         if state.products.isEmpty {Text("Registra el primer conteo físico. Sin conteo no se presume una existencia comprobada.").foregroundStyle(.secondary)}
         LazyVStack(spacing:12) {
             ForEach(state.products.filter{query.isEmpty || $0.name.localizedStandardContains(query) || $0.code.contains(query)}) {p in
@@ -104,7 +107,9 @@ struct N2SimpleInventoryView:View {
             Text(p.name).font(.headline).foregroundStyle(.primary).fixedSize(horizontal:false,vertical:true)
             Text("Catálogo: "+p.unit+" · "+(p.mode == .presentation ? "Conteo por presentación":"Conteo por unidad"))
                 .font(.caption).foregroundStyle(.secondary)
-            LabeledContent("Existencias",value:p.quantity.formatted()+" "+(p.mode == .presentation ? "presentaciones":p.unit))
+            LabeledContent {
+                Text(p.quantity.formatted()+" "+(p.mode == .presentation ? "presentaciones":p.unit)).accessibilityIdentifier("simple-stock-"+p.code)
+            } label:{Text("Existencias")}
                 .foregroundStyle(.primary)
             Text(n2SimpleExpiry(p)).font(.caption).foregroundStyle(p.expiryVerified ? Color.secondary:.orange)
             Text("Último conteo: "+n2SimpleDateTime(p.lastCountAt)).font(.caption2).foregroundStyle(.secondary)

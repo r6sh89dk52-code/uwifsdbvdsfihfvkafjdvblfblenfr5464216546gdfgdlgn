@@ -143,7 +143,7 @@ public enum N2SimpleInventory {
         SHA256.hash(data:try bytes(object(data))).map{String(format:"%02x",$0)}.joined()
     }
     static func digest(_ data:Data)->String {SHA256.hash(data:data).map{String(format:"%02x",$0)}.joined()}
-    static func round(_ value:Double)->Double {(value*1000).rounded()/1000}
+    static func round(_ value:Double)->Double {let result=(value*1000).rounded()/1000;return result==0 ? 0:result}
     static func validQuantity(_ q:Double)->Bool {
         q.isFinite && q>=0 && q<=10_000_000 && abs(round(q)-q)<0.0000001
     }
@@ -205,7 +205,7 @@ public enum N2SimpleInventory {
         }
         guard let lots=root["stockLots"] as? [Any],lots.isEmpty,
               let oldMoves=root["stockMovements"] as? [Any],oldMoves.isEmpty,
-              ["nativePendingDispensingEvidence","nativeStockSiteVerifications","nativeLotMetadataCorrections","deliveryIncidents"].allSatisfy({
+              ["nativePendingDispensingEvidence","nativeStockSiteVerifications","nativeLotMetadataCorrections","deliveryIncidents","ambulatoryReconciliation"].allSatisfy({
                   root[$0]==nil || (root[$0] as? [Any])?.isEmpty==true
               }) else {
             throw N2SimpleInventoryError.legacyOperation
@@ -229,7 +229,12 @@ public enum N2SimpleInventory {
                   let items=v["items"] as? [[String:Any]] else{throw N2SimpleInventoryError.invalidClinicalLink}
             for item in items {
                 guard let iid=item["id"] as? String else{throw N2SimpleInventoryError.invalidClinicalLink}
-                let k=key(id,iid);clinical[k]=item;ordered.append(k)
+                if let declaration=item["simpleR"] {
+                    guard let n=declaration as? NSNumber,CFGetTypeID(n) != CFBooleanGetTypeID(),[0.0,1.0].contains(n.doubleValue) else {throw N2SimpleInventoryError.invalidDeclaration}
+                }
+                let k=key(id,iid)
+                guard clinical[k]==nil else {throw N2SimpleInventoryError.invalidClinicalLink}
+                clinical[k]=item;ordered.append(k)
             }
         }
         var ids=Set<String>(),balances=[String:Double](),lastAt=[String:Int64](),uses=[String:Double]()
@@ -268,7 +273,7 @@ public enum N2SimpleInventory {
                 } else {
                     guard m.declaredR==nil,m.delta == -quantity.doubleValue else{throw N2SimpleInventoryError.invalidDeclaration}
                 }
-                uses[k] = -m.delta
+                uses[k] = round(-m.delta)
             } else if m.visitID != nil || m.itemID != nil || m.declaredR != nil || m.clinicalQuantity != nil {
                 throw N2SimpleInventoryError.invalidClinicalLink
             }
