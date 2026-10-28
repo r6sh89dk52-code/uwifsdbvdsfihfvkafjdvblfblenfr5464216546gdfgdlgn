@@ -15,13 +15,22 @@ final class N3ClinicalJourneyTests:XCTestCase {
         for _ in 0..<8 {
             let footer=app.buttons["Anterior"]
             let bottom=footer.exists && footer.isHittable ? footer.frame.minY-8:app.frame.maxY-70
-            let fixed=element.identifier.hasPrefix("premium-tab-") || element.identifier=="premium-close-attention" || element.identifier=="attention-step-actions"
+            let navigation=app.navigationBars.allElementsBoundByIndex.contains {
+                $0.frame.contains(CGPoint(x:element.frame.midX,y:element.frame.midY))
+            }
+            let fixed=navigation || element.identifier.hasPrefix("premium-tab-") || element.identifier=="premium-close-attention" || element.identifier=="attention-step-actions"
             if element.isHittable && (fixed || (element.frame.minY>130 && element.frame.maxY<bottom)) {break}
             if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
-            else if element.frame.minY<130 {app.swipeDown()}
-            else {app.swipeUp()}
+            else {scrollShort(in:app,up:element.frame.minY>=130)}
         }
         XCTAssertTrue(element.isHittable,app.debugDescription);element.tap()
+    }
+    /// Screen-wide inertial flicks can jump a short inline field past both
+    /// viewport edges. Use bounded drags; every target must still be hittable.
+    private func scrollShort(in app:XCUIApplication,up:Bool) {
+        let start=app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:up ? 0.65:0.40))
+        let end=app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:up ? 0.45:0.60))
+        start.press(forDuration:0.10,thenDragTo:end,withVelocity:.slow,thenHoldForDuration:0.10)
     }
     private func enter(_ element:XCUIElement,_ value:String,in app:XCUIApplication) {
         tap(element,in:app)
