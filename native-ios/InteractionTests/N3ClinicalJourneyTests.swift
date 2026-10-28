@@ -19,9 +19,11 @@ final class N3ClinicalJourneyTests:XCTestCase {
                 $0.frame.contains(CGPoint(x:element.frame.midX,y:element.frame.midY))
             }
             let fixed=navigation || element.identifier.hasPrefix("premium-tab-") || element.identifier=="premium-close-attention" || element.identifier=="attention-step-actions"
-            if element.isHittable && (fixed || (element.frame.minY>130 && element.frame.maxY<bottom)) {break}
+            let textInput=element.elementType == .textField || element.elementType == .textView
+            let safeTop:CGFloat=textInput ? 170:130
+            if element.isHittable && (fixed || (element.frame.minY>safeTop && element.frame.maxY<bottom)) {break}
             if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
-            else {scrollShort(in:app,up:element.frame.minY>=130)}
+            else {scrollShort(in:app,up:element.frame.minY>=safeTop)}
         }
         XCTAssertTrue(element.isHittable,app.debugDescription);element.tap()
     }
@@ -34,11 +36,26 @@ final class N3ClinicalJourneyTests:XCTestCase {
         start.press(forDuration:0.10,thenDragTo:end,withVelocity:.slow,thenHoldForDuration:0.10)
     }
     private func enter(_ element:XCUIElement,_ value:String,in app:XCUIApplication) {
+        // Finish the previous responder before moving to a different field.
+        // Otherwise a just-scrolled search near the navigation edge can leave
+        // the quantity field focused while XCTest starts typing into search.
+        let keyboard=app.keyboards.firstMatch
+        if keyboard.exists {
+            let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
+            XCTAssertTrue(hide.waitForExistence(timeout:5),app.debugDescription)
+            hide.tap()
+            let hidden=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:keyboard)
+            XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:5),.completed)
+        }
         tap(element,in:app)
+        XCTAssertTrue(keyboard.waitForExistence(timeout:5),app.debugDescription)
         if let old=element.value as? String,old != element.placeholderValue,!old.isEmpty {
             element.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:old.count))
         }
         element.typeText(value)
+        if element.identifier=="inline-catalog-query" {
+            XCTAssertEqual(element.value as? String,value,"La consulta debe escribirse en el buscador, nunca en la cantidad clínica")
+        }
     }
     private func inventory(_ app:XCUIApplication) {
         tap(app.buttons["premium-tab-home"],in:app)
