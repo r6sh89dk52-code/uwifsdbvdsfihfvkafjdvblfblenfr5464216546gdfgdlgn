@@ -110,7 +110,7 @@ struct NativeFirstRunOnboarding: View {
             .padding(.horizontal,28)
             .padding(.bottom,38)
         }
-        .background(DanperStyle.canvas)
+        .background(DanperBackdrop())
         .environment(\.locale,Locale(identifier:"es_PE"))
         .sensoryFeedback(.selection,trigger:step)
         .task {

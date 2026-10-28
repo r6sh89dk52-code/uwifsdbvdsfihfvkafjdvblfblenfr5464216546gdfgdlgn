@@ -18,31 +18,13 @@ enum DanperStyle {
         healthPalette ? Color(red:0.01,green:0.73,blue:0.93) :
                         Color(red:0.57,green:0.035,blue:0.12)
     }
-    static var canvas:Color {
-        Color(uiColor:UIColor { traits in
-            if traits.userInterfaceStyle == .dark {
-                return healthPalette
-                    ? UIColor(red:0.055,green:0.095,blue:0.155,alpha:1)
-                    : UIColor(red:0.018,green:0.023,blue:0.031,alpha:1)
-            }
-            return healthPalette
-                ? UIColor(red:0.942,green:0.979,blue:0.995,alpha:1)
-                : UIColor(red:0.965,green:0.965,blue:0.974,alpha:1)
-        })
-    }
-    static var surface:Color {
-        Color(uiColor:UIColor { traits in
-            if traits.userInterfaceStyle == .dark {
-                return healthPalette
-                    ? UIColor(red:0.095,green:0.15,blue:0.21,alpha:1)
-                    : UIColor(red:0.073,green:0.083,blue:0.102,alpha:1)
-            }
-            return .white
-        })
-    }
+    // Clinical glass remains charcoal in either system appearance. The user's
+    // appearance preference still controls system presentations and keyboards.
+    static let canvas=Color(red:0.022,green:0.027,blue:0.037)
+    static let surface=Color(red:0.085,green:0.092,blue:0.11)
     static let animation=Animation.easeInOut(duration:0.22)
     static var gradient:LinearGradient {
-        LinearGradient(colors:[red,deepRed],
+        LinearGradient(colors:[red.opacity(0.88),deepRed.opacity(0.58)],
                        startPoint:.topLeading,endPoint:.bottomTrailing)
     }
 }
@@ -70,8 +52,8 @@ struct DanperBrandHeader:View {
             Image(uiImage:Self.wordmark ?? UIImage()).renderingMode(.template)
                 .resizable()
                 .scaledToFill()
-                .frame(width:160,height:54)
-                .foregroundStyle(.white)
+                .frame(width:130,height:44)
+                .foregroundStyle(DanperStyle.red)
                 .clipped()
                 .accessibilityLabel("Danper")
             Text("SALUD MÓVIL")
@@ -80,11 +62,13 @@ struct DanperBrandHeader:View {
                 .foregroundStyle(.white)
                 .fixedSize(horizontal:true,vertical:false)
             Spacer(minLength:3)
+            Image(systemName:"bell").font(.system(size:19,weight:.medium))
+                .foregroundStyle(.white.opacity(0.85)).accessibilityHidden(true)
             Button(action:onSettings) {
                 Image(systemName:"gearshape")
-                    .font(.system(size:22,weight:.semibold))
+                    .font(.system(size:18,weight:.medium))
                     .foregroundStyle(.white)
-                    .frame(width:45,height:45)
+                    .frame(width:38,height:38)
                     .background(.ultraThinMaterial,in:RoundedRectangle(cornerRadius:14))
                     .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(.white.opacity(0.16),lineWidth:0.5))
             }
@@ -92,12 +76,11 @@ struct DanperBrandHeader:View {
             .accessibilityLabel("Ajustes")
             .accessibilityIdentifier("brand-header-settings")
         }
-        .padding(.horizontal,18)
-        .frame(maxWidth:.infinity)
-        .frame(height:65)
-        .background(
-            LinearGradient(colors:[Color(red:0.98,green:0.025,blue:0.15),Color(red:0.64,green:0.01,blue:0.13)],startPoint:.topLeading,endPoint:.bottomTrailing)
-                .ignoresSafeArea(edges:.top))
+        .padding(.horizontal,14)
+        .frame(maxWidth:.infinity).frame(minHeight:58)
+        .danperGlassSurface(cornerRadius:20)
+        .padding(.horizontal,14).padding(.bottom,5)
+        .environment(\.colorScheme,.dark)
         .accessibilityElement(children:.contain)
         .accessibilityIdentifier("danper-brand-header")
     }
@@ -152,7 +135,9 @@ struct DanperFormChrome:ViewModifier {
             }
             .toolbarBackground(.ultraThinMaterial,for:.navigationBar)
             .scrollContentBackground(.hidden)
-            .background(DanperStyle.canvas)
+            .background(DanperBackdrop())
+            .environment(\.colorScheme,.dark)
+            .toolbarColorScheme(.dark,for:.navigationBar)
             .tint(DanperStyle.red)
             .environment(\.locale,Locale(identifier:"es_PE"))
     }
@@ -206,7 +191,7 @@ struct DanperStepProgress:View {
             .accessibilityLabel("Progreso \(step+1) de \(titles.count)")
         }
         .padding(15)
-        .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:18))
+        .danperGlassSurface(cornerRadius:18)
     }
 }
 struct DanperStatusBanner:View {
@@ -227,7 +212,7 @@ struct DanperStatusBanner:View {
             }
         }
         .padding(14).frame(maxWidth:.infinity,alignment:.leading)
-        .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:17))
+        .danperGlassSurface(cornerRadius:17)
     }
 }
 
@@ -242,14 +227,14 @@ struct DanperPanel<Content:View>:View {
         self.title=title;self.content=content()
     }
     var body:some View {
-        VStack(alignment:.leading,spacing:16) {
+        VStack(alignment:.leading,spacing:13) {
             if let title {Text(title).font(.headline).foregroundStyle(.primary)}
             content
         }
         .frame(maxWidth:.infinity,alignment:.leading)
         .padding(16)
         .danperGlassSurface(cornerRadius:20)
-        .overlay(RoundedRectangle(cornerRadius:20).strokeBorder(Color.secondary.opacity(0.16)).allowsHitTesting(false))
+        .environment(\.colorScheme,.dark)
     }
 }
 struct DanperField<Content:View>:View {
@@ -261,7 +246,7 @@ struct DanperField<Content:View>:View {
             Text(title).font(.subheadline.weight(.semibold))
                 .foregroundStyle(highlighted ? DanperStyle.red : Color.secondary)
             content.padding(12).frame(maxWidth:.infinity,alignment:.leading)
-                .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:13))
+                .background(.black.opacity(0.27),in:RoundedRectangle(cornerRadius:13))
                 .overlay(RoundedRectangle(cornerRadius:13)
                     .strokeBorder(highlighted ? DanperStyle.red : Color.secondary.opacity(0.15),
                                   lineWidth:highlighted ? 2 : 1)

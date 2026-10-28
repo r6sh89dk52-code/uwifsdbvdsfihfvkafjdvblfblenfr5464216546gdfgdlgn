@@ -76,7 +76,7 @@ struct DANPERNativeApp: App {
                 } else if !sourceResolved {
                     DanperLoadingState(title:"Preparando DANPER…")
                         .frame(maxWidth:.infinity,maxHeight:.infinity)
-                        .background(DanperStyle.canvas)
+                        .background(DanperBackdrop())
                 } else if onboardingFinished || hasClinicalSource {
                     if authenticated || sessionStarted {
                         N2ClinicalWorkspaceGateView(authenticatedLaunch:true,sessionUnlocked:authenticated,onLock:lockAccess)
@@ -183,32 +183,23 @@ struct DANPERNativeApp: App {
 /// Authentication stays owned by the app lifecycle. Both buttons use iOS
 /// device-owner authentication; only the system handles the device passcode.
 struct DanperAccessView:View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
     let unlocking:Bool
     let canRetry:Bool
     let error:String
     let onUnlock:()->Void
     var onUseCode:(()->Void)?=nil
     private let version=DanperAppVersion()
-    private var background:Color {colorScheme == .dark ? Color(red:0.035,green:0.012,blue:0.02):Color(red:0.99,green:0.975,blue:0.98)}
     var body:some View {
         GeometryReader {geo in
             ScrollView {
                 VStack(spacing:0) {
-                    hero(width:geo.size.width,height:max(250,min(350,geo.size.height*0.43)))
+                    hero(width:geo.size.width,height:max(315,geo.size.height*0.56))
                     VStack(spacing:13) {
-                        Image(systemName:"faceid")
-                            .font(.system(size:40,weight:.light))
-                            .foregroundStyle(DanperStyle.red)
-                            .frame(width:80,height:80)
-                            .background(DanperStyle.red.opacity(0.12),in:RoundedRectangle(cornerRadius:25))
-                            .overlay(RoundedRectangle(cornerRadius:25).strokeBorder(DanperStyle.red.opacity(0.15)))
+                        Image(systemName:"faceid").font(.system(size:38,weight:.light))
+                            .foregroundStyle(DanperStyle.red).frame(width:70,height:70)
+                            .danperGlassSurface(cornerRadius:20)
+                            .overlay(RoundedRectangle(cornerRadius:20).strokeBorder(DanperStyle.red.opacity(0.6),lineWidth:0.7))
                             .accessibilityHidden(true)
-                        Text("Bienvenido").font(.system(.largeTitle,weight:.bold))
-                        Text("Accede de forma segura a tu\ninformación de salud ocupacional.")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center).fixedSize(horizontal:false,vertical:true)
                         if !error.isEmpty {
                             Label(error,systemImage:"exclamationmark.circle")
                                 .font(.footnote).foregroundStyle(.orange)
@@ -222,72 +213,67 @@ struct DanperAccessView:View {
                                 Text(unlocking ? "Verificando identidad…" : canRetry ? "Reintentar Face ID" : "Ingresar con Face ID")
                                 Spacer(minLength:0)
                                 if !unlocking {Image(systemName:"chevron.right").font(.caption.weight(.semibold))}
-                            }.padding(.horizontal,9)
-                        }.buttonStyle(DanperPrimaryButton()).clipShape(Capsule())
-                            .disabled(unlocking)
+                            }
+                        }.buttonStyle(DanperGlassAction(accented:true)).disabled(unlocking)
                             .accessibilityLabel(unlocking ? "Verificando identidad…" : canRetry ? "Reintentar Face ID" : "Ingresar con Face ID")
                             .accessibilityIdentifier("premium-face-id")
                         HStack(spacing:14) {
-                            Rectangle().fill(Color.secondary.opacity(0.20)).frame(height:0.5)
+                            Rectangle().fill(.white.opacity(0.14)).frame(height:0.5)
                             Text("o").font(.caption).foregroundStyle(.secondary)
-                            Rectangle().fill(Color.secondary.opacity(0.20)).frame(height:0.5)
-                        }.padding(.horizontal,25).padding(.top,2)
+                            Rectangle().fill(.white.opacity(0.14)).frame(height:0.5)
+                        }.padding(.horizontal,25)
                         Button(action:onUseCode ?? onUnlock) {
-                            Label("Usar código del dispositivo",systemImage:"circle.grid.3x3.fill")
-                                .font(.subheadline.weight(.medium))
-                                .frame(maxWidth:.infinity,minHeight:46)
-                                .background(Color.primary.opacity(0.045),in:Capsule())
-                                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.12)))
-                        }.buttonStyle(.plain).disabled(unlocking)
+                            HStack(spacing:12) {
+                                Image(systemName:"circle.grid.3x3.fill").font(.title2)
+                                Text("Usar código del dispositivo")
+                                Spacer(minLength:0)
+                                Image(systemName:"chevron.right").font(.caption.weight(.semibold))
+                            }
+                        }.buttonStyle(DanperGlassAction()).disabled(unlocking)
                             .accessibilityHint("Abre la autenticación segura de iOS, que permite usar el código del iPhone.")
                             .accessibilityIdentifier("premium-device-code")
-                        HStack(spacing:10) {
-                            Image(systemName:"lock.shield").font(.title2).foregroundStyle(DanperStyle.red)
-                            VStack(alignment:.leading,spacing:4) {
+                        HStack(spacing:12) {
+                            Image(systemName:"lock.shield").font(.title).foregroundStyle(DanperStyle.red).accessibilityHidden(true)
+                            VStack(alignment:.leading,spacing:5) {
                                 Text("Fuente clínica protegida").font(.caption.weight(.semibold))
                                 Text("Tus datos están seguros y encriptados.").font(.caption2).foregroundStyle(.secondary)
                             }
-                        }.padding(.top,10)
-                        Text(version.compact).font(.caption2).foregroundStyle(.secondary)
+                        }.padding(.top,15)
+                        Text(version.compact).font(.caption2).foregroundStyle(.secondary).padding(.top,6)
                             .accessibilityIdentifier("premium-access-version")
-                    }
-                    .padding(.horizontal,24).padding(.top,-8).padding(.bottom,22)
-                    .frame(maxWidth:520).frame(maxWidth:.infinity)
+                    }.padding(.horizontal,26).padding(.top,-20).padding(.bottom,20)
+                        .frame(maxWidth:520).frame(maxWidth:.infinity)
                 }.frame(minHeight:geo.size.height,alignment:.top)
-            }.background(background.ignoresSafeArea())
-                .overlay(alignment:.top) {
-                    DanperStyle.red.frame(height:geo.safeAreaInsets.top)
-                        .offset(y:-geo.safeAreaInsets.top)
-                        .allowsHitTesting(false).accessibilityHidden(true)
-                }
-                .scrollIndicators(.hidden)
-        }
+            }.background(DanperBackdrop()).scrollIndicators(.hidden)
+        }.environment(\.colorScheme,.dark)
     }
     private func hero(width:CGFloat,height:CGFloat)->some View {
         ZStack(alignment:.topLeading) {
-            // The gradient remains a complete fallback if the optional photo
-            // cannot load. The photo depicts a generated fictional person.
-            LinearGradient(colors:[DanperStyle.red,Color(red:0.16,green:0.025,blue:0.05)],startPoint:.topLeading,endPoint:.bottomTrailing)
-            if UIImage(named:"AccessHero") != nil {
-                Image("AccessHero").resizable().scaledToFill()
-                    .frame(width:width,height:height).clipped()
-                    .accessibilityHidden(true)
-            }
-            LinearGradient(colors:[.black.opacity(0.12),.clear,background],startPoint:.top,endPoint:.bottom)
+            // Exact supplied portrait, unchanged bytes. All lettering, curves
+            // and controls are native SwiftUI; no phone/mockup is embedded.
+            Image("ClinicalPortrait").resizable().scaledToFill()
+                .frame(width:width,height:height+90,alignment:.top).clipped()
+                .offset(y:-45).accessibilityHidden(true)
+            LinearGradient(colors:[.black.opacity(0.12),.clear,DanperStyle.canvas],startPoint:.top,endPoint:.bottom)
+            LinearGradient(colors:[.black.opacity(0.40),.clear],startPoint:.leading,endPoint:.trailing)
             VStack(alignment:.leading,spacing:11) {
-                DanperWordmark(width:min(190,width*0.49))
+                DanperWordmark(width:min(165,width*0.44),color:DanperStyle.red)
                 Text("SALUD MÓVIL").font(.caption.weight(.semibold)).tracking(3)
-                Spacer(minLength:10)
-                Text("Cuidamos\nlo más importante,\nnuestra gente")
-                    .font(.subheadline.weight(.medium)).lineSpacing(3)
-                    .shadow(color:.black.opacity(0.3),radius:5)
-                Spacer(minLength:10)
-            }.foregroundStyle(.white).padding(.leading,28).padding(.top,20).padding(.bottom,60)
-            DanperAccessRibbon().fill(LinearGradient(colors:[DanperStyle.red,DanperStyle.deepRed.opacity(0.4)],startPoint:.topLeading,endPoint:.bottomTrailing))
-                .frame(height:70).frame(maxHeight:.infinity,alignment:.bottom)
+                Spacer(minLength:30)
+                Text("Cuidamos\nlo más importante,\nnuestra gente.")
+                    .font(.subheadline.weight(.semibold)).lineSpacing(3)
+                    .fixedSize(horizontal:false,vertical:true)
+                    .frame(width:width*0.50,alignment:.leading)
+                    .shadow(color:.black.opacity(0.7),radius:8)
+                Spacer(minLength:55)
+            }.foregroundStyle(.white).padding(.leading,27).padding(.top,20).padding(.bottom,35)
+            DanperAccessRibbon().fill(LinearGradient(colors:[DanperStyle.red.opacity(0.8),DanperStyle.deepRed.opacity(0.15)],startPoint:.topLeading,endPoint:.bottomTrailing))
+                .frame(height:80).frame(maxHeight:.infinity,alignment:.bottom)
+                .allowsHitTesting(false).accessibilityHidden(true)
+            DanperAccessRibbon().stroke(DanperStyle.red.opacity(0.45),lineWidth:0.7)
+                .frame(height:80).frame(maxHeight:.infinity,alignment:.bottom)
                 .allowsHitTesting(false).accessibilityHidden(true)
         }.frame(width:width,height:height).clipped()
-            .background(DanperStyle.red.ignoresSafeArea(edges:.top))
     }
 }
 

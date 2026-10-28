@@ -33,7 +33,8 @@ private struct DanperFloatingNavigation:ViewModifier {
                     .transition(.move(edge:.bottom).combined(with:.opacity))
             }
         }
-        .background(DanperStyle.canvas)
+        .background(DanperBackdrop())
+        .environment(\.colorScheme,.dark)
         .animation(reduceMotion ? nil : DanperStyle.animation,value:keyboard.visible)
     }
 }
@@ -55,12 +56,12 @@ private struct DanperGlassSurface:ViewModifier {
             if opaque {shape.fill(DanperStyle.surface)}
             else {
                 shape.fill(.ultraThinMaterial)
-                    .overlay(shape.fill(DanperStyle.surface.opacity(0.78)))
-                    .overlay(shape.fill(LinearGradient(colors:[.white.opacity(0.07),.clear],startPoint:.topLeading,endPoint:.bottomTrailing)))
+                    .overlay(shape.fill(.black.opacity(0.30)))
+                    .overlay(shape.fill(LinearGradient(colors:[.white.opacity(0.065),.clear],startPoint:.topLeading,endPoint:.bottomTrailing)))
             }
         }
         .overlay(RoundedRectangle(cornerRadius:cornerRadius).strokeBorder(.white.opacity(0.10),lineWidth:0.5).allowsHitTesting(false))
-        .shadow(color:.black.opacity(0.07),radius:12,y:5)
+        .shadow(color:.black.opacity(0.25),radius:16,y:7)
     }
 }
 
@@ -94,6 +95,7 @@ struct DanperAttentionEditor:View {
                 }
                 .toolbarBackground(.ultraThinMaterial,for:.navigationBar)
         }
+        .environment(\.colorScheme,.dark)
         .tint(DanperStyle.red)
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(28)
@@ -119,5 +121,34 @@ extension EnvironmentValues {
     var danperAuthenticatedSession:Bool {
         get{self[DanperAuthenticatedSessionKey.self]}
         set{self[DanperAuthenticatedSessionKey.self]=newValue}
+    }
+}
+
+/// Layered charcoal and restrained reflected light, visible through Material.
+/// No animation, so Reduce Motion is respected without a separate branch.
+struct DanperBackdrop:View {
+    @Environment(\.accessibilityReduceTransparency) private var opaque
+    var body:some View {
+        ZStack {
+            DanperStyle.canvas
+            if !opaque {
+                RadialGradient(colors:[DanperStyle.red.opacity(0.12),.clear],center:.topTrailing,startRadius:0,endRadius:380)
+                LinearGradient(colors:[.white.opacity(0.025),.clear,.black.opacity(0.4)],startPoint:.topLeading,endPoint:.bottomTrailing)
+            }
+        }.ignoresSafeArea().allowsHitTesting(false).accessibilityHidden(true)
+    }
+}
+
+struct DanperGlassAction:ButtonStyle {
+    var accented=false
+    func makeBody(configuration:Configuration)->some View {
+        configuration.label.font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+            .padding(.horizontal,18).padding(.vertical,17).frame(maxWidth:.infinity,minHeight:56)
+            .danperGlassSurface(cornerRadius:32)
+            .background {
+                if accented {Capsule().fill(LinearGradient(colors:[DanperStyle.red.opacity(0.65),.clear],startPoint:.leading,endPoint:.trailing))}
+            }
+            .overlay(Capsule().strokeBorder(accented ? DanperStyle.red.opacity(0.48):.white.opacity(0.16),lineWidth:0.7))
+            .opacity(configuration.isPressed ? 0.75:1)
     }
 }

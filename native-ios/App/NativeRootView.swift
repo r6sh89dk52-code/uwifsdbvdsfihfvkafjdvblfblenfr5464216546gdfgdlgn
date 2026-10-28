@@ -72,7 +72,8 @@ struct NativeRootView:View {
             .toolbar(.hidden,for:.tabBar)
         }
         .danperFloatingNavigation(selection:$tab)
-        .background(DanperStyle.canvas)
+        .environment(\.colorScheme,.dark)
+        .background(DanperBackdrop())
         .tint(DanperStyle.red)
         .environment(\.n2WorkspaceVault,.demo)
         .environment(\.locale,Locale(identifier:"es_PE"))
@@ -163,6 +164,7 @@ struct NativeRootView:View {
                     Text("Herramientas").font(.title2.weight(.bold))
                     Spacer()
                     Button("Ver todas",systemImage:"chevron.right") {tab=3}
+                        .accessibilityIdentifier("glass-home-all-tools")
                         .font(.caption.weight(.semibold))
                 }
                 LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
@@ -174,7 +176,7 @@ struct NativeRootView:View {
                     shortcut("Indicadores","Exportaciones de salud","list.clipboard.fill") {DanperExportsView()}
                 }
             }.padding(14)
-        }.background(DanperStyle.canvas)
+        }.background(DanperBackdrop())
             .navigationTitle("Inicio").toolbar(.hidden,for:.navigationBar)
     }
     private func shortcut<Destination:View>(_ title:String,_ description:String,_ symbol:String,

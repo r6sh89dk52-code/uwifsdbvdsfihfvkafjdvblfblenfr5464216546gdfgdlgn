@@ -45,7 +45,7 @@ struct N2ClinicalWorkspaceGateView:View {
                 }
             }
         }
-        .background(DanperStyle.canvas)
+        .background(DanperBackdrop())
         .task {if !checked {await refresh()}}
         .onChange(of:sessionUnlocked) {_,unlocked in
             if unlocked && summary != nil {Task {await verifyRevision()}}
@@ -192,7 +192,8 @@ struct N2ClinicalWorkspaceRootView:View {
             .toolbar(.hidden,for:.tabBar)
         }
         .danperFloatingNavigation(selection:$tab)
-        .background(DanperStyle.canvas)
+        .environment(\.colorScheme,.dark)
+        .background(DanperBackdrop())
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .preferredColorScheme(appearance=="system" ? nil : appearance=="dark" ? .dark : .light)
@@ -230,6 +231,7 @@ struct N2ClinicalWorkspaceRootView:View {
                     Text("Herramientas").font(.title2.weight(.bold))
                     Spacer()
                     Button("Ver todas",systemImage:"chevron.right") {tab=3}
+                        .accessibilityIdentifier("glass-home-all-tools")
                         .font(.caption.weight(.semibold))
                 }.padding(.top,3)
                 LazyVGrid(columns:dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(),spacing:10),GridItem(.flexible(),spacing:10)],spacing:10) {
@@ -243,7 +245,7 @@ struct N2ClinicalWorkspaceRootView:View {
             }.padding(14)
         }
         .navigationTitle("Inicio").toolbar(.hidden,for:.navigationBar)
-        .background(DanperStyle.canvas)
+        .background(DanperBackdrop())
         .refreshable {await refreshHomeCounts()}
     }
     @MainActor private func refreshHomeCounts() async {
@@ -301,6 +303,6 @@ struct N2ClinicalWorkspaceRootView:View {
                 }
             }.padding(16)
         }.navigationTitle("Ajustes").navigationBarTitleDisplayMode(.inline)
-            .background(DanperStyle.canvas)
+            .background(DanperBackdrop())
     }
 }

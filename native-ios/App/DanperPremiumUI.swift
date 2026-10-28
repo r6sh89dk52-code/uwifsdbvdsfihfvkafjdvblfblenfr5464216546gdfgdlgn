@@ -13,10 +13,11 @@ struct DanperAppVersion:Equatable {
 
 struct DanperWordmark:View {
     var width:CGFloat=145
+    var color:Color = .white
     var body:some View {
         Image(uiImage:DanperBrandHeader.wordmark ?? UIImage()).renderingMode(.template)
             .resizable().scaledToFill().frame(width:width,height:width*0.34)
-            .clipped().foregroundStyle(.white).accessibilityLabel("Danper")
+            .clipped().foregroundStyle(color).accessibilityLabel("Danper")
     }
 }
 
@@ -81,46 +82,32 @@ struct DanperFloatingTabs:View {
     }
 }
 
+/// Generic greeting: no unconsented personal name or invented location.
 struct DanperHomeWelcome:View {
     var isDemo=false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {
-        VStack(alignment:.leading,spacing:12) {
-            HStack(alignment:.top,spacing:14) {
-                VStack(alignment:.leading,spacing:6) {
-                    Text("DEPARTAMENTO DE SALUD").font(.caption2.weight(.bold))
-                        .tracking(1.6).foregroundStyle(DanperStyle.red)
-                    Text("Bienvenido").font(.system(.title,weight:.bold))
-                    Text("Registro ambulatorio local")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal:false,vertical:true)
-                }
-                Spacer(minLength:0)
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Image(systemName:"waveform.path.ecg").font(.system(size:27,weight:.semibold))
-                        .foregroundStyle(DanperStyle.red).frame(width:54,height:58)
-                        .background(DanperStyle.red.opacity(0.10),in:RoundedRectangle(cornerRadius:17))
-                        .accessibilityHidden(true)
+        HStack(spacing:16) {
+            Image("ClinicalAvatar").resizable().scaledToFit()
+                .frame(width:dynamicTypeSize.isAccessibilitySize ? 48:68,height:dynamicTypeSize.isAccessibilitySize ? 48:68)
+                .clipShape(Circle()).padding(3)
+                .overlay(Circle().strokeBorder(DanperStyle.red.opacity(0.8),lineWidth:2))
+                .shadow(color:DanperStyle.red.opacity(0.18),radius:12)
+                .accessibilityHidden(true)
+            VStack(alignment:.leading,spacing:6) {
+                Text("Hola").font(.title2.weight(.bold))
+                Text("Departamento de Salud").font(.subheadline).foregroundStyle(.secondary)
+                    .fixedSize(horizontal:false,vertical:true)
+                if !isDemo {
+                    Label("Fuente clínica protegida",systemImage:"lock.shield")
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("premium-protected-source")
                 }
             }
-            HStack(spacing:11) {
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Image(systemName:isDemo ? "testtube.2" : "lock.shield.fill")
-                        .font(.title2).foregroundStyle(DanperStyle.red).accessibilityHidden(true)
-                }
-                VStack(alignment:.leading,spacing:3) {
-                    Text(isDemo ? "DEMO · Solo datos ficticios" : "Fuente clínica protegida")
-                        .font(.subheadline.weight(.semibold))
-                    Text(isDemo ? "Practica sin utilizar datos de pacientes." : "Tus datos están seguros y encriptados")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength:0)
-            }.padding(10).frame(maxWidth:.infinity,alignment:.leading)
-                .background(DanperStyle.red.opacity(0.07),in:RoundedRectangle(cornerRadius:15))
-                .accessibilityIdentifier(isDemo ? "clinical-demo-mode-warning" : "premium-protected-source")
-        }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
-            .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:24))
-            .overlay(RoundedRectangle(cornerRadius:24).strokeBorder(Color.primary.opacity(0.05)))
+            Spacer(minLength:0)
+        }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
+            .danperGlassSurface(cornerRadius:22)
+            .accessibilityIdentifier("glass-home-greeting")
     }
 }
 
@@ -145,11 +132,12 @@ struct DanperNewAttentionCard:View {
                     Text("Registra con menos pasos").font(.caption).opacity(0.85)
                 }
                 Spacer(minLength:0)
-                Image(systemName:"plus").font(.system(size:29,weight:.medium))
-                    .frame(width:54,height:54).background(.white.opacity(0.16),in:Circle())
+                Image(systemName:"doc.badge.plus").font(.system(size:29,weight:.medium))
+                    .frame(width:62,height:68).danperGlassSurface(cornerRadius:19)
             }.foregroundStyle(.white).padding(18)
                 .frame(maxWidth:.infinity,minHeight:118,alignment:.leading)
                 .background(DanperStyle.gradient,in:RoundedRectangle(cornerRadius:25))
+                .danperGlassSurface(cornerRadius:25)
                 .overlay(DanperAccentWave().fill(.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius:25)))
                 .contentShape(RoundedRectangle(cornerRadius:25))
         }.buttonStyle(.plain).accessibilityIdentifier(identifier)
@@ -170,16 +158,13 @@ struct DanperHomeMetricRow:View {
     }
     private func metric(_ title:String,_ value:Int?,_ symbol:String,id:String)->some View {
         VStack(alignment:.leading,spacing:8) {
-            HStack(spacing:6) {
-                Image(systemName:symbol).font(.system(size:17,weight:.semibold))
-                    .foregroundStyle(DanperStyle.red)
-                Spacer(minLength:0)
-                Text(value.map{String($0)} ?? "—").font(.title2.weight(.bold))
-                    .monospacedDigit().minimumScaleFactor(0.65).lineLimit(1)
-            }
+            Image(systemName:symbol).font(.system(size:19,weight:.semibold))
+                .foregroundStyle(DanperStyle.red).accessibilityHidden(true)
+            Text(value.map{String($0)} ?? "—").font(.title2.weight(.bold))
+                .monospacedDigit().minimumScaleFactor(0.65).lineLimit(1)
             Text(title).font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal:false,vertical:true)
-        }.padding(11).frame(maxWidth:.infinity,minHeight:76,alignment:.topLeading)
+        }.padding(13).frame(maxWidth:.infinity,minHeight:101,alignment:.topLeading)
             .danperGlassSurface(cornerRadius:19)
             .overlay(RoundedRectangle(cornerRadius:19).strokeBorder(Color.primary.opacity(0.05)))
             .accessibilityElement(children:.ignore)
@@ -206,6 +191,9 @@ struct DanperToolCard:View {
                     .fixedSize(horizontal:false,vertical:true)
             }
             Spacer(minLength:0)
+            if !dynamicTypeSize.isAccessibilitySize {
+                Image(systemName:"chevron.right").font(.caption).foregroundStyle(.secondary).accessibilityHidden(true)
+            }
         }.padding(12).frame(maxWidth:.infinity,minHeight:92,alignment:.topLeading)
             .danperGlassSurface(cornerRadius:21)
             .overlay(RoundedRectangle(cornerRadius:21).strokeBorder(Color.primary.opacity(0.05)))
@@ -253,14 +241,14 @@ struct DanperStatisticsView:View {
                     Text("—").font(.system(size:42,weight:.bold))
                     Text("El resumen estará disponible próximamente.").font(.subheadline)
                 }.foregroundStyle(.white).padding(20).frame(maxWidth:.infinity,alignment:.leading)
-                    .background(DanperStyle.gradient,in:RoundedRectangle(cornerRadius:24))
+                    .danperGlassSurface(cornerRadius:24)
                 section("Top 5 sistemas afectados",symbol:"heart.text.clipboard")
                 section("Top 5 áreas más atendidas",symbol:"person.3.sequence")
                 section("Accidentes de trabajo",symbol:"chart.bar.xaxis")
                 Text("Puedes consultar tus atenciones en Historial.")
                     .font(.footnote).foregroundStyle(.secondary).padding(.horizontal,4)
             }.padding(16)
-        }.background(DanperStyle.canvas)
+        }.background(DanperBackdrop())
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("premium-statistics")
     }
@@ -283,7 +271,7 @@ struct DanperExportsView:View {
                     DanperToolLink(title:"Vigilancia ocupacional · Excel",symbol:"figure.walk.motion") {N2OccupationalVigilanceExportView()}
                 }
             }.padding(16)
-        }.background(DanperStyle.canvas).navigationTitle("Indicadores").navigationBarTitleDisplayMode(.inline)
+        }.background(DanperBackdrop()).navigationTitle("Indicadores").navigationBarTitleDisplayMode(.inline)
     }
 }
 
