@@ -274,6 +274,14 @@ struct N2ClinicalWorkspaceRootView:View {
     private func toolsPage(title:String,showPreferences:Bool)->some View {
         ScrollView {
             VStack(alignment:.leading,spacing:15) {
+            if !showPreferences {
+                DanperPanel("Accesos rápidos") {
+                    DanperToolLink(title:"Trabajadores",symbol:"person.badge.plus") {N2NativeHistoryView(useProtectedVault:true,showWorkers:true)}
+                    DanperToolLink(title:"Kardex",symbol:"shippingbox.fill") {N2Build222KardexHub()}
+                    DanperToolLink(title:"Estadísticas",symbol:"chart.bar.fill") {DanperStatisticsView()}
+                    DanperToolLink(title:"Indicadores",symbol:"list.clipboard.fill") {DanperExportsView()}
+                }
+            }
                 if showPreferences {
                 DanperVersionPanel()
                 DanperPanel("Apariencia") {
