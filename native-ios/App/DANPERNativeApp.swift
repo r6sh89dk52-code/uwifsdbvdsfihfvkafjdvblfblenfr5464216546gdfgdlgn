@@ -183,6 +183,7 @@ struct DANPERNativeApp: App {
 /// Authentication stays owned by the app lifecycle. Both buttons use iOS
 /// device-owner authentication; only the system handles the device passcode.
 struct DanperAccessView:View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let unlocking:Bool
     let canRetry:Bool
     let error:String
@@ -194,6 +195,13 @@ struct DanperAccessView:View {
             ScrollView {
                 VStack(spacing:0) {
                     hero(width:geo.size.width,height:max(315,geo.size.height*0.56))
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Text("Cuidamos lo más importante, nuestra gente.")
+                            .font(.subheadline.weight(.semibold))
+                            .fixedSize(horizontal:false,vertical:true)
+                            .frame(maxWidth:.infinity,alignment:.leading)
+                            .padding(.horizontal,26).padding(.top,16).padding(.bottom,24)
+                    }
                     VStack(spacing:13) {
                         Image(systemName:"faceid").font(.system(size:38,weight:.light))
                             .foregroundStyle(DanperStyle.red).frame(width:70,height:70)
@@ -241,7 +249,7 @@ struct DanperAccessView:View {
                         }.padding(.top,15)
                         Text(version.compact).font(.caption2).foregroundStyle(.secondary).padding(.top,6)
                             .accessibilityIdentifier("premium-access-version")
-                    }.padding(.horizontal,26).padding(.top,-20).padding(.bottom,20)
+                    }.padding(.horizontal,26).padding(.top,dynamicTypeSize.isAccessibilitySize ? 0:-20).padding(.bottom,20)
                         .frame(maxWidth:520).frame(maxWidth:.infinity)
                 }.frame(minHeight:geo.size.height,alignment:.top)
             }.background(DanperBackdrop()).scrollIndicators(.hidden)
@@ -259,13 +267,17 @@ struct DanperAccessView:View {
             VStack(alignment:.leading,spacing:11) {
                 DanperWordmark(width:min(165,width*0.44),color:DanperStyle.red)
                 Text("SALUD MÓVIL").font(.caption.weight(.semibold)).tracking(3)
-                Spacer(minLength:30)
-                Text("Cuidamos\nlo más importante,\nnuestra gente.")
-                    .font(.subheadline.weight(.semibold)).lineSpacing(3)
-                    .fixedSize(horizontal:false,vertical:true)
-                    .frame(width:width*0.50,alignment:.leading)
-                    .shadow(color:.black.opacity(0.7),radius:8)
-                Spacer(minLength:55)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer(minLength:30)
+                    Text("Cuidamos\nlo más importante,\nnuestra gente.")
+                        .font(.subheadline.weight(.semibold)).lineSpacing(3)
+                        .fixedSize(horizontal:false,vertical:true)
+                        .frame(width:width*0.50,alignment:.leading)
+                        .shadow(color:.black.opacity(0.7),radius:8)
+                    Spacer(minLength:55)
+                } else {
+                    Spacer(minLength:0)
+                }
             }.foregroundStyle(.white).padding(.leading,27).padding(.top,20).padding(.bottom,35)
             DanperAccessRibbon().fill(LinearGradient(colors:[DanperStyle.red.opacity(0.8),DanperStyle.deepRed.opacity(0.15)],startPoint:.topLeading,endPoint:.bottomTrailing))
                 .frame(height:80).frame(maxHeight:.infinity,alignment:.bottom)
