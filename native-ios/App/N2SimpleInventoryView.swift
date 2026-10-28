@@ -126,7 +126,7 @@ struct N2SimpleInventoryView:View {
                 }
             }.padding(12).danperGlassSurface(cornerRadius:15)
         }.padding(.horizontal,16).padding(.vertical,10)
-            .background(.regularMaterial)
+            .danperGlassSurface(cornerRadius:0)
             .environment(\.colorScheme,.dark)
     }
     private func incidents(_ context:N2SimpleInventoryContext,_ state:N2SimpleInventoryState)->some View {

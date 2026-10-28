@@ -54,7 +54,7 @@ final class N2GlassClinicalTests:XCTestCase {
         continueAfterFailure=false
         let app=XCUIApplication();launch(app)
         XCTAssertTrue(app.staticTexts["Hola"].exists)
-        XCTAssertTrue(app.descendants(matching:.any)["premium-demo-banner"].exists)
+        XCTAssertTrue(app.staticTexts["DEMO · Datos ficticios"].exists)
         app.buttons["premium-tab-settings"].tap()
         let name=app.textFields["glass-display-name"]
         reveal(name,in:app);name.tap();name.typeText("Felipe")
