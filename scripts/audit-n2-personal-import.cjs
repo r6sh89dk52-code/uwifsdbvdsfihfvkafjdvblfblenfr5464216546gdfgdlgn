@@ -34,7 +34,19 @@ for(const part of ['"attentions"','"allergies"','"stockLots"',
  assert(planner.includes(part),'Missing preserved clinical collection '+part);
 }
 assert(planner.includes('throw N2PersonalImportError.needsReview'));
-assert(planner.includes('N1eLegacyClinicalAudit.inspect(next)'));
+// Kardex v2 routes through the strict versioned auditor. Require both
+// branches and reject removal of either validator; do not demand obsolete
+// direct legacy-only calls in the import planner.
+assert(planner.includes('N2VersionedSnapshotAudit.inspect(snapshot)'));
+assert(planner.includes('N2VersionedSnapshotAudit.inspect(next)'));
+const versioned=read('native-ios/Sources/DanperCore/N2SimpleInventoryModel.swift');
+const dispatcher=versioned.slice(versioned.indexOf('public enum N2VersionedSnapshotAudit'),versioned.indexOf('public enum N2SimpleInventory {'));
+for(const marker of ['root["inventorySchemaVersion"]','n.intValue==2','n.doubleValue==2',
+ 'CFGetTypeID(n) != CFBooleanGetTypeID()','return try N2SimpleInventory.audit(data)',
+ 'root["simpleInventory"] == nil','throw N2SimpleInventoryError.unsupportedSchema',
+ 'return try N1eLegacyClinicalAudit.inspect(data,allowEmptySynthetic:allowEmptySynthetic)']) {
+ assert(dispatcher.includes(marker),'Missing strict versioned validation: '+marker);
+}
 assert(planner.includes('N1fLosslessFieldGate.inspect(next)'));
 assert(planner.includes('return (snapshot,N2PersonalImportResult('),'Missing idempotent reimport');
 assert(vault.includes('public func activateInitialPersonal('));

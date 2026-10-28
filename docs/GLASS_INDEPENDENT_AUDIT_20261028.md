@@ -25,6 +25,8 @@ Esta revisión estática no equivale a aprobar ejecución en Xcode ni restauraci
 - Variante iLoader: `pe.danper.saludmovil.native.iloaderpreview`, versión `0.4.2`, build `12` (entrega: `0.4.1` / `11`). Ambos targets de pruebas ajustados.
 - Cinco servicios Keychain separados; se conservan cuentas, AES, WhenUnlockedThisDeviceOnly y no sincronización. Directorios Application Support relativos al sandbox; sin App Groups ni grupos Keychain explícitos. El aislamiento físico depende también del application-identifier y entitlements aplicados por iLoader.
 
+- Fallo reproducido en control adicional PERSONAL: esperaba `N1eLegacyClinicalAudit.inspect(next)`, sustituido antes de la base por `N2VersionedSnapshotAudit.inspect(next)` en `32dc07d`. Se actualiza el guard para exigir auditoría de entrada y salida, rechazo de versión desconocida/booleana, auditor v2 y fallback legado estricto. Se conserva N1fLosslessFieldGate. Sin cambio de producción para conseguir PASS.
+
 ## Suites reproducibles
 
 - 50 scripts originales de `npm run test:logic`, inventario exacto en package.json.
