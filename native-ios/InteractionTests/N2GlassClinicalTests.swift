@@ -37,7 +37,7 @@ final class N2GlassClinicalTests:XCTestCase {
         }
         launch(app)
         let all=app.buttons["glass-home-all-tools"];reveal(all,in:app);all.tap()
-        XCTAssertTrue(app.navigationBars["Ajustes"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.navigationBars["Herramientas"].waitForExistence(timeout:10))
         capture("Ver-todas-inicio")
         let backup=app.buttons.matching(NSPredicate(format:"label CONTAINS %@","Respaldo cifrado")).firstMatch
         reveal(backup,in:app);capture("Ver-todas-reportes-seguridad");backup.tap()

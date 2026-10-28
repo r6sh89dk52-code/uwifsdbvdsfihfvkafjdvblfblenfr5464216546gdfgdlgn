@@ -163,7 +163,7 @@ struct NativeRootView:View {
                 HStack {
                     Text("Herramientas").font(.title2.weight(.bold))
                     Spacer()
-                    Button("Ver todas",systemImage:"chevron.right") {tab=3}
+                    NavigationLink {toolsPage(title:"Herramientas",showPreferences:false)} label: {Label("Ver todas",systemImage:"chevron.right")}
                         .accessibilityIdentifier("glass-home-all-tools")
                         .font(.caption.weight(.semibold))
                 }
@@ -198,10 +198,11 @@ struct NativeRootView:View {
         }
         .navigationTitle(title)
     }
-    private var toolsTab:some View {
+    private var toolsTab:some View {toolsPage(title:"Ajustes",showPreferences:true)}
+    private func toolsPage(title:String,showPreferences:Bool)->some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
-            DanperVersionPanel()
+            if showPreferences {DanperVersionPanel()}
             DanperPanel {
                 Label(isReady ? "DEMO · Solo datos ficticios" :
                     "Inicia la práctica desde Inicio",systemImage:"info.circle")
@@ -262,6 +263,7 @@ struct NativeRootView:View {
                 Text("Elimina solo los datos DEMO. Tus datos clínicos se conservan. Requiere confirmación escrita y autenticación.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            if showPreferences {
             DanperPanel("Identidad visual") {
                 Picker("Colores del aplicativo",selection:$visualPalette) {
                     Text("DANPER rojo").tag("danper")
@@ -285,13 +287,14 @@ struct NativeRootView:View {
                 LabeledContent("Responsable",value:N2ClinicianIdentity.name)
                 LabeledContent("DNI del responsable",value:N2ClinicianIdentity.dni)
             }
+            }
             DanperPanel {
                 Text("DEMO · Utiliza únicamente información ficticia.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
           }.padding(16)
         }
-        .navigationTitle("Ajustes")
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .danperFormChrome()
     }

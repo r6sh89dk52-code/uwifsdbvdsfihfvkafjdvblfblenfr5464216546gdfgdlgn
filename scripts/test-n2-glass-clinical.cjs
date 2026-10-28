@@ -21,7 +21,7 @@ for(const marker of ['.safeAreaInset(edge:.top','glass-inventory-filter','simple
 for(const file of ['NativeRootView','N2ClinicalWorkspaceView']) {
  const source=read('native-ios/App/'+file+'.swift');
  assert.deepEqual([...source.matchAll(/\.tabItem\s*\{\s*Label\("([^"]+)"/g)].map(m=>m[1]),['Inicio','Historial','Borradores','Ajustes']);
- assert(source.includes('Button("Ver todas",systemImage:"chevron.right") {tab=3}'));
+ assert(source.includes('toolsPage(title:"Herramientas",showPreferences:false)'));
  for(const destination of ['N2Build222KardexHub()','DanperStatisticsView()','DanperExportsView()','N2NativeHistoryView(useProtectedVault:true,showWorkers:true)'])assert(source.includes(destination));
 }
 console.log('PASS: exact portrait/avatar hashes; native Face ID; real dark Material; no welcome block; unchanged four tabs/tools; catalog-only filters, inline search and expiry/zero-stock presentation. Runtime tests are separate.');

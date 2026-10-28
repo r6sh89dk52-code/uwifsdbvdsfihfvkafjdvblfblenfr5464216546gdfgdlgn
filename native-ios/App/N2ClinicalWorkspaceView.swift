@@ -230,7 +230,7 @@ struct N2ClinicalWorkspaceRootView:View {
                 HStack {
                     Text("Herramientas").font(.title2.weight(.bold))
                     Spacer()
-                    Button("Ver todas",systemImage:"chevron.right") {tab=3}
+                    NavigationLink {toolsPage(title:"Herramientas",showPreferences:false)} label: {Label("Ver todas",systemImage:"chevron.right")}
                         .accessibilityIdentifier("glass-home-all-tools")
                         .font(.caption.weight(.semibold))
                 }.padding(.top,3)
@@ -270,9 +270,11 @@ struct N2ClinicalWorkspaceRootView:View {
             .accessibilityLabel(title+": "+subtitle)
             .accessibilityIdentifier("clinical-home-tool-"+title.lowercased())
     }
-    private var settings:some View {
+    private var settings:some View {toolsPage(title:"Ajustes",showPreferences:true)}
+    private func toolsPage(title:String,showPreferences:Bool)->some View {
         ScrollView {
             VStack(alignment:.leading,spacing:15) {
+                if showPreferences {
                 DanperVersionPanel()
                 DanperPanel("Apariencia") {
                     Picker("Colores",selection:$visualPalette) {
@@ -281,6 +283,7 @@ struct N2ClinicalWorkspaceRootView:View {
                     Picker("Hoja de compartir",selection:$appearance) {
                         Text("Sistema").tag("system");Text("Claro").tag("light");Text("Oscuro").tag("dark")
                     }.pickerStyle(.segmented)
+                }
                 }
                 DanperPanel("Personal y atenciones") {
                     DanperToolLink(title:"Trabajadores",symbol:"person.2") {N2NativeHistoryView(useProtectedVault:true,showWorkers:true)}
@@ -299,10 +302,10 @@ struct N2ClinicalWorkspaceRootView:View {
                 DanperPanel("Seguridad") {
                     DanperToolLink(title:"Respaldo cifrado",symbol:"lock.doc") {N2NativeBackupExportView()}
                     DanperToolLink(title:"Restaurar historial sin reemplazar inventario",symbol:"clock.arrow.circlepath") {N2SimpleRestoreView(kind:.clinical)}
-                    Button("Bloquear aplicación",role:.cancel) {onClose()}.buttonStyle(DanperSecondaryButton())
+                    if showPreferences {Button("Bloquear aplicación",role:.cancel) {onClose()}.buttonStyle(DanperSecondaryButton())}
                 }
             }.padding(16)
-        }.navigationTitle("Ajustes").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle(title).navigationBarTitleDisplayMode(.inline)
             .danperFormChrome()
     }
 }
