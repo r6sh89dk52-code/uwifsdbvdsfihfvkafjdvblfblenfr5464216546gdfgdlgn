@@ -7,6 +7,8 @@ for(const [asset,hash] of [['ClinicalPortrait','c43917268ce67191a70e2b6549747229
  const bytes=fs.readFileSync(path.join(root,`native-ios/App/Assets.xcassets/${asset}.imageset/${asset}.png`));
  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),hash,asset+' must be the exact supplied asset');
 }
+assert(app.includes('.preferredColorScheme(.dark)'),'Clinical glass must keep readable system chrome in either system appearance');
+assert(theme.includes('static var sharingAppearance:UIUserInterfaceStyle'),'Existing sharing appearance preference remains active');
 assert(app.includes('Image("ClinicalPortrait")'));assert(ui.includes('Image("ClinicalAvatar")'));assert(app.includes('Image(systemName:"faceid")'));
 assert(!app.includes('Image("AccessHero")'));assert(!ui.includes('Text("Bienvenido")'));assert(!app.includes('Text("Bienvenido")'));
 for(const marker of ['shape.fill(.ultraThinMaterial)','accessibilityReduceTransparency','DanperBackdrop','struct DanperGlassAction'])assert(glass.includes(marker),marker);
