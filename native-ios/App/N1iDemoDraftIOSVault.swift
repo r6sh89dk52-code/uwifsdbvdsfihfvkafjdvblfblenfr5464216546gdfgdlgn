@@ -9,7 +9,7 @@ import DanperCore
 /// Only N1g's closed fictional demo catalog is accepted by the core codec.
 actor N1iDemoDraftIOSVault {
     static let shared = N1iDemoDraftIOSVault()
-    private let service = "pe.danper.saludmovil.native.preview.n1i.demo-only"
+    private let service = "pe.danper.saludmovil.native.iloaderpreview.n1i.demo-only"
     private let account = "fictitious-drafts-aes256-key-v1"
 
     enum VaultIssue: LocalizedError {

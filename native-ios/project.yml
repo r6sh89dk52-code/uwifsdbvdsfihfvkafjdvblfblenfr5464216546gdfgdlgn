@@ -25,12 +25,12 @@ targets:
       - package: DanperCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview
+        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview
         PRODUCT_NAME: DANPERNative
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.9"
-        MARKETING_VERSION: "0.4.1"
-        CURRENT_PROJECT_VERSION: "11"
+        MARKETING_VERSION: "0.4.2"
+        CURRENT_PROJECT_VERSION: "12"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDevelopmentRegion: es
@@ -62,7 +62,7 @@ targets:
       - target: DANPERNative
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview.tests
+        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview.tests
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.9"
@@ -79,7 +79,7 @@ targets:
       - target: DANPERNative
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview.interactiontests
+        PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview.interactiontests
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.9"

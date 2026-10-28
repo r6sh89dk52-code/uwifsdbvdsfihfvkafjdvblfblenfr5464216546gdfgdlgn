@@ -7,7 +7,7 @@ import DanperCore
 /// Keychain. No view starts migration or activation automatically.
 actor N2SyntheticTrialIOSVault {
     static let shared=N2SyntheticTrialIOSVault()
-    private let service="pe.danper.saludmovil.native.preview.n2.synthetic"
+    private let service="pe.danper.saludmovil.native.iloaderpreview.n2.synthetic"
     private let account="n2-synthetic-trial-key-v1"
     enum Failure:LocalizedError {
         case missingKey, unavailableKeychain, keyInvalid, blockedMigration, resetIncomplete

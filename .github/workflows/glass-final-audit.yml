@@ -1,0 +1,61 @@
+name: DANPER Glass Clinical Pro - independent audit and iLoader candidate
+run-name: Glass audit + unsigned iLoader · ${{ github.sha }}
+on:
+  push:
+    branches: [audit/glass-pro-iloader-20261028]
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+concurrency:
+  group: danper-glass-final-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  macos-validation:
+    runs-on: macos-15
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify published lineage and exact checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor 20b8ae6cc799dd88f952f6b6dc04316a51ac97b4 HEAD
+          git merge-base --is-ancestor 1c131e1e3b46b704b9621914369f9fdf7138a1b9 HEAD
+          git diff --exit-code 1c131e1e3b46b704b9621914369f9fdf7138a1b9 HEAD -- native-ios/Sources/DanperCore
+          echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/danper-glass-evidence" >> "$GITHUB_ENV"
+      - name: Prepare available Xcode
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+      - name: Full synthetic independent validation - all current UI cases
+        run: bash scripts/glass-audit/validate-macos.sh
+      - name: Release ARM64 candidate from validated checkout only
+        run: bash scripts/glass-audit/package-macos.sh
+      - name: Retain logs, summaries, simulator captures and xcresult even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_AUDIT_EVIDENCE_${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/danper-glass-evidence
+            !${{ runner.temp }}/danper-glass-evidence/DerivedData/**
+            !${{ runner.temp }}/danper-glass-evidence/DeviceDerivedData/**
+            !${{ runner.temp }}/danper-glass-evidence/package/**
+            !${{ runner.temp }}/danper-glass-evidence/ipa/**
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Publish verified unsigned candidate and manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_GLASS_PRO_ILOADER_UNSIGNED_${{ github.sha }}
+          path: ${{ runner.temp }}/danper-glass-evidence/ipa
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

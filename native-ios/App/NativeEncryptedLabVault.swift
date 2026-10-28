@@ -7,7 +7,7 @@ import Security
 actor NativeEncryptedLabVault {
     static let shared = NativeEncryptedLabVault()
     private let marker = "DANPER-N1-SYNTHETIC-ONLY"
-    private let service = "pe.danper.saludmovil.native.preview.n1"
+    private let service = "pe.danper.saludmovil.native.iloaderpreview.n1"
     private let keyAccount = "lab-aes256-v1"
     private let pointerAccount = "lab-active-generation-v1"
 

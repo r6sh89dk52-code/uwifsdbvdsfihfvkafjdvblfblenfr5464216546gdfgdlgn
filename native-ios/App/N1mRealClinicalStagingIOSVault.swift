@@ -9,7 +9,7 @@ import DanperCore
 /// are not accessed. This stage cannot activate a clinical database.
 actor N1mRealClinicalStagingIOSVault {
     static let shared = N1mRealClinicalStagingIOSVault()
-    private let service = "pe.danper.saludmovil.native.preview.n1m.real-staging"
+    private let service = "pe.danper.saludmovil.native.iloaderpreview.n1m.real-staging"
     private let account = "single-build222-source-aes256-v1"
 
     private enum Issue: Error {

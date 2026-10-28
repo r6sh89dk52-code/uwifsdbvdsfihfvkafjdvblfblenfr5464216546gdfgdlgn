@@ -27,6 +27,20 @@ final class N2InventoryPresentationTests:XCTestCase {
         // The same supplied catalog is unchanged; no unit normalization or mutation.
         XCTAssertEqual(c.clinical.first{$0.code=="16000025"}?.unit,"FCO")
     }
+    func testAll432CatalogCodesRetain341UnclassifiedProductsInAll() throws {
+        let c=try catalog()
+        let products=try c.clinical.map { try product($0.code,catalog:c) }
+        let all=N2InventoryPresentation.products(products,catalog:c,filter:.all,query:"")
+        let medications=N2InventoryPresentation.products(products,catalog:c,filter:.medications,query:"")
+        let supplies=N2InventoryPresentation.products(products,catalog:c,filter:.supplies,query:"")
+        let unknown=products.filter { N2InventoryPresentation.category(code:$0.code,catalog:c)==nil }
+        XCTAssertEqual(all.count,432)
+        XCTAssertEqual(medications.count,38)
+        XCTAssertEqual(supplies.count,53)
+        XCTAssertEqual(unknown.count,341)
+        XCTAssertEqual(Set(all.map(\.code)),Set(products.map(\.code)))
+        XCTAssertTrue(Set(unknown.map(\.code)).isDisjoint(with:Set((medications+supplies).map(\.code))))
+    }
     func testIntegratedSearchSupportsNameCodeAndOriginalPresentation() throws {
         let c=try catalog(),products=try ["16000182","16000025"].map{try product($0,catalog:c)}
         for q in [" paracetamol ","16000182","UND"] {
