@@ -39,6 +39,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "DANPER Salud Móvil"
         INFOPLIST_KEY_NSFaceIDUsageDescription: "DANPER Salud Móvil utiliza Face ID para restringir el acceso a la aplicación."
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UIViewControllerBasedStatusBarAppearance: NO
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
         # Use Xcode-managed development profiles for a physical iPhone.
         # The developer selects their own Team locally; never commit a
