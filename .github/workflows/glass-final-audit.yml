@@ -9,10 +9,10 @@ permissions:
   contents: read
 concurrency:
   group: danper-glass-final-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   macos-validation:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 110
     steps:
       - uses: actions/checkout@v4
