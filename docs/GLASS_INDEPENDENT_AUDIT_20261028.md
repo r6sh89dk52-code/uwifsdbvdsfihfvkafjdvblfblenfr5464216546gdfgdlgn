@@ -58,3 +58,13 @@ Solo crea y elimina sus propios simuladores nuevos; no borra existentes ni conec
 Salida: logs individuales, SOURCE_SHA/TREE, versión Xcode, inventario UI, xcresult, JSON y attachments. El IPA se publica solo tras validación completa, con DANPER_BUILD.json incrustado, manifiesto por archivo y SHA-256. Compila el nuevo SHA de variante, nunca se atribuye al SHA anterior.
 
 Estado de ejecución se documentará al terminar CI. Este documento no es un PASS. Pendientes: iPhone físico, firma iLoader, VoiceOver manual, Reducir transparencia, Reducir movimiento y migración clínica real. Solo datos sintéticos.
+
+## Segunda ejecución independiente y corrección de entorno
+
+Run 40782758469 / SHA 47f946c9faee7179ae9bfcac905b26fcec54af24: 412 Swift, 50 JS + 12 controles, dos comparaciones XLSX y build-for-testing aprobados. XCTest nativo 22/22, cero fallos/omisiones, iPhone 16 ARM64 / iOS 26.2. Artefacto 12858729958, SHA256 c8c3ed91b672a4a29dc0b33f712a2e38ec871c8df72a5dbf1373b658b7d0a06e. El paquete descargado coincide con ese hash.
+
+Primer caso UI falló en N2BiometricInteractionTests.swift:31: el sistema presentó un botón «cancelar» minúsculo en la pantalla de código; el selector esperaba Cancel/Cancelar. Los otros diez casos no se ejecutaron porque el script se detenía al primer fallo. No hubo IPA.
+
+Se corrige únicamente el selector de Cancelar para admitir las mismas dos palabras sin distinguir mayúsculas; se mantienen todas las aserciones y la política LAContext. Se selecciona el runtime coincidente con el SDK de Xcode (18.5 en este runner), en lugar de escoger silenciosamente el mayor instalado (26.2). iOS 26.2 no queda aprobado por esta corrida fallida.
+
+Se añade una comprobación nativa real de canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics) y biometryType Face ID: el total final esperado pasa a 23 (21 originales + catálogo exhaustivo + disponibilidad biométrica). No se permite pasar con solo el código ni simulando un éxito en la aplicación. Se publican resultados nativos antes de iniciar UI. Cada clase UI conserva su resultado y attachments incluso cuando falla, y las restantes clases continúan para no perder cobertura diagnóstica. El empaquetado sigue bloqueado si falla cualquier caso.

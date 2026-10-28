@@ -34,8 +34,22 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
           if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
-      - name: Full synthetic independent validation - all current UI cases
-        run: bash scripts/glass-audit/validate-macos.sh
+      - name: Full Swift, JavaScript, native XCTest and simulator build
+        run: bash scripts/glass-audit/validate-macos.sh native
+      - name: Publish core and native evidence before lengthy UI journeys
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_CORE_NATIVE_${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/danper-glass-evidence/*.log
+            ${{ runner.temp }}/danper-glass-evidence/*.json
+            ${{ runner.temp }}/danper-glass-evidence/*.txt
+            ${{ runner.temp }}/danper-glass-evidence/native-23-attachments
+            ${{ runner.temp }}/danper-glass-evidence/native-23.xcresult
+          retention-days: 14
+      - name: All 11 current UI cases with genuine simulated authentication
+        run: bash scripts/glass-audit/validate-macos.sh ui
       - name: Release ARM64 candidate from validated checkout only
         run: bash scripts/glass-audit/package-macos.sh
       - name: Retain logs, summaries, simulator captures and xcresult even on failure

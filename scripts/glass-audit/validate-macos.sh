@@ -5,6 +5,9 @@ cd "$(dirname "$0")/../.."
 : "${DANPER_AUDIT_OUT:?Set an absolute evidence directory}"
 mkdir -p "$DANPER_AUDIT_OUT"
 OUT="$DANPER_AUDIT_OUT"
+MODE="${1:-all}"
+DD="$OUT/DerivedData"
+if test "$MODE" != ui; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -23,14 +26,19 @@ for name in test-n1r-native-xlsx test-n1s-full-native-workbooks; do
  node "scripts/$name.cjs" > "$OUT/$name.log" 2>&1
 done
 (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
-DD="$OUT/DerivedData"
 xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" build-for-testing > "$OUT/build-for-testing.log" 2>&1
+fi
+if test "$MODE" = ui; then test "$(cat "$OUT/CORE_NATIVE_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 # Never pick or erase an existing user's simulator.
-RUNTIME=$(python3 - "$OUT/runtimes.json" <<'PY'
+SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
+RUNTIME=$(python3 - "$OUT/runtimes.json" "$SDK_VERSION" <<'PY'
 import json,sys
 r=[x for x in json.load(open(sys.argv[1]))['runtimes'] if x.get('isAvailable') and x['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-')]
-assert r,'No available iOS runtime'; print(sorted(r,key=lambda x:tuple(map(int,x['version'].split('.'))))[-1]['identifier'])
+sdk=tuple(map(int,sys.argv[2].split('.')[:2]))
+r=[x for x in r if tuple(map(int,x['version'].split('.')[:2]))==sdk]
+assert r,'No iOS runtime matching the selected Xcode SDK; do not silently select another major release'
+print(r[0]['identifier'])
 PY
 )
 SIM_ID=''
@@ -50,17 +58,22 @@ fresh(){
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
 }
 run_tests(){
- local label="$1" expected="$2"; shift 2
+ local label="$1" expected="$2" status=0; shift 2
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
   -derivedDataPath "$DD" -parallel-testing-enabled NO -resultBundlePath "$OUT/$label.xcresult" \
-  "$@" test-without-building > "$OUT/$label.log" 2>&1
- python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected"
- xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments"
+  "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
+ python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
+ xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments" || status=1
+ return "$status"
 }
-fresh native
-# All original 21 cases, plus the exhaustive 432-code classification regression.
-run_tests native-22 22 -only-testing:DANPERNativeTests
+if test "$MODE" != ui; then
+ fresh native
+ # All original 21 cases + exhaustive catalog + genuine Face ID availability.
+ run_tests native-23 23 -only-testing:DANPERNativeTests
+ git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
+ if test "$MODE" = native; then exit 0; fi
+fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
 python3 - <<'PY' > "$OUT/ui-classes.tsv"
 from pathlib import Path
@@ -69,18 +82,20 @@ for p in sorted(Path('native-ios/InteractionTests').glob('*.swift')):
  s=p.read_text(); c=re.search(r'final class (\w+):XCTestCase',s)
  if c: print(c[1],len(re.findall(r'func test\w+\(',s)),sep='\t')
 PY
+overall=0
 while IFS=$'\t' read -r cls count; do
  fresh "$cls"
  case "$cls" in
   N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests)
-   run_tests "seed-$cls" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests ;;
+   if ! run_tests "seed-$cls" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; continue; fi ;;
  esac
- run_tests "$cls" "$count" "-only-testing:DANPERInteractionTests/$cls"
+ if ! run_tests "$cls" "$count" "-only-testing:DANPERInteractionTests/$cls"; then overall=1; fi
 done < "$OUT/ui-classes.tsv"
 python3 - "$OUT/ui-classes.tsv" <<'PY'
 import sys
 assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==11,'Review UI test inventory'
 PY
+test "$overall" = 0
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
-echo 'PASS: 412 Swift, 22 native (21 original + exhaustive catalog), all 11 UI, 50 JavaScript, 12 additional guards + 2 cross-workbook controls.'
+echo 'PASS: 412 Swift, 23 native (21 original + exhaustive catalog + Face ID environment), all 11 UI, 50 JavaScript, 12 additional guards + 2 cross-workbook controls.'

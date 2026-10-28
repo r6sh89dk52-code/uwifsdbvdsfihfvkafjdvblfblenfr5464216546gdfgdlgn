@@ -27,7 +27,7 @@ final class N2BiometricInteractionTests:XCTestCase {
         capture(app,"Autenticacion-automatica-sin-tocar-ingresar")
         Thread.sleep(forTimeInterval:2)
         biometric("nomatch")
-        let cancel=springboard.buttons.matching(NSPredicate(format:"label IN %@",["Cancel","Cancelar"])).firstMatch
+        let cancel=springboard.buttons.matching(NSPredicate(format:"label ==[c] %@ OR label ==[c] %@","Cancel","Cancelar")).firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout:10),springboard.debugDescription)
         cancel.tap()
         let retry=app.buttons["Reintentar Face ID"]
