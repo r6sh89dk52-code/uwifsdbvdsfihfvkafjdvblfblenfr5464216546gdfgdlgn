@@ -26,10 +26,11 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertTrue(element.isHittable,app.debugDescription);element.tap()
     }
     /// Screen-wide inertial flicks can jump a short inline field past both
-    /// viewport edges. Use bounded drags; every target must still be hittable.
+    /// viewport edges. Drag the empty outer gutter so date/menu controls never
+    /// receive an accidental press; every target must still be hittable.
     private func scrollShort(in app:XCUIApplication,up:Bool) {
-        let start=app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:up ? 0.65:0.40))
-        let end=app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:up ? 0.45:0.60))
+        let start=app.coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:up ? 0.65:0.40))
+        let end=app.coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:up ? 0.45:0.60))
         start.press(forDuration:0.10,thenDragTo:end,withVelocity:.slow,thenHoldForDuration:0.10)
     }
     private func enter(_ element:XCUIElement,_ value:String,in app:XCUIApplication) {
