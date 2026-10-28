@@ -76,6 +76,7 @@ struct DanperAttentionEditor:View {
     var initialWorkerDNI:String?=nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceTransparency) private var opaque
     @Environment(\.n2WorkspaceVault) private var vault
     var body:some View {
         NavigationStack {
@@ -93,7 +94,9 @@ struct DanperAttentionEditor:View {
                             .accessibilityIdentifier("premium-close-attention")
                     }
                 }
-                .danperFormChrome()
+                .toolbarBackground(.black.opacity(opaque ? 1:0.78),for:.navigationBar)
+                .toolbarBackground(.visible,for:.navigationBar)
+                .toolbarColorScheme(.dark,for:.navigationBar)
         }
         .environment(\.colorScheme,.dark)
         .tint(DanperStyle.red)
