@@ -143,7 +143,7 @@ struct DanperFormChrome:ViewModifier {
                     .accessibilityIdentifier("danper-dismiss-keyboard")
                 }
             }
-            .toolbarBackground(.ultraThinMaterial,for:.navigationBar)
+            .background(DanperNavigationGlass())
             .toolbarBackground(.visible,for:.navigationBar)
             .scrollContentBackground(.hidden)
             .background(DanperBackdrop())
@@ -491,5 +491,36 @@ struct DanperToolLink<Destination:View>:View {
             }.padding(10).frame(maxWidth:.infinity,minHeight:64)
                 .background(DanperStyle.canvas,in:RoundedRectangle(cornerRadius:14))
         }.buttonStyle(.plain)
+    }
+}
+
+/// Native dark glass navigation, including sheets; UIKit owns safe areas and keyboard geometry.
+private struct DanperNavigationGlass:UIViewRepresentable {
+    @Environment(\.accessibilityReduceTransparency) private var opaque
+    func makeUIView(context:Context)->UIView {UIView(frame:.zero)}
+    func updateUIView(_ view:UIView,context:Context) {
+        let opaque=opaque
+        DispatchQueue.main.async {
+            var responder:UIResponder?=view
+            while let current=responder {
+                if let controller=current as? UIViewController,
+                   let navigation=controller.navigationController {
+                    let appearance=UINavigationBarAppearance()
+                    appearance.configureWithTransparentBackground()
+                    appearance.backgroundEffect=opaque ? nil : UIBlurEffect(style:.systemUltraThinMaterialDark)
+                    appearance.backgroundColor=UIColor(white:0.015,alpha:opaque ? 1:0.68)
+                    appearance.shadowColor=UIColor.white.withAlphaComponent(0.08)
+                    appearance.titleTextAttributes=[.foregroundColor:UIColor.white]
+                    appearance.largeTitleTextAttributes=[.foregroundColor:UIColor.white]
+                    let bar=navigation.navigationBar
+                    bar.standardAppearance=appearance
+                    bar.scrollEdgeAppearance=appearance
+                    bar.compactAppearance=appearance
+                    bar.compactScrollEdgeAppearance=appearance
+                    break
+                }
+                responder=current.next
+            }
+        }
     }
 }

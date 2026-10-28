@@ -93,7 +93,7 @@ struct DanperAttentionEditor:View {
                             .accessibilityIdentifier("premium-close-attention")
                     }
                 }
-                .toolbarBackground(.ultraThinMaterial,for:.navigationBar)
+                .danperFormChrome()
         }
         .environment(\.colorScheme,.dark)
         .tint(DanperStyle.red)
