@@ -56,8 +56,8 @@ private struct DanperGlassSurface:ViewModifier {
             if opaque {shape.fill(DanperStyle.surface)}
             else {
                 shape.fill(.ultraThinMaterial)
-                    .overlay(shape.fill(.black.opacity(0.30)))
-                    .overlay(shape.fill(LinearGradient(colors:[.white.opacity(0.065),.clear],startPoint:.topLeading,endPoint:.bottomTrailing)))
+                    .overlay(shape.fill(.black.opacity(0.42)))
+                    .overlay(shape.fill(LinearGradient(colors:[.white.opacity(0.055),.clear],startPoint:.topLeading,endPoint:.bottomTrailing)))
             }
         }
         .overlay(RoundedRectangle(cornerRadius:cornerRadius).strokeBorder(.white.opacity(0.10),lineWidth:0.5).allowsHitTesting(false))

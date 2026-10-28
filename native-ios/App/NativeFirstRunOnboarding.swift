@@ -6,6 +6,7 @@ import LocalAuthentication
 /// person explicitly taps a matching explanation button. Skips always work.
 struct NativeFirstRunOnboarding: View {
     let onFinished: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var step = 0
     @State private var notificationState = "Puedes decidir más adelante."
     @State private var biometricState = "El código del iPhone seguirá disponible."
@@ -110,7 +111,7 @@ struct NativeFirstRunOnboarding: View {
             .padding(.horizontal,28)
             .padding(.bottom,38)
         }
-        .background(DanperBackdrop())
+        .background(DanperBackdrop()).environment(\.colorScheme,.dark)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .sensoryFeedback(.selection,trigger:step)
         .task {
@@ -170,7 +171,7 @@ struct NativeFirstRunOnboarding: View {
     }
 
     private func advance() {
-        withAnimation(.smooth(duration:0.4)) {
+        withAnimation(reduceMotion ? nil:.smooth(duration:0.4)) {
             step = min(steps-1,step+1)
         }
     }

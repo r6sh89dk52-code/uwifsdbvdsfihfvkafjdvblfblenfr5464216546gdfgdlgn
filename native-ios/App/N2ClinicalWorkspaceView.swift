@@ -303,6 +303,6 @@ struct N2ClinicalWorkspaceRootView:View {
                 }
             }.padding(16)
         }.navigationTitle("Ajustes").navigationBarTitleDisplayMode(.inline)
-            .background(DanperBackdrop())
+            .danperFormChrome()
     }
 }

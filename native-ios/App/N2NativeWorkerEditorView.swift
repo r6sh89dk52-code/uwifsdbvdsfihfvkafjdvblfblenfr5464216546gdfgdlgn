@@ -219,8 +219,7 @@ struct N2NativeWorkerEditorView:View {
                             }.padding(6)
                         }
                         .frame(maxHeight:260)
-                        .background(DanperStyle.surface,
-                                    in:RoundedRectangle(cornerRadius:15))
+                        .danperGlassSurface(cornerRadius:15)
                         .overlay(RoundedRectangle(cornerRadius:15)
                             .strokeBorder(Color.secondary.opacity(0.15)))
                         .id(areaAnchor)

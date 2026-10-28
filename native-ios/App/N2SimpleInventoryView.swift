@@ -47,6 +47,11 @@ struct N2SimpleInventoryView:View {
     @State private var filter:N2InventoryFilter = .all
     @State private var editor:N2SimpleEditorRoute?
     @State private var presentedInitialOperation=false
+    init(layoutContext:N2SimpleInventoryContext?=nil,initialOperation:String?=nil,
+         layoutFilter:N2InventoryFilter = .all,layoutQuery:String="") {
+        self.layoutContext=layoutContext;self.initialOperation=initialOperation
+        _filter=State(initialValue:layoutFilter);_query=State(initialValue:layoutQuery)
+    }
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:16) {
@@ -254,7 +259,7 @@ struct N2GlassInventoryRow:View {
                 }
             }.frame(maxWidth:.infinity,alignment:.leading)
             VStack(alignment:.trailing,spacing:3) {
-                Text(product.quantity.formatted()).font(.system(.largeTitle,weight:.semibold,design:.rounded))
+                Text(product.quantity.formatted()).font(.system(.largeTitle,design:.rounded,weight:.semibold))
                     .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                     .accessibilityIdentifier("simple-stock-"+product.code)
                 Text(product.unit).font(.caption.weight(.semibold)).foregroundStyle(.secondary)

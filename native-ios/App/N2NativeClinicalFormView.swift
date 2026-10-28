@@ -528,7 +528,7 @@ struct N2NativeClinicalFormView:View {
                     }
                     Spacer(minLength:4)
                     Button("Editar") {step=0}.font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                }.padding(12).background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+                }.padding(12).danperGlassSurface(cornerRadius:16)
             }
         }
     }

@@ -30,7 +30,7 @@ enum DanperStyle {
 }
 
 
-/// Shared red top banner for Build 222 native screens. The real Danper
+/// Shared dark glass header for native screens. The real Danper
 /// wordmark is a bundled asset, never recreated with a system font.
 struct DanperBrandHeader:View {
     let onSettings:()->Void
@@ -48,11 +48,11 @@ struct DanperBrandHeader:View {
         return UIImage(cgImage:cg)
     }()
     var body:some View {
-        HStack(spacing:9) {
+        HStack(spacing:8) {
             Image(uiImage:Self.wordmark ?? UIImage()).renderingMode(.template)
                 .resizable()
                 .scaledToFill()
-                .frame(width:130,height:44)
+                .frame(width:120,height:42)
                 .foregroundStyle(DanperStyle.red)
                 .clipped()
                 .accessibilityLabel("Danper")
@@ -68,7 +68,7 @@ struct DanperBrandHeader:View {
                 Image(systemName:"gearshape")
                     .font(.system(size:18,weight:.medium))
                     .foregroundStyle(.white)
-                    .frame(width:38,height:38)
+                    .frame(width:44,height:44)
                     .background(.ultraThinMaterial,in:RoundedRectangle(cornerRadius:14))
                     .overlay(RoundedRectangle(cornerRadius:14).strokeBorder(.white.opacity(0.16),lineWidth:0.5))
             }
@@ -202,7 +202,7 @@ struct DanperStatusBanner:View {
         HStack(alignment:.top,spacing:12) {
             Image(systemName:symbol).font(.headline)
                 .foregroundStyle(DanperStyle.red)
-                .frame(width:38,height:38)
+                .frame(width:44,height:44)
                 .background(DanperStyle.red.opacity(0.10),
                             in:RoundedRectangle(cornerRadius:12))
             VStack(alignment:.leading,spacing:5) {

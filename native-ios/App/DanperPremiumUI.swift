@@ -136,7 +136,7 @@ struct DanperNewAttentionCard:View {
                     .frame(width:62,height:68).danperGlassSurface(cornerRadius:19)
             }.foregroundStyle(.white).padding(18)
                 .frame(maxWidth:.infinity,minHeight:118,alignment:.leading)
-                .background(DanperStyle.gradient,in:RoundedRectangle(cornerRadius:25))
+                .background(LinearGradient(colors:[DanperStyle.red.opacity(0.65),DanperStyle.deepRed.opacity(0.15)],startPoint:.topLeading,endPoint:.bottomTrailing),in:RoundedRectangle(cornerRadius:25))
                 .danperGlassSurface(cornerRadius:25)
                 .overlay(DanperAccentWave().fill(.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius:25)))
                 .contentShape(RoundedRectangle(cornerRadius:25))

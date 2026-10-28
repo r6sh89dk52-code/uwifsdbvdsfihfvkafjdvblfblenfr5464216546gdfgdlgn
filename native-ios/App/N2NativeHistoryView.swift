@@ -545,7 +545,7 @@ struct N2VisitDispensingView:View {
                     }
                     .frame(maxWidth:.infinity,alignment:.leading)
                     .padding(14)
-                    .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:16))
+                    .danperGlassSurface(cornerRadius:16)
                 }
                 if lines.isEmpty && !failed {
                     Text("Esta atención no tiene medicamentos ni insumos registrados.")

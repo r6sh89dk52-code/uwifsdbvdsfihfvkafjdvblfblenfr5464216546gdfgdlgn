@@ -22,7 +22,7 @@ struct N2Build222ExportProgress:View {
             }
         }
         .padding(12)
-        .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:15))
+        .danperGlassSurface(cornerRadius:15)
         .accessibilityElement(children:.combine)
         .accessibilityLabel("Etapas: "+titles.joined(separator:", "))
     }

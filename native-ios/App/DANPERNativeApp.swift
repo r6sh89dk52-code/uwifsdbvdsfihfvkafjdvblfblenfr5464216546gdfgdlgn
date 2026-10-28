@@ -252,8 +252,8 @@ struct DanperAccessView:View {
             // Exact supplied portrait, unchanged bytes. All lettering, curves
             // and controls are native SwiftUI; no phone/mockup is embedded.
             Image("ClinicalPortrait").resizable().scaledToFill()
-                .frame(width:width,height:height+90,alignment:.top).clipped()
-                .offset(y:-45).accessibilityHidden(true)
+                .frame(width:width,height:height,alignment:.top).clipped()
+                .accessibilityHidden(true)
             LinearGradient(colors:[.black.opacity(0.12),.clear,DanperStyle.canvas],startPoint:.top,endPoint:.bottom)
             LinearGradient(colors:[.black.opacity(0.40),.clear],startPoint:.leading,endPoint:.trailing)
             VStack(alignment:.leading,spacing:11) {

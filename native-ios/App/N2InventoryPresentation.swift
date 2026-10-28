@@ -46,7 +46,7 @@ enum N2InventoryPresentation {
     }
     static func symbol(_ product:N2SimpleProduct,catalog:N2NativeCatalogIndex)->String {
         let group=catalog.authorizedNursingOptions(for:product.code).first?.group
-        let name=product.name.folding(options:[.diacriticInsensitive,.caseInsensitive],locale:Locale(identifier:"es_PE"))
+        let name=product.name.folding(options:[.diacriticInsensitive,.caseInsensitive],locale:Locale(identifier:"es_PE")).uppercased()
         // Illustration only. These words never assign a category or unit.
         if group=="TABLETAS" {return "pills.fill"}
         if group=="AMPOLLAS" || group=="JERINGAS" {return "syringe.fill"}

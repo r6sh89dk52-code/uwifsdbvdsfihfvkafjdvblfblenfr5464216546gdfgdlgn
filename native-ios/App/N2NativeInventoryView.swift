@@ -253,7 +253,7 @@ struct N2NativeInventoryView:View {
         }
         .frame(maxWidth:.infinity,minHeight:77,alignment:.leading)
         .padding(14)
-        .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:14))
+        .danperGlassSurface(cornerRadius:14)
     }
     private var operationChoices:some View {
         DanperPanel("¿Qué deseas hacer?") {
@@ -460,8 +460,7 @@ struct N2NativeInventoryView:View {
                                     }
                                     .frame(maxWidth:.infinity,alignment:.leading)
                                     .padding(11)
-                                    .background(DanperStyle.surface,
-                                                in:RoundedRectangle(cornerRadius:10))
+                                    .danperGlassSurface(cornerRadius:10)
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
@@ -494,7 +493,7 @@ struct N2NativeInventoryView:View {
                                 }
                                 .frame(maxWidth:.infinity,alignment:.leading)
                                 .padding(11)
-                                .background(DanperStyle.surface,in:RoundedRectangle(cornerRadius:10))
+                                .danperGlassSurface(cornerRadius:10)
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("inventory-auxiliary-"+product.code)
