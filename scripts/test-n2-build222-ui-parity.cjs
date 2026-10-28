@@ -245,7 +245,7 @@ for(const marker of [
   'projection.reportedUse==Double(used)',
   'projection.received==Double(income)',
   'expected==Int(physicalCount)',
-  'N2PendingDispensingEvidence.read(snapshot:clinical)',
+  'N2PendingDispensingEvidence.read(snapshot:snapshot)',
   'R histórico declarado='
 ]) assert(exportedIndicatorCore.includes(marker),'Protección de Indicador único: '+marker);
 for(const marker of [
@@ -565,7 +565,7 @@ for (const key of [
   'drafts.removeAll(where:{$0.id==form.id})'
 ]) must(form,key,'guardado atómico sin carrera con borrador y sin lecturas redundantes');
 
-console.log('PASS: pendientes con una sola acción pertinente: stock, vínculo, lote o cronología.');
+console.log('PASS (compatibilidad v1, sin activación cotidiana): pendientes con una sola acción pertinente: stock, vínculo, lote o cronología.');
 for(const phrase of [
   'kardexID:"E-20"','clinicalCode:"16025008"',
   'kardexID:"E-68"','clinicalCode:"16000178"',
@@ -588,7 +588,7 @@ for(const phrase of ['address:"D"+n,value:row["initial"]',
                      'address:"G"+n,value:row["consumed"]',
                      'address:"H"+n,value:row["final"]'])
   must(officialWriter,phrase,'exportar 0 numérico sin crear lotes');
-console.log('PASS: revisión masiva confirmada y stock sin lote expresado como 0.');
+console.log('PASS (compatibilidad v1, sin activación cotidiana): revisión masiva confirmada y stock sin lote expresado como 0.');
 
 must(history,'Resolver incidencia en Inventario','resolver salidas v2');
 must(history,'Los pendientes del inventario anterior no se reintentan.','retiro de pendientes FEFO');
@@ -713,7 +713,7 @@ for(const key of [
   'quantity+use-receipts-adjustments',
   'Failure.ambiguousHistoricalOpenings'
 ]) must(stockChoice,key,'lógica única de stock inicial y físico contado');
-console.log('PASS: registro de lote solicita elegir inicio día 9 o conteo actual y aplica cálculo sin doble descuento.');
+console.log('PASS (compatibilidad v1, sin activación cotidiana): registro de lote solicita elegir inicio día 9 o conteo actual y aplica cálculo sin doble descuento.');
 
 const containerCore=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2ContainerAccounting.swift'),'utf8');
 const formData=fs.readFileSync(path.join(root,'native-ios/Sources/DanperCore/N2NativeFormContext.swift'),'utf8');
@@ -770,7 +770,7 @@ for(const needle of [
   'selectedForAccounting',
   'movements.append(contentsOf:pendingClosures)'
 ]) must(clinicalTx,needle,'FEFO apertura previa con actual R0');
-console.log('PASS: alertas 1/0 por cada envase, cierre anterior auditable sin doble descuento.');
+console.log('PASS (compatibilidad v1, sin activación cotidiana): alertas 1/0 por cada envase, cierre anterior auditable sin doble descuento.');
 
 
 
