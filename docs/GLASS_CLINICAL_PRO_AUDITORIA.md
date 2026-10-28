@@ -1,6 +1,6 @@
 # Glass Clinical + Clinical Pro — auditoría de partida
 
-Base verificada: `1c131e1e3b46b704b9621914369f9fdf7138a1b9`; rama exclusiva `feat/swiftui-v2-glass-clinical-pro`; árbol inicialmente limpio. La cadena abreviada errónea del mensaje se resolvió con el SHA completo del paquete y el HEAD local, sin reset. Paquete extraído fuera del repositorio; siete archivos coinciden con su manifiesto SHA256.
+Base verificada: `1c131e1e3b46b704b9621914369f9fdf7138a1b9`; rama exclusiva `feat/swiftui-v2-glass-clinical-pro`; árbol inicialmente limpio. Se contrastó el SHA completo del paquete con el HEAD local, sin reset. Paquete extraído fuera del repositorio; siete archivos coinciden con su manifiesto SHA256.
 
 ## Referencias
 
@@ -20,6 +20,8 @@ Base verificada: `1c131e1e3b46b704b9621914369f9fdf7138a1b9`; rama exclusiva `fea
 ## Categorización verificada
 
 El catálogo clínico de 432 productos solo ofrece código/nombre/unidad. El catálogo de enfermería tiene grupos TABLETAS, AMPOLLAS, JERINGAS e INSUMOS. Los filtros visuales usarán exclusivamente correspondencias aprobadas o revisadas ya presentes: TABLETAS/AMPOLLAS → Medicamentos; JERINGAS/INSUMOS → Insumos. Las filas sin correspondencia inequívoca permanecen en Todos, con clasificación pendiente visible; nunca se deduce una categoría por palabras o presentación. Iconos ilustrativos no alteran dicha clasificación.
+
+La comprobación del catálogo completo identifica 38 medicamentos y 53 insumos mediante 91 códigos distintos con correspondencia. Los otros 341 códigos no tienen categoría autorizada: se mantienen en Todos con la marca Clasificación pendiente; no se modifica el catálogo ni se presume que sean medicamentos. Los filtros actúan sobre los productos realmente registrados en el inventario, no crean existencias para los 432 códigos.
 
 El umbral de próximo vencimiento conserva los 30 días de la UI v2; fecha de Lima, hoy vigente, límite inclusivo. Fecha no verificada no se presenta como comprobada. Existencia cero es independiente. Ningún cambio de esquema ni de contabilidad.
 
@@ -67,3 +69,12 @@ El umbral de próximo vencimiento conserva los 30 días de la UI v2; fecha de Li
 - `native-ios/App/NativeFirstRunOnboarding.swift`
 - `native-ios/App/NativeRootView.swift`
 - `native-ios/App/NativeStorageLabView.swift`
+
+## Decisiones de presentación
+
+- Tema principal carbón oscuro incluso si el sistema está en claro. Las preferencias de paleta y de apariencia al compartir se conservan. La interfaz clínica solicita esquema oscuro desde la raíz SwiftUI para mantener legibles los indicadores del sistema incluso con iOS en modo claro. La opción alternativa Salud azul permanece en Ajustes y no cambia las unidades, reglas ni datos. La referencia aprobada corresponde al valor predeterminado DANPER rojo.
+- La campana es decorativa, sin alerta/badge ni acción, y queda oculta a accesibilidad. El engranaje conserva su acción Ajustes con área de 44 pt.
+- El saludo es Hola: no se obtiene ni infiere un nombre personal a partir del responsable clínico fijo. No se añade una sede ilustrativa.
+- Material ultraThin real con tinte negro, borde fino y reflexión discreta. Reducir transparencia utiliza superficie carbón opaca legible; movimiento reducido suprime animación de pestañas y bienvenida.
+- Kardex conserva el detalle y las cuatro acciones reales; filtros y búsqueda ocupan una región superior fija, fuera del desplazamiento. El rótulo de fecha es referencia manual; las fechas no verificadas quedan pendientes y no se presentan como comprobadas.
+- Las métricas sin datos continúan mostrando —; Estadísticas conserva sus avisos honestos de resumen no disponible y no publica números de las maquetas.
