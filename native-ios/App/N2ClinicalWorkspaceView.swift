@@ -277,6 +277,7 @@ struct N2ClinicalWorkspaceRootView:View {
                 if showPreferences {
                 DanperVersionPanel()
                 DanperPanel("Apariencia") {
+                    DanperDisplayNamePreference()
                     Picker("Colores",selection:$visualPalette) {
                         Text("DANPER rojo").tag("danper");Text("Salud azul").tag("salud")
                     }.pickerStyle(.segmented)

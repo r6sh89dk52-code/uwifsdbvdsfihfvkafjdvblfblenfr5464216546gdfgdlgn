@@ -426,7 +426,7 @@ assert(!firstWorker.includes('#if targetEnvironment(simulator)'),
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
 
-for(const label of ['Departamento de Salud','Text("Hola")','clinical-home-new-attention'])
+for(const label of ['Departamento de Salud','"Hola"','clinical-home-new-attention'])
   must(premium,label,'portada premium');
 must(clinicalHome,'clinical-home-tool-','herramientas conservadas');
 for(const label of ['@AppStorage("danper.haptics.enabled")',

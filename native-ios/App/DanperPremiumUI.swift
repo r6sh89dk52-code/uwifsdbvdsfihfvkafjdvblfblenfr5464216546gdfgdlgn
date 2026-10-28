@@ -82,8 +82,9 @@ struct DanperFloatingTabs:View {
     }
 }
 
-/// Generic greeting: no unconsented personal name or invented location.
+/// Optional local display name, independent of workers and clinical identity.
 struct DanperHomeWelcome:View {
+    @AppStorage("danper.displayName") private var displayName=""
     var isDemo=false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {
@@ -95,7 +96,8 @@ struct DanperHomeWelcome:View {
                 .shadow(color:DanperStyle.red.opacity(0.18),radius:12)
                 .accessibilityHidden(true)
             VStack(alignment:.leading,spacing:6) {
-                Text("Hola").font(.title2.weight(.bold))
+                Text(displayName.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ? "Hola" : "Hola, \(displayName.trimmingCharacters(in:.whitespacesAndNewlines))").font(.title2.weight(.bold))
+                    .fixedSize(horizontal:false,vertical:true)
                 Text("Departamento de Salud").font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal:false,vertical:true)
                 if !isDemo {
@@ -318,5 +320,19 @@ struct DanperErrorState:View {
             if let retry {Button("Reintentar",action:retry).font(.footnote.weight(.semibold))}
         }.padding(12).frame(maxWidth:.infinity,alignment:.leading)
             .background(Color.orange.opacity(0.08),in:RoundedRectangle(cornerRadius:14))
+    }
+}
+
+/// Stored only in local UI preferences; never used as the clinical responsible person.
+struct DanperDisplayNamePreference:View {
+    @AppStorage("danper.displayName") private var displayName=""
+    var body:some View {
+        VStack(alignment:.leading,spacing:8) {
+            TextField("Nombre visible (opcional)",text:$displayName)
+                .textContentType(.nickname).textInputAutocapitalization(.words)
+                .submitLabel(.done).accessibilityIdentifier("glass-display-name")
+            Text("Solo personaliza el saludo en este dispositivo. No cambia al responsable clínico ni los registros de trabajadores. Déjalo vacío para mostrar Hola.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
