@@ -50,6 +50,29 @@ final class N2GlassClinicalTests:XCTestCase {
         for _ in 0..<4 {app.scrollViews.firstMatch.swipeUp()}
         capture("Ver-todas-final-desplazado")
     }
+    func testLocalDisplayNamePersistsWithoutChangingClinicalIdentity() {
+        continueAfterFailure=false
+        let app=XCUIApplication();launch(app)
+        XCTAssertTrue(app.staticTexts["Hola"].exists)
+        XCTAssertTrue(app.descendants(matching:.any)["premium-demo-banner"].exists)
+        app.buttons["premium-tab-settings"].tap()
+        let name=app.textFields["glass-display-name"]
+        reveal(name,in:app);name.tap();name.typeText("Felipe")
+        app.buttons["danper-dismiss-keyboard"].tap()
+        capture("Preferencia-nombre-local")
+        app.buttons["premium-tab-home"].tap()
+        XCTAssertTrue(app.staticTexts["Hola, Felipe"].waitForExistence(timeout:10))
+        capture("Inicio-Felipe-DEMO-discreto")
+        app.terminate();launch(app)
+        XCTAssertTrue(app.staticTexts["Hola, Felipe"].exists)
+        capture("Inicio-nombre-persistido")
+        app.buttons["premium-tab-settings"].tap()
+        reveal(name,in:app);name.tap();name.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:6))
+        app.buttons["danper-dismiss-keyboard"].tap()
+        app.buttons["premium-tab-home"].tap()
+        XCTAssertTrue(app.staticTexts["Hola"].waitForExistence(timeout:10))
+        capture("Inicio-nombre-opcional-vacio")
+    }
     func testRealKardexFiltersSearchAndDetailWithoutMutations() {
         continueAfterFailure=false
         let app=XCUIApplication();launch(app)

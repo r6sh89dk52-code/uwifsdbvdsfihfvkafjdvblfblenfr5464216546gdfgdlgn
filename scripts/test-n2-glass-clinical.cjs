@@ -14,6 +14,12 @@ assert(!app.includes('Image("AccessHero")'));assert(!ui.includes('Text("Bienveni
 for(const marker of ['shape.fill(.ultraThinMaterial)','accessibilityReduceTransparency','DanperBackdrop','struct DanperGlassAction'])assert(glass.includes(marker),marker);
 assert(!glass.includes('surface.opacity(0.78)'),'Do not cover the material with nearly opaque paint');
 assert(theme.includes('danperGlassSurface(cornerRadius:20)'));
+assert(theme.includes('UIBlurEffect(style:.systemUltraThinMaterialDark)'));
+assert(theme.includes('appearance.backgroundColor=UIColor(white:0.015,alpha:opaque ? 1:0.68)'));
+assert(ui.includes('@AppStorage("danper.displayName")'));
+assert(ui.includes('DEMO · Datos ficticios'));
+assert(!read('native-ios/App/NativeRootView.swift').includes('premium-demo-banner'));
+assert(!read('native-ios/App/N2ClinicalWorkspaceView.swift').includes('premium-demo-banner'));
 assert(theme.includes('accessibilityHidden(true)'),'Decorative bell is not a fake action');
 for(const marker of ['case all="Todos",medications="Medicamentos",supplies="Insumos"','authorizedNursingOptions','expiryWarningDays=30','p.name,p.code,p.unit','Pendiente de verificar'])assert(presentation.includes(marker),marker);
 assert(!/applySimple|activateSimple|\.shared/.test(presentation),'Presentation helpers cannot write or reach a vault');
