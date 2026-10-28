@@ -28,13 +28,7 @@ func n2SimpleDateTime(_ at:Int64)->String {
     f.dateFormat="dd/MM/yyyy HH:mm";return f.string(from:Date(timeIntervalSince1970:Double(at)/1000))
 }
 func n2SimpleExpiry(_ p:N2SimpleProduct)->String {
-    guard !p.expiry.isEmpty else{return "Vencimiento pendiente de verificar"}
-    let date=DanperDatePresentation.display(p.expiry)
-    if !p.expiryVerified{return "Por verificar · "+date}
-    let today=N2SimpleInventory.day(Int64(Date().timeIntervalSince1970*1000))
-    if p.expiry<today{return "Referencia vencida · "+date}
-    let horizon=N2SimpleInventory.day(Int64(Date().addingTimeInterval(30*86400).timeIntervalSince1970*1000))
-    return (p.expiry<=horizon ? "Próximo a vencer · ":"Próximo vencimiento · ")+date
+    N2InventoryPresentation.expiryText(p)
 }
 private struct N2SimpleEditorRoute:Identifiable {
     let id=UUID()
@@ -50,6 +44,7 @@ struct N2SimpleInventoryView:View {
     @State private var loading=true
     @State private var error=""
     @State private var query=""
+    @State private var filter:N2InventoryFilter = .all
     @State private var editor:N2SimpleEditorRoute?
     @State private var presentedInitialOperation=false
     var body:some View {
@@ -61,6 +56,9 @@ struct N2SimpleInventoryView:View {
                 } else if loading {DanperLoadingState(title:"Verificando inventario…")}
                 if !error.isEmpty {DanperErrorState(message:error,retry:{Task {await load()}})}
             }.padding(16)
+        }
+        .safeAreaInset(edge:.top,spacing:0) {
+            if let context,context.state != nil {inventoryControls(context)}
         }
         .navigationTitle("Inventario").navigationBarTitleDisplayMode(.inline).danperFormChrome()
         .task {if let layoutContext {context=layoutContext;loading=false}else{await load()}}.refreshable {await load()}
@@ -81,17 +79,20 @@ struct N2SimpleInventoryView:View {
         }
         Button {editor=N2SimpleEditorRoute(operation:.register)} label:{Label("Registrar inventario",systemImage:"plus")}
             .buttonStyle(DanperPrimaryButton()).accessibilityIdentifier("simple-register-product")
-        DanperField(title:"Buscar medicamento o insumo") {
-            TextField("Nombre o código",text:$query,prompt:Text("Nombre o código").foregroundStyle(.secondary))
-                .accessibilityIdentifier("simple-inventory-search")
-        }
         if state.products.isEmpty {Text("Registra el primer conteo físico. Sin conteo no se presume una existencia comprobada.").foregroundStyle(.secondary)}
         LazyVStack(spacing:12) {
-            ForEach(state.products.filter{query.isEmpty || $0.name.localizedStandardContains(query) || $0.code.contains(query)}) {p in
+            ForEach(N2InventoryPresentation.products(state.products,catalog:context.catalog,filter:filter,query:query)) {p in
                 NavigationLink {
                     N2SimpleProductDetail(code:p.code)
-                } label:{productRow(p)}.buttonStyle(.plain).accessibilityIdentifier("simple-product-"+p.code)
+                } label:{N2GlassInventoryRow(product:p,catalog:context.catalog)}.buttonStyle(.plain).accessibilityIdentifier("simple-product-"+p.code)
             }
+        }
+        if N2InventoryPresentation.products(state.products,catalog:context.catalog,filter:filter,query:query).isEmpty && !state.products.isEmpty {
+            DanperEmptyState(title:"No hay productos con estos filtros",symbol:"magnifyingglass")
+        }
+        if state.products.contains(where:{N2InventoryPresentation.category(code:$0.code,catalog:context.catalog)==nil}) {
+            Text("Los productos con clasificación pendiente se muestran en Todos.")
+                .font(.caption).foregroundStyle(.secondary)
         }
         if !state.incidents.filter({$0.resolutionEventID==nil}).isEmpty {incidents(context,state)}
         DanperPanel("Kardex y respaldo") {
@@ -102,18 +103,26 @@ struct N2SimpleInventoryView:View {
             NavigationLink {N2SimpleRestoreView(kind:.clinical)} label:{Label("Restaurar historial clínico sin reemplazar inventario",systemImage:"clock.arrow.circlepath")}
         }
     }
-    private func productRow(_ p:N2SimpleProduct)->some View {
-        DanperPanel {
-            Text(p.name).font(.headline).foregroundStyle(.primary).fixedSize(horizontal:false,vertical:true)
-            Text("Catálogo: "+p.unit+" · "+(p.mode == .presentation ? "Conteo por presentación":"Conteo por unidad"))
-                .font(.caption).foregroundStyle(.secondary)
-            LabeledContent {
-                Text(p.quantity.formatted()+" "+(p.mode == .presentation ? "presentaciones":p.unit)).accessibilityIdentifier("simple-stock-"+p.code)
-            } label:{Text("Existencias")}
-                .foregroundStyle(.primary)
-            Text(n2SimpleExpiry(p)).font(.caption).foregroundStyle(p.expiryVerified ? Color.secondary:.orange)
-            Text("Último conteo: "+n2SimpleDateTime(p.lastCountAt)).font(.caption2).foregroundStyle(.secondary)
-        }
+    private func inventoryControls(_ context:N2SimpleInventoryContext)->some View {
+        VStack(spacing:10) {
+            Picker("Tipo de producto",selection:$filter) {
+                ForEach(N2InventoryFilter.allCases) {Text($0.rawValue).tag($0)}
+            }.pickerStyle(.segmented).accessibilityIdentifier("glass-inventory-filter")
+            HStack(spacing:10) {
+                Image(systemName:"magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                TextField("Nombre, presentación o código",text:$query,
+                    prompt:Text("Nombre, presentación o código").foregroundStyle(.secondary))
+                    .font(.subheadline).autocorrectionDisabled()
+                    .accessibilityLabel("Buscar medicamento o insumo")
+                    .accessibilityIdentifier("simple-inventory-search")
+                if !query.isEmpty {
+                    Button {query=""} label:{Image(systemName:"xmark.circle.fill")}
+                        .accessibilityLabel("Borrar búsqueda").accessibilityIdentifier("glass-inventory-clear-search")
+                }
+            }.padding(12).danperGlassSurface(cornerRadius:15)
+        }.padding(.horizontal,16).padding(.vertical,10)
+            .background(.regularMaterial)
+            .environment(\.colorScheme,.dark)
     }
     private func incidents(_ context:N2SimpleInventoryContext,_ state:N2SimpleInventoryState)->some View {
         DanperPanel("Salidas por revisar") {
@@ -207,5 +216,51 @@ struct N2SimpleProductDetail:View {
     }
     @MainActor private func load() async {
         do {context=try await vault.simpleInventoryContext();error=""}catch{self.error=n2SimpleMessage(error)}
+    }
+}
+
+/// Every value comes from the consolidated v2 projection; expiry is reference
+/// metadata, independent of stock (including a zero physical balance).
+struct N2GlassInventoryRow:View {
+    let product:N2SimpleProduct
+    let catalog:N2NativeCatalogIndex
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var status:N2InventoryPresentation.Expiry {N2InventoryPresentation.expiry(product)}
+    private var statusColor:Color {
+        switch status {case .valid:return .green;case .near:return .yellow;case .expired:return .red;case .unverified:return .gray}
+    }
+    var body:some View {
+        let layout=dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:12)):AnyLayout(HStackLayout(alignment:.top,spacing:12))
+        layout {
+            HStack(alignment:.top,spacing:11) {
+                Image(systemName:N2InventoryPresentation.symbol(product,catalog:catalog))
+                    .font(.system(size:21,weight:.medium)).foregroundStyle(DanperStyle.red)
+                    .frame(width:38,height:44).background(DanperStyle.red.opacity(0.12),in:RoundedRectangle(cornerRadius:13))
+                    .accessibilityHidden(true)
+                VStack(alignment:.leading,spacing:7) {
+                    Text(product.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                        .fixedSize(horizontal:false,vertical:true)
+                    Text("Presentación: "+product.unit).font(.caption).foregroundStyle(.secondary)
+                    Label(N2InventoryPresentation.expiryText(product),systemImage:status == .unverified ? "questionmark.circle":"calendar")
+                        .font(.caption2.weight(.medium)).foregroundStyle(statusColor)
+                        .fixedSize(horizontal:false,vertical:true)
+                        .accessibilityIdentifier("glass-expiry-"+product.code)
+                    if product.quantity==0 {
+                        Text("Sin existencias").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                    if N2InventoryPresentation.category(code:product.code,catalog:catalog)==nil {
+                        Text("Clasificación pendiente").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }.frame(maxWidth:.infinity,alignment:.leading)
+            VStack(alignment:.trailing,spacing:3) {
+                Text(product.quantity.formatted()).font(.system(.largeTitle,weight:.semibold,design:.rounded))
+                    .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                    .accessibilityIdentifier("simple-stock-"+product.code)
+                Text(product.unit).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Image(systemName:"chevron.right").font(.caption2).foregroundStyle(.secondary).padding(.top,5).accessibilityHidden(true)
+            }.frame(minWidth:64,maxWidth:95,alignment:.trailing)
+        }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
+            .danperGlassSurface(cornerRadius:20).environment(\.colorScheme,.dark)
     }
 }
