@@ -1,13 +1,12 @@
 {
-  "request": "diagnose-three-system-ui-readiness-2",
+  "request": "diagnose-two-biometric-system-ui-lifecycle-3",
   "baselineSHA": "409c37149917d5c811229680a3f14d1450b171ed",
   "recoveredRun": 40806554927,
   "fullAudit": false,
   "packageIPA": false,
-  "previousDiagnosticRun": 40807354709,
+  "previousDiagnosticRun": 40814464695,
   "cases": [
     "N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground",
-    "N2PremiumRedesignTests/testDemoNavigationAttentionAndVersion",
     "N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch"
   ]
 }

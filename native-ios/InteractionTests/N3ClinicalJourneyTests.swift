@@ -152,6 +152,13 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertFalse(app.buttons["premium-tab-home"].exists)
         Thread.sleep(forTimeInterval:2)
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),CFNotificationName(rawValue:"com.apple.BiometricKit_Sim.pearl.match" as CFString),nil,nil,true)
+        let usable=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            let manual=app.buttons["clinical-first-run-manual-worker"]
+            let home=app.buttons["premium-tab-home"]
+            return (manual.exists && manual.isHittable) || (home.exists && home.isHittable)
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[usable],timeout:15),.completed,
+            "Face ID debe cerrar su UI antes de tocar la fuente protegida: "+app.debugDescription)
     }
     /// Preserve the former protected-source assertions independently of the
     /// replaced FEFO journey. This uses actual LocalAuthentication, not DEMO.

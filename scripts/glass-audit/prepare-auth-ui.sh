@@ -12,4 +12,9 @@ open -a Simulator --args -CurrentDeviceUDID "$SIM_ID"
 xcrun simctl launch "$SIM_ID" com.apple.CoreAuthUI
 # Allow the UI-service cold start to finish outside the authentication watchdog.
 sleep 8
-xcrun simctl spawn "$SIM_ID" launchctl list | rg 'CoreAuthUI|coreauthd' || true
+# Do not leave a standalone User Authentication foreground scene behind.
+# The actual app request must create its own system-hosted authentication UI.
+xcrun simctl terminate "$SIM_ID" com.apple.CoreAuthUI
+xcrun simctl spawn "$SIM_ID" launchctl list | python3 -c 'import sys
+for line in sys.stdin:
+ if "CoreAuthUI" in line or "coreauthd" in line:print(line.rstrip())'

@@ -47,7 +47,7 @@ jobs:
   final-ui-and-ipa:
     needs: diagnostic-gate
     runs-on: macos-15-intel
-    timeout-minutes: 165
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,7 +103,7 @@ jobs:
       - name: Require every mandatory control before packaging
         run: python3 scripts/glass-audit/seal-controls.py "$DANPER_AUDIT_OUT"
       - name: Build unsigned ARM64 IPA, manifest and SHA-256
-        timeout-minutes: 15
+        timeout-minutes: 30
         run: |
           test "$(cat "$DANPER_AUDIT_OUT/ALL_CONTROLS_SHA.txt")" = "$GITHUB_SHA"
           bash scripts/glass-audit/package-macos.sh

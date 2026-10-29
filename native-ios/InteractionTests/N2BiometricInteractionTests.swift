@@ -62,7 +62,12 @@ final class N2BiometricInteractionTests:XCTestCase {
         Thread.sleep(forTimeInterval:2)
         biometric("match")
         let source=app.buttons["clinical-first-run-import-personal"]
-        XCTAssertTrue(source.waitForExistence(timeout:5) || app.buttons["premium-tab-home"].waitForExistence(timeout:10),app.debugDescription)
+        let usable=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            let home=app.buttons["premium-tab-home"]
+            return (source.exists && source.isHittable) || (home.exists && home.isHittable)
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[usable],timeout:15),.completed,
+            "La autenticación debe retirar la cobertura y permitir interacción real: "+app.debugDescription)
         capture(app,"Autenticacion-simulada-aceptada-seleccion-fuente")
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(app.wait(for:.runningBackground,timeout:10))
@@ -70,6 +75,11 @@ final class N2BiometricInteractionTests:XCTestCase {
         XCTAssertTrue(checking.waitForExistence(timeout:10),app.debugDescription)
         Thread.sleep(forTimeInterval:2)
         biometric("match")
-        XCTAssertTrue(source.waitForExistence(timeout:5) || app.buttons["premium-tab-home"].waitForExistence(timeout:10),app.debugDescription)
+        let foregroundUsable=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            let home=app.buttons["premium-tab-home"]
+            return (source.exists && source.isHittable) || (home.exists && home.isHittable)
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[foregroundUsable],timeout:15),.completed,
+            "La autenticación debe retirar la cobertura y permitir interacción real: "+app.debugDescription)
     }
 }

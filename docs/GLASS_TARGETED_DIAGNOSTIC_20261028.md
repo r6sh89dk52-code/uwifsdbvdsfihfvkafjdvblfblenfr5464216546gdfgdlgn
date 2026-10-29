@@ -144,3 +144,35 @@ both existing redesign/Glass static guards passed. The scoped verifier was
 exercised against the recovered evidence and baseline environment metadata;
 actual CI reuse must repeat these comparisons against its own environment.
 No new test result or IPA is asserted by these infrastructure preparations.
+
+## Second diagnostic completed: preserve the real individual outcomes
+
+Run `40814464695` finished FAILURE at its strict aggregate gate. Its individual
+summaries (compact artifact `12873476892`) are:
+- Biometric: 1 PASS / 0 FAIL / 0 SKIP; raw artifact `12872298883`.
+- Premium: 1 PASS / 0 FAIL / 0 SKIP, with the original immediate keyboard check;
+  raw artifact `12872468452`. Production and this test remain unchanged next.
+- Protected: 0 PASS / 1 FAIL / 0 SKIP; raw artifact `12872759870`.
+Build succeeded and compiler cache was saved. The job's continue-on-error step
+presentation is NOT treated as a test PASS: its xcresult governs the verdict.
+
+Protected failure moved past authentication: system log 04:28:38.939 reports
+successful evaluatePolicy, but the screenshot still has the Face ID window on
+top. The setup/manual-worker button exists at y=485..549 yet is not hittable.
+The helper correctly refuses to tap through the cover. This is not a clinical
+vault or worker-record failure. CoreAuthUI did not deactivate until teardown.
+The standalone prelaunch left a User Authentication app scene (visible back link).
+
+Next minimal environment correction terminates the standalone warm-up process
+BEFORE any DANPER launch, so real LocalAuthentication owns its later UI. No
+active DANPER context is terminated and no success is injected in preparation.
+Both biometric tests now additionally require a hittable source/home after
+match, preventing an obscured but existing control from counting as success.
+All former cancellation/no-loop/retry/foreground and creation/persistence
+assertions remain. No production source is changed.
+
+The third request selects ONLY Bio + Protected, whose shared authentication
+preparation changed. Keep Premium's individual PASS from `47fa1a9`; its own test,
+DEMO application/fixture/resource inputs remain identical. The final gate must
+verify individual per-case input identity before aggregating evidence from
+multiple diagnostic runs. Never mark the second overall run as successful.
