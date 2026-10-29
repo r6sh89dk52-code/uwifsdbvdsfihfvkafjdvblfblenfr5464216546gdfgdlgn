@@ -25,12 +25,22 @@ PYDIAG
 python3 scripts/glass-audit/verify-scoped-reuse.py "$DANPER_BASELINE_EVIDENCE" "$OUT"
 echo 'PHASE: generate deterministic fixtures and resources'
 bash scripts/glass-audit/prepare.sh
-echo 'PHASE: validate JavaScript guards and both workbook controls'
-node scripts/glass-audit/javascript.cjs > "$OUT/javascript.log" 2>&1
-for name in test-n1r-native-xlsx test-n1s-full-native-workbooks; do
- node "scripts/$name.cjs" > "$OUT/$name.log" 2>&1
-done
-git rev-parse HEAD > "$OUT/JAVASCRIPT_VALIDATED_SHA.txt"
+echo 'PHASE: validate JavaScript guards, reusing only proven equal inputs'
+if python3 scripts/glass-audit/verify-javascript-reuse.py "${DANPER_APPROVED_JAVASCRIPT:-$OUT/no-approved-js}" "$OUT"; then
+ echo 'PHASE: reused 61 JS passes; current identity guard passed'
+else
+ reuse_status=$?
+ test "$reuse_status" = 1 || exit "$reuse_status"
+ node scripts/glass-audit/javascript.cjs > "$OUT/javascript.log" 2>&1
+ python3 - "$OUT" <<'PYJSRUN'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1]);rows=json.loads((p/'javascript-results.json').read_text())
+assert len(rows)==62 and all(r['exit']==0 for r in rows)
+s=json.loads((p/'JAVASCRIPT_REUSE.json').read_text());s.update(reused=False,reusedCount=0,executedCount=62)
+(p/'JAVASCRIPT_REUSE.json').write_text(json.dumps(s,indent=2)+'\n')
+PYJSRUN
+fi
 if test "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["suites"]["swift"]["identical"])' "$OUT/SCOPED_REUSE.json")" != True; then
  echo 'PHASE: Swift inputs changed; rerun package suite'
  (cd native-ios && swift test --jobs 2) > "$OUT/swift-412.log" 2>&1
@@ -41,6 +51,24 @@ assert not re.search(r'\d+ tests? (?:were )?skipped',s)
 PY
 fi
 git rev-parse HEAD > "$OUT/SWIFT_VALIDATED_SHA.txt"
+# Native XLSX files are Swift TEST OUTPUTS, not Node preparation inputs.
+if test "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["suites"]["swift"]["identical"])' "$OUT/SCOPED_REUSE.json")" = True; then
+ echo 'PHASE: generate only the four native workbook outputs when full Swift results were reused'
+ (cd native-ios && swift test --jobs 2 --filter 'testWritesNativeFiveRowXlsx|testWritesSevenFrequencyRowsInNativeXlsx|testIndicatorTenSheets432MaterialsAndAllReconciliationCalculationsWrittenBySwift|testNursingOriginalWorkbook98RowsPlusPrintSettings') > "$OUT/workbook-producers.log" 2>&1
+ python3 - "$OUT/workbook-producers.log" <<'PYBOOKS'
+import re,sys
+s=open(sys.argv[1]).read();assert re.search(r'Executed 4 tests, with 0 failures',s)
+assert not re.search(r'\d+ tests? (?:were )?skipped',s)
+PYBOOKS
+fi
+for name in n1r-stock-native.xlsx n1r-frequency-native.xlsx n1s-indicator-native.xlsx n1s-nursing-native.xlsx; do
+ test -f "$OUT/fixtures/$name"
+done
+echo 'PHASE: cross-check actual Swift-produced workbooks'
+for name in test-n1r-native-xlsx test-n1s-full-native-workbooks; do
+ node "scripts/$name.cjs" > "$OUT/$name.log" 2>&1
+done
+git rev-parse HEAD > "$OUT/JAVASCRIPT_VALIDATED_SHA.txt"
 node scripts/glass-audit/identity.cjs
 (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
 git diff --exit-code HEAD -- native-ios src package.json package-lock.json

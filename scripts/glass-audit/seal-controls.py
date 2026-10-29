@@ -8,6 +8,9 @@ for name in ['SOURCE_SHA.txt','SWIFT_VALIDATED_SHA.txt','JAVASCRIPT_VALIDATED_SH
 js=json.loads((out/'javascript-results.json').read_text());assert len(js)==62 and all(r['exit']==0 for r in js)
 for name in ['test-n1r-native-xlsx.log','test-n1s-full-native-workbooks.log']:assert 'PASS' in (out/name).read_text(),name
 reuse=json.loads((out/'SCOPED_REUSE.json').read_text());assert reuse['currentSHA']==sha
+jsreuse=json.loads((out/'JAVASCRIPT_REUSE.json').read_text());assert jsreuse['currentSHA']==sha
+assert jsreuse['reusedCount']+jsreuse['executedCount']==62
+if jsreuse['reused']:assert sum(r.get('reused',False) for r in js)==jsreuse['reusedCount']
 if reuse['suites']['swift']['identical']:
  assert (out/'verified-reused-swift-412.log').is_file()
 else:
@@ -24,7 +27,7 @@ gate=json.loads((out/'DIAGNOSTIC_GATE.json').read_text());assert gate['currentSH
 request=json.loads(Path('.github/glass-final-release-request.json').read_text())
 simulator_build=json.loads((out/'SIMULATOR_BUILD_REUSE.json').read_text())
 if simulator_build['reused']:assert simulator_build['codeInputSHA']==sha and not simulator_build['uiResultsReused']
-manifest={'sourceSHA':sha,'simulatorBuild':simulator_build,'swift':{'passed':412,'reused':reuse['suites']['swift']['identical']},'native':{'passed':23,'reused':reuse['suites']['native']['identical']},'javascript':{'passed':62,'crossWorkbookControls':2,'reused':False},'ui':{'passed':11,'failed':0,'skipped':0,'classes':ui,'reused':False},'targetedDiagnostic':request,'physicalDeviceValidated':False}
+manifest={'sourceSHA':sha,'simulatorBuild':simulator_build,'swift':{'passed':412,'reused':reuse['suites']['swift']['identical']},'native':{'passed':23,'reused':reuse['suites']['native']['identical']},'javascript':{'passed':62,'crossWorkbookControls':2,'crossWorkbookControlsReused':False,'reuseProof':jsreuse},'ui':{'passed':11,'failed':0,'skipped':0,'classes':ui,'reused':False},'targetedDiagnostic':request,'physicalDeviceValidated':False}
 (out/'VALIDATION_MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n')
 (out/'ALL_CONTROLS_SHA.txt').write_text(sha+'\n')
 print('PASS: all mandatory controls sealed for',sha)

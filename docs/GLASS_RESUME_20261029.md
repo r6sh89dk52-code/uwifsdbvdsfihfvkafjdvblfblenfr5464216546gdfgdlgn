@@ -60,3 +60,41 @@ when its observed phase is active, or on subsequent active/background paths.
 The trace establishes successful UI cleanup with the corrected source; it
 does not isolate a retention duration or prove the exact OS race mechanism.
 All original assertions remain; the final all-11 run is still required.
+
+## First final preparation result and precise resume
+
+Run `40857793155` at `cb49f7048a8f3bd4a358e4af7c77f1d625432ef4`
+passed the three-case input gate and ALL 62 JavaScript guards. Its preparation
+failed with ENOENT for `fixtures/n1r-stock-native.xlsx`: it attempted the
+cross-workbook control before the Swift tests that produce the native files.
+No Swift, native, final UI or IPA build ran. Core `12891281001`, complete
+preparation evidence `12889799915`, diagnostic input proof `12889822901`.
+This is an orchestration ordering defect, not a failed clinical calculation.
+
+The corrected order executes (or independently proves reuse of) Swift 412
+BEFORE consuming its four native XLSX outputs in the two Node controls.
+If full Swift results are reusable in a future equal-architecture environment,
+only the four existing workbook-producing tests generate those fresh files.
+Missing files still fail. Current ARM64 requires the complete 412-case run.
+No generator, clinical logic, model, test or UI assertion is edited.
+
+To avoid duplicating the 62 JavaScript checks, the next request pins the
+existing core artifact/run/source SHA and exact actual Node runtime
+(v22.23.2, darwin, arm64). Reuse requires every tracked input blob/mode/path
+outside the explicitly reviewed pipeline-only edits to match. The unchanged
+62-script runner and package locks are included. All 62 old summaries/logs
+must exist and pass; their hashes and input digest are recorded. Identity is
+executed again to bind this checkout, giving 61 reused outcomes + 1 current
+outcome. A failed current identity guard stops preparation; it cannot be
+hidden by fallback. Unproven inputs/runtime cause a real 62-check execution.
+The two workbook controls always execute on current Swift-produced files.
+The manifest records these counts and provenance honestly, without relabeling
+the overall failed run as successful.
+
+Local checks verified shell/Python/YAML syntax and producer-before-consumer
+ordering. Protocol tests with mocked runtime accepted valid immutable evidence,
+rejected a failed verdict, and stopped on failed identity; the actual local
+Node 24/Linux runtime was correctly rejected. No mock is accepted by the CI
+entry point: it probes the real Node executable. The three UI approvals remain
+valid because these pipeline-only changes do not change their inputs. Final
+all-11 UI and unsigned IPA are still pending.

@@ -89,6 +89,14 @@ jobs:
           echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-ui-diagnostic" >> "$GITHUB_ENV"
           echo "DANPER_BASELINE_EVIDENCE=$RUNNER_TEMP/recovered-baseline" >> "$GITHUB_ENV"
           echo "DANPER_DIAGNOSTIC_GATE=$RUNNER_TEMP/diagnostic-gate/DIAGNOSTIC_GATE.json" >> "$GITHUB_ENV"
+          echo "DANPER_APPROVED_JAVASCRIPT=$RUNNER_TEMP/approved-javascript" >> "$GITHUB_ENV"
+          python3 - <<'PYJS' >> "$GITHUB_OUTPUT"
+          import json
+          r=json.load(open('.github/glass-final-release-request.json')).get('javascriptBaseline')
+          if r:
+              assert isinstance(r['run'],int) and r['run']>0 and isinstance(r['artifact'],int) and r['artifact']>0
+              print('js_run='+str(r['run'])+'\njs_artifact='+str(r['artifact']))
+          PYJS
           test "$(uname -m)" = arm64
           echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
           echo "xcode=$(xcodebuild -version | tr ' \n' '__')" >> "$GITHUB_OUTPUT"
@@ -102,6 +110,14 @@ jobs:
           run-id: 40806554927
           github-token: ${{ github.token }}
           path: ${{ env.DANPER_BASELINE_EVIDENCE }}
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: steps.setup.outputs.js_run != ''
+        with:
+          artifact-ids: ${{ steps.setup.outputs.js_artifact }}
+          run-id: ${{ steps.setup.outputs.js_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/approved-javascript
           merge-multiple: true
       - uses: actions/cache/restore@v4
         id: cache
