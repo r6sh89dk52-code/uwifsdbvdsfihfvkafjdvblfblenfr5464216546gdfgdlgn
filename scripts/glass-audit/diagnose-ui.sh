@@ -6,10 +6,25 @@ cd "$(dirname "$0")/../.."
 OUT="$DANPER_AUDIT_OUT"
 DD="$OUT/DerivedData"
 mkdir -p "$OUT"
+# A request may select a strict subset after individual cases have passed.
+python3 - <<'PYCASES' > "$OUT/selected-cases.txt"
+import json
+from pathlib import Path
+allowed=[
+ 'N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground',
+ 'N2PremiumRedesignTests/testDemoNavigationAttentionAndVersion',
+ 'N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch']
+request=json.loads(Path('.github/glass-ui-diagnostic-request.json').read_text())
+cases=request.get('cases',allowed)
+assert isinstance(cases,list) and cases and len(cases)==len(set(cases))
+assert all(c in allowed for c in cases), 'Only the three recovered failures are authorized'
+print('\n'.join(cases))
+PYCASES
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
 git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
 xcodebuild -version > "$OUT/xcode-version.txt"
 xcrun simctl list runtimes -j > "$OUT/runtimes.json"
+echo "PHASE: prepare dependencies and resources"
 npm ci --ignore-scripts --no-audit --no-fund > "$OUT/npm.log" 2>&1
 node scripts/prepare-n1s-ios-demo-resources.cjs > "$OUT/resources.log" 2>&1
 node scripts/glass-audit/identity.cjs
@@ -27,6 +42,7 @@ cleanup(){ if test -n "$SIM_ID"; then xcrun simctl shutdown "$SIM_ID" || true; x
 trap cleanup EXIT
 fresh(){
  cleanup
+ echo "PHASE: create isolated simulator $1"
  SIM_ID=$(xcrun simctl create "DANPER-SYNTHETIC-DIAG-$1" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
  echo "$1 $SIM_ID" >> "$OUT/isolated-simulators.txt"
  xcrun simctl boot "$SIM_ID"
@@ -39,18 +55,21 @@ fresh(){
 }
 run_test(){
  local label="$1" expected="$2" status=0; shift 2
+ echo "PHASE: run $label ($expected required tests; no skips allowed)"
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
   -derivedDataPath "$DD" -parallel-testing-enabled NO -resultBundlePath "$OUT/$label.xcresult" \
   "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
+ echo "PHASE: verify and export $label"
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
  xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments" || status=1
  return "$status"
 }
 fresh build
+echo "PHASE: build simulator test binaries once"
 xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
  -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
- ONLY_ACTIVE_ARCH=YES build-for-testing > "$OUT/build-for-testing.log" 2>&1
+ ONLY_ACTIVE_ARCH=YES build-for-testing 2>&1 | tee "$OUT/build-for-testing.log"
 overall=0
 while IFS=/ read -r cls method; do
  fresh "$cls"
@@ -65,10 +84,11 @@ while IFS=/ read -r cls method; do
   > "$OUT/$cls-system.log" 2>&1 || true
  # Preserve each completed case before the next one begins.
  echo "Completed $cls (cumulative status $overall)"
-done <<'CASES'
-N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground
-N2PremiumRedesignTests/testDemoNavigationAttentionAndVersion
-N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch
-CASES
-if test "$overall" = 0; then git rev-parse HEAD > "$OUT/DIAGNOSED_3_SHA.txt"; fi
+done < "$OUT/selected-cases.txt"
+if test "$overall" = 0; then
+ git rev-parse HEAD > "$OUT/DIAGNOSED_SELECTED_SHA.txt"
+ if test "$(wc -l < "$OUT/selected-cases.txt" | tr -d ' ')" = 3; then
+  git rev-parse HEAD > "$OUT/DIAGNOSED_3_SHA.txt"
+ fi
+fi
 exit "$overall"

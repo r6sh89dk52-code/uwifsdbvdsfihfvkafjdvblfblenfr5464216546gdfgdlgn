@@ -55,3 +55,17 @@ was added.
 
 Protected branches/main, production app, clinical data, Face ID policy and
 DanperCore/Kardex v2 are unchanged in this diagnostic stage.
+
+## Published run checkpoint
+
+Diagnostic source commit: `bd2630578a2fc8098947e903f61853702ffd1407`.
+Run: `40807354709`, job `123229369663` (macos-15-intel).
+This is the ONLY new execution requested by this continuation. Read its current
+status from GitHub; no result is asserted by this checkpoint.
+
+Follow-up infrastructure change: print explicit diagnostic phases and stream
+build output into the Actions console. The request file can now select a strict,
+nonempty subset of the three allowed case identifiers. This enables repeating
+only failures after an individual case passes. No assertions changed, no new
+run is requested by this infrastructure commit, and the existing run continues
+to execute its original `bd263057` snapshot.
