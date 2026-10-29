@@ -68,6 +68,10 @@ fresh(){
  xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
  bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
+ case "$1" in
+  N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
+   bash scripts/glass-audit/attach-simulator-display.sh "$SIM_ID" >> "$OUT/simulator-display.log" 2>&1 ;;
+ esac
  bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1
 }
 run_tests(){

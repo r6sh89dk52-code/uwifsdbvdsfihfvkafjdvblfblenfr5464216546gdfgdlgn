@@ -1,13 +1,12 @@
 {
-  "request": "diagnose-three-on-native-arm64-same-xcode-and-ios-5",
+  "request": "diagnose-two-with-explicit-device-display-6",
   "baselineSHA": "409c37149917d5c811229680a3f14d1450b171ed",
   "recoveredRun": 40806554927,
   "fullAudit": false,
   "packageIPA": false,
-  "previousDiagnosticRun": 40823214523,
+  "previousDiagnosticRun": 40826603674,
   "cases": [
     "N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground",
-    "N2PremiumRedesignTests/testDemoNavigationAttentionAndVersion",
     "N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch"
   ]
 }

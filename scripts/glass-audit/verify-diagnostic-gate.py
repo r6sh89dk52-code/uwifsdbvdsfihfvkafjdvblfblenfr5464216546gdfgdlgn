@@ -27,7 +27,7 @@ for e in entries:
   assert seed['totalTestCount']==2 and seed['passedTests']==2 and seed['failedTests']==0 and seed['skippedTests']==0
  paths=common+['native-ios/InteractionTests/'+cls+'.swift']
  if cls!='N2PremiumRedesignTests':
-  paths+=['scripts/glass-audit/enroll-simulator.sh','scripts/glass-audit/prepare-auth-ui.sh','scripts/glass-audit/simulator-ready-bridge.py','native-ios/InteractionTests/SimulatorBiometricEvents.swift']
+  paths+=['scripts/glass-audit/attach-simulator-display.sh','scripts/glass-audit/enroll-simulator.sh','scripts/glass-audit/prepare-auth-ui.sh','scripts/glass-audit/simulator-ready-bridge.py','native-ios/InteractionTests/SimulatorBiometricEvents.swift']
  # Premium explicitly launches DEMO and never invokes LAContext. Auth process
  # preparation is not one of its code/data inputs; its fixture and own source are.
  subprocess.run(['git','diff','--exit-code',sha,'HEAD','--',*paths],check=True)

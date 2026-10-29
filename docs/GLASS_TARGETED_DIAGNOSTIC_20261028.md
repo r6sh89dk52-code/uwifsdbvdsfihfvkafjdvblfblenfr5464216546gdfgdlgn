@@ -308,3 +308,43 @@ job `123290972911`, label `macos-15`. Setup verified actual ARM64 and selected
 Xcode 16.4. Consult this run's summaries/artifacts before taking the next step;
 no UI pass is claimed by this checkpoint. The final release request file does
 not exist yet. This documentation-only commit does not request another run.
+
+## ARM64 diagnostic result and targeted display correction
+
+Run `40826603674` completed FAILURE overall, with Bio 1/1 PASS, Premium 1/1
+PASS and Protected 0/1, zero skips. Availability preflight 1/1 and Premium seeds
+2/2 PASS. Compact `12877229281`; raw Bio `12877311802`, Premium `12877946637`,
+Protected `12877692763`; build `12876818161`. All are bound to source
+`1e84ae2d2d9a0a7b6caf50ca67b98603ea6271aa`.
+
+Bio's trace proves three sensor-active generations before nomatch/retry/
+foreground events; its final XCTest screenshot shows accessible source setup.
+Premium preserves the immediate five-second keyboard assertion and passes.
+Its hierarchy contains the focused DNI field and onscreen keyboard, no
+Siguiente. The original Premium timeout's exact underlying cause remains
+unproven; no product fix or causal certainty is claimed for that failure.
+
+Protected now reaches sensor active at 06:27:53.453 and genuine policy success
+at 06:28:00.169, but the OS Face ID HUD remains visible and the application
+remains inactive. The screenshot and CoreAuthUI hierarchy confirm the stuck
+HUD, not an authentication rejection. It disappears only at test teardown.
+The application's privacy cover correctly refuses interaction while inactive.
+Do not remove that cover, force taps, suppress the assertion or inject success.
+
+A concrete harness defect was identified: `open -a Simulator --args
+-CurrentDeviceUDID` does not select a new device if Simulator is already
+running (also documented in Expo's own simulator launcher source:
+https://github.com/expo/eas-cli/blob/main/packages/eas-cli/src/run/ios/simulator.ts).
+Bio was the first visible device; Protected ran after other fresh devices.
+The next experiment attaches a new selected-Xcode Simulator GUI instance with
+`open -n` to EACH biometric device, and records a real process bound to that
+exact synthetic UDID. No animation setting, app authorization, OS permission,
+success event, production code or clinical state is changed by this helper.
+The link between the missing display and stuck HUD is a hypothesis to test.
+
+Only Bio and Protected are selected because their shared display preparation
+changes; their diagnostic gate also compares the new helper. Premium keeps
+its unchanged DEMO preparation and input trees, so its individual ARM64 PASS
+can be retained despite the overall run failure. Final all-11 UI and IPA remain
+blocked. Shell/Python/YAML/whitespace and unchanged-product checks passed
+before publication.
