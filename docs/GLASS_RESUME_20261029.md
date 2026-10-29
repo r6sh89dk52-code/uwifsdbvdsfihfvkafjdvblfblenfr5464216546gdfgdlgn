@@ -15,3 +15,32 @@ The failed display-instance experiment has been removed. Standalone CoreAuthUI l
 Source-validation run `40835538219` (job `123319318957`) completed SUCCESS: shell/Python syntax and all three existing native premium/glass/build222 guards passed. The next explicit diagnostic request selects exactly the three original UI methods because the shared App input changes; no earlier Premium/Bio approval is substituted for this changed App. Full audit, final all-11 UI and IPA remain blocked pending these genuine verdicts.
 
 Current three-case execution: source `2bb98bf9bf52f35f9711350d40ce00d2db097060`, run `40835749202`, job `123320009569`. Query its actual summaries and conclusion; this checkpoint claims no new UI PASS. Local shell/Python/YAML syntax and whitespace checks passed after synchronizing the published source. This documentation-only update does not request another test run.
+
+## Three-case approval and first final validation request
+
+Run `40835749202` completed SUCCESS at source
+`2bb98bf9bf52f35f9711350d40ce00d2db097060`: all three original UI methods
+PASS individually (1/1 each), no failures/skips, matching source/build/PASS
+SHA markers and the aggregate DIAGNOSED_3 marker. Compact `12881741798`;
+raw Bio `12880573559`, Premium `12881775105`, Protected `12881731821`;
+build `12880678834`. Local execution of the unchanged strict diagnostic gate
+confirmed identical relevant inputs and Xcode 16.4 / ARM64 / iOS 18.5 (22F77).
+The original XCTest screenshot after protected-source relaunch now shows the
+actual clinical home with no access cover or Face ID HUD. All three real
+sensor generations precede their intended events. No test was weakened.
+
+The explicit `.github/glass-final-release-request.json` now requests the
+FIRST final 11-UI validation on the corrected code. The pipeline first repeats
+the individual approval/input proof in Ubuntu; only then may its Mac job
+prepare current controls. Architecture and App-host changes invalidate the
+Intel Swift/native baseline equivalence, so 412 Swift and 23 native execute.
+All 62 JavaScript guards and both workbook controls execute on this checkout.
+All 11 UI methods execute; no prior UI verdict is used for this final stage.
+Only matching current-SHA mandatory successes permit the fresh unsigned
+ARM64 Release build and publication of IPA, manifests and SHA-256.
+
+This request is not a claim that final validation or IPA packaging succeeded.
+Query its associated workflow and preserve its actual results before declaring
+an IPA validated. No full audit workflow or main/original SwiftUI change is
+requested. The optional simulator cache requires matching complete native
+code/resource inputs and never supplies a UI PASS.
