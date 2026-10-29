@@ -1,0 +1,13 @@
+# DANPER — resumable checkpoint, 2026-10-29
+
+Branch: `audit/glass-pro-iloader-20261028` only. Original recovery baseline: `409c37149917d5c811229680a3f14d1450b171ed`; recovered run `40806554927` already complete and not repeated.
+
+Latest diagnostic source: `3d8e1e90abae166c7e49c6cf3a5041c39bb3f9bd`, tree `c570c1f1bc35ac3bb4709bbdb412f2c25cfc12f8`. Run `40830269793`, job `123302621908`. Only Bio and Protected are selected. Query its actual conclusion and summaries; no pass is claimed here. Build artifact `12878328057` proves Xcode 16.4, ARM64, availability preflight PASS and a real Simulator process bound to the target synthetic device.
+
+Previous ARM64 run `40826603674` at `1e84ae2d2d9a0a7b6caf50ca67b98603ea6271aa` failed overall: Bio PASS, Premium PASS, Protected FAIL. Compact artifact `12877229281`; raw Bio `12877311802`, Premium `12877946637`, Protected `12877692763`. Premium's immediate keyboard assertions remain unchanged; its precise original timeout cause remains unproven. Its unchanged individual ARM64 PASS may be reused by the strict per-case input gate.
+
+Protected reached genuine LocalAuthentication success but its OS Face ID HUD remained stuck, leaving the app inactive and its privacy cover correctly blocking interaction. The new helper opens a fresh selected-Xcode Simulator GUI instance for each biometric device and records its exact UDID process. This tests a display-attachment hypothesis. It sends no authentication events and changes no production code, data or assertions. The shared biometric preparation changes require Bio and Protected to be checked again; Premium is not repeated.
+
+Next: inspect run `40830269793`. Only after both selected summaries/PASS markers succeed, create `.github/glass-final-release-request.json` with the three individual run/artifact/source SHA entries, retaining Premium from `40826603674`. `glass-ui-release.yml` verifies all three input proofs before any Mac work, then requires all 11 fresh UI verdicts. ARM64 invalidates the Intel Swift/native baseline equivalence, so rerun 412 Swift and 23 native; 62 JavaScript guards and two workbook controls also execute. Only after all mandatory controls pass may the workflow publish the unsigned ARM64 iLoader IPA, manifest and SHA-256. No final release request or validated IPA exists at this checkpoint.
+
+Full reasoning and earlier evidence: `docs/GLASS_TARGETED_DIAGNOSTIC_20261028.md`. Main, the original SwiftUI branch, App, NativeTests, Sources and src remain untouched. Do not restart recovery or previously completed audits. No Face ID bypass, forced taps, skipped tests or suppressed failures.
