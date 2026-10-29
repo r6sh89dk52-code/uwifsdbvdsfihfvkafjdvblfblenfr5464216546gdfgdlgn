@@ -114,3 +114,33 @@ instrumentation timing changed too. It does not run any other UI method, the
 Swift/JS/native suites, or the IPA stage. App, native tests and DanperCore remain
 byte-identical to the recovered baseline; only diagnostic infrastructure and
 interaction-test synchronization have changed.
+
+## Second diagnostic and prepared final gate
+
+Second diagnostic source: `47fa1a9fd2be5d3b9d281eda1e2b1fc5c3413cbb`.
+Run `40814464695`, job `123252188177`. Check GitHub for its current result;
+this checkpoint does not claim it passed.
+
+The final `glass-ui-release.yml` pipeline is prepared but not requested. No
+`.github/glass-final-release-request.json` exists yet. Its Ubuntu gate requires
+an actual DIAGNOSED_3_SHA marker plus all three one-test PASS summaries, with
+zero skips, and identical current app/UI/resource/auth-preparation inputs.
+Only after this passes may the Mac runner validate all 11 UI tests and package.
+
+Reuse is now scoped per suite, rather than rejecting every interaction-test
+edit as if it changed the Swift package:
+- Pin the recovered 412-test Swift log and 23-test native summary by SHA-256.
+- Compare Swift package/source/tests, dependency lockfiles, deterministic
+  fixture preparation and all conservatively relevant external tracked inputs.
+- For native tests also compare App, NativeTests, project and icon scripts.
+- Require equal Xcode version and architecture; native reuse also requires the
+  identical available iOS runtime version/build. Otherwise rerun that suite.
+- Run all 62 JS guards and the two workbook controls on the final checkout.
+- Seal source-SHA markers and all 11 current UI summaries before ARM64 Release
+  packaging. Publish validation/reuse manifests alongside the IPA checksum.
+
+Local checks: shell syntax, Python compilation, YAML parsing, whitespace and
+both existing redesign/Glass static guards passed. The scoped verifier was
+exercised against the recovered evidence and baseline environment metadata;
+actual CI reuse must repeat these comparisons against its own environment.
+No new test result or IPA is asserted by these infrastructure preparations.

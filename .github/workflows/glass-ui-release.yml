@@ -1,0 +1,132 @@
+name: Glass - gated 11 UI cases and unsigned iLoader IPA
+run-name: Glass final UI + IPA · ${{ github.sha }}
+on:
+  workflow_dispatch:
+  push:
+    branches: [audit/glass-pro-iloader-20261028]
+    paths: [.github/glass-final-release-request.json]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: danper-glass-final-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  diagnostic-gate:
+    if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      diagnostic-run: ${{ steps.request.outputs.diagnostic-run }}
+      diagnostic-artifact: ${{ steps.request.outputs.diagnostic-artifact }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Read explicit release request
+        id: request
+        run: |
+          python3 - <<'PY'
+          import json,os
+          r=json.load(open('.github/glass-final-release-request.json'))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              for name,key in [('diagnostic-run','diagnosticRun'),('diagnostic-artifact','diagnosticArtifact')]:
+                  value=r[key];assert isinstance(value,int) and value>0
+                  f.write(name+'='+str(value)+'\n')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.request.outputs.diagnostic-artifact }}
+          run-id: ${{ steps.request.outputs.diagnostic-run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/diagnostic
+          merge-multiple: true
+      - name: Verify three genuine passes and identical current tested inputs
+        run: python3 scripts/glass-audit/verify-diagnostic-gate.py "$RUNNER_TEMP/diagnostic"
+  final-ui-and-ipa:
+    needs: diagnostic-gate
+    runs-on: macos-15-intel
+    timeout-minutes: 165
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare Xcode environment
+        id: setup
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-ui-diagnostic" >> "$GITHUB_ENV"
+          echo "DANPER_BASELINE_EVIDENCE=$RUNNER_TEMP/recovered-baseline" >> "$GITHUB_ENV"
+          echo "xcode=$(xcodebuild -version | tr ' \n' '__')" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12868187797
+          run-id: 40806554927
+          github-token: ${{ github.token }}
+          path: ${{ env.DANPER_BASELINE_EVIDENCE }}
+          merge-multiple: true
+      - uses: actions/cache/restore@v4
+        id: cache
+        with:
+          path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
+          key: glass-ui-intel-${{ steps.setup.outputs.xcode }}-${{ github.sha }}
+          restore-keys: |
+            glass-ui-intel-${{ steps.setup.outputs.xcode }}-
+      - name: Verify scoped reuse, rerun affected guards, rebuild test binaries
+        id: prepare
+        timeout-minutes: 35
+        run: bash scripts/glass-audit/prepare-scoped-final.sh
+      - uses: actions/cache/save@v4
+        if: steps.prepare.outcome == 'success' && steps.cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
+          key: glass-ui-intel-${{ steps.setup.outputs.xcode }}-${{ github.sha }}
+      - name: Publish suite-reuse proof and mandatory core results before UI
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_SCOPED_CORE_${{ github.sha }}
+          path: |
+            ${{ env.DANPER_AUDIT_OUT }}/*.txt
+            ${{ env.DANPER_AUDIT_OUT }}/*.json
+            ${{ env.DANPER_AUDIT_OUT }}/*.log
+          retention-days: 14
+      - name: Validate all 11 UI cases on the corrected checkout
+        timeout-minutes: 110
+        run: bash scripts/glass-audit/validate-macos.sh ui
+      - name: Require every mandatory control before packaging
+        run: python3 scripts/glass-audit/seal-controls.py "$DANPER_AUDIT_OUT"
+      - name: Build unsigned ARM64 IPA, manifest and SHA-256
+        timeout-minutes: 15
+        run: |
+          test "$(cat "$DANPER_AUDIT_OUT/ALL_CONTROLS_SHA.txt")" = "$GITHUB_SHA"
+          bash scripts/glass-audit/package-macos.sh
+          cp "$DANPER_AUDIT_OUT/SCOPED_REUSE.json" "$DANPER_AUDIT_OUT/ipa/SCOPED_REUSE.json"
+          cp "$DANPER_AUDIT_OUT/VALIDATION_MANIFEST.json" "$DANPER_AUDIT_OUT/ipa/VALIDATION_MANIFEST.json"
+      - name: Preserve complete final evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_FINAL_UI_EVIDENCE_${{ github.sha }}
+          path: |
+            ${{ env.DANPER_AUDIT_OUT }}
+            !${{ env.DANPER_AUDIT_OUT }}/DerivedData/**
+            !${{ env.DANPER_AUDIT_OUT }}/DeviceDerivedData/**
+            !${{ env.DANPER_AUDIT_OUT }}/package/**
+            !${{ env.DANPER_AUDIT_OUT }}/ipa/**
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish verified unsigned iLoader candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_GLASS_PRO_ILOADER_UNSIGNED_${{ github.sha }}
+          path: ${{ env.DANPER_AUDIT_OUT }}/ipa
+          retention-days: 14
+          compression-level: 0
+          if-no-files-found: error

@@ -7,7 +7,7 @@ mkdir -p "$DANPER_AUDIT_OUT"
 OUT="$DANPER_AUDIT_OUT"
 MODE="${1:-all}"
 DD="$OUT/DerivedData"
-if test "$MODE" != ui && test "$MODE" != resume-native; then
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -41,6 +41,7 @@ if test "$MODE" = resume-native; then
  node scripts/glass-audit/identity.cjs
  (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
 fi
+if test "$MODE" = scoped-native; then test "$(cat "$OUT/BUILD_SUCCESS_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 if test "$MODE" = ui; then test "$(cat "$OUT/CORE_NATIVE_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 # Never pick or erase an existing user's simulator.
 SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
@@ -67,6 +68,7 @@ fresh(){
  xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
  bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
+ bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1
 }
 run_tests(){
  local label="$1" expected="$2" status=0; shift 2
@@ -91,7 +93,7 @@ if test "$MODE" != ui; then
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  run_tests native-23 23 -only-testing:DANPERNativeTests
  git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
- if test "$MODE" = native || test "$MODE" = resume-native; then exit 0; fi
+ if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
 fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
 python3 - <<'PY' > "$OUT/ui-classes.tsv"
