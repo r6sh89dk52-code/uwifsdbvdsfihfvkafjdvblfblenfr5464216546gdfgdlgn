@@ -123,3 +123,9 @@ sequence and correctly fell back to a real build. No stale binary approval
 was forced. The workflow is now executing all 11 UI methods on that rebuilt
 checkout. No full-11 verdict, mandatory seal or IPA PASS is claimed here.
 This checkpoint changes documentation only and does not request another run.
+
+## All mandatory controls approved; device package building
+
+Run `40861610616`, source `2b76453cd51b2998ac300d9c6d435ec871b56cc1`: all-11 UI step `SUCCESS` (11:18:30–12:13:46 UTC), mandatory seal `SUCCESS` (12:13:46–47 UTC). The strict seal reads all seven result summaries and requires 11 passed, zero failed/skipped, all current-source markers, Swift 412, native 23, JS 62 with explicit reuse provenance and both fresh workbook controls. ARM64 unsigned packaging is in progress; no IPA validation/publication is claimed yet. Query Mac job `123406070405` and verify its actual IPA artifact, manifest and SHA-256 before completion. Do not repeat these completed suites if their inputs remain identical.
+
+The local executor became unavailable again; GitHub Actions continues independently and the connector still reads/writes this audit branch. This documentation-only checkpoint triggers no validation run.
