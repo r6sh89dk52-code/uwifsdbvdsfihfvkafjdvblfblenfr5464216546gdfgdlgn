@@ -54,10 +54,6 @@ fresh(){
  xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
  bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
- case "$1" in
-  N2BiometricInteractionTests|N3ClinicalJourneyTests)
-   bash scripts/glass-audit/attach-simulator-display.sh "$SIM_ID" 2>&1 | tee -a "$OUT/simulator-display.log" ;;
- esac
  echo 'PHASE: prelaunch system authentication UI (no app authorization)'
  bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" 2>&1 | tee -a "$OUT/auth-ui-preparation.log"
 }
@@ -106,7 +102,7 @@ else
 fi
 # Stream before the test, so relaunch failures survive step timeouts too.
 xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \
- --predicate 'process == "DANPERNative" OR process == "coreauthd" OR process == "CoreAuthUI" OR subsystem CONTAINS[c] "LocalAuthentication" OR subsystem CONTAINS[c] "Biometric"' \
+ --predicate 'subsystem BEGINSWITH "com.apple.LocalAuthentication" OR (process == "coreauthd" AND eventMessage CONTAINS "simulateMatching") OR (process == "DANPERNative" AND subsystem == "com.apple.UIKit" AND category == "Application")' \
  > "$OUT/$CLS-system.log" 2>&1 & STREAM_PID=$!
 if test "$CLS" = N2BiometricInteractionTests || test "$CLS" = N3ClinicalJourneyTests; then
  python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$CLS-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$CLS-biometric-readiness.log" 2>&1 & READY_PID=$!

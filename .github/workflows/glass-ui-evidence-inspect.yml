@@ -17,6 +17,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+      - name: Validate harness syntax without building or testing
+        run: |
+          bash -n scripts/glass-audit/prepare-auth-ui.sh scripts/glass-audit/diagnose-ui.sh scripts/glass-audit/validate-macos.sh
+          python3 - <<'PYSTATIC'
+          from pathlib import Path
+          for p in Path('scripts/glass-audit').glob('*.py'):compile(p.read_text(),str(p),'exec')
+          assert not Path('scripts/glass-audit/attach-simulator-display.sh').exists()
+          for name in ['diagnose-ui.sh','validate-macos.sh']:
+              s=Path('scripts/glass-audit',name).read_text()
+              assert 'attach-simulator-display.sh' not in s
+              assert 'subsystem BEGINSWITH "com.apple.LocalAuthentication"' in s
+          s=Path('scripts/glass-audit/prepare-auth-ui.sh').read_text()
+          assert 'simctl launch' not in s and 'simctl terminate' not in s
+          print('PASS: shell and Python syntax; no standalone system UI launch or display experiment')
+          PYSTATIC
       - uses: actions/download-artifact@v4
         with:
           artifact-ids: 12877229281

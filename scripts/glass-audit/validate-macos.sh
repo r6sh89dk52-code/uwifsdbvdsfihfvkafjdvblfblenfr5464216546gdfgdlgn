@@ -68,10 +68,6 @@ fresh(){
  xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
  bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
- case "$1" in
-  N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
-   bash scripts/glass-audit/attach-simulator-display.sh "$SIM_ID" >> "$OUT/simulator-display.log" 2>&1 ;;
- esac
  bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1
 }
 run_tests(){
@@ -79,7 +75,7 @@ run_tests(){
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
    xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \
-    --predicate 'process == "DANPERNative" OR process == "coreauthd" OR process == "CoreAuthUI" OR subsystem CONTAINS[c] "LocalAuthentication" OR subsystem CONTAINS[c] "Biometric"' > "$OUT/$label-system.log" 2>&1 & stream=$!
+    --predicate 'subsystem BEGINSWITH "com.apple.LocalAuthentication" OR (process == "coreauthd" AND eventMessage CONTAINS "simulateMatching") OR (process == "DANPERNative" AND subsystem == "com.apple.UIKit" AND category == "Application")' > "$OUT/$label-system.log" 2>&1 & stream=$!
    python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;
  esac
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
