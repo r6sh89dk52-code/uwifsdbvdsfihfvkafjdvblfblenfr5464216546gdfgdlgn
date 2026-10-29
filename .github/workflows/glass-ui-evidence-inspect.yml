@@ -1,0 +1,64 @@
+name: Glass - inspect existing diagnostic evidence only
+run-name: Glass evidence read only · ${{ github.sha }}
+on:
+  workflow_dispatch:
+  push:
+    branches: [audit/glass-pro-iloader-20261028]
+    paths: [.github/glass-ui-evidence-request.json]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12877229281
+          run-id: 40826603674
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/evidence/fifth
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12878922365
+          run-id: 40830269793
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/evidence/sixth
+          merge-multiple: true
+      - name: Read summaries and compare actual auth UI lifecycle (NO TESTS)
+        env:
+          EVIDENCE: ${{ runner.temp }}/evidence
+        run: |
+          python3 - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          root=Path(os.environ['EVIDENCE'])
+          for run in ['fifth','sixth']:
+              p=root/run
+              print('RUN_EVIDENCE',run,(p/'SOURCE_SHA.txt').read_text().strip())
+              for name in ['auth-ui-preparation.log','simulator-display.log','isolated-simulators.txt']:
+                  f=p/name
+                  if f.exists():print(name,f.read_text()[-6000:])
+              for cls in ['N2BiometricInteractionTests','N2PremiumRedesignTests','N3ClinicalJourneyTests']:
+                  f=p/(cls+'.xcresult.summary.json')
+                  if not f.exists():print('NOT_EXECUTED',cls);continue
+                  s=json.loads(f.read_text());print('SUMMARY',cls,json.dumps({k:s.get(k) for k in ['totalTestCount','passedTests','failedTests','skippedTests']}))
+                  for failure in s.get('testFailures',[]):print('FAILURE',failure['failureText'][:1200])
+                  ready=p/(cls+'-biometric-readiness.log')
+                  if ready.exists():print('READINESS',ready.read_text())
+                  log=p/(cls+'-system.log')
+                  if log.exists():
+                      lines=log.read_text().splitlines();print('SYSTEM_LOG_LINES',len(lines))
+                      selected=[l for l in lines if any(t in l for t in ['simulateMatching','evaluatePolicy on LAContext','evaluatePolicy rid:','Mechanism event ','willFinish','has finished with','will dismiss',' was dismissed','UI dismissed -','UI activation timed out','No pending UI mechanism','Deactivation reason added:','Deactivation reason removed:']) or 'LAContext[' in l and 'deallocated' in l]
+                      print('AUTH_LIFECYCLE\n'+'\n'.join(selected[-180:]))
+                  test=p/(cls+'.log')
+                  if test.exists():
+                      lines=test.read_text().splitlines();print('TEST_END\n'+'\n'.join(lines[-18:]))
+          print('READ ONLY: no builds, simulator boots, authentication or tests executed')
+          PY
