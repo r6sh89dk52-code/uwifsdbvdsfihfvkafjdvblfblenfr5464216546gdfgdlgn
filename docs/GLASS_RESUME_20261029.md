@@ -105,3 +105,21 @@ run `40861610616`. Input gate `123405976837` completed SUCCESS; Mac job
 by this checkpoint. Request provenance retains the original three-case PASS
 run and the actual 62-check JavaScript evidence from the failed preparation.
 This documentation-only checkpoint does not trigger a second execution.
+
+## Corrected preparation approved; final UI running
+
+Run `40861610616`, source `2b76453cd51b2998ac300d9c6d435ec871b56cc1`,
+completed preparation successfully. Core artifact `12893306113`, diagnostic
+input artifact `12890594882`. Actual Swift log: 412 passed, zero failures
+(242.286 seconds); actual native summary: 23/23 passed, zero failures/skips.
+Both current Swift-produced XLSX cross-controls passed. JavaScript JSON
+contains 62/62 PASS; reuse proof confirms 61 immutable prior outcomes and one
+new current-identity execution on the exact Node v22.23.2/darwin/arm64 runtime.
+All Swift/JS/native SHA markers match this immutable run source. No failed
+workbook verdict was reused or relabeled.
+
+The simulator cache verifier rejected a changed generated template ZIP byte
+sequence and correctly fell back to a real build. No stale binary approval
+was forced. The workflow is now executing all 11 UI methods on that rebuilt
+checkout. No full-11 verdict, mandatory seal or IPA PASS is claimed here.
+This checkpoint changes documentation only and does not request another run.
