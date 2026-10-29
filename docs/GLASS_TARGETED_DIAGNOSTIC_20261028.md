@@ -300,3 +300,11 @@ so their affected suites will execute during final validation.
 No production App, NativeTests, clinical data or Kardex logic changes are made.
 No Face ID bypass, timeout suppression or weakened assertions are introduced.
 No full audit, final 11-case UI run or IPA is requested at this stage.
+
+Fifth execution published at source
+`1e84ae2d2d9a0a7b6caf50ca67b98603ea6271aa`, tree
+`902f86bbba6912fd73a9e9f7c67ebbd394ba5a2f`: run `40826603674`,
+job `123290972911`, label `macos-15`. Setup verified actual ARM64 and selected
+Xcode 16.4. Consult this run's summaries/artifacts before taking the next step;
+no UI pass is claimed by this checkpoint. The final release request file does
+not exist yet. This documentation-only commit does not request another run.
