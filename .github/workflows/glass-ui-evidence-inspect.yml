@@ -17,44 +17,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - name: Validate harness syntax without building or testing
-        run: |
-          bash -n scripts/glass-audit/prepare-auth-ui.sh scripts/glass-audit/diagnose-ui.sh scripts/glass-audit/validate-macos.sh
-          python3 - <<'PYSTATIC'
-          from pathlib import Path
-          for p in Path('scripts/glass-audit').glob('*.py'):compile(p.read_text(),str(p),'exec')
-          assert not Path('scripts/glass-audit/attach-simulator-display.sh').exists()
-          for name in ['diagnose-ui.sh','validate-macos.sh']:
-              s=Path('scripts/glass-audit',name).read_text()
-              assert 'attach-simulator-display.sh' not in s
-              assert 'subsystem BEGINSWITH "com.apple.LocalAuthentication"' in s
-          s=Path('scripts/glass-audit/prepare-auth-ui.sh').read_text()
-          assert 'simctl launch' not in s and 'simctl terminate' not in s
-          print('PASS: shell and Python syntax; no standalone system UI launch or display experiment')
-          PYSTATIC
       - uses: actions/download-artifact@v4
         with:
-          artifact-ids: 12877229281
-          run-id: 40826603674
+          artifact-ids: 12879918256
+          run-id: 40832912495
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/evidence/fifth
+          path: ${{ runner.temp }}/evidence/seventh
           merge-multiple: true
       - uses: actions/download-artifact@v4
         with:
-          artifact-ids: 12878922365
-          run-id: 40830269793
+          artifact-ids: 12880580446
+          run-id: 40832912495
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/evidence/sixth
+          path: ${{ runner.temp }}/evidence/seventh
           merge-multiple: true
       - name: Read summaries and compare actual auth UI lifecycle (NO TESTS)
         env:
           EVIDENCE: ${{ runner.temp }}/evidence
         run: |
           python3 - <<'PY'
-          import json,os,re
+          import json,os,re,base64
           from pathlib import Path
           root=Path(os.environ['EVIDENCE'])
-          for run in ['fifth','sixth']:
+          for run in ['seventh']:
               p=root/run
               print('RUN_EVIDENCE',run,(p/'SOURCE_SHA.txt').read_text().strip())
               for name in ['auth-ui-preparation.log','simulator-display.log','isolated-simulators.txt']:
@@ -75,5 +60,16 @@ jobs:
                   test=p/(cls+'.log')
                   if test.exists():
                       lines=test.read_text().splitlines();print('TEST_END\n'+'\n'.join(lines[-18:]))
+          p=root/'seventh';test=p/'N3ClinicalJourneyTests.log'
+          lines=test.read_text().splitlines()
+          for i,line in enumerate(lines):
+              if 'error:' in line or 'Failed to determine hittability' in line:
+                  print('FAILURE_CONTEXT\n'+'\n'.join(lines[max(0,i-45):i+8]));break
+          p=p/'N3ClinicalJourneyTests-attachments'
+          for row in json.loads((p/'manifest.json').read_text()):
+              for a in row['attachments']:
+                  name=a['suggestedHumanReadableName'];f=p/a['exportedFileName']
+                  if name.startswith(('diagnostic-DANPER','diagnostic-LocalAuthentication')):print('UI_HIERARCHY',name,'\n'+f.read_text()[:30000])
+                  if name.startswith('diagnostic-final-screen'):print('IMAGE_BASE64',base64.b64encode(f.read_bytes()).decode())
           print('READ ONLY: no builds, simulator boots, authentication or tests executed')
           PY

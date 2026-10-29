@@ -1,13 +1,8 @@
 {
-  "request": "validate-retired-display-and-standalone-coreauthui-no-tests",
-  "runs": [
-    40826603674,
-    40830269793
-  ],
-  "artifacts": [
-    12877229281,
-    12878922365
-  ],
+  "request": "read-new-protected-hittability-failure-no-tests",
+  "run": 40832912495,
+  "compact": 12879918256,
+  "raw": 12880580446,
   "tests": false,
   "build": false
 }
