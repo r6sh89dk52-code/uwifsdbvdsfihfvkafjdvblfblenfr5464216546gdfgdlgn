@@ -86,17 +86,23 @@ struct DanperFloatingTabs:View {
 struct DanperHomeWelcome:View {
     @AppStorage("danper.displayName") private var displayName=""
     var isDemo=false
+    var clock=DanperGreetingClock.device
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var greetingDate=Date()
+    @State private var clockRevision=0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {
         HStack(spacing:16) {
             Image("ClinicalAvatar").resizable().scaledToFit()
                 .frame(width:dynamicTypeSize.isAccessibilitySize ? 48:68,height:dynamicTypeSize.isAccessibilitySize ? 48:68)
                 .clipShape(Circle()).padding(3)
-                .overlay(Circle().strokeBorder(DanperStyle.red.opacity(0.8),lineWidth:2))
+                .overlay(Circle().strokeBorder(DanperStyle.red.opacity(0.38),lineWidth:1))
                 .shadow(color:DanperStyle.red.opacity(0.18),radius:12)
-                .accessibilityHidden(true)
+                .accessibilityLabel("Ilustración de enfermero")
+                .accessibilityIdentifier("glass-home-avatar")
             VStack(alignment:.leading,spacing:6) {
-                Text(displayName.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ? "Hola" : "Hola, \(displayName.trimmingCharacters(in:.whitespacesAndNewlines))").font(.title2.weight(.bold))
+                Text(DanperGreeting.text(name:displayName,at:greetingDate)).font(.title2.weight(.bold))
+                    .accessibilityIdentifier("glass-home-greeting-text")
                     .fixedSize(horizontal:false,vertical:true)
                 Text("Departamento de Salud").font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal:false,vertical:true)
@@ -114,6 +120,17 @@ struct DanperHomeWelcome:View {
         }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
             .danperGlassSurface(cornerRadius:22)
             .accessibilityIdentifier("glass-home-greeting")
+            .task(id:"\(scenePhase)-\(clockRevision)") {
+                guard scenePhase == .active else {return}
+                while !Task.isCancelled {
+                    greetingDate=clock.now()
+                    let delay=DanperGreeting.nextBoundary(after:greetingDate).timeIntervalSince(greetingDate)
+                    do {try await Task.sleep(for:.seconds(max(0.01,delay)))}
+                    catch {return}
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for:UIApplication.significantTimeChangeNotification)) {_ in clockRevision += 1}
+            .onReceive(NotificationCenter.default.publisher(for:NSNotification.Name.NSSystemTimeZoneDidChange)) {_ in clockRevision += 1}
     }
 }
 

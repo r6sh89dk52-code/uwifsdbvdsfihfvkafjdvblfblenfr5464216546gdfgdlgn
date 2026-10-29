@@ -3,9 +3,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const app=read('native-ios/App/DANPERNativeApp.swift'),ui=read('native-ios/App/DanperPremiumUI.swift'),theme=read('native-ios/App/DanperUITheme.swift');
 const inventory=read('native-ios/App/N2SimpleInventoryView.swift'),presentation=read('native-ios/App/N2InventoryPresentation.swift'),glass=read('native-ios/App/DanperPremiumPresentation.swift');
-for(const [asset,hash] of [['ClinicalPortrait','c43917268ce67191a70e2b6549747229b3e7414b21c951bf4432d3257f177291'],['ClinicalAvatar','caf85b6e0704edc7663ed4da677e1a1db796f11d6b29a34056a0001c6a82f4c1']]) {
+for(const [asset,hash] of [['ClinicalPortrait','c43917268ce67191a70e2b6549747229b3e7414b21c951bf4432d3257f177291'],['ClinicalAvatar','51d79d1d46607d4b9e58599e861428790a06c55ebff391c85d28a0b5a829fdcf']]) {
  const bytes=fs.readFileSync(path.join(root,`native-ios/App/Assets.xcassets/${asset}.imageset/${asset}.png`));
- assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),hash,asset+' must be the exact supplied asset');
+ assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),hash,asset+' must match the approved original asset');
 }
 assert(app.includes('.preferredColorScheme(.dark)'),'Clinical glass must keep readable system chrome in either system appearance');
 assert(theme.includes('static var sharingAppearance:UIUserInterfaceStyle'),'Existing sharing appearance preference remains active');

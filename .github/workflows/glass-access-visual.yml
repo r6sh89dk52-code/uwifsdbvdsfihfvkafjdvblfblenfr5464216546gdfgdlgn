@@ -1,5 +1,5 @@
-name: Glass - access composition only
-run-name: Glass access visual · ${{ github.sha }}
+name: Glass - targeted home and access
+run-name: Glass home and access · ${{ github.sha }}
 on:
   workflow_dispatch:
   push:
@@ -14,7 +14,7 @@ jobs:
   access-visual:
     if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
     runs-on: macos-15
-    timeout-minutes: 50
+    timeout-minutes: 65
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
@@ -29,8 +29,10 @@ jobs:
           echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-access-visual" >> "$GITHUB_ENV"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git fetch --no-tags --depth=1 origin 2b76453cd51b2998ac300d9c6d435ec871b56cc1
-          git diff --exit-code 2b76453cd51b2998ac300d9c6d435ec871b56cc1 HEAD -- native-ios/Sources native-ios/NativeTests src
-      - name: Build once and capture access on two phone sizes
+          git diff --exit-code 2b76453cd51b2998ac300d9c6d435ec871b56cc1 HEAD -- native-ios/Sources src
+          git fetch --no-tags --depth=1 origin 5aa09ad20a99eedabd0bbaefd16fbb3d0316f2eb
+          git diff --exit-code 5aa09ad20a99eedabd0bbaefd16fbb3d0316f2eb HEAD -- native-ios/App/DANPERNativeApp.swift
+      - name: Build once and capture home and access on two phone sizes
         run: bash scripts/glass-audit/access-visual.sh
       - name: Publish actual screenshots, xcresult and logs
         if: always()
@@ -45,3 +47,9 @@ jobs:
             ${{ runner.temp }}/glass-access-visual/*-attachments
           retention-days: 14
           if-no-files-found: error
+      - name: Save successful compiler outputs for the final run
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/glass-access-visual/DerivedData
+          key: glass-ui-arm64-Xcode_16.4__Build_version_16F6_-${{ github.sha }}

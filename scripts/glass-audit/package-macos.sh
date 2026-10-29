@@ -20,7 +20,7 @@ from pathlib import Path
 import json,plistlib,sys,subprocess,hashlib
 app=Path(sys.argv[1]); p=plistlib.loads((app/'Info.plist').read_bytes())
 assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
-assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='12'
+assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='13'
 assert p['CFBundleSupportedPlatforms']==['iPhoneOS']
 assert p['NSFaceIDUsageDescription'] and p['UILaunchStoryboardName']=='LaunchScreen'
 assert list(app.rglob('LaunchScreen.storyboardc'))
@@ -40,7 +40,7 @@ PY
 mkdir -p "$OUT/package/Payload" "$OUT/ipa"
 cp -R "$APP" "$OUT/package/Payload/"
 cp "$DD/Build/Products/Release-iphoneos/APP_SHA256.json" "$OUT/ipa/APP_SHA256.json"
-IPA="$OUT/ipa/DANPER_GLASS_PRO_0.4.2_12_ILOADER_UNSIGNED.ipa"
+IPA="$OUT/ipa/DANPER_GLASS_PRO_0.4.2_13_ILOADER_UNSIGNED.ipa"
 (cd "$OUT/package" && /usr/bin/ditto -c -k --keepParent Payload "$IPA")
 unzip -t "$IPA" > "$OUT/ipa/zip-integrity.log"
 python3 - "$IPA" "$OUT/ipa/APP_SHA256.json" "$SHA" <<'PY'

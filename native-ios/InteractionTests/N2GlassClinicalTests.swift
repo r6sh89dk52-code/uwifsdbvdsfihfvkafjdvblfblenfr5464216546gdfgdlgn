@@ -14,8 +14,10 @@ final class N2GlassClinicalTests:XCTestCase {
         }
         XCTAssertTrue(element.exists,app.debugDescription);XCTAssertTrue(element.isHittable)
     }
-    private func launch(_ app:XCUIApplication) {
-        app.launchArguments=["--danper-redesign-demo","-danper.appearance","dark"]
+    private func launch(_ app:XCUIApplication,localTime:String="09:00:00",appearance:String="dark",large:Bool=false) {
+        app.launchArguments=["--danper-redesign-demo","-danper.appearance",appearance]
+        if large {app.launchArguments += ["-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]}
+        app.launchEnvironment["DANPER_GREETING_TEST_LOCAL"]="2026-10-29T"+localTime
         app.launch()
         XCTAssertTrue(app.buttons["demo-home-new-attention"].waitForExistence(timeout:20),app.debugDescription)
     }
@@ -24,7 +26,7 @@ final class N2GlassClinicalTests:XCTestCase {
         let app=XCUIApplication()
         for (name,destination) in [("Trabajadores","Personal"),("Kardex","Inventario"),("Estadísticas",""),("Indicadores","Indicadores")] {
             launch(app)
-            XCTAssertTrue(app.staticTexts["Hola"].exists)
+            XCTAssertTrue(app.staticTexts["Buenos días ☀️"].exists)
             XCTAssertFalse(app.staticTexts["Bienvenido"].exists)
             for id in ["today","week","month"] {XCTAssertTrue(app.descendants(matching:.any)["premium-metric-"+id].exists)}
             capture("Inicio-"+name)
@@ -50,10 +52,23 @@ final class N2GlassClinicalTests:XCTestCase {
         for _ in 0..<4 {app.scrollViews.firstMatch.swipeUp()}
         capture("Ver-todas-final-desplazado")
     }
+    private func assertWelcome(_ app:XCUIApplication,_ expected:String) {
+        let greeting=app.staticTexts["glass-home-greeting-text"]
+        let match=XCTNSPredicateExpectation(predicate:NSPredicate(format:"label == %@",expected),object:greeting)
+        XCTAssertEqual(XCTWaiter.wait(for:[match],timeout:10),.completed,app.debugDescription)
+        let avatar=app.images["glass-home-avatar"]
+        XCTAssertTrue(avatar.exists);XCTAssertTrue(avatar.isHittable)
+        XCTAssertGreaterThanOrEqual(avatar.frame.minX,app.frame.minX)
+        XCTAssertLessThanOrEqual(greeting.frame.maxX,app.frame.maxX)
+        XCTAssertLessThanOrEqual(avatar.frame.maxX,greeting.frame.minX,"Avatar and greeting must not overlap")
+        XCTAssertTrue(app.staticTexts["Departamento de Salud"].exists)
+        let next=app.buttons["demo-home-new-attention"]
+        XCTAssertLessThanOrEqual(greeting.frame.maxY,next.frame.minY,"Greeting must not cover Nueva atención")
+    }
     func testLocalDisplayNamePersistsWithoutChangingClinicalIdentity() {
         continueAfterFailure=false
         let app=XCUIApplication();launch(app)
-        XCTAssertTrue(app.staticTexts["Hola"].exists)
+        assertWelcome(app,"Buenos días ☀️")
         XCTAssertTrue(app.staticTexts["DEMO · Datos ficticios"].exists)
         app.buttons["premium-tab-settings"].tap()
         let name=app.textFields["glass-display-name"]
@@ -61,17 +76,41 @@ final class N2GlassClinicalTests:XCTestCase {
         app.buttons["danper-dismiss-keyboard"].tap()
         capture("Preferencia-nombre-local")
         app.buttons["premium-tab-home"].tap()
-        XCTAssertTrue(app.staticTexts["Hola, Felipe"].waitForExistence(timeout:10))
-        capture("Inicio-Felipe-DEMO-discreto")
+        assertWelcome(app,"Buenos días Felipe ☀️");capture("Inicio-manana-Felipe-avatar")
         app.terminate();launch(app)
-        XCTAssertTrue(app.staticTexts["Hola, Felipe"].exists)
-        capture("Inicio-nombre-persistido")
+        assertWelcome(app,"Buenos días Felipe ☀️");capture("Inicio-nombre-persistido")
+        for (time,text,appearance) in [("12:00:00","Buenas tardes Felipe 🌤️","light"),
+                                        ("19:00:00","Buenas noches Felipe 🌙","dark")] {
+            app.terminate();launch(app,localTime:time,appearance:appearance)
+            assertWelcome(app,text);capture("Inicio-"+time+"-"+appearance)
+        }
+        // The injected clock advances using uptime. Cross a real scheduled
+        // boundary while visible, then another during actual backgrounding.
+        app.terminate();launch(app,localTime:"11:59:45")
+        assertWelcome(app,"Buenos días Felipe ☀️")
+        let afternoon=app.staticTexts["glass-home-greeting-text"]
+        let changed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"label == %@","Buenas tardes Felipe 🌤️"),object:afternoon)
+        XCTAssertEqual(XCTWaiter.wait(for:[changed],timeout:25),.completed)
+        capture("Inicio-cambio-tramo-visible")
+        app.terminate();launch(app,localTime:"18:59:45")
+        assertWelcome(app,"Buenas tardes Felipe 🌤️")
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for:.runningBackground,timeout:10))
+        let elapsed=XCTestExpectation(description:"Cross injected clock boundary in background")
+        DispatchQueue.main.asyncAfter(deadline:.now()+17) {elapsed.fulfill()}
+        wait(for:[elapsed],timeout:20)
+        app.activate()
+        assertWelcome(app,"Buenas noches Felipe 🌙");capture("Inicio-primer-plano-actualizado")
+        app.terminate();launch(app,large:true)
+        assertWelcome(app,"Buenos días Felipe ☀️");capture("Inicio-Felipe-texto-accesible")
+        app.terminate();launch(app)
         app.buttons["premium-tab-settings"].tap()
         reveal(name,in:app);name.tap();name.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:6))
         app.buttons["danper-dismiss-keyboard"].tap()
         app.buttons["premium-tab-home"].tap()
-        XCTAssertTrue(app.staticTexts["Hola"].waitForExistence(timeout:10))
-        capture("Inicio-nombre-opcional-vacio")
+        assertWelcome(app,"Buenos días ☀️");capture("Inicio-nombre-opcional-vacio")
+        app.terminate();launch(app)
+        assertWelcome(app,"Buenos días ☀️")
     }
     func testRealKardexFiltersSearchAndDetailWithoutMutations() {
         continueAfterFailure=false

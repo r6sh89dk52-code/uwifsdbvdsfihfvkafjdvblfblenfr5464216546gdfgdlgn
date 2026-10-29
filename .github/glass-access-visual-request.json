@@ -1,8 +1,9 @@
 {
-  "request": "continuous-access-composition-20261029-2",
-  "previousValidatedSource": "2b76453cd51b2998ac300d9c6d435ec871b56cc1",
-  "test": "N2PremiumRedesignTests/testAccessLightAndDark",
-  "devices": ["iPhone-16", "iPhone-SE-3rd-generation"],
+  "request": "build13-professional-avatar-local-greeting-targeted-1",
+  "baselineSource": "5aa09ad20a99eedabd0bbaefd16fbb3d0316f2eb",
   "fullAudit": false,
-  "packageIPA": false
+  "packageIPA": false,
+  "uiCasesIPhone16": 4,
+  "uiCasesSE": 2,
+  "newNativeCases": 3
 }
