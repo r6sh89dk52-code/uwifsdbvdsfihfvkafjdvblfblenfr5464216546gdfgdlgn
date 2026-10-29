@@ -1,5 +1,5 @@
 {
-  "request": "continuous-access-composition-20261029-1",
+  "request": "continuous-access-composition-20261029-2",
   "previousValidatedSource": "2b76453cd51b2998ac300d9c6d435ec871b56cc1",
   "test": "N2PremiumRedesignTests/testAccessLightAndDark",
   "devices": ["iPhone-16", "iPhone-SE-3rd-generation"],

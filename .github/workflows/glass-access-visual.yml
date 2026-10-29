@@ -17,7 +17,6 @@ jobs:
     timeout-minutes: 50
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-      DANPER_AUDIT_OUT: ${{ runner.temp }}/glass-access-visual
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,6 +26,7 @@ jobs:
           node-version: '22'
       - name: Verify protected source is unchanged
         run: |
+          echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-access-visual" >> "$GITHUB_ENV"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git fetch --no-tags --depth=1 origin 2b76453cd51b2998ac300d9c6d435ec871b56cc1
           git diff --exit-code 2b76453cd51b2998ac300d9c6d435ec871b56cc1 HEAD -- native-ios/Sources native-ios/NativeTests src
