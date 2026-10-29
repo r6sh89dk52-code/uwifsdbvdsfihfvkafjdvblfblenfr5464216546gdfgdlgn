@@ -69,7 +69,9 @@ jobs:
           retention-days: 14
   final-ui-and-ipa:
     needs: diagnostic-gate
-    runs-on: macos-15-intel
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
@@ -87,6 +89,8 @@ jobs:
           echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-ui-diagnostic" >> "$GITHUB_ENV"
           echo "DANPER_BASELINE_EVIDENCE=$RUNNER_TEMP/recovered-baseline" >> "$GITHUB_ENV"
           echo "DANPER_DIAGNOSTIC_GATE=$RUNNER_TEMP/diagnostic-gate/DIAGNOSTIC_GATE.json" >> "$GITHUB_ENV"
+          test "$(uname -m)" = arm64
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
           echo "xcode=$(xcodebuild -version | tr ' \n' '__')" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
@@ -103,9 +107,9 @@ jobs:
         id: cache
         with:
           path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
-          key: glass-ui-intel-${{ steps.setup.outputs.xcode }}-${{ github.sha }}
+          key: glass-ui-${{ steps.setup.outputs.arch }}-${{ steps.setup.outputs.xcode }}-${{ github.sha }}
           restore-keys: |
-            glass-ui-intel-${{ steps.setup.outputs.xcode }}-
+            glass-ui-${{ steps.setup.outputs.arch }}-${{ steps.setup.outputs.xcode }}-
       - name: Verify scoped reuse, rerun affected guards, rebuild test binaries
         id: prepare
         timeout-minutes: 35
@@ -116,7 +120,7 @@ jobs:
         if: steps.prepare.outcome == 'success' && steps.cache.outputs.cache-hit != 'true'
         with:
           path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
-          key: glass-ui-intel-${{ steps.setup.outputs.xcode }}-${{ github.sha }}
+          key: glass-ui-${{ steps.setup.outputs.arch }}-${{ steps.setup.outputs.xcode }}-${{ github.sha }}
       - name: Publish suite-reuse proof and mandatory core results before UI
         if: always()
         uses: actions/upload-artifact@v4

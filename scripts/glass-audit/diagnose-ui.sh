@@ -85,6 +85,8 @@ if test "$MODE" = build; then
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
   ONLY_ACTIVE_ARCH=YES build-for-testing 2>&1 | tee "$OUT/build-for-testing.log"
  git rev-parse HEAD > "$OUT/BUILD_SUCCESS_SHA.txt"
+ echo 'PHASE: verify actual Face ID availability on this architecture (no authentication injected)'
+ run_test biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  trap - EXIT
  exit 0
 fi

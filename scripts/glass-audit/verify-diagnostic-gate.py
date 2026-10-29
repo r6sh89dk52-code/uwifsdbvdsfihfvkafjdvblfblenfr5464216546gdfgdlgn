@@ -52,7 +52,7 @@ for e in entries:
  buildpaths=['native-ios','src','package.json','package-lock.json','scripts/prepare-n1s-ios-demo-resources.cjs','scripts/glass-audit/prepare.sh']
  same=subprocess.run(['git','diff','--quiet',sha,'HEAD','--',*buildpaths]).returncode==0
  if same:
-  cachekey='glass-ui-intel-'+report['xcodeVersion'].replace(' ','_').replace('\n','_')+'-'+sha
+  cachekey='glass-ui-'+report['architecture']+'-'+report['xcodeVersion'].replace(' ','_').replace('\n','_')+'-'+sha
   report['simulatorBuild']={'sourceSHA':sha,'run':e['run'],'artifact':e['artifact'],'cacheKey':cachekey,'nativeTree':git('rev-parse',sha+':native-ios'),'currentNativeTree':git('rev-parse','HEAD:native-ios')}
   break
 (root/'DIAGNOSTIC_GATE.json').write_text(json.dumps(report,indent=2)+'\n')

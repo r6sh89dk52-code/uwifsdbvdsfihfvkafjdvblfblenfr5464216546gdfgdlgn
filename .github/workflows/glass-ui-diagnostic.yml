@@ -13,7 +13,9 @@ concurrency:
 jobs:
   targeted-ui:
     if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
-    runs-on: macos-15-intel
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     timeout-minutes: 95
     steps:
       - uses: actions/checkout@v4
@@ -37,15 +39,17 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
               for k,v in names.items():f.write(k+'='+str(any(c.startswith(v+'/') for c in cases)).lower()+'\n')
           PYSELECT
+          test "$(uname -m)" = arm64
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
           echo "xcode=$(xcodebuild -version | tr ' \n' '__')" >> "$GITHUB_OUTPUT"
       - name: Restore compiler cache (Xcode still rebuilds and validates inputs)
         id: cache
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
-          key: glass-ui-intel-${{ steps.select.outputs.xcode }}-${{ github.sha }}
+          key: glass-ui-${{ steps.select.outputs.arch }}-${{ steps.select.outputs.xcode }}-${{ github.sha }}
           restore-keys: |
-            glass-ui-intel-${{ steps.select.outputs.xcode }}-
+            glass-ui-${{ steps.select.outputs.arch }}-${{ steps.select.outputs.xcode }}-
       - name: Prepare system UI and build test binaries once
         id: build
         timeout-minutes: 30
@@ -56,7 +60,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
-          key: glass-ui-intel-${{ steps.select.outputs.xcode }}-${{ github.sha }}
+          key: glass-ui-${{ steps.select.outputs.arch }}-${{ steps.select.outputs.xcode }}-${{ github.sha }}
       - name: Publish build checkpoint
         if: always()
         uses: actions/upload-artifact@v4

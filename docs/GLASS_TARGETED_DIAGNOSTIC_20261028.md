@@ -274,3 +274,29 @@ actual generated App resources and native synthetic fixtures byte-for-byte
 against the restored bundles, because those generated files are ignored by
 Git. Missing or different resources require an actual rebuild. Cached binaries
 never supply UI PASS verdicts, and the unsigned ARM64 build is still separate.
+
+## Fourth result and architecture-specific fifth diagnostic
+
+Run `40823214523` completed FAILURE: Bio 0/1, Protected 0/1, no skips.
+Compact artifact `12876867077`; raw Protected `12877260147`; raw Bio
+`12876366635`; build checkpoint `12876097801`. Both actual summaries fail
+waiting for sensor readiness. The bridge observed each new DANPER context,
+but no active sensor. Both real system logs show LocalAuthentication -1000
+“UI activation timed out after 5 seconds”, then “No pending UI mechanism”.
+The bridge did not acknowledge or inject an event into an inactive sensor.
+
+The fifth diagnostic changes the runner to native ARM64 `macos-15`, explicitly
+pinning Xcode 16.4 and its iOS 18.5 runtime. This tests whether the repeatedly
+observed Intel system-UI startup watchdog is environment-specific. It is an
+experiment, not a claim of success. Cache keys now include the actual runner
+architecture; Intel binaries/results are not treated as ARM64 equivalents.
+The diagnostic runs only the three original selected UI methods, plus the
+existing one-test native Face ID availability preflight (no authentication).
+Premium is included again because the architecture changes its inputs too.
+The final gate requires matching architecture/Xcode/runtime across all three
+approvals. Swift and native baseline reuse must fail on architecture mismatch,
+so their affected suites will execute during final validation.
+
+No production App, NativeTests, clinical data or Kardex logic changes are made.
+No Face ID bypass, timeout suppression or weakened assertions are introduced.
+No full audit, final 11-case UI run or IPA is requested at this stage.
