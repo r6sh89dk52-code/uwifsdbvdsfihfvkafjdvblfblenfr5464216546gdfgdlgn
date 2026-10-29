@@ -54,7 +54,7 @@ fresh(){
  xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
  bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
- echo 'PHASE: prelaunch system authentication UI (no app authorization)'
+ echo 'PHASE: prepare Simulator; LocalAuthentication owns system UI'
  bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" 2>&1 | tee -a "$OUT/auth-ui-preparation.log"
 }
 run_test(){

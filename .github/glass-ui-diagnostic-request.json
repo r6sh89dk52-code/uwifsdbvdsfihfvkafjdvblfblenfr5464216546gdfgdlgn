@@ -1,10 +1,12 @@
 {
-  "request": "diagnose-two-with-explicit-device-display-6",
+  "request": "diagnose-two-with-os-owned-auth-ui-7",
   "baselineSHA": "409c37149917d5c811229680a3f14d1450b171ed",
   "recoveredRun": 40806554927,
   "fullAudit": false,
   "packageIPA": false,
-  "previousDiagnosticRun": 40826603674,
+  "previousDiagnosticRun": 40830269793,
+  "evidenceInspectionRun": 40832471077,
+  "syntaxValidationRun": 40832840813,
   "cases": [
     "N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground",
     "N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch"
