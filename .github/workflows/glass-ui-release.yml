@@ -109,6 +109,8 @@ jobs:
       - name: Verify scoped reuse, rerun affected guards, rebuild test binaries
         id: prepare
         timeout-minutes: 35
+        env:
+          DANPER_RESTORED_CACHE_KEY: ${{ steps.cache.outputs.cache-matched-key }}
         run: bash scripts/glass-audit/prepare-scoped-final.sh
       - uses: actions/cache/save@v4
         if: steps.prepare.outcome == 'success' && steps.cache.outputs.cache-hit != 'true'

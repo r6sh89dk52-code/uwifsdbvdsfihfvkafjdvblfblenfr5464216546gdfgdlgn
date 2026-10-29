@@ -218,3 +218,45 @@ failures/skips before sealing. No final UI result is claimed by this change.
 Local validation extracted the actual inventory generator from the shell script
 and verified all 11 methods/counts and the dedicated protected selector. Shell
 syntax, Python parsing and whitespace checks passed.
+
+## Third diagnostic results: event readiness and late TCC permission
+
+Run `40818891397` failed both selected cases (0/2 PASS, no skips). Compact
+artifact `12875515283`; raw Bio `12873614666`, raw Protected `12874379170`.
+The stricter assertions correctly rejected these results.
+
+Bio no longer has an activation-timeout error. Its real CoreAuthUI exists, but
+the old event was posted before matching began: coreauthd only reports sensor
+active at `05:00:53.052`, after the capture + two-second event sequence. No
+simulateMatching/nomatch reached the active operation. The absence of Cancel
+therefore has a proven event-ordering explanation, not a missing enrollment.
+
+Protected also exposes late TCC startup: the five-second optional permission
+poll ended before coreauthd requested Face ID permission at `05:13:13.302`.
+There was no Allow tap, no sensor-active signal, and no completed authentication.
+An app-level “Verificando identidad” label is not a readiness signal for either
+TCC or the biometric sensor.
+
+The next two-case request adds test-runner-only coordination:
+- Host reads the real simulator log and acknowledges only an observed active
+  MechanismPearl sensor for a new DANPER evaluatePolicy generation.
+- The UI runner writes a nonce/request in its OWN Documents container, waits for
+  that readiness acknowledgement, then posts its original intended event.
+- No host code posts match/nomatch and no production code is involved. The
+  helper fails closed if readiness, nonce, or new context is missing.
+- While waiting, the UI test can tap Allow only on an actual Face ID permission
+  alert, covering the late TCC prompt without authorizing clinical access.
+- Bundle identity is read from the compiled UI runner's Info.plist, not guessed.
+
+Local replay against the actual failed Bio log permits no event before the
+observed sensor-active record and resets on stop. Replay against the earlier
+passing Bio log identifies three distinct contexts (initial, retry, foreground)
+and their three actual sensor-active signals. These are parser checks, not new
+claims that the UI cases passed.
+
+Optional final simulator-binary reuse now requires the complete native input
+tree (all UI methods included), external resources, exact compiler cache key,
+SDK/architecture and valid simulator bundle signatures. Actual binary hashes
+and origin SHA are recorded. Any missing proof falls back to compilation.
+All 11 final UI tests still execute; ARM64 Release still builds independently.
+No UI verdict is obtained from the compiler cache.

@@ -151,7 +151,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertTrue(app.staticTexts["Verificando identidad…"].waitForExistence(timeout:15),app.debugDescription)
         XCTAssertFalse(app.buttons["premium-tab-home"].exists)
         Thread.sleep(forTimeInterval:2)
-        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),CFNotificationName(rawValue:"com.apple.BiometricKit_Sim.pearl.match" as CFString),nil,nil,true)
+        SimulatorBiometricEvents.send("match")
         let usable=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
             let manual=app.buttons["clinical-first-run-manual-worker"]
             let home=app.buttons["premium-tab-home"]
@@ -179,7 +179,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
             tap(app.buttons["first-manual-worker-activate"],in:app)
             tap(app.buttons["Crear e ingresar primer trabajador"],in:app)
             Thread.sleep(forTimeInterval:2)
-            CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),CFNotificationName(rawValue:"com.apple.BiometricKit_Sim.pearl.match" as CFString),nil,nil,true)
+            SimulatorBiometricEvents.send("match")
             XCTAssertTrue(app.buttons["Volver para entrar a DANPER"].waitForExistence(timeout:15),app.debugDescription)
             tap(app.buttons["Volver para entrar a DANPER"],in:app)
         }

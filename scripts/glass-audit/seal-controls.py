@@ -22,7 +22,9 @@ for line in (out/'ui-classes.tsv').read_text().splitlines():
 assert sum(s['passed'] for s in ui)==11
 gate=json.loads((out/'DIAGNOSTIC_GATE.json').read_text());assert gate['currentSHA']==sha and gate['allThreePassed'] and len(gate['cases'])==3
 request=json.loads(Path('.github/glass-final-release-request.json').read_text())
-manifest={'sourceSHA':sha,'swift':{'passed':412,'reused':reuse['suites']['swift']['identical']},'native':{'passed':23,'reused':reuse['suites']['native']['identical']},'javascript':{'passed':62,'crossWorkbookControls':2,'reused':False},'ui':{'passed':11,'failed':0,'skipped':0,'classes':ui,'reused':False},'targetedDiagnostic':request,'physicalDeviceValidated':False}
+simulator_build=json.loads((out/'SIMULATOR_BUILD_REUSE.json').read_text())
+if simulator_build['reused']:assert simulator_build['codeInputSHA']==sha and not simulator_build['uiResultsReused']
+manifest={'sourceSHA':sha,'simulatorBuild':simulator_build,'swift':{'passed':412,'reused':reuse['suites']['swift']['identical']},'native':{'passed':23,'reused':reuse['suites']['native']['identical']},'javascript':{'passed':62,'crossWorkbookControls':2,'reused':False},'ui':{'passed':11,'failed':0,'skipped':0,'classes':ui,'reused':False},'targetedDiagnostic':request,'physicalDeviceValidated':False}
 (out/'VALIDATION_MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n')
 (out/'ALL_CONTROLS_SHA.txt').write_text(sha+'\n')
 print('PASS: all mandatory controls sealed for',sha)

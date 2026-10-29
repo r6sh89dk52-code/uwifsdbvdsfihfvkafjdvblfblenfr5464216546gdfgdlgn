@@ -27,12 +27,13 @@ for e in entries:
   assert seed['totalTestCount']==2 and seed['passedTests']==2 and seed['failedTests']==0 and seed['skippedTests']==0
  paths=common+['native-ios/InteractionTests/'+cls+'.swift']
  if cls!='N2PremiumRedesignTests':
-  paths+=['scripts/glass-audit/enroll-simulator.sh','scripts/glass-audit/prepare-auth-ui.sh']
+  paths+=['scripts/glass-audit/enroll-simulator.sh','scripts/glass-audit/prepare-auth-ui.sh','scripts/glass-audit/simulator-ready-bridge.py','native-ios/InteractionTests/SimulatorBiometricEvents.swift']
  # Premium explicitly launches DEMO and never invokes LAContext. Auth process
  # preparation is not one of its code/data inputs; its fixture and own source are.
  subprocess.run(['git','diff','--exit-code',sha,'HEAD','--',*paths],check=True)
  changed=git('diff','--name-only',sha,'HEAD').splitlines()
  allowed_tests={'native-ios/InteractionTests/'+c+'.swift' for c in methods if c!=cls}
+ if cls=='N2PremiumRedesignTests':allowed_tests.add('native-ios/InteractionTests/SimulatorBiometricEvents.swift')
  unknown=[v for v in changed if v not in allowed_tests and not v.startswith(('.github/','docs/','scripts/glass-audit/'))]
  assert not unknown,('Unreviewed external input changes',cls,unknown)
  toolchains.add((p/'xcode-version.txt').read_text())
@@ -43,5 +44,16 @@ for e in entries:
 assert len(toolchains)==1 and len(devices)==1
 arch,version,build=devices.pop()
 report={'currentSHA':git('rev-parse','HEAD'),'cases':proof,'xcodeVersion':toolchains.pop(),'architecture':arch,'runtimeVersion':version,'runtimeBuild':build,'allThreePassed':True,'overallFailedRunsAreNotRelabeled':True}
+# A simulator build may be reused only when its ENTIRE native tree (including
+# all UI methods), external resources and compiler inputs equal this checkout.
+report['simulatorBuild']=None
+for e in entries:
+ sha=e['sourceSHA']
+ buildpaths=['native-ios','src','package.json','package-lock.json','scripts/prepare-n1s-ios-demo-resources.cjs','scripts/glass-audit/prepare.sh']
+ same=subprocess.run(['git','diff','--quiet',sha,'HEAD','--',*buildpaths]).returncode==0
+ if same:
+  cachekey='glass-ui-intel-'+report['xcodeVersion'].replace(' ','_').replace('\n','_')+'-'+sha
+  report['simulatorBuild']={'sourceSHA':sha,'run':e['run'],'artifact':e['artifact'],'cacheKey':cachekey,'nativeTree':git('rev-parse',sha+':native-ios'),'currentNativeTree':git('rev-parse','HEAD:native-ios')}
+  break
 (root/'DIAGNOSTIC_GATE.json').write_text(json.dumps(report,indent=2)+'\n')
 print('PASS: all three individual cases, identical relevant inputs, pinned run/artifact/SHA provenance')

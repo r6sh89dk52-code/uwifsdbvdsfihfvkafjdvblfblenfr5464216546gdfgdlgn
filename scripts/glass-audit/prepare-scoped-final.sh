@@ -43,10 +43,15 @@ fi
 git rev-parse HEAD > "$OUT/SWIFT_VALIDATED_SHA.txt"
 node scripts/glass-audit/identity.cjs
 (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
-echo 'PHASE: rebuild/revalidate simulator binaries for this checkout'
-xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
- -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" \
- ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES build-for-testing 2>&1 | tee "$OUT/build-for-testing.log"
+git diff --exit-code HEAD -- native-ios src package.json package-lock.json
+if python3 scripts/glass-audit/verify-simulator-build-cache.py "$OUT"; then
+ echo 'PHASE: reuse proven identical simulator binaries; all 11 UI tests still execute'
+else
+ echo 'PHASE: rebuild/revalidate simulator binaries for this checkout'
+ xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
+  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" \
+  ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES build-for-testing 2>&1 | tee "$OUT/build-for-testing.log"
+fi
 git rev-parse HEAD > "$OUT/BUILD_SUCCESS_SHA.txt"
 if test "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["suites"]["native"]["identical"])' "$OUT/SCOPED_REUSE.json")" = True; then
  # Permitted only by byte-identity proof and pinned PASS evidence.

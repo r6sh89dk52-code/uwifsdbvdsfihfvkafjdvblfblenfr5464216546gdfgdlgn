@@ -15,8 +15,7 @@ final class N2BiometricInteractionTests:XCTestCase {
     }
 
     private func biometric(_ result:String) {
-        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
-            CFNotificationName(rawValue:("com.apple.BiometricKit_Sim.pearl."+result) as CFString),nil,nil,true)
+        SimulatorBiometricEvents.send(result)
     }
     private func capture(_ app:XCUIApplication,_ name:String) {
         let attachment=XCTAttachment(screenshot:app.screenshot())

@@ -71,11 +71,19 @@ fresh(){
  bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1
 }
 run_tests(){
- local label="$1" expected="$2" status=0; shift 2
+ local label="$1" expected="$2" status=0 stream='' bridge=''; shift 2
+ case "$label" in
+  N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
+   xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \
+    --predicate 'process == "DANPERNative" OR process == "coreauthd" OR process == "CoreAuthUI" OR subsystem CONTAINS[c] "LocalAuthentication" OR subsystem CONTAINS[c] "Biometric"' > "$OUT/$label-system.log" 2>&1 & stream=$!
+   python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;
+ esac
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
   -derivedDataPath "$DD" -parallel-testing-enabled NO -resultBundlePath "$OUT/$label.xcresult" \
   "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
+ if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
+ if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
  xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments" || status=1
  return "$status"

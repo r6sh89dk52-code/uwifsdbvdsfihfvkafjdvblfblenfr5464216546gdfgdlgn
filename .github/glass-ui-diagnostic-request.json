@@ -1,10 +1,10 @@
 {
-  "request": "diagnose-two-biometric-system-ui-lifecycle-3",
+  "request": "diagnose-two-after-actual-sensor-readiness-4",
   "baselineSHA": "409c37149917d5c811229680a3f14d1450b171ed",
   "recoveredRun": 40806554927,
   "fullAudit": false,
   "packageIPA": false,
-  "previousDiagnosticRun": 40814464695,
+  "previousDiagnosticRun": 40818891397,
   "cases": [
     "N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground",
     "N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch"

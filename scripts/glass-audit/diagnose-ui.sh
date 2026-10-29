@@ -36,8 +36,9 @@ assert rows,'No runtime matching selected Xcode SDK'
 print(rows[0]['identifier'])
 PY
 )
-SIM_ID=''; STREAM_PID=''
+SIM_ID=''; STREAM_PID=''; READY_PID=''
 cleanup(){
+ if test -n "$READY_PID"; then kill "$READY_PID" 2>/dev/null || true; wait "$READY_PID" 2>/dev/null || true; fi
  if test -n "$STREAM_PID"; then kill "$STREAM_PID" 2>/dev/null || true; wait "$STREAM_PID" 2>/dev/null || true; fi
  if test -n "$SIM_ID"; then xcrun simctl shutdown "$SIM_ID" || true; xcrun simctl delete "$SIM_ID" || true; fi
 }
@@ -101,6 +102,9 @@ fi
 xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \
  --predicate 'process == "DANPERNative" OR process == "coreauthd" OR process == "CoreAuthUI" OR subsystem CONTAINS[c] "LocalAuthentication" OR subsystem CONTAINS[c] "Biometric"' \
  > "$OUT/$CLS-system.log" 2>&1 & STREAM_PID=$!
+if test "$CLS" = N2BiometricInteractionTests || test "$CLS" = N3ClinicalJourneyTests; then
+ python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$CLS-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$CLS-biometric-readiness.log" 2>&1 & READY_PID=$!
+fi
 if test "$CLS" = N2PremiumRedesignTests; then
  run_test "seed-$CLS" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests
 fi
