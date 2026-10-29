@@ -1,14 +1,14 @@
 {
-  "request": "diagnose-two-with-os-owned-auth-ui-7",
+  "request": "diagnose-three-after-context-lifetime-correction-8",
   "baselineSHA": "409c37149917d5c811229680a3f14d1450b171ed",
   "recoveredRun": 40806554927,
   "fullAudit": false,
   "packageIPA": false,
-  "previousDiagnosticRun": 40830269793,
-  "evidenceInspectionRun": 40832471077,
-  "syntaxValidationRun": 40832840813,
+  "previousDiagnosticRun": 40832912495,
+  "sourceValidationRun": 40835538219,
   "cases": [
     "N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground",
+    "N2PremiumRedesignTests/testDemoNavigationAttentionAndVersion",
     "N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch"
   ]
 }
