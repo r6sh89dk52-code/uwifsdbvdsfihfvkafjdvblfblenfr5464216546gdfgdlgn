@@ -12,6 +12,16 @@ git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
 xcodebuild -version > "$OUT/xcode-version.txt"
 uname -m > "$OUT/architecture.txt"
 xcrun simctl list runtimes -j > "$OUT/runtimes.json"
+python3 - "$DANPER_DIAGNOSTIC_GATE" "$OUT" <<'PYDIAG'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[2]);d=json.load(open(sys.argv[1]))
+assert d['currentSHA']==(p/'SOURCE_SHA.txt').read_text().strip()
+assert d['allThreePassed'] and d['xcodeVersion']==(p/'xcode-version.txt').read_text()
+assert d['architecture']==(p/'architecture.txt').read_text().strip()
+assert any(r.get('isAvailable') and r['version']==d['runtimeVersion'] and r['buildversion']==d['runtimeBuild'] for r in json.load(open(p/'runtimes.json'))['runtimes'])
+(p/'DIAGNOSTIC_GATE.json').write_text(json.dumps(d,indent=2)+'\n')
+PYDIAG
 python3 scripts/glass-audit/verify-scoped-reuse.py "$DANPER_BASELINE_EVIDENCE" "$OUT"
 echo 'PHASE: generate deterministic fixtures and resources'
 bash scripts/glass-audit/prepare.sh

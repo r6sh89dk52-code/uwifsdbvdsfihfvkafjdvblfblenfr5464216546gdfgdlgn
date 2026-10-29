@@ -16,9 +16,6 @@ jobs:
     if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    outputs:
-      diagnostic-run: ${{ steps.request.outputs.diagnostic-run }}
-      diagnostic-artifact: ${{ steps.request.outputs.diagnostic-artifact }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,20 +27,46 @@ jobs:
           python3 - <<'PY'
           import json,os
           r=json.load(open('.github/glass-final-release-request.json'))
+          rows=r['diagnostics'];assert len(rows)==3
+          pairs=list(dict.fromkeys((e['run'],e['artifact']) for e in rows))
+          assert 1<=len(pairs)<=3
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
-              for name,key in [('diagnostic-run','diagnosticRun'),('diagnostic-artifact','diagnosticArtifact')]:
-                  value=r[key];assert isinstance(value,int) and value>0
-                  f.write(name+'='+str(value)+'\n')
+              for i,(run,artifact) in enumerate(pairs,1):
+                  assert isinstance(run,int) and run>0 and isinstance(artifact,int) and artifact>0
+                  f.write('run'+str(i)+'='+str(run)+'\nartifact'+str(i)+'='+str(artifact)+'\n')
           PY
       - uses: actions/download-artifact@v4
+        if: steps.request.outputs.run1 != ''
         with:
-          artifact-ids: ${{ steps.request.outputs.diagnostic-artifact }}
-          run-id: ${{ steps.request.outputs.diagnostic-run }}
+          artifact-ids: ${{ steps.request.outputs.artifact1 }}
+          run-id: ${{ steps.request.outputs.run1 }}
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/diagnostic
+          path: ${{ runner.temp }}/diagnostic/run-${{ steps.request.outputs.run1 }}
           merge-multiple: true
-      - name: Verify three genuine passes and identical current tested inputs
-        run: python3 scripts/glass-audit/verify-diagnostic-gate.py "$RUNNER_TEMP/diagnostic"
+      - uses: actions/download-artifact@v4
+        if: steps.request.outputs.run2 != ''
+        with:
+          artifact-ids: ${{ steps.request.outputs.artifact2 }}
+          run-id: ${{ steps.request.outputs.run2 }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/diagnostic/run-${{ steps.request.outputs.run2 }}
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: steps.request.outputs.run3 != ''
+        with:
+          artifact-ids: ${{ steps.request.outputs.artifact3 }}
+          run-id: ${{ steps.request.outputs.run3 }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/diagnostic/run-${{ steps.request.outputs.run3 }}
+          merge-multiple: true
+      - name: Verify individual passes and identical current inputs
+        run: python3 scripts/glass-audit/verify-diagnostic-gate.py "$RUNNER_TEMP/diagnostic" .github/glass-final-release-request.json
+      - name: Publish diagnostic input proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_DIAGNOSTIC_GATE_${{ github.sha }}
+          path: ${{ runner.temp }}/diagnostic/DIAGNOSTIC_GATE.json
+          retention-days: 14
   final-ui-and-ipa:
     needs: diagnostic-gate
     runs-on: macos-15-intel
@@ -63,7 +86,12 @@ jobs:
           if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
           echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-ui-diagnostic" >> "$GITHUB_ENV"
           echo "DANPER_BASELINE_EVIDENCE=$RUNNER_TEMP/recovered-baseline" >> "$GITHUB_ENV"
+          echo "DANPER_DIAGNOSTIC_GATE=$RUNNER_TEMP/diagnostic-gate/DIAGNOSTIC_GATE.json" >> "$GITHUB_ENV"
           echo "xcode=$(xcodebuild -version | tr ' \n' '__')" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: GLASS_DIAGNOSTIC_GATE_${{ github.sha }}
+          path: ${{ runner.temp }}/diagnostic-gate
       - uses: actions/download-artifact@v4
         with:
           artifact-ids: 12868187797
@@ -107,6 +135,7 @@ jobs:
         run: |
           test "$(cat "$DANPER_AUDIT_OUT/ALL_CONTROLS_SHA.txt")" = "$GITHUB_SHA"
           bash scripts/glass-audit/package-macos.sh
+          cp "$DANPER_AUDIT_OUT/DIAGNOSTIC_GATE.json" "$DANPER_AUDIT_OUT/ipa/DIAGNOSTIC_GATE.json"
           cp "$DANPER_AUDIT_OUT/SCOPED_REUSE.json" "$DANPER_AUDIT_OUT/ipa/SCOPED_REUSE.json"
           cp "$DANPER_AUDIT_OUT/VALIDATION_MANIFEST.json" "$DANPER_AUDIT_OUT/ipa/VALIDATION_MANIFEST.json"
       - name: Preserve complete final evidence on success or failure

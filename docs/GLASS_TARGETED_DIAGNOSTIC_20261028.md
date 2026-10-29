@@ -176,3 +176,30 @@ preparation changed. Keep Premium's individual PASS from `47fa1a9`; its own test
 DEMO application/fixture/resource inputs remain identical. The final gate must
 verify individual per-case input identity before aggregating evidence from
 multiple diagnostic runs. Never mark the second overall run as successful.
+
+## Third diagnostic checkpoint and independent case provenance
+
+Third diagnostic run: `40818891397`, job `123266422475`, source
+`3b17655b3028cad670e3dfc2ab613bc2c06d66cc`. Only Bio + Protected are selected.
+Read its actual current status; no PASS is claimed here.
+
+The final gate can aggregate individual diagnostic cases from different runs.
+It does not require repeating Premium just to populate a same-run marker.
+For EACH case it requires an immutable artifact/run/source SHA, the correct
+selected method in the actual xcodebuild log, a one-test PASS/zero-skip summary,
+matching build/PASS SHA markers, and identical current application, package,
+fixture/resource and OWN interaction-test input trees. Unreviewed external
+input changes reject reuse. Toolchain/architecture/runtime must also agree
+across the diagnostic cases and with the eventual Mac runner.
+
+Premium's DEMO route never calls LocalAuthentication, so the auth-process
+preparation script is not its test input; its entire app/DEMO fixture/own test
+source is still compared. The auth preparation and enrollment scripts ARE
+mandatory identical inputs for Bio and Protected. Thus the prior Bio pass
+cannot be reused after strengthening its assertions or changing the shared
+auth preparation, while Premium's unchanged DEMO pass can be preserved.
+
+The final 11 UI cases still always run together on the final checkout; none of
+those final UI results are reused. No failed overall diagnostic run is relabeled
+as successful. Negative local verification rejects the actual failed Protected
+summary and writes no aggregate approval marker.

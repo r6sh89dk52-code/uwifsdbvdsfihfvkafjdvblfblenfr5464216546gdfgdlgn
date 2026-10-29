@@ -20,6 +20,7 @@ for line in (out/'ui-classes.tsv').read_text().splitlines():
  assert s['totalTestCount']==int(count) and s['passedTests']==int(count) and s['failedTests']==0 and s['skippedTests']==0 and not s.get('testFailures'),cls
  ui.append({'class':cls,'passed':int(count)})
 assert sum(s['passed'] for s in ui)==11
+gate=json.loads((out/'DIAGNOSTIC_GATE.json').read_text());assert gate['currentSHA']==sha and gate['allThreePassed'] and len(gate['cases'])==3
 request=json.loads(Path('.github/glass-final-release-request.json').read_text())
 manifest={'sourceSHA':sha,'swift':{'passed':412,'reused':reuse['suites']['swift']['identical']},'native':{'passed':23,'reused':reuse['suites']['native']['identical']},'javascript':{'passed':62,'crossWorkbookControls':2,'reused':False},'ui':{'passed':11,'failed':0,'skipped':0,'classes':ui,'reused':False},'targetedDiagnostic':request,'physicalDeviceValidated':False}
 (out/'VALIDATION_MANIFEST.json').write_text(json.dumps(manifest,indent=2)+'\n')
