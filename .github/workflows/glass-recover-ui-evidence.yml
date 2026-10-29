@@ -1,0 +1,64 @@
+name: Glass - recover existing failed UI evidence only
+on:
+  workflow_dispatch:
+  push:
+    branches: [audit/glass-pro-iloader-20261028]
+    paths: [.github/glass-recover-request.json]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: danper-glass-final-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12868605150
+          run-id: 40795027687
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/original
+          merge-multiple: true
+      - name: Verify original SHA and retain individual UI evidence
+        shell: bash
+        run: |
+          test "$(cat "$RUNNER_TEMP/original/SOURCE_SHA.txt")" = 9280d7871f7c39fd21c4484e9f40a2b504a841f9
+          python3 - <<'PY'
+          import json,os,pathlib
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'original'
+          names=['N2BiometricInteractionTests','N2PremiumRedesignTests','N3ClinicalJourneyTests']
+          for n in names:
+              s=json.load(open(p/(n+'.xcresult.summary.json')))
+              print(n,s['passedTests'],s['failedTests'],s['skippedTests'])
+              assert s['failedTests']==1 and s['skippedTests']==0
+          (p/'RECOVERED_FROM.json').write_text(json.dumps({'sourceSHA':'9280d7871f7c39fd21c4484e9f40a2b504a841f9','run':40795027687,'artifact':12868605150,'originalZIP_SHA256':'91891785c6579414c2bc7431d620c92afc1b362453d26d39ba1152937613faee','noTestsExecuted':True},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RECOVERED_UI_LOGS_9280
+          path: |
+            ${{ runner.temp }}/original/*.log
+            ${{ runner.temp }}/original/*.json
+            ${{ runner.temp }}/original/*.txt
+            ${{ runner.temp }}/original/N2BiometricInteractionTests-attachments
+            ${{ runner.temp }}/original/N2PremiumRedesignTests-attachments
+            ${{ runner.temp }}/original/N3ClinicalJourneyTests-attachments
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RECOVERED_BIOMETRIC_XCRESULT_9280
+          path: ${{ runner.temp }}/original/N2BiometricInteractionTests.xcresult
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RECOVERED_PREMIUM_XCRESULT_9280
+          path: ${{ runner.temp }}/original/N2PremiumRedesignTests.xcresult
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RECOVERED_PROTECTED_XCRESULT_9280
+          path: ${{ runner.temp }}/original/N3ClinicalJourneyTests.xcresult
+          retention-days: 14

@@ -1,8 +1,6 @@
 name: DANPER Glass Clinical Pro - independent audit and iLoader candidate
 run-name: Glass audit + unsigned iLoader · ${{ github.sha }}
 on:
-  push:
-    branches: [audit/glass-pro-iloader-20261028]
   workflow_dispatch:
   workflow_call:
 permissions:
