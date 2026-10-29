@@ -69,3 +69,48 @@ nonempty subset of the three allowed case identifiers. This enables repeating
 only failures after an individual case passes. No assertions changed, no new
 run is requested by this infrastructure commit, and the existing run continues
 to execute its original `bd263057` snapshot.
+
+## Diagnostic 40807354709: results and concrete cause
+
+Run reached the job time limit; all three xcresult summaries and attachments
+survived in artifact `12870218245` (ZIP SHA-256
+`944c32f78ea378322d250539b70f0ce033258008a70ecc753a153859969b159d`).
+- Biometric: 0/1 PASS, Cancel absent. System log 02:57:43.643 queues the system
+  UI with its fixed 5-second watchdog; 02:57:48.936 coreauthd returns Code=-1000,
+  `UI activation timed out after 5 seconds`. CoreAuthUI activates only later,
+  then reports `No pending UI mechanism`. The nomatch was posted after that
+  mechanism had already failed. This is direct system evidence, not enrollment
+  failure and not a successful or bypassed authentication.
+- Premium: 1/1 PASS, both keyboard assertions, navigation and persisted deletion
+  completed. No production change. Diagnostic attachment was before the first
+  keyboard assertion, adding observational delay. Move it AFTER that assertion
+  for the next run so the original five-second check remains immediate.
+- Protected: 0/1 PASS. Real simulated authentication, manual creation of the
+  fictional protected source and initial home display succeeded. Failure is
+  on the second launch, line 151: automatic authentication has already failed
+  before `Verificando identidad…` is observed. No second match was sent.
+  Protected system stream was not collected before job cancellation; inspect
+  the next run's live stream for the precise relaunch error.
+
+## Minimal corrections under test (not yet validated)
+
+- Bring the targeted Simulator UI client up and prelaunch only CoreAuthUI before
+  DANPER's first LAContext, allowing cold startup outside the system watchdog.
+  This is an environment hypothesis grounded in the activation-timeout log.
+  It performs NO biometric match, NO app authorization, and NO vault access.
+  If simctl refuses the prelaunch, fail before the expensive compilation.
+- Find the actual Cancel/Cancelar button across SpringBoard, the app's hosted
+  system UI and CoreAuthUI. Still require a real hittable button and tap it;
+  preserve cancellation, no-loop, retry, success and foreground assertions.
+- Stream authentication logs BEFORE each case; store the relaunch failure even
+  if the step later times out. Keep one build and independent isolated devices.
+- Separate build/case time limits and publish each case immediately. A final
+  strict gate checks every selected summary, zero failures/skips and exact SHA.
+- Cache compiler outputs only after successful build; Xcode still validates and
+  rebuilds inputs. No successful test result is inferred from that cache.
+
+Next explicit request repeats the three affected methods, since Premium's
+instrumentation timing changed too. It does not run any other UI method, the
+Swift/JS/native suites, or the IPA stage. App, native tests and DanperCore remain
+byte-identical to the recovered baseline; only diagnostic infrastructure and
+interaction-test synchronization have changed.

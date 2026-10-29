@@ -2,7 +2,6 @@ name: Glass - three failed UI cases only
 run-name: Glass targeted diagnosis · ${{ github.sha }}
 on:
   workflow_dispatch:
-  # Explicit request-file commit is the manual API fallback; normal fixes do not run it.
   push:
     branches: [audit/glass-pro-iloader-20261028]
     paths: [.github/glass-ui-diagnostic-request.json]
@@ -15,7 +14,7 @@ jobs:
   targeted-ui:
     if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
     runs-on: macos-15-intel
-    timeout-minutes: 45
+    timeout-minutes: 95
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,21 +23,125 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Set up targeted diagnostic environment
+      - name: Verify checkout and select explicit cases
+        id: select
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --exit-code 409c37149917d5c811229680a3f14d1450b171ed HEAD -- native-ios/Sources/DanperCore
           echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-ui-diagnostic" >> "$GITHUB_ENV"
           if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
-      - name: Exactly three affected UI cases
-        run: bash scripts/glass-audit/diagnose-ui.sh
-      - name: Publish diagnostic evidence even when a case fails
+          python3 - <<'PYSELECT'
+          import json,os
+          cases=json.load(open('.github/glass-ui-diagnostic-request.json'))['cases']
+          names={'bio':'N2BiometricInteractionTests','premium':'N2PremiumRedesignTests','protected':'N3ClinicalJourneyTests'}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              for k,v in names.items():f.write(k+'='+str(any(c.startswith(v+'/') for c in cases)).lower()+'\n')
+          PYSELECT
+          echo "xcode=$(xcodebuild -version | tr ' \n' '__')" >> "$GITHUB_OUTPUT"
+      - name: Restore compiler cache (Xcode still rebuilds and validates inputs)
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
+          key: glass-ui-intel-${{ steps.select.outputs.xcode }}-${{ github.sha }}
+          restore-keys: |
+            glass-ui-intel-${{ steps.select.outputs.xcode }}-
+      - name: Prepare system UI and build test binaries once
+        id: build
+        timeout-minutes: 30
+        continue-on-error: true
+        run: bash scripts/glass-audit/diagnose-ui.sh build
+      - name: Save successful compiler outputs before any test can fail
+        if: steps.build.outcome == 'success' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/glass-ui-diagnostic/DerivedData
+          key: glass-ui-intel-${{ steps.select.outputs.xcode }}-${{ github.sha }}
+      - name: Publish build checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_UI_BUILD_${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/glass-ui-diagnostic/*.txt
+            ${{ runner.temp }}/glass-ui-diagnostic/*.log
+            ${{ runner.temp }}/glass-ui-diagnostic/*.json
+          retention-days: 14
+      - name: Diagnose N2BiometricInteractionTests
+        id: bio
+        if: steps.build.outcome == 'success' && steps.select.outputs.bio == 'true'
+        timeout-minutes: 18
+        continue-on-error: true
+        run: bash scripts/glass-audit/diagnose-ui.sh case N2BiometricInteractionTests
+      - name: Publish N2BiometricInteractionTests immediately
+        if: always() && steps.build.outcome == 'success' && steps.select.outputs.bio == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_UI_bio_${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/glass-ui-diagnostic/N2BiometricInteractionTests*
+            ${{ runner.temp }}/glass-ui-diagnostic/seed-N2BiometricInteractionTests*
+          retention-days: 14
+          if-no-files-found: error
+      - name: Diagnose N2PremiumRedesignTests
+        id: premium
+        if: steps.build.outcome == 'success' && steps.select.outputs.premium == 'true'
+        timeout-minutes: 18
+        continue-on-error: true
+        run: bash scripts/glass-audit/diagnose-ui.sh case N2PremiumRedesignTests
+      - name: Publish N2PremiumRedesignTests immediately
+        if: always() && steps.build.outcome == 'success' && steps.select.outputs.premium == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_UI_premium_${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/glass-ui-diagnostic/N2PremiumRedesignTests*
+            ${{ runner.temp }}/glass-ui-diagnostic/seed-N2PremiumRedesignTests*
+          retention-days: 14
+          if-no-files-found: error
+      - name: Diagnose N3ClinicalJourneyTests
+        id: protected
+        if: steps.build.outcome == 'success' && steps.select.outputs.protected == 'true'
+        timeout-minutes: 18
+        continue-on-error: true
+        run: bash scripts/glass-audit/diagnose-ui.sh case N3ClinicalJourneyTests
+      - name: Publish N3ClinicalJourneyTests immediately
+        if: always() && steps.build.outcome == 'success' && steps.select.outputs.protected == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_UI_protected_${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/glass-ui-diagnostic/N3ClinicalJourneyTests*
+            ${{ runner.temp }}/glass-ui-diagnostic/seed-N3ClinicalJourneyTests*
+          retention-days: 14
+          if-no-files-found: error
+      - name: Require every selected case to pass on this checkout
+        if: always()
+        env:
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          test "$BUILD" = success
+          python3 - <<'PYVERIFY'
+          import json,os,pathlib
+          p=pathlib.Path(os.environ['DANPER_AUDIT_OUT']);sha=os.environ['GITHUB_SHA']
+          cases=(p/'selected-cases.txt').read_text().splitlines()
+          for case in cases:
+              cls=case.split('/')[0];s=json.load(open(p/(cls+'.xcresult.summary.json')))
+              assert s['totalTestCount']==1 and s['passedTests']==1 and s['failedTests']==0 and s['skippedTests']==0
+              assert not s.get('testFailures')
+              assert (p/(cls+'-PASS_SHA.txt')).read_text().strip()==sha
+          (p/'DIAGNOSED_SELECTED_SHA.txt').write_text(sha+'\n')
+          if len(cases)==3:(p/'DIAGNOSED_3_SHA.txt').write_text(sha+'\n')
+          PYVERIFY
+      - name: Publish final compact checkpoint
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: GLASS_UI_DIAGNOSTIC_${{ github.sha }}
           path: |
-            ${{ runner.temp }}/glass-ui-diagnostic
-            !${{ runner.temp }}/glass-ui-diagnostic/DerivedData/**
+            ${{ runner.temp }}/glass-ui-diagnostic/*.txt
+            ${{ runner.temp }}/glass-ui-diagnostic/*.json
+            ${{ runner.temp }}/glass-ui-diagnostic/*.log
+            ${{ runner.temp }}/glass-ui-diagnostic/*.png
           retention-days: 14
           if-no-files-found: error

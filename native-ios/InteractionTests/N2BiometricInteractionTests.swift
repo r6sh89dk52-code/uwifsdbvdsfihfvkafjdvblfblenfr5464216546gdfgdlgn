@@ -39,9 +39,18 @@ final class N2BiometricInteractionTests:XCTestCase {
         capture(app,"Autenticacion-automatica-sin-tocar-ingresar")
         Thread.sleep(forTimeInterval:2)
         biometric("nomatch")
-        let cancel=springboard.buttons.matching(NSPredicate(format:"label ==[c] %@ OR label ==[c] %@","Cancel","Cancelar")).firstMatch
-        XCTAssertTrue(cancel.waitForExistence(timeout:10),springboard.debugDescription)
-        cancel.tap()
+        let cancelPredicate=NSPredicate(format:"label ==[c] %@ OR label ==[c] %@","Cancel","Cancelar")
+        let hosts=[springboard,app,XCUIApplication(bundleIdentifier:"com.apple.CoreAuthUI")]
+        var cancel:XCUIElement?
+        let shown=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            cancel=hosts.map {$0.buttons.matching(cancelPredicate).firstMatch}
+                .first {$0.exists && $0.isHittable}
+            return cancel != nil
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[shown],timeout:10),.completed,
+            "Debe existir un botón Cancelar real del sistema, sin inyectar éxito")
+        XCTAssertNotNil(cancel)
+        cancel!.tap()
         let retry=app.buttons["Reintentar Face ID"]
         XCTAssertTrue(retry.waitForExistence(timeout:10),app.debugDescription)
         capture(app,"Autenticacion-cancelada-reintento-opcional")
