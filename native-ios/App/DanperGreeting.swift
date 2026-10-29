@@ -23,7 +23,9 @@ enum DanperGreeting {
 
 struct DanperGreetingClock {
     var now:()->Date
-    static var device:Self {
+    // Keep one clock per process: SwiftUI recreates view values on scene changes.
+    // A new injected anchor on foreground would incorrectly rewind test time.
+    static let device:Self = {
         #if DEBUG && targetEnvironment(simulator)
         // Ephemeral injected clock only in the existing isolated UI DEMO probe.
         // Release and all operational launches always use real local time.
@@ -40,5 +42,5 @@ struct DanperGreetingClock {
         }
         #endif
         return Self(now:{Date()})
-    }
+    }()
 }
