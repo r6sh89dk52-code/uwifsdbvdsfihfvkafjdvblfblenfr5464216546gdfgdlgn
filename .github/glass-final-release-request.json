@@ -1,34 +1,23 @@
 {
-  "request": "validate-eleven-after-swift-workbook-order-fix",
-  "diagnostics": [
-    {
-      "class": "N2BiometricInteractionTests",
-      "run": 40835749202,
-      "artifact": 12881741798,
-      "sourceSHA": "2bb98bf9bf52f35f9711350d40ce00d2db097060"
-    },
-    {
-      "class": "N2PremiumRedesignTests",
-      "run": 40835749202,
-      "artifact": 12881741798,
-      "sourceSHA": "2bb98bf9bf52f35f9711350d40ce00d2db097060"
-    },
-    {
-      "class": "N3ClinicalJourneyTests",
-      "run": 40835749202,
-      "artifact": 12881741798,
-      "sourceSHA": "2bb98bf9bf52f35f9711350d40ce00d2db097060"
-    }
-  ],
-  "previousFinalRun": 40857793155,
-  "javascriptBaseline": {
-    "run": 40857793155,
-    "artifact": 12891281001,
-    "sourceSHA": "cb49f7048a8f3bd4a358e4af7c77f1d625432ef4",
-    "runtime": {
-      "version": "v22.23.2",
-      "platform": "darwin",
-      "arch": "arm64"
-    }
+  "request": "build13-final-intel-after-approved-greeting-foreground",
+  "targetedHome": {
+    "run": 40913202798,
+    "artifact": 12915989939,
+    "sourceSHA": "be7e511fd626dff7ab000498d4accf61c218b666"
+  },
+  "previousFinalRun": 40861610616,
+  "requiredControls": {
+    "swift": 412,
+    "native": 26,
+    "javascript": 62,
+    "excel": 2,
+    "ui": 11
+  },
+  "release": {
+    "version": "0.4.2",
+    "build": "13",
+    "bundle": "pe.danper.saludmovil.native.iloaderpreview",
+    "architecture": "arm64",
+    "signed": false
   }
 }
