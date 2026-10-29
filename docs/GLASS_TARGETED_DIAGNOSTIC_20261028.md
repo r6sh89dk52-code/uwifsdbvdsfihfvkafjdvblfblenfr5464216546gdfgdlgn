@@ -260,3 +260,17 @@ SDK/architecture and valid simulator bundle signatures. Actual binary hashes
 and origin SHA are recorded. Any missing proof falls back to compilation.
 All 11 final UI tests still execute; ARM64 Release still builds independently.
 No UI verdict is obtained from the compiler cache.
+
+## Fourth diagnostic execution
+
+Source `21c44e8cab81320cc4bcbf8fe841904911466b20`, run `40823214523`,
+job `123280210625`. Only Bio + Protected. Query GitHub for its current results;
+no success is claimed in this checkpoint. The readiness parser's local trace
+checks passed, and the production App/NativeTests/DanperCore trees still match
+`409c371` exactly.
+
+Before reusing a simulator binary, the optional cache verifier also compares
+actual generated App resources and native synthetic fixtures byte-for-byte
+against the restored bundles, because those generated files are ignored by
+Git. Missing or different resources require an actual rebuild. Cached binaries
+never supply UI PASS verdicts, and the unsigned ARM64 build is still separate.
