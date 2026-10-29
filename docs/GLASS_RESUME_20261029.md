@@ -98,3 +98,10 @@ Node 24/Linux runtime was correctly rejected. No mock is accepted by the CI
 entry point: it probes the real Node executable. The three UI approvals remain
 valid because these pipeline-only changes do not change their inputs. Final
 all-11 UI and unsigned IPA are still pending.
+
+Corrected final execution: source `2b76453cd51b2998ac300d9c6d435ec871b56cc1`,
+run `40861610616`. Input gate `123405976837` completed SUCCESS; Mac job
+`123406070405` is preparing controls. No new suite or IPA PASS is claimed
+by this checkpoint. Request provenance retains the original three-case PASS
+run and the actual 62-check JavaScript evidence from the failed preparation.
+This documentation-only checkpoint does not trigger a second execution.
