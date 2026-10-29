@@ -44,3 +44,9 @@ Query its associated workflow and preserve its actual results before declaring
 an IPA validated. No full audit workflow or main/original SwiftUI change is
 requested. The optional simulator cache requires matching complete native
 code/resource inputs and never supplies a UI PASS.
+
+Final execution published: source `cb49f7048a8f3bd4a358e4af7c77f1d625432ef4`,
+run `40857793155`. Ubuntu diagnostic input gate job `123393051986` completed
+SUCCESS. Mac job `123393148502` is queued at this checkpoint; no final core,
+11-UI or IPA success is claimed. Checkout is pinned to the immutable source
+SHA. This documentation-only commit does not request another run.
