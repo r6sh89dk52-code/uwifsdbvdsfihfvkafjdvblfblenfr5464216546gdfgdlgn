@@ -197,9 +197,14 @@ struct DanperAccessView:View {
     private let version=DanperAppVersion()
     var body:some View {
         GeometryReader {geo in
+            let heroHeight=max(315,geo.size.height*0.56)
             ScrollView {
-                VStack(spacing:0) {
-                    hero(width:geo.size.width,height:max(315,geo.size.height*0.56))
+                ZStack(alignment:.top) {
+                    // One continuous canvas: the portrait fades underneath the
+                    // controls; the ribbon is not clipped to the hero boundary.
+                    accessBackdrop(width:geo.size.width,heroHeight:heroHeight)
+                    VStack(spacing:0) {
+                    heroLettering(width:geo.size.width,height:heroHeight)
                     if dynamicTypeSize.isAccessibilitySize {
                         Text("Cuidamos lo más importante, nuestra gente.")
                             .font(.subheadline.weight(.semibold))
@@ -256,19 +261,46 @@ struct DanperAccessView:View {
                             .accessibilityIdentifier("premium-access-version")
                     }.padding(.horizontal,26).padding(.top,dynamicTypeSize.isAccessibilitySize ? 0:-20).padding(.bottom,20)
                         .frame(maxWidth:520).frame(maxWidth:.infinity)
+                    }
                 }.frame(minHeight:geo.size.height,alignment:.top)
-            }.background(DanperBackdrop()).scrollIndicators(.hidden)
+            }.background(DanperStyle.canvas.ignoresSafeArea()).scrollIndicators(.hidden)
         }.environment(\.colorScheme,.dark)
     }
-    private func hero(width:CGFloat,height:CGFloat)->some View {
-        ZStack(alignment:.topLeading) {
-            // Exact supplied portrait, unchanged bytes. All lettering, curves
-            // and controls are native SwiftUI; no phone/mockup is embedded.
+    private func accessBackdrop(width:CGFloat,heroHeight:CGFloat)->some View {
+        ZStack(alignment:.top) {
             Image("ClinicalPortrait").resizable().scaledToFill()
-                .frame(width:width,height:height,alignment:.top).clipped()
-                .accessibilityHidden(true)
-            LinearGradient(colors:[.black.opacity(0.12),.clear,DanperStyle.canvas],startPoint:.top,endPoint:.bottom)
-            LinearGradient(colors:[.black.opacity(0.40),.clear],startPoint:.leading,endPoint:.trailing)
+                .frame(width:width,height:heroHeight+150,alignment:.top).clipped()
+                .overlay {
+                    LinearGradient(colors:[.black.opacity(0.38),.clear],startPoint:.leading,endPoint:.trailing)
+                }
+                .mask {
+                    LinearGradient(stops:[
+                        .init(color:.white,location:0),
+                        .init(color:.white,location:0.50),
+                        .init(color:.white.opacity(0.75),location:0.66),
+                        .init(color:.white.opacity(0.22),location:0.85),
+                        .init(color:.clear,location:1)
+                    ],startPoint:.top,endPoint:.bottom)
+                }
+            RadialGradient(colors:[DanperStyle.deepRed.opacity(0.32),.clear],
+                           center:.topLeading,startRadius:0,endRadius:width*0.95)
+                .frame(height:360).offset(y:heroHeight-50)
+            DanperAccessRibbon().fill(LinearGradient(stops:[
+                .init(color:DanperStyle.red.opacity(0.95),location:0),
+                .init(color:DanperStyle.deepRed.opacity(0.60),location:0.45),
+                .init(color:DanperStyle.deepRed.opacity(0.08),location:1)
+            ],startPoint:.topLeading,endPoint:.bottomTrailing))
+                .overlay {
+                    DanperAccessRibbonCrest().stroke(
+                        LinearGradient(colors:[DanperStyle.red,.red.opacity(0.65),.clear],
+                                       startPoint:.leading,endPoint:.trailing),lineWidth:1)
+                        .shadow(color:DanperStyle.red.opacity(0.65),radius:5)
+                }
+                .frame(width:width,height:140).offset(y:heroHeight-80)
+        }.frame(width:width,height:heroHeight+310,alignment:.top)
+            .allowsHitTesting(false).accessibilityHidden(true)
+    }
+    private func heroLettering(width:CGFloat,height:CGFloat)->some View {
             VStack(alignment:.leading,spacing:11) {
                 DanperWordmark(width:min(165,width*0.44),color:DanperStyle.red)
                 Text("SALUD MÓVIL").font(.caption.weight(.semibold)).tracking(3)
@@ -284,20 +316,28 @@ struct DanperAccessView:View {
                     Spacer(minLength:0)
                 }
             }.foregroundStyle(.white).padding(.leading,27).padding(.top,20).padding(.bottom,35)
-            DanperAccessRibbon().fill(LinearGradient(colors:[DanperStyle.red.opacity(0.8),DanperStyle.deepRed.opacity(0.15)],startPoint:.topLeading,endPoint:.bottomTrailing))
-                .frame(height:80).frame(maxHeight:.infinity,alignment:.bottom)
-                .allowsHitTesting(false).accessibilityHidden(true)
-            DanperAccessRibbon().stroke(DanperStyle.red.opacity(0.45),lineWidth:0.7)
-                .frame(height:80).frame(maxHeight:.infinity,alignment:.bottom)
-                .allowsHitTesting(false).accessibilityHidden(true)
-        }.frame(width:width,height:height).clipped()
+                .frame(width:width,height:height,alignment:.topLeading)
     }
 }
 
+// Both edges curve through the transition. There is no horizontal closing
+// edge across the screen and no opaque panel underneath the wave.
 private struct DanperAccessRibbon:Shape {
     func path(in rect:CGRect)->Path {
+        var p=DanperAccessRibbonCrest().path(in:rect)
+        p.addLine(to:CGPoint(x:rect.width,y:rect.height*0.94))
+        p.addCurve(to:CGPoint(x:0,y:rect.height*0.85),
+                   control1:CGPoint(x:rect.width*0.58,y:rect.height*0.38),
+                   control2:CGPoint(x:rect.width*0.30,y:rect.height*0.43))
+        p.closeSubpath();return p
+    }
+}
+private struct DanperAccessRibbonCrest:Shape {
+    func path(in rect:CGRect)->Path {
         var p=Path();p.move(to:CGPoint(x:0,y:0))
-        p.addCurve(to:CGPoint(x:rect.width,y:rect.height),control1:CGPoint(x:rect.width*0.28,y:rect.height*0.55),control2:CGPoint(x:rect.width*0.75,y:rect.height*0.20))
-        p.addLine(to:CGPoint(x:0,y:rect.height));p.closeSubpath();return p
+        p.addCurve(to:CGPoint(x:rect.width,y:rect.height*0.72),
+                   control1:CGPoint(x:rect.width*0.28,y:rect.height*0.25),
+                   control2:CGPoint(x:rect.width*0.72,y:rect.height*0.35))
+        return p
     }
 }

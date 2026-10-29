@@ -120,14 +120,31 @@ final class N2PremiumRedesignTests:XCTestCase {
         capture(app,"Eliminacion-persistida-tras-relanzar")
     }
     func testAccessLightAndDark() {
+        continueAfterFailure=false
         let app=XCUIApplication()
-        for appearance in ["dark","light"] {
-            app.launchArguments=["--danper-redesign-access","-danper.appearance",appearance]
+        for appearance in ["dark","light","dark-accessibility"] {
+            app.launchArguments=["--danper-redesign-access","-danper.appearance",appearance == "light" ? "light":"dark"]
+            if appearance == "dark-accessibility" {
+                app.launchArguments += ["-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]
+            }
             app.launch()
-            XCTAssertTrue(app.buttons["premium-face-id"].waitForExistence(timeout:5))
-            XCTAssertTrue(app.buttons["premium-device-code"].exists)
-            XCTAssertTrue(app.staticTexts["premium-access-version"].exists)
+            let face=app.buttons["premium-face-id"]
+            let code=app.buttons["premium-device-code"]
+            let version=app.staticTexts["premium-access-version"]
+            XCTAssertTrue(face.waitForExistence(timeout:5))
+            XCTAssertTrue(code.exists)
+            XCTAssertTrue(version.exists)
             capture(app,"Acceso-"+appearance)
+            reveal(face,in:app)
+            XCTAssertTrue(face.isEnabled)
+            XCTAssertGreaterThanOrEqual(face.frame.minX,app.frame.minX)
+            XCTAssertLessThanOrEqual(face.frame.maxX,app.frame.maxX)
+            reveal(code,in:app)
+            XCTAssertTrue(code.isEnabled)
+            XCTAssertGreaterThanOrEqual(code.frame.minX,app.frame.minX)
+            XCTAssertLessThanOrEqual(code.frame.maxX,app.frame.maxX)
+            reveal(version,in:app)
+            capture(app,"Acceso-inferior-"+appearance)
             app.terminate()
         }
     }
