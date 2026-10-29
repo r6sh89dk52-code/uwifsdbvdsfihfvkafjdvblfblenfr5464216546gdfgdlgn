@@ -3,6 +3,9 @@
 import json,re,subprocess,sys
 from pathlib import Path
 root,request=Path(sys.argv[1]),json.loads(Path(sys.argv[2]).read_text())
+if 'targetedHome' in request:
+ subprocess.run([sys.executable,'scripts/glass-audit/verify-home-gate.py',sys.argv[1],sys.argv[2]],check=True)
+ raise SystemExit(0)
 methods={
  'N2BiometricInteractionTests':'testAutomaticBiometryCancellationRetryAndForeground',
  'N2PremiumRedesignTests':'testDemoNavigationAttentionAndVersion',

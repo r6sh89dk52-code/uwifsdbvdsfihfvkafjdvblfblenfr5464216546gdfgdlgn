@@ -27,8 +27,11 @@ jobs:
           python3 - <<'PY'
           import json,os
           r=json.load(open('.github/glass-final-release-request.json'))
-          rows=r['diagnostics'];assert len(rows)==3
-          pairs=list(dict.fromkeys((e['run'],e['artifact']) for e in rows))
+          if 'targetedHome' in r:
+              e=r['targetedHome'];pairs=[(e['run'],e['artifact'])]
+          else:
+              rows=r['diagnostics'];assert len(rows)==3
+              pairs=list(dict.fromkeys((e['run'],e['artifact']) for e in rows))
           assert 1<=len(pairs)<=3
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:
               for i,(run,artifact) in enumerate(pairs,1):
@@ -106,8 +109,8 @@ jobs:
           path: ${{ runner.temp }}/diagnostic-gate
       - uses: actions/download-artifact@v4
         with:
-          artifact-ids: 12868187797
-          run-id: 40806554927
+          artifact-ids: 12893306113
+          run-id: 40861610616
           github-token: ${{ github.token }}
           path: ${{ env.DANPER_BASELINE_EVIDENCE }}
           merge-multiple: true

@@ -300,7 +300,7 @@ must(clinicalHome,'clinical-first-run-manual-worker','inicio manual sin Excel');
 for(const phrase of ['DanperBrandHeader {','DanperHomeWelcome()',
   'DanperNewAttentionCard','DanperHomeMetricRow'])
   must(clinicalHome,phrase,'composición reutilizable de Inicio');
-for(const phrase of ['Hola','ClinicalAvatar','ACCESO RÁPIDO','Nueva atención','Este mes'])
+for(const phrase of ['DanperGreeting.text(name:displayName,at:greetingDate)','ClinicalAvatar','ACCESO RÁPIDO','Nueva atención','Este mes'])
   must(premium,phrase,'Inicio aprobado y contadores de atenciones');
 for(const phrase of ['UIImage(named:"BrandLogo")',
   'Image(uiImage:Self.wordmark ?? UIImage())','danper-brand-header',
@@ -426,7 +426,7 @@ assert(!firstWorker.includes('#if targetEnvironment(simulator)'),
 assert(clinicalHome.indexOf('clinical-first-run-import-personal') <
        clinicalHome.indexOf('clinical-first-run-restore-222'));
 
-for(const label of ['Departamento de Salud','"Hola"','clinical-home-new-attention'])
+for(const label of ['Departamento de Salud','DanperGreeting.text(name:displayName,at:greetingDate)','clinical-home-new-attention'])
   must(premium,label,'portada premium');
 must(clinicalHome,'clinical-home-tool-','herramientas conservadas');
 for(const label of ['@AppStorage("danper.haptics.enabled")',
@@ -864,3 +864,7 @@ console.log('PASS: historial 15/página, borradores, lotes agrupados y edición 
 
 console.log('PASS: Alta compacta con vencimiento DDMMAA; corte 9–8 resumido, movimientos diarios en Excel de Enfermeras.');
 console.log('AVISO: verificación estructural, no prueba de compilación ni paridad visual completa.');
+
+const greeting=fs.readFileSync(path.join(root,'native-ios/App/DanperGreeting.swift'),'utf8');
+for(const marker of ['Calendar = .current','calendar.component(.hour','case 5..<12','case 12..<19','Buenos días','Buenas tardes','Buenas noches','☀️','🌤️','🌙','calendar.nextDate','DEBUG && targetEnvironment(simulator)']) must(greeting,marker,'saludo por hora local y reloj de prueba aislado');
+for(const marker of ['.task(id:', 'scenePhase == .active','DanperGreeting.nextBoundary','significantTimeChangeNotification','NSSystemTimeZoneDidChange']) must(premium,marker,'saludo actualizado sin sondeo frecuente');

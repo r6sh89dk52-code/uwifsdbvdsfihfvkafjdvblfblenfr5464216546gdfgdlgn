@@ -11,7 +11,9 @@ final class N2Build222ShellTests:XCTestCase {
             let button=app.buttons["premium-tab-"+id]
             XCTAssertTrue(button.exists);XCTAssertEqual(button.label,label)
         }
-        XCTAssertTrue(app.staticTexts["Hola"].exists)
+        let hour=Calendar.current.component(.hour,from:Date())
+        let greeting=hour>=5 && hour<12 ? "Buenos días ☀️" : hour>=12 && hour<19 ? "Buenas tardes 🌤️":"Buenas noches 🌙"
+        XCTAssertTrue(app.staticTexts[greeting].exists)
         XCTAssertFalse(app.staticTexts["Bienvenido"].exists)
         XCTAssertTrue(app.descendants(matching:.any)["premium-metric-month"].exists)
         XCTAssertTrue(app.buttons["demo-home-new-attention"].exists)

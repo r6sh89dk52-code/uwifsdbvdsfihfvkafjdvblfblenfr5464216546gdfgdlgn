@@ -17,7 +17,7 @@ xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -conf
 APP="$DD/Build/Products/Release-iphoneos/DANPERNative.app"
 python3 - "$APP" "$SHA" <<'PY'
 from pathlib import Path
-import json,plistlib,sys,subprocess,hashlib
+import json,plistlib,sys,subprocess,hashlib,shutil
 app=Path(sys.argv[1]); p=plistlib.loads((app/'Info.plist').read_bytes())
 assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
 assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='13'
@@ -30,6 +30,26 @@ archs=subprocess.check_output(['lipo','-archs',str(exe)],text=True).strip(); ass
 header=subprocess.check_output(['otool','-l',str(exe)],text=True);assert 'LC_ENCRYPTION_INFO' not in header or 'cryptid 0' in header
 assert subprocess.run(['codesign','--verify',str(app)],capture_output=True).returncode != 0
 assert not (app/'N1sDemoResources/n2-synthetic-clinical.json').exists()
+assert not list(app.rglob('*.xctest')) and not list(app.rglob('SyntheticFixtures'))
+resources=app/'N1sDemoResources'
+expected={'n1s-indicator-plan.json','n1s-indicator-template-store.zip','n1s-nursing-plan.json','n1s-nursing-template-store.zip','n2-ambulatory-products.json','n2-nursing-catalog.json','n2-approved-mappings.json','n2-organization-areas.json'}
+assert {p.name for p in resources.iterdir()}==expected,'Unexpected bundled dataset/resource'
+assert b'DANPER_GREETING_TEST_LOCAL' not in exe.read_bytes(),'Test clock must not ship in Release'
+# Asset catalog compilation embeds both images; preserve the exact source digests.
+assetutil=shutil.which('assetutil') or '/usr/bin/assetutil'
+assetinfo=json.loads(subprocess.check_output([assetutil,'--info',str(app/'Assets.car')]))
+names={row.get('Name') for row in assetinfo}
+assert {'ClinicalAvatar','ClinicalPortrait'}<=names,names
+subprocess.run(['git','diff','--exit-code','5aa09ad20a99eedabd0bbaefd16fbb3d0316f2eb','HEAD','--','native-ios/App/DANPERNativeApp.swift'],check=True)
+content={'avatarSHA256':hashlib.sha256(Path('native-ios/App/Assets.xcassets/ClinicalAvatar.imageset/ClinicalAvatar.png').read_bytes()).hexdigest(),
+ 'portraitSHA256':hashlib.sha256(Path('native-ios/App/Assets.xcassets/ClinicalPortrait.imageset/ClinicalPortrait.png').read_bytes()).hexdigest(),
+ 'accessViewFileSHA256':hashlib.sha256(Path('native-ios/App/DANPERNativeApp.swift').read_bytes()).hexdigest(),
+ 'greetingFileSHA256':hashlib.sha256(Path('native-ios/App/DanperGreeting.swift').read_bytes()).hexdigest(),
+ 'compiledAssetNames':sorted(n for n in names if n),'distributionResources':sorted(expected),
+ 'testClockAbsentInRelease':True,'clinicalDatasetsBundled':False}
+assert content['avatarSHA256']=='51d79d1d46607d4b9e58599e861428790a06c55ebff391c85d28a0b5a829fdcf'
+assert content['portraitSHA256']=='c43917268ce67191a70e2b6549747229b3e7414b21c951bf4432d3257f177291'
+(app/'DANPER_CONTENTS.json').write_text(json.dumps(content,indent=2))
 for name in ['n1s-indicator-template-store.zip','n1s-nursing-template-store.zip','n2-ambulatory-products.json','n2-nursing-catalog.json','n2-approved-mappings.json']:
  assert (app/'N1sDemoResources'/name).is_file(),name
 identity={'sourceSHA':sys.argv[2],'bundle':p['CFBundleIdentifier'],'version':p['CFBundleShortVersionString'],'build':p['CFBundleVersion'],'architecture':archs,'signed':False,'deviceValidation':False}
@@ -51,6 +71,8 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  prefix='Payload/DANPERNative.app/'
  for f,digest in json.load(open(sys.argv[2])).items(): assert hashlib.sha256(z.read(prefix+f)).hexdigest()==digest,f
  p=plistlib.loads(z.read(prefix+'Info.plist'));assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
+ assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='13'
+ content=json.loads(z.read(prefix+'DANPER_CONTENTS.json'));assert content['testClockAbsentInRelease'] and not content['clinicalDatasetsBundled']
  provenance=json.loads(z.read(prefix+'DANPER_BUILD.json'));assert provenance['sourceSHA']==sys.argv[3]
 provenance['ipaSHA256']=hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest()
 open(sys.argv[1]+'.json','w').write(json.dumps(provenance,indent=2))

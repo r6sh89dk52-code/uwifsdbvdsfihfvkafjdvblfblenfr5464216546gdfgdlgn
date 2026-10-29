@@ -99,7 +99,7 @@ if test "$MODE" != ui; then
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
- run_tests native-23 23 -only-testing:DANPERNativeTests
+ run_tests native-26 26 -only-testing:DANPERNativeTests
  git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
  if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
 fi
@@ -138,4 +138,4 @@ PY
 test "$overall" = 0
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
-echo 'PASS: 412 Swift, 23 native (21 original + exhaustive catalog + Face ID environment), all 11 UI, 50 JavaScript, 12 additional guards + 2 cross-workbook controls.'
+echo 'PASS: 412 Swift, 26 native (23 original + 3 local greeting cases), all 11 UI, 50 JavaScript, 12 additional guards + 2 cross-workbook controls.'

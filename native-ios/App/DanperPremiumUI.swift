@@ -352,7 +352,7 @@ struct DanperDisplayNamePreference:View {
             TextField("Nombre visible (opcional)",text:$displayName)
                 .textContentType(.nickname).textInputAutocapitalization(.words)
                 .submitLabel(.done).accessibilityIdentifier("glass-display-name")
-            Text("Solo personaliza el saludo en este dispositivo. No cambia al responsable clínico ni los registros de trabajadores. Déjalo vacío para mostrar Hola.")
+            Text("Solo personaliza el saludo en este dispositivo. No cambia al responsable clínico ni los registros de trabajadores. Déjalo vacío para mostrar el saludo según la hora, sin nombre.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

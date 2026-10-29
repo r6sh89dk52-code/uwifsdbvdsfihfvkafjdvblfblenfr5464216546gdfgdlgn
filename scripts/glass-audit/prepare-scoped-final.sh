@@ -17,7 +17,7 @@ import json,sys
 from pathlib import Path
 p=Path(sys.argv[2]);d=json.load(open(sys.argv[1]))
 assert d['currentSHA']==(p/'SOURCE_SHA.txt').read_text().strip()
-assert d['allThreePassed'] and d['xcodeVersion']==(p/'xcode-version.txt').read_text()
+assert (d.get('allThreePassed') or d.get('targetedPassed')) and d['xcodeVersion']==(p/'xcode-version.txt').read_text()
 assert d['architecture']==(p/'architecture.txt').read_text().strip()
 assert any(r.get('isAvailable') and r['version']==d['runtimeVersion'] and r['buildversion']==d['runtimeBuild'] for r in json.load(open(p/'runtimes.json'))['runtimes'])
 (p/'DIAGNOSTIC_GATE.json').write_text(json.dumps(d,indent=2)+'\n')
