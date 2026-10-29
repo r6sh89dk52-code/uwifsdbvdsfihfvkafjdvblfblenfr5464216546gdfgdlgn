@@ -119,6 +119,7 @@ struct DanperHomeWelcome:View {
             Spacer(minLength:0)
         }.padding(16).frame(maxWidth:.infinity,alignment:.leading)
             .danperGlassSurface(cornerRadius:22)
+            .accessibilityElement(children:.contain)
             .accessibilityIdentifier("glass-home-greeting")
             .task(id:"\(scenePhase)-\(clockRevision)") {
                 guard scenePhase == .active else {return}
