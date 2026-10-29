@@ -7,7 +7,7 @@ mkdir -p "$DANPER_AUDIT_OUT"
 OUT="$DANPER_AUDIT_OUT"
 MODE="${1:-all}"
 DD="$OUT/DerivedData"
-if test "$MODE" != ui; then
+if test "$MODE" != ui && test "$MODE" != resume-native; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -28,6 +28,18 @@ done
 (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
 xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" build-for-testing > "$OUT/build-for-testing.log" 2>&1
+fi
+if test "$MODE" = resume-native; then
+ : "${DANPER_BASELINE_EVIDENCE:?Download run 40790429936 evidence first}"
+ python3 scripts/glass-audit/verify-reuse.py "$DANPER_BASELINE_EVIDENCE" "$OUT"
+ git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
+ git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
+ xcodebuild -version > "$OUT/xcode-version.txt"
+ xcrun simctl list runtimes -j > "$OUT/runtimes.json"
+ npm ci --ignore-scripts --no-audit --no-fund > "$OUT/npm.log" 2>&1
+ node scripts/prepare-n1s-ios-demo-resources.cjs > "$OUT/resources.log" 2>&1
+ node scripts/glass-audit/identity.cjs
+ (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
 fi
 if test "$MODE" = ui; then test "$(cat "$OUT/CORE_NATIVE_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 # Never pick or erase an existing user's simulator.
@@ -53,8 +65,7 @@ fresh(){
  xcrun simctl ui "$SIM_ID" appearance dark
  xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLanguages -array es
  xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
- xcrun simctl spawn "$SIM_ID" notifyutil -s com.apple.BiometricKit.enrolled 1
- xcrun simctl spawn "$SIM_ID" notifyutil -s com.apple.BiometricKit.pearl.enrolled 1
+ bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
 }
 run_tests(){
@@ -69,10 +80,18 @@ run_tests(){
 }
 if test "$MODE" != ui; then
  fresh native
+ if test "$MODE" = resume-native; then
+  # Compile for this actual Simulator architecture, not two unused slices.
+  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
+   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
+   ONLY_ACTIVE_ARCH=YES build-for-testing > "$OUT/build-for-testing.log" 2>&1
+ fi
+ # Diagnose enrollment before running the remaining native/interaction cases.
+ run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  run_tests native-23 23 -only-testing:DANPERNativeTests
  git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
- if test "$MODE" = native; then exit 0; fi
+ if test "$MODE" = native || test "$MODE" = resume-native; then exit 0; fi
 fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
 python3 - <<'PY' > "$OUT/ui-classes.tsv"

@@ -7,9 +7,10 @@ on:
   workflow_call:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: danper-glass-final-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   macos-validation:
     runs-on: macos-15-intel
@@ -34,8 +35,18 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
           if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
-      - name: Full Swift, JavaScript, native XCTest and simulator build
-        run: bash scripts/glass-audit/validate-macos.sh native
+      - name: Recover immutable ce97445 evidence for unchanged suites
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12863355350
+          run-id: 40790429936
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/danper-ce-evidence
+          merge-multiple: true
+      - name: Verify reused suites, rebuild and prove actual Face ID enrollment
+        env:
+          DANPER_BASELINE_EVIDENCE: ${{ runner.temp }}/danper-ce-evidence
+        run: bash scripts/glass-audit/validate-macos.sh resume-native
       - name: Publish core and native evidence before lengthy UI journeys
         if: always()
         uses: actions/upload-artifact@v4
@@ -47,6 +58,8 @@ jobs:
             ${{ runner.temp }}/danper-glass-evidence/*.txt
             ${{ runner.temp }}/danper-glass-evidence/native-23-attachments
             ${{ runner.temp }}/danper-glass-evidence/native-23.xcresult
+            ${{ runner.temp }}/danper-glass-evidence/biometric-preflight.xcresult
+            ${{ runner.temp }}/danper-glass-evidence/biometric-preflight-attachments
           retention-days: 14
       - name: All 11 current UI cases with genuine simulated authentication
         run: bash scripts/glass-audit/validate-macos.sh ui
