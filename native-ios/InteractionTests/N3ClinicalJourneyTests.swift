@@ -5,6 +5,18 @@ import CoreFoundation
 /// UI test. Uses the existing fictional DEMO harness; authentication is tested
 /// separately against the genuine device-owner policy, without bypassing it.
 final class N3ClinicalJourneyTests:XCTestCase {
+    override func tearDownWithError() throws {
+        for (name, app) in [("DANPER", XCUIApplication()),
+                            ("SpringBoard", XCUIApplication(bundleIdentifier:"com.apple.springboard")),
+                            ("LocalAuthentication", XCUIApplication(bundleIdentifier:"com.apple.CoreAuthUI"))] {
+            let tree=XCTAttachment(string:app.debugDescription)
+            tree.name="diagnostic-"+name+"-hierarchy";tree.lifetime = .keepAlways;add(tree)
+        }
+        let screen=XCTAttachment(screenshot:XCUIScreen.main.screenshot())
+        screen.name="diagnostic-final-screen";screen.lifetime = .keepAlways;add(screen)
+        try super.tearDownWithError()
+    }
+
     private func capture(_ app:XCUIApplication,_ name:String) {
         let image=XCTAttachment(screenshot:app.screenshot());image.name="KardexV2-"+name;image.lifetime = .keepAlways;add(image)
     }

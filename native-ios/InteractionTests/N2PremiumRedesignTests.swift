@@ -1,6 +1,18 @@
 import XCTest
 
 final class N2PremiumRedesignTests:XCTestCase {
+    override func tearDownWithError() throws {
+        for (name, app) in [("DANPER", XCUIApplication()),
+                            ("SpringBoard", XCUIApplication(bundleIdentifier:"com.apple.springboard")),
+                            ("LocalAuthentication", XCUIApplication(bundleIdentifier:"com.apple.CoreAuthUI"))] {
+            let tree=XCTAttachment(string:app.debugDescription)
+            tree.name="diagnostic-"+name+"-hierarchy";tree.lifetime = .keepAlways;add(tree)
+        }
+        let screen=XCTAttachment(screenshot:XCUIScreen.main.screenshot())
+        screen.name="diagnostic-final-screen";screen.lifetime = .keepAlways;add(screen)
+        try super.tearDownWithError()
+    }
+
     private func capture(_ app:XCUIApplication,_ name:String) {
         let attachment=XCTAttachment(screenshot:XCUIScreen.main.screenshot())
         attachment.name="Premium-"+name;attachment.lifetime = .keepAlways;add(attachment)
@@ -30,6 +42,9 @@ final class N2PremiumRedesignTests:XCTestCase {
         app.textFields["attention-worker-dni"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5))
         XCTAssertGreaterThan(app.keyboards.firstMatch.frame.height,150,"Validar con teclado en pantalla")
+        let tree=XCTAttachment(string:app.debugDescription)
+        tree.name="diagnostic-keyboard-visible-hierarchy";tree.lifetime = .keepAlways;add(tree)
+        capture(app,"Teclado-antes-de-verificar-barra")
         let hiddenNew=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["Siguiente"])
         XCTAssertEqual(XCTWaiter.wait(for:[hiddenNew],timeout:5),.completed,"El teclado debe ocultar la barra de pasos")
         XCTAssertFalse(app.buttons["premium-tab-home"].exists && app.buttons["premium-tab-home"].isHittable,"La cápsula no debe interferir con el editor")

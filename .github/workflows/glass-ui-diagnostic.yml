@@ -1,0 +1,44 @@
+name: Glass - three failed UI cases only
+run-name: Glass targeted diagnosis · ${{ github.sha }}
+on:
+  workflow_dispatch:
+  # Explicit request-file commit is the manual API fallback; normal fixes do not run it.
+  push:
+    branches: [audit/glass-pro-iloader-20261028]
+    paths: [.github/glass-ui-diagnostic-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: danper-glass-final-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  targeted-ui:
+    if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Set up targeted diagnostic environment
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code 409c37149917d5c811229680a3f14d1450b171ed HEAD -- native-ios/Sources/DanperCore
+          echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-ui-diagnostic" >> "$GITHUB_ENV"
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+      - name: Exactly three affected UI cases
+        run: bash scripts/glass-audit/diagnose-ui.sh
+      - name: Publish diagnostic evidence even when a case fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GLASS_UI_DIAGNOSTIC_${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/glass-ui-diagnostic
+            !${{ runner.temp }}/glass-ui-diagnostic/DerivedData/**
+          retention-days: 14
+          if-no-files-found: error

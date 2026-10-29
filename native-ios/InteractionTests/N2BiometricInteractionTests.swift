@@ -2,6 +2,18 @@ import XCTest
 import CoreFoundation
 
 final class N2BiometricInteractionTests:XCTestCase {
+    override func tearDownWithError() throws {
+        for (name, app) in [("DANPER", XCUIApplication()),
+                            ("SpringBoard", XCUIApplication(bundleIdentifier:"com.apple.springboard")),
+                            ("LocalAuthentication", XCUIApplication(bundleIdentifier:"com.apple.CoreAuthUI"))] {
+            let tree=XCTAttachment(string:app.debugDescription)
+            tree.name="diagnostic-"+name+"-hierarchy";tree.lifetime = .keepAlways;add(tree)
+        }
+        let screen=XCTAttachment(screenshot:XCUIScreen.main.screenshot())
+        screen.name="diagnostic-final-screen";screen.lifetime = .keepAlways;add(screen)
+        try super.tearDownWithError()
+    }
+
     private func biometric(_ result:String) {
         CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
             CFNotificationName(rawValue:("com.apple.BiometricKit_Sim.pearl."+result) as CFString),nil,nil,true)
