@@ -72,7 +72,7 @@ jobs:
           retention-days: 14
   final-ui-and-ipa:
     needs: diagnostic-gate
-    runs-on: macos-15
+    runs-on: macos-15-intel
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     timeout-minutes: 180
@@ -100,7 +100,7 @@ jobs:
               assert isinstance(r['run'],int) and r['run']>0 and isinstance(r['artifact'],int) and r['artifact']>0
               print('js_run='+str(r['run'])+'\njs_artifact='+str(r['artifact']))
           PYJS
-          test "$(uname -m)" = arm64
+          test "$(uname -m)" = x86_64
           echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
           echo "xcode=$(xcodebuild -version | tr ' \n' '__')" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4

@@ -9,7 +9,7 @@ git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
 git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
 uname -m > "$OUT/architecture.txt"
 xcodebuild -version > "$OUT/xcode-version.txt"
-test "$(uname -m)" = arm64
+test "$(uname -m)" = x86_64
 bash scripts/glass-audit/prepare.sh
 node scripts/glass-audit/identity.cjs
 node scripts/test-n2-premium-redesign.cjs
@@ -19,7 +19,7 @@ if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
 (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
 xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" \
- ONLY_ACTIVE_ARCH=NO ARCHS=arm64 build-for-testing > "$OUT/build.log" 2>&1
+ ONLY_ACTIVE_ARCH=NO ARCHS="$(uname -m)" build-for-testing > "$OUT/build.log" 2>&1
 git rev-parse HEAD > "$OUT/BUILD_SUCCESS_SHA.txt"
 xcrun simctl list runtimes -j > "$OUT/runtimes.json"
 SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   access-visual:
     if: github.ref == 'refs/heads/audit/glass-pro-iloader-20261028'
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 65
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
@@ -25,7 +25,9 @@ jobs:
         with:
           node-version: '22'
       - name: Verify protected source is unchanged
+        id: source
         run: |
+          echo "arch=$(uname -m)" >> "$GITHUB_OUTPUT"
           echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/glass-access-visual" >> "$GITHUB_ENV"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git fetch --no-tags --depth=1 origin 2b76453cd51b2998ac300d9c6d435ec871b56cc1
@@ -52,4 +54,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/glass-access-visual/DerivedData
-          key: glass-ui-arm64-Xcode_16.4__Build_version_16F6_-${{ github.sha }}
+          key: glass-ui-${{ steps.source.outputs.arch }}-Xcode_16.4__Build_version_16F6_-${{ github.sha }}

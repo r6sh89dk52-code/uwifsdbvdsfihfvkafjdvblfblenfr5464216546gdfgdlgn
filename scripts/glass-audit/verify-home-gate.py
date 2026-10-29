@@ -26,14 +26,15 @@ subprocess.run(['git','diff','--exit-code',ref,'HEAD','--',*paths],check=True)
 unknown=[v for v in git('diff','--name-only',ref,'HEAD').splitlines() if not v.startswith(('.github/','docs/','scripts/glass-audit/'))]
 assert not unknown,unknown
 architectures={d['architecture'] for d in devices};runtimes={(d['osVersion'],d['osBuildNumber']) for d in devices}
-assert architectures=={'arm64'} and len(runtimes)==1
+assert len(architectures)==1 and architectures <= {'arm64','x86_64'} and len(runtimes)==1
+arch=architectures.pop()
 version,build=runtimes.pop();xcode=(p/'xcode-version.txt').read_text()
-assert (p/'architecture.txt').read_text().strip()=='arm64'
+assert (p/'architecture.txt').read_text().strip()==arch
 report={'currentSHA':git('rev-parse','HEAD'),'targetedPassed':True,'cases':proof,'targetedSource':e,
- 'architecture':'arm64','runtimeVersion':version,'runtimeBuild':build,'xcodeVersion':xcode,
+ 'architecture':arch,'runtimeVersion':version,'runtimeBuild':build,'xcodeVersion':xcode,
  'identicalInputTrees':{v:git('rev-parse','HEAD:'+v) for v in paths},
  'simulatorBuild':{'sourceSHA':ref,'run':e['run'],'artifact':e['artifact'],
-  'cacheKey':'glass-ui-arm64-'+xcode.replace(' ','_').replace('\n','_')+'-'+ref,
+  'cacheKey':'glass-ui-'+arch+'-'+xcode.replace(' ','_').replace('\n','_')+'-'+ref,
   'nativeTree':git('rev-parse',ref+':native-ios'),'currentNativeTree':git('rev-parse','HEAD:native-ios')},
  'uiResultsReusedForFinal':False}
 (root/'DIAGNOSTIC_GATE.json').write_text(json.dumps(report,indent=2)+'\n')
