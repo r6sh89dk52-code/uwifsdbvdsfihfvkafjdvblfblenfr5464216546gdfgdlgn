@@ -50,3 +50,13 @@ run `40857793155`. Ubuntu diagnostic input gate job `123393051986` completed
 SUCCESS. Mac job `123393148502` is queued at this checkpoint; no final core,
 11-UI or IPA success is claimed. Checkout is pinned to the immutable source
 SHA. This documentation-only commit does not request another run.
+
+Trace qualification after the three-case PASS: do not claim the context was
+necessarily retained until the HUD disappeared. In the successful protected
+relaunch, policy reply was 07:53:00.626 UTC, LAContext deallocation 00.696,
+CoreAuthUI dismissal 01.869 and UIKit removal of deactivation reason 7 at
+01.940. The actual code adds explicit invalidation of a completed context
+when its observed phase is active, or on subsequent active/background paths.
+The trace establishes successful UI cleanup with the corrected source; it
+does not isolate a retention duration or prove the exact OS race mechanism.
+All original assertions remain; the final all-11 run is still required.
