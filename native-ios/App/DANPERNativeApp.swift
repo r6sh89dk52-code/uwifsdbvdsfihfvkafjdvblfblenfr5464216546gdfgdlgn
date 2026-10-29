@@ -109,6 +109,9 @@ struct DANPERNativeApp: App {
                 } else if phase == .inactive,automaticUnlockScheduled,!unlocking {
                     authCycle=UUID();automaticUnlockScheduled=false
                 } else if phase == .active {
+                    // The system authentication UI may outlive its policy reply.
+                    // Release a completed context only after its scene is active.
+                    if !unlocking {activeContext?.invalidate();activeContext=nil}
                     attemptAutomaticUnlock()
                 }
             }
@@ -166,8 +169,10 @@ struct DANPERNativeApp: App {
             localizedReason: "Acceder de forma segura a tu información de salud ocupacional") { success, error in
             DispatchQueue.main.async {
                 guard cycle==authCycle else{return}
-                activeContext=nil
                 access.complete(success:success)
+                // Keep the completed context alive while CoreAuthUI closes.
+                // Backgrounding still invalidates it and locks the session.
+                if scenePhase == .active {activeContext?.invalidate();activeContext=nil}
                 if !success {
                     manualRetryAvailable = true
                     let code=(error as? LAError)?.code

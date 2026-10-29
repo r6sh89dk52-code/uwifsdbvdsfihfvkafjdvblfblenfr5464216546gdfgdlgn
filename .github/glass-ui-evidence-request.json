@@ -1,8 +1,6 @@
 {
-  "request": "read-new-protected-hittability-failure-no-tests",
-  "run": 40832912495,
-  "compact": 12879918256,
-  "raw": 12880580446,
-  "tests": false,
+  "request": "validate-native-auth-context-lifetime-guards",
+  "mode": "validate",
+  "simulatorTests": false,
   "build": false
 }

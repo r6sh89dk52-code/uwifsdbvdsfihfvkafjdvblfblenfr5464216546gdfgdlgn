@@ -17,29 +17,57 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-      - uses: actions/download-artifact@v4
+      - name: Select evidence reading or source validation
+        id: mode
+        run: |
+          python3 - <<'PYMODE' >> "$GITHUB_OUTPUT"
+          import json
+          print('value='+json.load(open('.github/glass-ui-evidence-request.json')).get('mode','evidence'))
+          PYMODE
+      - name: Check shell and Python syntax
+        run: |
+          bash -n scripts/glass-audit/prepare-auth-ui.sh scripts/glass-audit/diagnose-ui.sh scripts/glass-audit/validate-macos.sh
+          python3 - <<'PYSTATIC'
+          from pathlib import Path
+          for p in Path('scripts/glass-audit').glob('*.py'):compile(p.read_text(),str(p),'exec')
+          print('PASS: shell and Python syntax')
+          PYSTATIC
+      - uses: actions/setup-node@v4
+        if: steps.mode.outputs.value == 'validate'
         with:
-          artifact-ids: 12879918256
-          run-id: 40832912495
+          node-version: '22'
+      - name: Existing guards affected by native app lifecycle change
+        if: steps.mode.outputs.value == 'validate'
+        run: |
+          node scripts/test-n2-premium-redesign.cjs
+          node scripts/test-n2-glass-clinical.cjs
+          node scripts/test-n2-build222-ui-parity.cjs
+      - uses: actions/download-artifact@v4
+        if: steps.mode.outputs.value == 'evidence'
+        with:
+          artifact-ids: 12877229281
+          run-id: 40826603674
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/evidence/seventh
+          path: ${{ runner.temp }}/evidence/fifth
           merge-multiple: true
       - uses: actions/download-artifact@v4
+        if: steps.mode.outputs.value == 'evidence'
         with:
-          artifact-ids: 12880580446
-          run-id: 40832912495
+          artifact-ids: 12878922365
+          run-id: 40830269793
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/evidence/seventh
+          path: ${{ runner.temp }}/evidence/sixth
           merge-multiple: true
       - name: Read summaries and compare actual auth UI lifecycle (NO TESTS)
+        if: steps.mode.outputs.value == 'evidence'
         env:
           EVIDENCE: ${{ runner.temp }}/evidence
         run: |
           python3 - <<'PY'
-          import json,os,re,base64
+          import json,os,re
           from pathlib import Path
           root=Path(os.environ['EVIDENCE'])
-          for run in ['seventh']:
+          for run in ['fifth','sixth']:
               p=root/run
               print('RUN_EVIDENCE',run,(p/'SOURCE_SHA.txt').read_text().strip())
               for name in ['auth-ui-preparation.log','simulator-display.log','isolated-simulators.txt']:
@@ -60,16 +88,5 @@ jobs:
                   test=p/(cls+'.log')
                   if test.exists():
                       lines=test.read_text().splitlines();print('TEST_END\n'+'\n'.join(lines[-18:]))
-          p=root/'seventh';test=p/'N3ClinicalJourneyTests.log'
-          lines=test.read_text().splitlines()
-          for i,line in enumerate(lines):
-              if 'error:' in line or 'Failed to determine hittability' in line:
-                  print('FAILURE_CONTEXT\n'+'\n'.join(lines[max(0,i-45):i+8]));break
-          p=p/'N3ClinicalJourneyTests-attachments'
-          for row in json.loads((p/'manifest.json').read_text()):
-              for a in row['attachments']:
-                  name=a['suggestedHumanReadableName'];f=p/a['exportedFileName']
-                  if name.startswith(('diagnostic-DANPER','diagnostic-LocalAuthentication')):print('UI_HIERARCHY',name,'\n'+f.read_text()[:30000])
-                  if name.startswith('diagnostic-final-screen'):print('IMAGE_BASE64',base64.b64encode(f.read_bytes()).decode())
           print('READ ONLY: no builds, simulator boots, authentication or tests executed')
           PY
