@@ -203,3 +203,18 @@ The final 11 UI cases still always run together on the final checkout; none of
 those final UI results are reused. No failed overall diagnostic run is relabeled
 as successful. Negative local verification rejects the actual failed Protected
 summary and writes no aggregate approval marker.
+
+## Final UI inventory isolation
+
+The final inventory still discovers exactly 11 methods from source. It runs the
+two existing N3 DEMO journeys together with their original native fixture seeds,
+and the protected-source method on its own fresh, warmed synthetic simulator,
+matching its diagnostic prerequisites. This avoids placing genuine system
+biometrics after a long DEMO journey with potentially cold system UI services.
+No method is omitted or duplicated, and no skip-testing flag is used. The seven
+result bundles contain counts 1+1+3+1+2+2+1 = 11; every summary must have zero
+failures/skips before sealing. No final UI result is claimed by this change.
+
+Local validation extracted the actual inventory generator from the shell script
+and verified all 11 methods/counts and the dedicated protected selector. Shell
+syntax, Python parsing and whitespace checks passed.

@@ -101,16 +101,27 @@ from pathlib import Path
 import re
 for p in sorted(Path('native-ios/InteractionTests').glob('*.swift')):
  s=p.read_text(); c=re.search(r'final class (\w+):XCTestCase',s)
- if c: print(c[1],len(re.findall(r'func test\w+\(',s)),sep='\t')
+ if not c:continue
+ cls=c[1];methods=re.findall(r'func (test\w+)\(',s)
+ assert len(methods)==len(set(methods))
+ if cls=='N3ClinicalJourneyTests':
+  protected='testProtectedClinicalSourceCreationAndRelaunch'
+  assert protected in methods
+  demo=[m for m in methods if m!=protected]
+  selectors=' '.join('-only-testing:DANPERInteractionTests/'+cls+'/'+m for m in demo)
+  print(cls+'-demo',len(demo),cls,selectors,sep='\t')
+  print(cls+'-protected',1,cls,'-only-testing:DANPERInteractionTests/'+cls+'/'+protected,sep='\t')
+ else:print(cls,len(methods),cls,'-only-testing:DANPERInteractionTests/'+cls,sep='\t')
 PY
 overall=0
-while IFS=$'\t' read -r cls count; do
- fresh "$cls"
- case "$cls" in
-  N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests)
-   if ! run_tests "seed-$cls" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; continue; fi ;;
+while IFS=$'\t' read -r label count cls selectors; do
+ fresh "$label"
+ case "$label" in
+  N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo)
+   if ! run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; continue; fi ;;
  esac
- if ! run_tests "$cls" "$count" "-only-testing:DANPERInteractionTests/$cls"; then overall=1; fi
+ IFS=' ' read -r -a selection <<< "$selectors"
+ if ! run_tests "$label" "$count" "${selection[@]}"; then overall=1; fi
 done < "$OUT/ui-classes.tsv"
 python3 - "$OUT/ui-classes.tsv" <<'PY'
 import sys

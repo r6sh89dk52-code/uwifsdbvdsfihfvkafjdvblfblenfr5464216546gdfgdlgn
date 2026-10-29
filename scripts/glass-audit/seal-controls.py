@@ -16,9 +16,9 @@ np=out/('verified-reused-native-23.xcresult.summary.json' if reuse['suites']['na
 s=json.loads(np.read_text());assert s['totalTestCount']==23 and s['passedTests']==23 and s['failedTests']==0 and s['skippedTests']==0 and not s.get('testFailures')
 ui=[]
 for line in (out/'ui-classes.tsv').read_text().splitlines():
- cls,count=line.split('\t');s=json.loads((out/(cls+'.xcresult.summary.json')).read_text())
+ cls,count,source_class,selectors=line.split('\t');s=json.loads((out/(cls+'.xcresult.summary.json')).read_text())
  assert s['totalTestCount']==int(count) and s['passedTests']==int(count) and s['failedTests']==0 and s['skippedTests']==0 and not s.get('testFailures'),cls
- ui.append({'class':cls,'passed':int(count)})
+ ui.append({'label':cls,'class':source_class,'selectors':selectors.split(),'passed':int(count)})
 assert sum(s['passed'] for s in ui)==11
 gate=json.loads((out/'DIAGNOSTIC_GATE.json').read_text());assert gate['currentSHA']==sha and gate['allThreePassed'] and len(gate['cases'])==3
 request=json.loads(Path('.github/glass-final-release-request.json').read_text())
