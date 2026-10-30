@@ -168,6 +168,9 @@ run_tests(){
  local derived=(-derivedDataPath "$DD")
  if test -n "$TEST_RUN"; then selection=(-xctestrun "$TEST_RUN"); derived=(); fi
  if test "$label" = N2AllergySaveInteractionTests; then
+  # Seed/preflight XCTest may leave its host alive. The UI suite explicitly
+  # relaunches the app: profiling must observe that new process, not the seed.
+  xcrun simctl terminate "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview > "$OUT/profiler-process-reset.log" 2>&1 || true
   python3 scripts/performance/profile-simulator.py "$SIM_ID" "$OUT/Instruments" > "$OUT/profiler-launch.log" 2>&1 & profiler=$!
  fi
  xcodebuild "${selection[@]}" \
