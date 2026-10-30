@@ -14,18 +14,8 @@ struct N2WorkerSearchSheet:View {
     @State private var page=0
     private let pageSize=25
 
-    // N2NativeFormContextReader delivers workers already sorted by name.
-    // Preserve that stable order, including after filtering: sorting 9,648
-    // records every time SwiftUI reevaluates the body was unnecessary.
-    // Render only the requested page of 25 results below.
-    private var matches:[N2FormWorker] {
-        let q=committedQuery.trimmingCharacters(in:.whitespacesAndNewlines)
-        // Nothing is enumerated or rendered until the user searches.
-        guard q.count>=2 else{return []}
-        return workers.filter {
-            $0.dni.contains(q) || $0.name.localizedStandardContains(q)
-        }
-    }
+    @State private var searchIndex:N2SearchIndex<N2FormWorker>?
+    @State private var matches=[N2FormWorker]()
     var body:some View {
         // Evaluate the 9k-person predicate once per render, not again
         // for the count, pagination and ForEach. Only 25 views are made.
@@ -116,13 +106,25 @@ struct N2WorkerSearchSheet:View {
             }
             .task(id:query) {
                 // Do not rescan 10k people on every keystroke.
+                let requested=query
+                if requested.trimmingCharacters(in:.whitespacesAndNewlines).count<2 {
+                    committedQuery=requested;matches=[];page=0
+                    return
+                }
                 do {try await Task.sleep(for:.milliseconds(180))}
                 catch{return}
                 guard !Task.isCancelled else{return}
-                committedQuery=query
-                page=0
+                let prior=searchIndex,rows=workers
+                let prepared=await Task.detached(priority:.userInitiated) {
+                    let index=prior ?? N2SearchIndex(rows:rows,fields:{$0.dni+"\u{1f}"+$0.name})
+                    return (index,index.matches(requested))
+                }.value
+                guard !Task.isCancelled else{return}
+                searchIndex=prepared.0;matches=prepared.1
+                committedQuery=requested;page=0
             }
         }
+        .onAppear {searchFocused=true}
         .navigationTitle("Buscar en padrón")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {ToolbarItem(placement:.topBarTrailing) {

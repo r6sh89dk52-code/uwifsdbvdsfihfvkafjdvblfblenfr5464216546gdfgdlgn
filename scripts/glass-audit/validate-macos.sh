@@ -14,7 +14,7 @@ if test "$MODE" = replay; then
  printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
 fi
 DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay; then
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay && test "$MODE" != b15-native && test "$MODE" != b15-shard; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -50,7 +50,7 @@ if test "$MODE" = resume-native; then
 fi
 # Current-branch CI: run every simulator suite from this checkout, without
 # reusing earlier evidence or packaging. Swift/Excel gates run independently.
-if test "$MODE" = current || test "$MODE" = replay; then
+if test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native || test "$MODE" = b15-shard; then
  git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
  git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
  xcodebuild -version > "$OUT/xcode-version.txt"
@@ -69,6 +69,21 @@ assert r,'No iOS runtime matching the selected Xcode SDK; do not silently select
 print(r[0]['identifier'])
 PY
 )
+TEST_RUN=''
+if test "$MODE" = b15-shard; then
+ : "${DANPER_B15_UI_LABEL:?Set one discovered UI suite}"
+ : "${DANPER_TEST_PROOF:?Set same-HEAD compiled product proof}"
+ python3 scripts/performance/test-products.py verify "$DD/Build/Products" "$DANPER_TEST_PROOF"
+ TEST_RUN=$(python3 - "$DD/Build/Products" <<'PYRUN'
+from pathlib import Path
+import sys
+paths=list(Path(sys.argv[1]).glob('*.xctestrun'))
+assert len(paths)==1,paths
+print(paths[0])
+PYRUN
+)
+ printf '%s\n' "$DANPER_B15_UI_LABEL" > "$OUT/SHARD_LABEL.txt"
+fi
 SIM_ID=''
 INSTALL_RECOVERY_SIM=''
 cleanup(){ if test -n "$SIM_ID"; then xcrun simctl shutdown "$SIM_ID" || true; xcrun simctl delete "$SIM_ID" || true; fi; }
@@ -141,7 +156,7 @@ PYINSTALL
  done
 }
 run_tests(){
- local label="$1" expected="$2" status=0 stream='' bridge=''; shift 2
+ local label="$1" expected="$2" status=0 stream='' bridge='' profiler=''; shift 2
  echo "PHASE: $label — $expected required tests; no skips"
  prepare_test_installation || return $?
  case "$label" in
@@ -149,11 +164,18 @@ run_tests(){
    python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$OUT/$label-system.log" 2>&1 & stream=$!
    python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;
  esac
- xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
+ local selection=(-project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug)
+ local derived=(-derivedDataPath "$DD")
+ if test -n "$TEST_RUN"; then selection=(-xctestrun "$TEST_RUN"); derived=(); fi
+ if test "$label" = N2AllergySaveInteractionTests; then
+  python3 scripts/performance/profile-simulator.py "$SIM_ID" "$OUT/Instruments" > "$OUT/profiler-launch.log" 2>&1 & profiler=$!
+ fi
+ xcodebuild "${selection[@]}" \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
-  -derivedDataPath "$DD" -parallel-testing-enabled NO -test-timeouts-enabled YES \
+  "${derived[@]}" -parallel-testing-enabled NO -test-timeouts-enabled YES \
   -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 -resultBundlePath "$OUT/$label.xcresult" \
   ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
+ if test -n "$profiler"; then wait "$profiler" || echo 'Profiler could not collect all diagnostics; inspect profiler-launch.log'; fi
  if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
@@ -162,7 +184,7 @@ run_tests(){
 }
 if test "$MODE" != ui; then
  fresh native
- if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = replay; then
+ if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native; then
   # Compile for this actual Simulator architecture, not two unused slices.
   xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
@@ -171,11 +193,17 @@ if test "$MODE" != ui; then
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
- if test "$MODE" != replay; then
-  run_tests native-26 26 -only-testing:DANPERNativeTests
+ if test "$MODE" != replay && test "$MODE" != b15-shard; then
+  NATIVE_COUNT=$(python3 - <<'PYCOUNT'
+from pathlib import Path
+import re
+print(sum(len(re.findall(r'func (test\w+)\(',p.read_text())) for p in Path('native-ios/NativeTests').glob('*.swift')))
+PYCOUNT
+)
+  run_tests "native-$NATIVE_COUNT" "$NATIVE_COUNT" -only-testing:DANPERNativeTests
   git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
  fi
- if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
+ if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native || test "$MODE" = b15-native; then exit 0; fi
 fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
 python3 - <<'PY' > "$OUT/ui-classes.tsv"
@@ -198,9 +226,10 @@ PY
 overall=0
 while IFS=$'\t' read -r label count cls selectors; do
  if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi
+ if test "$MODE" = b15-shard && test "$label" != "$DANPER_B15_UI_LABEL"; then continue; fi
  fresh "$label"
  case "$label" in
-  N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo)
+  N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo|N2AllergySaveInteractionTests)
    if ! run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; continue; fi ;;
  esac
  IFS=' ' read -r -a selection <<< "$selectors"
@@ -208,9 +237,14 @@ while IFS=$'\t' read -r label count cls selectors; do
 done < "$OUT/ui-classes.tsv"
 python3 - "$OUT/ui-classes.tsv" <<'PY'
 import sys
-assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==11,'Review UI test inventory'
+assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==13,'Review UI test inventory'
 PY
 test "$overall" = 0
+if test "$MODE" = b15-shard; then
+ grep -q "^$DANPER_B15_UI_LABEL" "$OUT/ui-classes.tsv"
+ git rev-parse HEAD > "$OUT/SHARD_PASS_SHA.txt"
+ exit 0
+fi
 if test "$MODE" = replay; then
  git rev-parse HEAD > "$OUT/REPLAY_PASS_SHA.txt"
  echo "PASS: replay $DANPER_REPLAY_LABEL only; combined coverage must be verified before packaging."

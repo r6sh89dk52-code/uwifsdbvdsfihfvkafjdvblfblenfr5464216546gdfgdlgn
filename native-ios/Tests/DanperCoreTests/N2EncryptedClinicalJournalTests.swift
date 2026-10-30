@@ -102,6 +102,12 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
         let folder=try path(),key=Data(repeating:0x11,count:32)
         let store=try start(folder,key)
         _=try store.commit(input(),expectedRevision:0)
+        let verified=try XCTUnwrap(store.recover())
+        XCTAssertEqual(verified.parity.sourceSHA256,verified.fields.sourceSHA256)
+        let auditCount=store.semanticValidationCount
+        _=try store.recover()
+        XCTAssertEqual(store.semanticValidationCount,auditCount,
+            "Identical authenticated bytes share semantic proof only inside this journal instance")
         let p=try FileManager.default.contentsOfDirectory(at:folder,
                                  includingPropertiesForKeys:nil).first {
             $0.lastPathComponent.hasPrefix("gen-")
@@ -113,6 +119,24 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
         XCTAssertThrowsError(try store.recover()) {
             XCTAssertEqual($0 as? N2EncryptedClinicalJournal.Failure,.authenticationFailed)
         }
+    }
+    func testValidationMemoDoesNotCertifyChangedBytesOrWrongKey()throws {
+        let folder=try path(),key=Data(repeating:0x31,count:32)
+        let store=try start(folder,key),raw=try input()
+        _=try store.commit(raw,expectedRevision:0)
+        let count=store.semanticValidationCount
+        let next=try N2SnapshotEditor.reviewAllergies(snapshot:raw,dni:"00000001",
+            status:"known",substances:"SUSTANCIA FICTICIA",at:1793370000000)
+        _=try store.commit(next,expectedRevision:1)
+        XCTAssertGreaterThan(store.semanticValidationCount,count)
+        let after=try XCTUnwrap(store.recover())
+        XCTAssertEqual(after.snapshot,next)
+        XCTAssertEqual(after.parity.sourceSHA256,after.fields.sourceSHA256)
+        XCTAssertThrowsError(try start(folder,Data(repeating:0x32,count:32)).recover())
+        var bad=try XCTUnwrap(JSONSerialization.jsonObject(with:next) as? [String:Any])
+        bad["allergies"]=["00000001":["status":"known","substances":7,"updatedAt":1793370000000]]
+        XCTAssertThrowsError(try store.commit(JSONSerialization.data(withJSONObject:bad),expectedRevision:2))
+        XCTAssertEqual(try store.recover()?.revision,2)
     }
     func testMissingApplicationSupportParentIsCreatedWithoutDestroyingData()throws {
         // Regression: on a fresh iPhone install, Application Support is not

@@ -341,7 +341,7 @@ struct N2VerifiedIndicatorExportView:View {
             let siteSuffix=site=="AMBAS" ? "AMBAS_" : ""
             let outputName="\(exportPrefix)\(siteSuffix)\(local(startDate))_\(local(endDate)).xlsx"
             let url=dir.appendingPathComponent(outputName)
-            try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
+            try await N2WorkspaceFileIO.shared.writeProtectedExport(result.xlsx,to:url)
             let warning=result.provisional
                 ? "PROVISIONAL · \(result.pendingLines) líneas pendientes, con R vacía cuando no hay apertura acreditada. "
                 : ""

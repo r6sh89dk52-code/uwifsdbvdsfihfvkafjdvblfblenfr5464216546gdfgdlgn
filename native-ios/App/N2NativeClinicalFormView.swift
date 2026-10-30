@@ -35,6 +35,11 @@ struct N2NativeClinicalFormView:View {
     private let systems=N2ClinicalFormOptions.systems
     private let procedures=N2ProcedureRules.procedures
     @State private var workersByDNI=[String:N2FormWorker]()
+    @State private var workerSearchIndex:N2SearchIndex<N2FormWorker>?
+    @State private var cachedNameSuggestions=[N2FormWorker]()
+    @State private var cachedSuggestionQuery=""
+    @State private var lastPersistedDraft:N2NativeFormDraft?
+    @State private var lastPersistedStage:Int?
     @State private var context:N2FormContext?
     @State private var pendingMappingItemID:String?
     @State private var pendingPhysicalItemID:String?
@@ -144,9 +149,8 @@ struct N2NativeClinicalFormView:View {
     }
     private var nameSuggestions:[N2FormWorker] {
         let query=workerNameInput.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard query.count>=2,form.dni.isEmpty else{return []}
-        return N2NativeWorkerLookup.nameMatches(query,
-            in:context?.workers ?? [],limit:5)
+        guard query.count>=2,form.dni.isEmpty,query==cachedSuggestionQuery else{return []}
+        return cachedNameSuggestions
     }
     private func selectWorker(_ worker:N2FormWorker) {
         dniLookupTask?.cancel()
@@ -380,7 +384,7 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
                 .onChange(of:form.dni) {_,dni in
-                    if let worker=context.workers.first(where:{$0.dni==dni}) {
+                    if let worker=workersByDNI[dni] {
                         workerDNIInput=dni
                         workerNameInput=worker.name
                     }
@@ -409,6 +413,21 @@ struct N2NativeClinicalFormView:View {
             }
         }
         .tint(brand)
+        .task(id:workerNameInput) {
+            let requested=workerNameInput
+            guard requested.trimmingCharacters(in:.whitespacesAndNewlines).count>=2,form.dni.isEmpty else {
+                cachedNameSuggestions=[];return
+            }
+            do {try await Task.sleep(for:.milliseconds(140))}catch{return}
+            let prior=workerSearchIndex,rows=context?.workers ?? []
+            let result=await Task.detached(priority:.userInitiated) {
+                let index=prior ?? N2SearchIndex(rows:rows,fields:{$0.dni+"\u{1f}"+$0.name})
+                return (index,index.matches(requested,limit:5))
+            }.value
+            guard !Task.isCancelled,form.dni.isEmpty else{return}
+            workerSearchIndex=result.0;cachedNameSuggestions=result.1
+            cachedSuggestionQuery=requested.trimmingCharacters(in:.whitespacesAndNewlines)
+        }
     }
 
     @ViewBuilder private func formContents(_ context:N2FormContext)->some View {
@@ -1245,6 +1264,7 @@ struct N2NativeClinicalFormView:View {
         } catch {status="No se pudo conciliar. La atención original permanece registrada; revisa los datos físicos y la cronología."}
     }
     private func indexWorkers(_ context:N2FormContext) {
+        workerSearchIndex=nil;cachedNameSuggestions=[]
         workersByDNI=Dictionary(context.workers.map{($0.dni,$0)},uniquingKeysWith:{first,_ in first})
     }
     private func blankForm()->N2NativeFormDraft {
@@ -1303,7 +1323,9 @@ struct N2NativeClinicalFormView:View {
         autosaveTask?.cancel()
         defer {
             editingAllergy=false
-            if didCommit {scheduleDraft()}
+            // A failed allergy transaction must not discard the draft which
+            // was waiting when its debounce was cancelled.
+            if !fault {scheduleDraft()}
         }
         do {
             let statusToSave=allergyStatus
@@ -1385,7 +1407,8 @@ struct N2NativeClinicalFormView:View {
         guard !layoutOnly,let context,!busy,!saved,!fault,!editingAllergy,
               meaningfulDraft else{return}
         autosaveTask?.cancel()
-        let version=form
+        let version=form,stage=step
+        guard version != lastPersistedDraft || stage != lastPersistedStage else{return}
         autosaveTask=Task { @MainActor in
             if !immediate {
                 do {try await Task.sleep(for:.milliseconds(650))}
@@ -1393,21 +1416,37 @@ struct N2NativeClinicalFormView:View {
             }
             guard !Task.isCancelled,!editingAllergy else{return}
             do{
-                let latestRevision=try await vault.currentRevision()
-                // A cancelled autosave must never race the final save with
-                // the same journal revision or replace its success banner.
-                guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
-                let patch=try version.makeDraftPatch(context:context,stage:step)
+                var source=context
+                var refreshedContext=false
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
-                let committed=try await vault.saveDraft(
-                    id:version.id,changes:patch,at:timestamp,
-                    expectedRevision:latestRevision)
+                let committed:N2ProtectedStoreSummary
+                do {
+                    guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
+                    committed=try await vault.saveDraft(id:version.id,
+                        changes:version.makeDraftPatch(context:source,stage:stage),
+                        at:timestamp,expectedRevision:source.revision)
+                } catch N2ProtectedStoreError.staleRevision {
+                    // Common path performs ONE transaction, without a separate
+                    // currentRevision recovery. Only an actual conflict needs
+                    // a new authenticated context and one bounded retry.
+                    source=try await vault.clinicalFormContext()
+                    guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
+                    committed=try await vault.saveDraft(id:version.id,
+                        changes:version.makeDraftPatch(context:source,stage:stage),
+                        at:timestamp,expectedRevision:source.revision)
+                    refreshedContext=true
+                }
+                let latestRevision=source.revision
                 guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
-                if let existing=self.context,existing.revision==latestRevision {
+                if refreshedContext {
+                    self.context=source.withCommittedRevision(committed.revision)
+                    indexWorkers(source)
+                } else if let existing=self.context,existing.revision==latestRevision {
                     self.context=existing.withCommittedRevision(committed.revision)
                 }
                 lastAutosaveTimestamp=timestamp
+                lastPersistedDraft=version;lastPersistedStage=stage
                 await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
                 status="Borrador guardado."
             }catch{

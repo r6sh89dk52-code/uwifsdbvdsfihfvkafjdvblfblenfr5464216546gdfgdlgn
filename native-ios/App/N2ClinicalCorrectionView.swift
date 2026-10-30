@@ -8,6 +8,7 @@ import DanperCore
 struct N2ClinicalCorrectionView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     let visitID:String
+    var onVerifiedSave:((N2CorrectionDetail)->Void)?=nil
     @State private var detail:N2CorrectionDetail?
     @State private var revision:Int?
     @State private var category=""
@@ -334,9 +335,10 @@ struct N2ClinicalCorrectionView:View {
                 do{try await Task.sleep(for:.milliseconds(650))}
                 catch{return}
             }
-            guard !Task.isCancelled else{return}
+            guard !Task.isCancelled,!saving,!saved,!suppressAutosave else{return}
             do {
-                let ctx=try await vault.clinicalFormContext()
+                let latestRevision=try await vault.currentRevision()
+                guard !Task.isCancelled,!saving,!saved,!suppressAutosave else{return}
                 let millis=max(Int64(Date().timeIntervalSince1970*1000),
                                lastDraftAt+1)
                 let raw=try JSONSerialization.data(withJSONObject:changes)
@@ -345,7 +347,8 @@ struct N2ClinicalCorrectionView:View {
                         visitID:visitID,changes:raw,reason:why,
                         operatorName:op,medicationDiscrepancy:note,
                         expectedEffectiveSHA:expected,at:millis,
-                        expectedRevision:ctx.revision)
+                        expectedRevision:latestRevision)
+                guard !Task.isCancelled,!saving,!saved,!suppressAutosave else{return}
                 lastDraftAt=millis
                 message="Rectificación en curso cifrada; aún no confirmada."
             }catch{
@@ -361,12 +364,10 @@ struct N2ClinicalCorrectionView:View {
         recovering=true
         defer{recovering=false}
         do {
-            let ctx=try await vault.clinicalFormContext()
-            let d=try await vault
-                .readCorrectionDetail(visitID:visitID)
-            history=try await vault
-                .readCorrectionHistory(visitID:visitID)
-            revision=ctx.revision
+            let prepared=try await vault.prepareClinicalCorrection(visitID:visitID)
+            let d=prepared.detail
+            history=prepared.history
+            revision=prepared.revision
             detail=d
             category=d.category
             system=d.system
@@ -390,8 +391,7 @@ struct N2ClinicalCorrectionView:View {
                 d.medications.filter(\.historicalOpeningEditable).map{
                     ($0.id,$0.historicalOpeningR.map(String.init) ?? "")
                 })
-            if let pending=try await vault
-                   .readPendingClinicalCorrection(visitID:visitID),
+            if let pending=prepared.draft,
                let changes=try? JSONSerialization.jsonObject(
                    with:pending.changes) as? [String:Any] {
                 category=changes["category"] as? String ?? category
@@ -444,10 +444,10 @@ struct N2ClinicalCorrectionView:View {
         do {
             if try await vault
                   .readPendingClinicalCorrection(visitID:visitID) != nil {
-                let ctx=try await vault.clinicalFormContext()
+                let latestRevision=try await vault.currentRevision()
                 _=try await vault
                     .deletePendingClinicalCorrection(
-                        visitID:visitID,expectedRevision:ctx.revision)
+                        visitID:visitID,expectedRevision:latestRevision)
             }
             suppressAutosave=true
             dismiss()
@@ -459,15 +459,16 @@ struct N2ClinicalCorrectionView:View {
     @MainActor
     private func confirm() async {
         guard ready,let d=detail else{return}
+        let previousDraft=draftTask
         draftTask?.cancel()
         saving=true
         failed=false
         defer{saving=false}
+        await previousDraft?.value
         do {
             let input=editPacket()
             let patch=try JSONSerialization.data(withJSONObject:input)
-            let latest=try await vault
-                .clinicalFormContext()
+            let latestRevision=try await vault.currentRevision()
             let result=try await vault
                 .saveClinicalCorrection(
                     visitID:visitID,eventID:eventID,changes:patch,
@@ -475,9 +476,15 @@ struct N2ClinicalCorrectionView:View {
                     medicationDiscrepancy:discrepancy,
                     expectedEffectiveSHA:d.effectiveSHA256,
                     at:Int64(Date().timeIntervalSince1970*1000),
-                    expectedRevision:latest.revision)
+                    expectedRevision:latestRevision)
             saved=true
             message="Rectificación verificada. Revisión cifrada \(result.revision); sin segundos descuentos de medicamentos."
+            do {
+                let verified=try await vault.readCorrectionDetail(visitID:visitID)
+                onVerifiedSave?(verified)
+            } catch {
+                message="Rectificación guardada y verificada. No se pudo actualizar la lista; vuelve a abrir el historial."
+            }
         }catch {
             failed=true
             message="No se guardó la rectificación. Puede haber cambios recientes o datos incorrectos. Reabre la historia y verifica."

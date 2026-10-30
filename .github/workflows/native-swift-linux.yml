@@ -1,7 +1,7 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1s-complete-excel-and-container-gate, fix/kardex-opening-history-build14-20261029, fix/indicator-historical-visit-site-build15-20261030]
+    branches: [native/swiftui-n1s-complete-excel-and-container-gate, fix/kardex-opening-history-build14-20261029 ]
     paths:
       - 'native-ios/**'
       - 'src/attentionStepValidation.ts'
@@ -37,13 +37,16 @@ concurrency:
   cancel-in-progress: true
 jobs:
   swift-core:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0.3'
       - name: Install synthetic fixture dependencies
         run: npm ci --no-fund --ignore-scripts
       - name: Generate entirely synthetic legacy interoperability fixtures
@@ -71,7 +74,13 @@ jobs:
       - name: Parse SwiftUI sources (syntax only; not UIKit/SwiftUI typecheck)
         run: swiftc -frontend -parse native-ios/App/*.swift
       - name: Swift tests including N1s both official full Excel workbooks and opening consent
-        run: cd native-ios && swift test --jobs 2
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/swift-evidence"
+          (cd native-ios && swift test --jobs 2) 2>&1 | tee "$RUNNER_TEMP/swift-evidence/swift.log"
+          if test "${{ github.ref }}" = refs/heads/fix/indicator-historical-visit-site-build15-20261030; then
+            python3 scripts/performance/summarize-swift.py "$RUNNER_TEMP/swift-evidence/swift.log" "$RUNNER_TEMP/swift-evidence/swift-results.json"
+          fi
       - name: Cross-verify native Swift XLSX against TypeScript A–AD
         run: DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-n1-fixtures" node scripts/test-n1r-native-xlsx.cjs
       - name: Compare both native Excel workbooks against TypeScript official originals
@@ -82,3 +91,10 @@ jobs:
           test ! -d native-ios/out
           echo 'PASS N1s: isolated encrypted staging + Swift tests, no IPA'
 
+
+      - uses: actions/upload-artifact@v4
+        if: always() && github.ref == 'refs/heads/fix/indicator-historical-visit-site-build15-20261030'
+        with:
+          name: B15_SWIFT_RESULTS
+          path: ${{ runner.temp }}/swift-evidence
+          retention-days: 14
