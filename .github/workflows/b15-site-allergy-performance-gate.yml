@@ -1,0 +1,69 @@
+name: B15 - Site, allergy and worker search validation (NO IPA)
+on:
+  push:
+    branches:
+      - fix/indicator-historical-visit-site-build15-20261030
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/b15-site-allergy-performance-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b15-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios-compile-and-simulator:
+    name: Build SwiftUI + clinical and UI simulator regressions
+    runs-on: macos-15-intel
+    timeout-minutes: 100
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-clinical-performance
+      DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Set up official synthetic resources and Xcode
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -resolvePackageDependencies -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative
+      - name: Typecheck the actual iOS app and prepare tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$DANPER_AUDIT_OUT"
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DANPER_AUDIT_DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            build-for-testing > "$DANPER_AUDIT_OUT/build.log" 2>&1 || {
+              grep -nE '(error:|fatal error:|BUILD FAILED)' "$DANPER_AUDIT_OUT/build.log" | tail -n 120 || true
+              exit 1
+            }
+          echo 'PASS: real SwiftUI app and XCTest hosts compiled'
+      - name: Validate native and UI workflows on isolated synthetic iPhone 16
+        timeout-minutes: 75
+        run: bash scripts/glass-audit/validate-macos.sh current
+      - name: Do not overwrite Build 14 or publish an IPA
+        run: |
+          test ! -d native-ios/outputs
+          echo 'PASS: Build 15 clinical site and performance verification only; zero release artifacts'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_XCODE_SIMULATOR_DIAGNOSTICS
+          path: |
+            ${{ runner.temp }}/b15-clinical-performance/build.log
+            ${{ runner.temp }}/b15-clinical-performance/*.json
+            ${{ runner.temp }}/b15-clinical-performance/*.log
+            ${{ runner.temp }}/b15-clinical-performance/*.txt
+          retention-days: 7
+          if-no-files-found: warn
