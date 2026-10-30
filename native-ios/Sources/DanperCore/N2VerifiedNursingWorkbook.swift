@@ -75,6 +75,15 @@ public enum N2VerifiedNursingWorkbook {
             throw Failure.incompleteOrUnreconciled
         }
         let state=try N2SimpleInventory.read(snapshot)
+        // A pre-count clinical record must not permanently invalidate every
+        // later monthly opening. Scope historical evidence to this report.
+        // Historical uses *inside* this period still require reconciliation;
+        // no unverified opening is silently certified.
+        let clinicalRows=try N2SimpleInventory.clinicalRows(N2SimpleInventory.object(snapshot))
+        let visitDates=Dictionary(uniqueKeysWithValues:clinicalRows.compactMap { visit -> (String,String)? in
+            guard let id=visit["id"] as? String,let day=visit["date"] as? String else{return nil}
+            return (id,day)
+        })
         let approved=try mappings.map{try JSONSerialization.jsonObject(with:$0) as? [[String:Any]] ?? []} ?? []
         var links=[String:Set<String>]()
         for row in approved {
@@ -102,8 +111,12 @@ public enum N2VerifiedNursingWorkbook {
                     let unresolved=state.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
                     if let final=events.last {row["final"]=final.after}
                     if let reference=state.metadataEvents.last(where:{$0.code==code && N2SimpleInventory.day($0.at)<=end}),reference.verified {row["expiry"]=reference.next}
+                    let historicalInPeriod=state.historicalUses.contains { item in
+                        guard item.code==code,let day=visitDates[item.visitID] else{return false}
+                        return day>=start && day<=end
+                    }
                     if let opening,!unresolved,inRange.allSatisfy({$0.kind != "initial"}),
-                       !state.historicalUses.contains(where:{$0.code==code}) {
+                       !historicalInPeriod {
                         let receipts=inRange.filter{$0.kind=="receipt"}.reduce(0){$0+$1.delta}
                         var uses = -inRange.filter{$0.kind=="outflow"}.reduce(0){$0+$1.delta}
                         for incident in state.incidents where incident.code==code && incident.resolutionEventID != nil && N2SimpleInventory.day(incident.clinicalAt)>=start && N2SimpleInventory.day(incident.clinicalAt)<=end {
