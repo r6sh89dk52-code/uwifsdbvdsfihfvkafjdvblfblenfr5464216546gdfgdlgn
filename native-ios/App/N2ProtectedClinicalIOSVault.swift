@@ -156,6 +156,12 @@ actor N2ProtectedClinicalIOSVault {
         try protectedStore().correctWorker(dni:dni,worker:worker,
                                            at:at,expectedRevision:expectedRevision)
     }
+    func reviewAllergiesRevision(dni:String,status:String,substances:String,
+                        at:Int64,expectedRevision:Int)throws->Int {
+        try protectedStore().reviewAllergiesRevision(
+            dni:dni,status:status,substances:substances,
+            at:at,expectedRevision:expectedRevision)
+    }
     func reviewAllergies(dni:String,status:String,substances:String,
                         at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().reviewAllergies(dni:dni,status:status,
