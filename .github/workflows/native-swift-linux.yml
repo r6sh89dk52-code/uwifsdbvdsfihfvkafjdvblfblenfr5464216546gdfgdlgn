@@ -32,6 +32,9 @@ on:
   workflow_call:
 permissions:
   contents: read
+concurrency:
+  group: danper-swift-core-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   swift-core:
     runs-on: ubuntu-latest
