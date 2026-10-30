@@ -16,6 +16,24 @@ public struct N2SimpleCutPreview:Sendable,Equatable {
     public let evidenceSHA256:String?
 }
 extension N2SimpleInventory {
+    /// Clinical projection only; never changes the physical inventory ledger.
+    static func historicalOpeningOverrides(_ snapshot:Data)throws->[String:Double] {
+        let archived=Set(try read(snapshot).historicalUses.map{key($0.visitID,$0.itemID)})
+        let projected=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
+        let projectedVisits=try clinicalRows(object(projected))
+        var correctedR=[String:Double]()
+        for visit in projectedVisits {
+            guard let vid=visit["id"] as? String,let items=visit["items"] as? [[String:Any]]
+            else{continue}
+            for item in items {
+                guard let iid=item["id"] as? String,
+                      let value=item["correctedHistoricalR"] as? Int,
+                      [0,1].contains(value),archived.contains(key(vid,iid)) else{continue}
+                correctedR[key(vid,iid)]=Double(value)
+            }
+        }
+        return correctedR
+    }
     public static func cutPreview(snapshot:Data,code:String,through:String,
                                   catalog:N2NativeCatalogIndex,archive:N2VerifiedInventoryBackup?=nil)throws->N2SimpleCutPreview {
         guard validDay(through) else{throw N2SimpleInventoryError.invalidDate}
@@ -38,6 +56,10 @@ extension N2SimpleInventory {
         let visitsByID=Dictionary(uniqueKeysWithValues:visits.compactMap {v->(String,[String:Any])? in
             guard let id=v["id"] as? String else{return nil};return(id,v)
         })
+        let correctedR=try historicalOpeningOverrides(snapshot)
+        func effectiveR(_ h:N2SimpleHistoricalUse)->Double? {
+            correctedR[key(h.visitID,h.itemID)] ?? h.verifiedR
+        }
         let historical=s.historicalUses.filter {h in
             guard h.code==code,h.unit==p.unit,let v=visitsByID[h.visitID],let date=v["date"] as? String else{return false}
             return date>=period.start && date<=day(count.at)
@@ -63,8 +85,8 @@ extension N2SimpleInventory {
             guard archive.sourceSHA256==s.regime.sourceSHA256 || s.clinicalImports.contains(where:{$0.sourceSHA256==archive.sourceSHA256}) else {
                 throw N2SimpleInventoryError.sourceChanged
             }
-            incomplete=historical.contains{$0.verifiedR==nil || $0.sourceSHA256 != archive.sourceSHA256} || relevantIncidents.contains{$0.resolutionEventID==nil}
-            used+=historical.compactMap(\.verifiedR).reduce(0,+)
+            incomplete=historical.contains{effectiveR($0)==nil || $0.sourceSHA256 != archive.sourceSHA256} || relevantIncidents.contains{$0.resolutionEventID==nil}
+            used+=historical.compactMap(effectiveR).reduce(0,+)
             let old=try object(archive.snapshot)
             if isActive(archive.snapshot) {
                 let prior=try read(archive.snapshot)

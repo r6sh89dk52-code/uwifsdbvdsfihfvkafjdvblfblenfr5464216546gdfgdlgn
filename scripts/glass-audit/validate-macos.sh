@@ -6,8 +6,15 @@ cd "$(dirname "$0")/../.."
 mkdir -p "$DANPER_AUDIT_OUT"
 OUT="$DANPER_AUDIT_OUT"
 MODE="${1:-all}"
-DD="$OUT/DerivedData"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native; then
+if test "$MODE" = replay; then
+ case "${DANPER_REPLAY_LABEL:-}" in
+  N2BiometricInteractionTests|N3ClinicalJourneyTests-demo|N3ClinicalJourneyTests-protected) ;;
+  *) echo 'Invalid or absent replay suite'; exit 1 ;;
+ esac
+ printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
+fi
+DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -41,6 +48,14 @@ if test "$MODE" = resume-native; then
  node scripts/glass-audit/identity.cjs
  (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
 fi
+# Current-branch CI: run every simulator suite from this checkout, without
+# reusing earlier evidence or packaging. Swift/Excel gates run independently.
+if test "$MODE" = current || test "$MODE" = replay; then
+ git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
+ git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
+ xcodebuild -version > "$OUT/xcode-version.txt"
+ xcrun simctl list runtimes -j > "$OUT/runtimes.json"
+fi
 if test "$MODE" = scoped-native; then test "$(cat "$OUT/BUILD_SUCCESS_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 if test "$MODE" = ui; then test "$(cat "$OUT/CORE_NATIVE_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 # Never pick or erase an existing user's simulator.
@@ -55,6 +70,7 @@ print(r[0]['identifier'])
 PY
 )
 SIM_ID=''
+INSTALL_RECOVERY_SIM=''
 cleanup(){ if test -n "$SIM_ID"; then xcrun simctl shutdown "$SIM_ID" || true; xcrun simctl delete "$SIM_ID" || true; fi; }
 trap cleanup EXIT
 fresh(){
@@ -70,18 +86,74 @@ fresh(){
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
  bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1
 }
+# Install explicitly before XCTest asks Xcode to launch its runner. New CI
+# images can fail in Xcode's placeholder/delta installer before any test runs.
+# Only the just-created synthetic device is eligible; install errors stay fatal.
+prepare_test_installation(){
+ xcrun simctl list devices -j | python3 -c 'import json,sys
+rows=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["udid"]==sys.argv[1]]
+assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswith("DANPER-SYNTHETIC-")' "$SIM_ID" || return 1
+ local app bundle executable attempt status
+ for app in "$DD/Build/Products/Debug-iphonesimulator/DANPERNative.app" \
+            "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app"; do
+  test -d "$app" || return 1
+  bundle=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist") || return 1
+  if ! xcrun simctl get_app_container "$SIM_ID" "$bundle" app >/dev/null 2>&1; then
+   # Check the actual signed Simulator binary before diagnosing its installer.
+   codesign --verify --deep --strict "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
+   codesign --display --entitlements - "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
+   executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist") || return 1
+   xcrun lipo -archs "$app/$executable" >> "$OUT/simulator-signatures.log" || return 1
+   attempt="$OUT/install-$SIM_ID-$bundle.log"
+   status=0
+   xcrun simctl install "$SIM_ID" "$app" > "$attempt" 2>&1 || status=$?
+   cat "$attempt" >> "$OUT/simulator-installation.log"
+   if test "$status" != 0; then
+    # Recover one known, pre-test InstallCoordination failure. Never retry an
+    # XCTest assertion, erase data, alter entitlements, or inject authentication.
+    if test "$INSTALL_RECOVERY_SIM" = "$SIM_ID" ||
+       ! grep -q 'domain=IXErrorDomain, code=2' "$attempt" ||
+       ! grep -q 'Failed to create promise' "$attempt"; then
+     cat "$attempt"; return "$status"
+    fi
+    INSTALL_RECOVERY_SIM="$SIM_ID"
+    echo "RECOVERY: reboot owned synthetic Simulator after recorded IXErrorDomain code=2" | tee -a "$OUT/simulator-installation.log"
+    python3 - "$SIM_ID" "$OUT/installer-system-$SIM_ID.log" <<'PYINSTALL'
+import subprocess,sys
+try:
+ p=subprocess.run(['xcrun','simctl','spawn',sys.argv[1],'log','show','--last','3m','--style','compact',
+  '--predicate','process == "installd" OR process == "installcoordinationd"'],capture_output=True,text=True,timeout=30)
+ open(sys.argv[2],'w').write(p.stdout+p.stderr)
+except subprocess.TimeoutExpired:
+ open(sys.argv[2],'w').write('Installer diagnostic collection timed out; original install error preserved.\n')
+PYINSTALL
+    xcrun simctl shutdown "$SIM_ID" || return 1
+    xcrun simctl boot "$SIM_ID" || return 1
+    xcrun simctl bootstatus "$SIM_ID" -b || return 1
+    bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1 || return 1
+    bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1 || return 1
+    xcrun simctl install "$SIM_ID" "$app" >> "$OUT/simulator-installation.log" 2>&1 || {
+     cat "$OUT/simulator-installation.log"; return 1;
+    }
+   fi
+  fi
+  xcrun simctl get_app_container "$SIM_ID" "$bundle" app >> "$OUT/simulator-installation.log" || return 1
+ done
+}
 run_tests(){
  local label="$1" expected="$2" status=0 stream='' bridge=''; shift 2
+ echo "PHASE: $label — $expected required tests; no skips"
+ prepare_test_installation || return $?
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
-   xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \
-    --predicate 'subsystem BEGINSWITH "com.apple.LocalAuthentication" OR (process == "coreauthd" AND eventMessage CONTAINS "simulateMatching") OR (process == "DANPERNative" AND subsystem == "com.apple.UIKit" AND category == "Application")' > "$OUT/$label-system.log" 2>&1 & stream=$!
+   python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$OUT/$label-system.log" 2>&1 & stream=$!
    python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;
  esac
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
-  -derivedDataPath "$DD" -parallel-testing-enabled NO -resultBundlePath "$OUT/$label.xcresult" \
-  "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
+  -derivedDataPath "$DD" -parallel-testing-enabled NO -test-timeouts-enabled YES \
+  -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 -resultBundlePath "$OUT/$label.xcresult" \
+  ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
  if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
@@ -90,17 +162,19 @@ run_tests(){
 }
 if test "$MODE" != ui; then
  fresh native
- if test "$MODE" = resume-native; then
+ if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = replay; then
   # Compile for this actual Simulator architecture, not two unused slices.
   xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
-   ONLY_ACTIVE_ARCH=YES build-for-testing > "$OUT/build-for-testing.log" 2>&1
+   ONLY_ACTIVE_ARCH=YES ASSETCATALOG_COMPILER_APPICON_NAME="" build-for-testing > "$OUT/build-for-testing.log" 2>&1
  fi
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
- run_tests native-26 26 -only-testing:DANPERNativeTests
- git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
+ if test "$MODE" != replay; then
+  run_tests native-26 26 -only-testing:DANPERNativeTests
+  git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
+ fi
  if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
 fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
@@ -123,6 +197,7 @@ for p in sorted(Path('native-ios/InteractionTests').glob('*.swift')):
 PY
 overall=0
 while IFS=$'\t' read -r label count cls selectors; do
+ if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi
  fresh "$label"
  case "$label" in
   N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo)
@@ -136,6 +211,11 @@ import sys
 assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==11,'Review UI test inventory'
 PY
 test "$overall" = 0
+if test "$MODE" = replay; then
+ git rev-parse HEAD > "$OUT/REPLAY_PASS_SHA.txt"
+ echo "PASS: replay $DANPER_REPLAY_LABEL only; combined coverage must be verified before packaging."
+ exit 0
+fi
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
-echo 'PASS: 412 Swift, 26 native (23 original + 3 local greeting cases), all 11 UI, 50 JavaScript, 12 additional guards + 2 cross-workbook controls.'
+echo 'PASS: current checkout, 26 native and all 11 UI cases; no failures/skips. Core/Excel results are validated separately.'

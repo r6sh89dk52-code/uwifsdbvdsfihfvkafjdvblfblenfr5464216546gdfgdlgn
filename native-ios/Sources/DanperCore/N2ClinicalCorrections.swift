@@ -16,6 +16,10 @@ public struct N2CorrectionField:Sendable,Equatable {
     public let quantity:Int
     public let originalQuantity:Int
     public let procedure:String
+    /// Effective historical opening shown as one editable visit (0/1);
+    /// an older physical ledger remains outside the current counted stock.
+    public let historicalOpeningR:Int?
+    public let historicalOpeningEditable:Bool
 }
 public struct N2CorrectionDetail:Sendable {
     public let id:String
@@ -91,7 +95,8 @@ public enum N2ClinicalCorrections {
               changes.keys.allSatisfy({
                 editableText.contains($0) || editableBools.contains($0) ||
                 $0=="standaloneProcedures" || $0=="itemProcedures" ||
-                $0=="itemClinicalQuantities"
+                $0=="itemClinicalQuantities" ||
+                $0=="itemHistoricalOpenings"
               }) else{throw N2CorrectionError.invalidChanges}
         for (key,v) in changes {
             if editableText.contains(key) {
@@ -125,6 +130,29 @@ public enum N2ClinicalCorrections {
                         item["procedure"]=p
                     }
                     return item
+                }
+            }else if key=="itemHistoricalOpenings" {
+                guard let entries=v as? [String:Int],!entries.isEmpty,entries.count<=100,
+                      let items=next["items"] as? [[String:Any]],
+                      entries.values.allSatisfy({[0,1].contains($0)}) else {
+                    throw N2CorrectionError.invalidChanges
+                }
+                let allowed=Set(items.compactMap { item -> String? in
+                    guard let id=item["id"] as? String,
+                          let unit=item["unit"] as? String,
+                          N2SimpleInventory.suggestedMode(unit:unit) == .presentation
+                    else{return nil}
+                    return id
+                })
+                guard Set(entries.keys).isSubset(of:allowed) else {
+                    throw N2CorrectionError.invalidChanges
+                }
+                next["items"]=items.map { original in
+                    var row=original
+                    if let id=original["id"] as? String,let opening=entries[id] {
+                        row["correctedHistoricalR"]=opening
+                    }
+                    return row
                 }
             }else if key=="itemClinicalQuantities" {
                 guard let quantities=v as? [String:Int],
@@ -231,15 +259,25 @@ public enum N2ClinicalCorrections {
               let items=visit["items"] as? [[String:Any]] else{
             throw N2CorrectionError.invalidSnapshot
         }
+        let priorHistorical=N2SimpleInventory.isActive(snapshot)
+            ? (try N2SimpleInventory.read(snapshot).historicalUses)
+            : []
         let lines=try items.map{v -> N2CorrectionField in
             guard let id=v["id"] as? String,let code=v["code"] as? String,
                   let name=v["name"] as? String,let quantity=v["quantity"] as? Int else{
                 throw N2CorrectionError.invalidSnapshot
             }
             let corrected=v["correctedClinicalQuantity"] as? Int ?? quantity
+            let h=priorHistorical.first{$0.visitID==visitID && $0.itemID==id}
+            let eligible=h != nil &&
+                N2SimpleInventory.suggestedMode(unit:v["unit"] as? String ?? "") == .presentation
+            let recordedR=h?.verifiedR.flatMap{($0==0 || $0==1) ? Int($0):nil}
+            let effectiveR=(v["correctedHistoricalR"] as? Int) ?? recordedR
             return N2CorrectionField(id:id,code:code,name:name,
                 quantity:corrected,originalQuantity:quantity,
-                procedure:v["procedure"] as? String ?? "")
+                procedure:v["procedure"] as? String ?? "",
+                historicalOpeningR:eligible ? effectiveR:nil,
+                historicalOpeningEditable:eligible)
         }
         func s(_ key:String)->String{visit[key] as? String ?? ""}
         return N2CorrectionDetail(id:visitID,workerName:worker["name"] as? String ?? "",
@@ -424,6 +462,18 @@ public enum N2ClinicalCorrections {
                 throw N2CorrectionError.duplicateCorrection
             }
             return snapshot
+        }
+        // Only a genuine archived pre-count presentation may receive an
+        // opening correction. A live V2 dispense is never rewritten here.
+        if let openings=changes["itemHistoricalOpenings"] as? [String:Int] {
+            guard N2SimpleInventory.isActive(snapshot) else{
+                throw N2CorrectionError.invalidChanges
+            }
+            let archived=try N2SimpleInventory.read(snapshot).historicalUses
+            let eligible=Set(archived.filter{$0.visitID==visitID}.map(\.itemID))
+            guard !openings.isEmpty,Set(openings.keys).isSubset(of:eligible) else{
+                throw N2CorrectionError.invalidChanges
+            }
         }
         let before=current.rows[index]
         guard try digest(before)==expectedEffectiveSHA else{

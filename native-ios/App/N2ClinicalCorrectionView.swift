@@ -25,7 +25,10 @@ struct N2ClinicalCorrectionView:View {
     @State private var procedures=""
     @State private var itemProcedures=[String:String]()
     @State private var itemQuantities=[String:String]()
-    @State private var reason=""
+    @State private var itemHistoricalR=[String:String]()
+    // No mandatory reason entry: the correction ledger supplies a technical
+    // provenance label. The record remains one editable clinical visit.
+    @State private var reason="Actualización de atención por el responsable"
     @State private var discrepancy=""
     @State private var operatorName=N2ClinicianIdentity.name
     @State private var eventID=UUID().uuidString
@@ -53,7 +56,7 @@ struct N2ClinicalCorrectionView:View {
         itemQuantities.values.allSatisfy{
             if let q=Int($0) {return (1...100_000).contains(q)}
             return false
-        }
+        } && itemHistoricalR.values.allSatisfy{["","0","1"].contains($0)}
     }
 
     var body:some View {
@@ -119,8 +122,8 @@ struct N2ClinicalCorrectionView:View {
                 }
                 }
                 if let detail {
-                    DanperPanel("Medicamentos y consumos originales") {
-                        Text("Puedes corregir la cantidad documentada en la ficha clínica y el procedimiento. Los movimientos FEFO y Kardex R originales permanecen intactos; cualquier diferencia entre cantidad clínica y cantidad dispensada exige revisión antes del Excel oficial.")
+                    DanperPanel("Tratamientos y consumos de la atención") {
+                        Text("Edita los datos de esta única atención. La apertura R=0/1 de un insumo anterior al conteo puede corregirse sin descontar otra vez las existencias actuales.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(detail.medications,id:\.id){ item in
                             VStack(alignment:.leading,spacing:4) {
@@ -137,6 +140,18 @@ struct N2ClinicalCorrectionView:View {
                                     get:{itemProcedures[item.id] ?? item.procedure},
                                     set:{itemProcedures[item.id]=$0}
                                 ))
+                                if item.historicalOpeningEditable {
+                                    DanperChoiceField(
+                                        title:"Apertura histórica · R",
+                                        selection:Binding(
+                                            get:{itemHistoricalR[item.id] ?? item.historicalOpeningR.map(String.init) ?? ""},
+                                            set:{itemHistoricalR[item.id]=$0}
+                                        ),
+                                        options:["","0","1"],
+                                        labels:["":"Sin verificar","0":"R=0 · ya estaba abierto","1":"R=1 · abrí uno nuevo"]
+                                    )
+                                    .accessibilityIdentifier("correction-historical-r-"+item.id)
+                                }
                             }
                         }
                         DanperField(title:"Discrepancia de medicamento / dosis (opcional)") {
@@ -148,12 +163,10 @@ struct N2ClinicalCorrectionView:View {
                             .font(.caption).foregroundStyle(.orange)
                     }
                 }
-                DanperPanel("Auditoría obligatoria") {
-                    DanperField(title:"Motivo detallado de la rectificación") {
-                    TextField("Motivo detallado de la rectificación",text:$reason,
-                              axis:.vertical).lineLimit(2...5)
-                }
-                    LabeledContent("Responsable que rectifica",value:operatorName)
+                DanperPanel("Guardar cambios") {
+                    Text("No tienes que escribir un motivo. Se guardará la edición de esta atención sin crear otra ni cambiar el stock físico actual.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    LabeledContent("Responsable",value:operatorName)
                     LabeledContent("DNI del profesional",value:N2ClinicianIdentity.dni)
                     Button {
                         pendingConfirmation=true
@@ -243,11 +256,14 @@ struct N2ClinicalCorrectionView:View {
         let quantityFingerprint:String=itemQuantities.keys.sorted().map { id in
             id+"="+(itemQuantities[id] ?? "")
         }.joined(separator:"|")
+        let openingFingerprint:String=itemHistoricalR.keys.sorted().map { id in
+            id+"="+(itemHistoricalR[id] ?? "")
+        }.joined(separator:"|")
         let fields:[String]=[
             category,system,segment,diagnosis,permission,permissionTime,
             responsible,responsibleDni,workStatus,blueBandage.description,
             returned.description,photoSent.description,procedures,reason,
-            discrepancy,operatorName,procedureFingerprint,quantityFingerprint
+            discrepancy,operatorName,procedureFingerprint,quantityFingerprint,openingFingerprint
         ]
         return fields.joined(separator:"\u{001F}")
     }
@@ -274,6 +290,14 @@ struct N2ClinicalCorrectionView:View {
                 return (item.id,q)
             })
             if !corrected.isEmpty {packet["itemClinicalQuantities"]=corrected}
+            let historical=Dictionary(uniqueKeysWithValues:detail.medications.compactMap {
+                item -> (String,Int)? in
+                guard item.historicalOpeningEditable,
+                      let typed=itemHistoricalR[item.id],let value=Int(typed),
+                      value != item.historicalOpeningR else{return nil}
+                return (item.id,value)
+            })
+            if !historical.isEmpty {packet["itemHistoricalOpenings"]=historical}
         }
         return packet
     }
@@ -340,6 +364,10 @@ struct N2ClinicalCorrectionView:View {
                 d.medications.map{($0.id,$0.procedure)})
             itemQuantities=Dictionary(uniqueKeysWithValues:
                 d.medications.map{($0.id,String($0.quantity))})
+            itemHistoricalR=Dictionary(uniqueKeysWithValues:
+                d.medications.filter(\.historicalOpeningEditable).map{
+                    ($0.id,$0.historicalOpeningR.map(String.init) ?? "")
+                })
             if let pending=try await vault
                    .readPendingClinicalCorrection(visitID:visitID),
                let changes=try? JSONSerialization.jsonObject(
@@ -365,7 +393,11 @@ struct N2ClinicalCorrectionView:View {
                         itemQuantities[id]=String(q)
                     }
                 }
-                reason=pending.reason
+                if let historical=changes["itemHistoricalOpenings"] as? [String:Int] {
+                    for (id,r) in historical {itemHistoricalR[id]=String(r)}
+                }
+                reason=pending.reason.isEmpty
+                    ? "Actualización de atención por el responsable" : pending.reason
                 operatorName=pending.operatorName
                 discrepancy=pending.medicationDiscrepancy
                 lastDraftAt=pending.updatedAt

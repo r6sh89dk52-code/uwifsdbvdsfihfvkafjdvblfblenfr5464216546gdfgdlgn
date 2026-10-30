@@ -278,6 +278,209 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertTrue(sheet.contains("NO VERIFICADO"));XCTAssertFalse(sheet.contains("<f>D7+E7</f>"))
         XCTAssertEqual(try N2SimpleInventory.read(raw).products.first?.quantity,70)
     }
+    private func nursingSheet(_ raw:Data,start:String,end:String)throws->String {
+        let n=try object(fixture("n2-nursing-parity.json"))
+        let result=try N2VerifiedNursingWorkbook.exportRange(
+            snapshot:raw,catalog:JSONSerialization.data(withJSONObject:n["catalog"]!),
+            template:fixture("n1s-nursing-template-store.zip"),start:start,end:end,
+            responsible:"OPERADOR FICTICIO",mappings:fixture("n2-reviewed-approved.json"))
+        let entries=try N1rStoredZip.unpack(result.xlsx)
+        return try XCTUnwrap(String(data:XCTUnwrap(entries.first{$0.name=="xl/worksheets/sheet2.xml"}).data,encoding:.utf8))
+    }
+    private func cell(_ sheet:String,_ address:String)throws->String {
+        let regex=try NSRegularExpression(pattern:"<c\\b[^>]*\\br=\""+address+"\"[^>]*?(?:/>|>.*?</c>)")
+        let match=try XCTUnwrap(regex.firstMatch(in:sheet,range:NSRange(sheet.startIndex..<sheet.endIndex,in:sheet)))
+        return String(sheet[try XCTUnwrap(Range(match.range,in:sheet))])
+    }
+    func testEditedHistoricalContainerRChangesCutOnlyNotPhysicalStock()throws {
+        let old=try source()
+        let verified=try proof(old)
+        let raw=try N2SimpleInventory.activate(
+            snapshot:old,backup:verified,
+            request:N2SimpleActivation(
+                id:regimeID,at:at("2026-10-29"),
+                operatorName:"OPERADOR FICTICIO",confirmed:true,
+                backupAvailable:true,initialProducts:[
+                    product("16000013",quantity:5)
+                ]),
+            catalog:catalog())
+        let prior=try N2SimpleInventory.read(raw)
+        let detail=try N2ClinicalCorrections.detail(
+            snapshot:raw,visitID:"planta-open")
+        let med=try XCTUnwrap(detail.medications.first{$0.id=="box-2"})
+        XCTAssertTrue(med.historicalOpeningEditable)
+        XCTAssertEqual(med.historicalOpeningR,1)
+        let before=try N2SimpleInventory.cutPreview(
+            snapshot:raw,code:"16000013",through:"2026-10-29",
+            catalog:catalog(),archive:verified)
+        let patch=try bytes(["itemHistoricalOpenings":["box-2":0]])
+        let edited=try N2ClinicalCorrections.append(
+            snapshot:raw,eventID:"A40B0C2F-A1D4-42D1-AF31-A1D87DF065E9",
+            visitID:"planta-open",changes:patch,
+            reason:"Corrección histórica sin sustento escrito del usuario",
+            operatorName:"OPERADOR FICTICIO",medicationDiscrepancy:"",
+            expectedEffectiveSHA:detail.effectiveSHA256,at:at("2026-11-01"))
+        XCTAssertEqual(try N2SimpleInventory.read(edited),prior,
+            "A historical R override must not create any new stock movement")
+        let effective=try N2ClinicalCorrections.detail(
+            snapshot:edited,visitID:"planta-open")
+        XCTAssertEqual(effective.medications.first(where:{$0.id=="box-2"})?.historicalOpeningR,0)
+        XCTAssertFalse(try N2ClinicalCorrections.pendingDiscrepancies(edited).contains("planta-open"))
+        let after=try N2SimpleInventory.cutPreview(
+            snapshot:edited,code:"16000013",through:"2026-10-29",
+            catalog:catalog(),archive:verified)
+        XCTAssertEqual(before.currentStock,after.currentStock)
+        XCTAssertEqual(after.verifiedOutflows,before.verifiedOutflows-1)
+        XCTAssertNoThrow(try N2SimpleInventory.audit(edited))
+        XCTAssertEqual(try N2NativeSnapshotReader.read(edited).visits.filter{$0.id=="planta-open"}.count,1)
+        let oldSheet=try nursingSheet(raw,start:"2026-10-09",end:"2026-11-08")
+        let newSheet=try nursingSheet(edited,start:"2026-10-09",end:"2026-11-08")
+        // E-57 is row 63: the clinical R changes, while the counted final
+        // balance remains 5 and the unproven opening stays NO VERIFICADO.
+        XCTAssertTrue(try cell(oldSheet,"G63").contains("<v>1</v>"))
+        XCTAssertTrue(try cell(newSheet,"G63").contains("<v>0</v>"))
+        XCTAssertTrue(try cell(newSheet,"D63").contains("NO VERIFICADO"))
+        XCTAssertTrue(try cell(newSheet,"H63").contains("<v>5</v>"))
+        XCTAssertEqual(try cell(oldSheet,"H63"),try cell(newSheet,"H63"))
+        XCTAssertFalse(try cell(newSheet,"H63").contains("<f>"))
+        let plan=try object(fixture("n1s-indicator-plan.json"))
+        for (snapshot,expectedR) in [(raw,1),(edited,0)] {
+            let indicator=try N2VerifiedIndicatorWorkbook.export(snapshot:snapshot,
+                products:JSONSerialization.data(withJSONObject:plan["catalog"]!),
+                mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+                start:"2026-10-09",end:"2026-11-08",subdivision:"PLVENTUROSA",
+                selectedVisitIDs:["planta-open"],allowPending:true)
+            XCTAssertEqual(indicator.visits,1);XCTAssertEqual(indicator.rows,1)
+            let parts=try N1rStoredZip.unpack(indicator.xlsx)
+            let consumption=try XCTUnwrap(String(data:XCTUnwrap(parts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,encoding:.utf8))
+            XCTAssertTrue(try cell(consumption,"R2").contains("<v>\(expectedR)</v>"))
+        }
+        XCTAssertEqual(try N2SimpleInventory.read(edited),prior)
+        let unallowed=try bytes(["itemHistoricalOpenings":["unit-5":0]])
+        XCTAssertThrowsError(try N2ClinicalCorrections.append(
+            snapshot:edited,eventID:"1923B0DE-1FAD-4D78-B983-909E62F31235",
+            visitID:"planta-open",changes:unallowed,
+            reason:"Cambio histórico de unidad no permitido",
+            operatorName:"OPERADOR FICTICIO",medicationDiscrepancy:"",
+            expectedEffectiveSHA:effective.effectiveSHA256,at:at("2026-11-02")))
+    }
+
+    func testBuild13CountedVaultReopensAndHistoricalRRoundTripsWithoutPhysicalDebit()throws {
+        // Build 13 uses the same v2 activation, journal and backup codecs.
+        // The release gate verifies those files byte-for-byte against Build 13.
+        let old=try source()
+        var raw=try N2SimpleInventory.activate(snapshot:old,backup:proof(old),
+            request:activation(products:[product(),product("16000013",quantity:5),product("16000025",quantity:12)]),catalog:catalog())
+        raw=try N2SimpleInventory.apply(command(.receipt,quantity:4),to:raw,catalog:catalog())
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,
+            visit:visit(raw,id:"NEW-AFTER-COUNT",quantity:2,day:"2026-11-18"),at:at("2026-11-18")).snapshot
+        let physical=try N2SimpleInventory.read(raw),original=try object(raw)
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-build13-upgrade-"+UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:folder)}
+        let secret=Data(repeating:53,count:32)
+        let oldJournal=try N2EncryptedClinicalJournal(directory:folder,secret:secret)
+        _=try oldJournal.commit(raw,expectedRevision:0)
+        let files=try FileManager.default.contentsOfDirectory(at:folder,includingPropertiesForKeys:nil)
+        let before=try files.map{try Data(contentsOf:$0)}
+        let upgraded=try N2EncryptedClinicalJournal(directory:folder,secret:secret)
+        XCTAssertEqual(try upgraded.recover()?.snapshot,raw)
+        XCTAssertEqual(try files.map{try Data(contentsOf:$0)},before,"Opening the app must not rewrite the existing vault")
+        var revision=1
+        for r in [0,1] {
+            let detail=try N2ClinicalCorrections.detail(snapshot:raw,visitID:"planta-open")
+            raw=try N2ClinicalCorrections.append(snapshot:raw,eventID:UUID().uuidString,
+                visitID:"planta-open",changes:bytes(["itemHistoricalOpenings":["box-2":r]]),
+                reason:"Rectificación histórica automática R",operatorName:"OPERADOR FICTICIO",
+                medicationDiscrepancy:"",expectedEffectiveSHA:detail.effectiveSHA256,at:at("2026-11-19"))
+            _=try upgraded.commit(raw,expectedRevision:revision);revision+=1
+            raw=try XCTUnwrap(N2EncryptedClinicalJournal(directory:folder,secret:secret).recover()).snapshot
+            XCTAssertEqual(try N2SimpleInventory.read(raw),physical)
+            let detailAfter=try N2ClinicalCorrections.detail(snapshot:raw,visitID:"planta-open")
+            XCTAssertEqual(detailAfter.medications.first{$0.id=="box-2"}?.historicalOpeningR,r)
+            XCTAssertGreaterThan(try XCTUnwrap(detailAfter.medications.first{$0.id=="box-2"}).quantity,0,
+                "R=0 must retain the administered clinical quantity")
+            let sheet=try nursingSheet(raw,start:"2026-10-09",end:"2026-11-08")
+            XCTAssertTrue(try cell(sheet,"G63").contains("<v>\(r)</v>"))
+            XCTAssertEqual(try N2NativeSnapshotReader.read(raw).visits.filter{$0.id=="planta-open"}.count,1)
+        }
+        let backup=try proof(raw)
+        XCTAssertEqual(backup.snapshot,raw)
+        XCTAssertEqual(try N2SimpleInventory.read(backup.snapshot),physical)
+        let restored=try object(backup.snapshot)
+        for key in ["workers","attentions","simpleInventory","stockMovements","stockLots"] {
+            XCTAssertEqual(try JSONSerialization.data(withJSONObject:restored[key]!,options:.sortedKeys),
+                           try JSONSerialization.data(withJSONObject:original[key]!,options:.sortedKeys),key)
+        }
+        XCTAssertEqual(try N2ClinicalCorrections.history(snapshot:raw,visitID:"planta-open").count,2)
+    }
+
+    func testNextPeriodNursingOpeningSurvivesOlderHistoricalClinicalUses()throws {
+        // Historical visits occur in October. The physical count is 15 Nov.
+        // It cannot prove the opening of 9 Nov, but it establishes a reliable
+        // balance for a later period starting 9 Dec (without intervening moves).
+        let raw=try active()
+        let n=try object(fixture("n2-nursing-parity.json"))
+        let template=try fixture("n1s-nursing-template-store.zip")
+        let catalogData=try JSONSerialization.data(withJSONObject:n["catalog"]!)
+        let mapping=try fixture("n2-reviewed-approved.json")
+        let before=try N2SimpleInventory.read(raw)
+        let first=try N2VerifiedNursingWorkbook.exportRange(
+            snapshot:raw,catalog:catalogData,template:template,
+            start:"2026-11-09",end:"2026-11-16",
+            responsible:"OPERADOR FICTICIO",mappings:mapping)
+        XCTAssertEqual(first.stockKnownRows,0,
+            "A late-November count must not certify November 9 retroactively")
+        let next=try N2VerifiedNursingWorkbook.exportRange(
+            snapshot:raw,catalog:catalogData,template:template,
+            start:"2026-12-09",end:"2026-12-16",
+            responsible:"OPERADOR FICTICIO",mappings:mapping)
+        XCTAssertGreaterThan(next.stockKnownRows,0,
+            "October clinical evidence must not block verified December openings")
+        XCTAssertEqual(try N2SimpleInventory.read(raw),before,
+            "Export must never change physical inventory")
+    }
+
+    func testUnknownHistoricalOpeningDoesNotInventConsumptionOrOpeningInExcel()throws {
+        let empty=try source(empty:true)
+        let old=try N2PreSimpleClinicalTransaction.save(snapshot:empty,
+            visit:visit(empty,code:"16000013",day:"2026-10-14"),at:at("2026-10-14")).snapshot
+        let raw=try N2SimpleInventory.activate(snapshot:old,backup:proof(old),
+            request:N2SimpleActivation(id:regimeID,at:at("2026-10-29"),
+                operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,
+                initialProducts:[product("16000013",quantity:5)]),catalog:catalog())
+        XCTAssertNil(try N2SimpleInventory.read(raw).historicalUses.first?.verifiedR)
+        let sheet=try nursingSheet(raw,start:"2026-10-09",end:"2026-11-08")
+        XCTAssertTrue(try cell(sheet,"D63").contains("NO VERIFICADO"))
+        XCTAssertFalse(try cell(sheet,"G63").contains("<v>"))
+        XCTAssertTrue(try cell(sheet,"H63").contains("<v>5</v>"))
+        XCTAssertEqual(try N2SimpleInventory.read(raw).products.first?.quantity,5)
+    }
+
+    func testNursingBalancesContinueAcrossNinthDayWithReceiptsAndOutflows()throws {
+        let old=try source()
+        var raw=try N2SimpleInventory.activate(snapshot:old,backup:proof(old),
+            request:N2SimpleActivation(id:regimeID,at:at("2026-10-29"),
+                operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,
+                initialProducts:[product()]),catalog:catalog())
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,
+            visit:visit(raw,id:"BEFORE-CUT",quantity:3,day:"2026-12-08"),at:at("2026-12-08")).snapshot
+        raw=try N2SimpleInventory.apply(command(.receipt,quantity:5,time:at("2026-12-09")),to:raw,catalog:catalog())
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,
+            visit:visit(raw,id:"AFTER-CUT",quantity:2,day:"2026-12-09"),at:at("2026-12-09","19:00:00")).snapshot
+        let before=try N2SimpleInventory.read(raw)
+        let first=try nursingSheet(raw,start:"2026-11-09",end:"2026-12-08")
+        let second=try nursingSheet(raw,start:"2026-12-09",end:"2027-01-08")
+        // E-22 / row 28. The 8th closes at 67; the 9th opens at 67.
+        XCTAssertTrue(try cell(first,"D28").contains("<v>70</v>"))
+        XCTAssertTrue(try cell(first,"G28").contains("<v>3</v>"))
+        XCTAssertTrue(try cell(first,"H28").contains("<v>67</v>"))
+        XCTAssertTrue(try cell(second,"D28").contains("<v>67</v>"))
+        XCTAssertTrue(try cell(second,"E28").contains("<v>5</v>"))
+        XCTAssertTrue(try cell(second,"G28").contains("<v>2</v>"))
+        XCTAssertTrue(try cell(second,"H28").contains("<v>70</v>"))
+        XCTAssertEqual(try N2SimpleInventory.read(raw),before)
+    }
+
     func testFormDraftRecoversExplicitRWithoutAnyLegacyPhysicalSelection()throws {
         let raw=try active(source:source(empty:true)),context=try N2NativeFormContextReader.read(snapshot:raw,revision:1,products:catalog())
         XCTAssertEqual(context.inventorySchemaVersion,2)
