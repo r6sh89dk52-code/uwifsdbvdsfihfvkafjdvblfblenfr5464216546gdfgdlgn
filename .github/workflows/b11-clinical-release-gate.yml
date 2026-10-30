@@ -16,7 +16,7 @@ concurrency:
 jobs:
   verified-evidence:
     if: github.head_ref == 'fix/kardex-opening-history-build14-20261029' || github.ref == 'refs/heads/fix/kardex-opening-history-build14-20261029'
-    name: Verify immutable 417 Swift, Excel, Xcode, 26 native and 7 UI results
+    name: Verify immutable 417 Swift, Excel, Xcode, 26 native and 9 UI results
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -24,20 +24,20 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-      - name: Recover original Linux evidence
+      - name: Recover immutable proof of completed Swift, native and seven UI suites
         uses: actions/download-artifact@v4
         with:
-          name: B14_LINUX_SWIFT_EXCEL_DIAGNOSTICS
-          run-id: 41003061702
+          name: B14_BASELINE_PROOF
+          run-id: 41067439602
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/b14-baseline/linux
-      - name: Recover original simulator results, including the failed biometric case
+          path: ${{ runner.temp }}/b14-baseline/proof
+      - name: Recover the two newly-passed N3 demo cases
         uses: actions/download-artifact@v4
         with:
-          name: B11_MACOS_XCODE_DIAGNOSTICS_ONLY
-          run-id: 41003061702
+          name: B14_REPLAY_RESULT_N3ClinicalJourneyTests-demo
+          run-id: 41067439602
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/b14-baseline/macos
+          path: ${{ runner.temp }}/b14-baseline/demo
       - name: Require unchanged application and test inputs; retain actual failure
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [N2BiometricInteractionTests, N3ClinicalJourneyTests-demo, N3ClinicalJourneyTests-protected]
+        suite: [N2BiometricInteractionTests, N3ClinicalJourneyTests-protected]
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       DANPER_REPLAY_LABEL: ${{ matrix.suite }}

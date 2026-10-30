@@ -27,7 +27,7 @@ def main():
  info=plistlib.loads(runner_info.read_bytes());bundle_id=info['CFBundleIdentifier']
  assert 'interactiontests' in bundle_id.lower() and bundle_id.startswith('pe.danper.saludmovil.native.iloaderpreview.')
  print('RUNNER_BUNDLE',bundle_id,flush=True)
- container=None;probe=0;offset=0;pending=b'';seen=set();state=SensorReadiness()
+ container=None;probe=0;offset=0;pending=b'';seen=set();observed=set();last_error=None;state=SensorReadiness()
  while True:
   if log.exists():
    with log.open('rb') as f:f.seek(offset);pending+=f.read();offset=f.tell()
@@ -36,21 +36,31 @@ def main():
     event=state.observe(raw.decode('utf-8',errors='replace'))
     if event:print(*event,flush=True)
   now=time.monotonic()
-  if container is None and now>=probe:
+  # XCTest may replace the explicitly preinstalled runner's data container.
+  # Resolve its active registration throughout the test, not just before launch.
+  if now>=probe:
    probe=now+2
    r=subprocess.run(['xcrun','simctl','get_app_container',sim,bundle_id,'data'],capture_output=True,text=True)
    if r.returncode==0:
-    container=Path(r.stdout.strip())/'Documents/DANPER_BIOMETRIC_READY'
-    print('RUNNER_CONTAINER_FOUND',flush=True)
-  if container is not None and state.ready:
+    active=Path(r.stdout.strip())/'Documents/DANPER_BIOMETRIC_READY'
+    if active!=container:
+     container=active
+     print('RUNNER_CONTAINER_ACTIVE',str(container),flush=True)
+  if container is not None:
    try:
     value=json.loads((container/'request.json').read_text());nonce=value['id'];minimum=value['minimumGeneration']
     assert re.fullmatch('[0-9A-Fa-f-]{36}',nonce) and value['event'] in ('match','nomatch') and isinstance(minimum,int) and minimum>0
+    last_error=None
+    if nonce not in observed:
+     observed.add(nonce);print('REQUEST_OBSERVED',nonce,value['event'],minimum,flush=True)
     if nonce not in seen and state.permits(minimum):
      ack={'id':nonce,'event':value['event'],'ready':True,'generation':state.generation,'sensorActiveAt':state.ready_stamp,'clientContextAt':state.begin_stamp,'noAuthenticationInjected':True}
      tmp=container/'ready.pending';tmp.write_text(json.dumps(ack));tmp.replace(container/'ready.json');seen.add(nonce)
      print('READY_ACK',json.dumps(ack),flush=True)
-   except (OSError,ValueError,KeyError,AssertionError):pass
+   except (OSError,ValueError,KeyError,AssertionError) as error:
+    detail=(str(container),type(error).__name__,str(error))
+    if detail!=last_error:
+     print('REQUEST_NOT_READABLE',*detail,flush=True);last_error=detail
   time.sleep(0.1)
 
 if __name__=='__main__':main()

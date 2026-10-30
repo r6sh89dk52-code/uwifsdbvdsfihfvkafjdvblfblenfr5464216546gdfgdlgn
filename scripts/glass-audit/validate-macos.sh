@@ -70,6 +70,7 @@ print(r[0]['identifier'])
 PY
 )
 SIM_ID=''
+INSTALL_RECOVERY_SIM=''
 cleanup(){ if test -n "$SIM_ID"; then xcrun simctl shutdown "$SIM_ID" || true; xcrun simctl delete "$SIM_ID" || true; fi; }
 trap cleanup EXIT
 fresh(){
@@ -91,21 +92,58 @@ fresh(){
 prepare_test_installation(){
  xcrun simctl list devices -j | python3 -c 'import json,sys
 rows=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["udid"]==sys.argv[1]]
-assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswith("DANPER-SYNTHETIC-")' "$SIM_ID"
+assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswith("DANPER-SYNTHETIC-")' "$SIM_ID" || return 1
+ local app bundle executable attempt status
  for app in "$DD/Build/Products/Debug-iphonesimulator/DANPERNative.app" \
             "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app"; do
-  test -d "$app"
-  bundle=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
+  test -d "$app" || return 1
+  bundle=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist") || return 1
   if ! xcrun simctl get_app_container "$SIM_ID" "$bundle" app >/dev/null 2>&1; then
-   xcrun simctl install "$SIM_ID" "$app" >> "$OUT/simulator-installation.log" 2>&1
+   # Check the actual signed Simulator binary before diagnosing its installer.
+   codesign --verify --deep --strict "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
+   codesign --display --entitlements - "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
+   executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist") || return 1
+   xcrun lipo -archs "$app/$executable" >> "$OUT/simulator-signatures.log" || return 1
+   attempt="$OUT/install-$SIM_ID-$bundle.log"
+   status=0
+   xcrun simctl install "$SIM_ID" "$app" > "$attempt" 2>&1 || status=$?
+   cat "$attempt" >> "$OUT/simulator-installation.log"
+   if test "$status" != 0; then
+    # Recover one known, pre-test InstallCoordination failure. Never retry an
+    # XCTest assertion, erase data, alter entitlements, or inject authentication.
+    if test "$INSTALL_RECOVERY_SIM" = "$SIM_ID" ||
+       ! grep -q 'domain=IXErrorDomain, code=2' "$attempt" ||
+       ! grep -q 'Failed to create promise' "$attempt"; then
+     cat "$attempt"; return "$status"
+    fi
+    INSTALL_RECOVERY_SIM="$SIM_ID"
+    echo "RECOVERY: reboot owned synthetic Simulator after recorded IXErrorDomain code=2" | tee -a "$OUT/simulator-installation.log"
+    python3 - "$SIM_ID" "$OUT/installer-system-$SIM_ID.log" <<'PYINSTALL'
+import subprocess,sys
+try:
+ p=subprocess.run(['xcrun','simctl','spawn',sys.argv[1],'log','show','--last','3m','--style','compact',
+  '--predicate','process == "installd" OR process == "installcoordinationd"'],capture_output=True,text=True,timeout=30)
+ open(sys.argv[2],'w').write(p.stdout+p.stderr)
+except subprocess.TimeoutExpired:
+ open(sys.argv[2],'w').write('Installer diagnostic collection timed out; original install error preserved.\n')
+PYINSTALL
+    xcrun simctl shutdown "$SIM_ID" || return 1
+    xcrun simctl boot "$SIM_ID" || return 1
+    xcrun simctl bootstatus "$SIM_ID" -b || return 1
+    bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1 || return 1
+    bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1 || return 1
+    xcrun simctl install "$SIM_ID" "$app" >> "$OUT/simulator-installation.log" 2>&1 || {
+     cat "$OUT/simulator-installation.log"; return 1;
+    }
+   fi
   fi
-  xcrun simctl get_app_container "$SIM_ID" "$bundle" app >> "$OUT/simulator-installation.log"
+  xcrun simctl get_app_container "$SIM_ID" "$bundle" app >> "$OUT/simulator-installation.log" || return 1
  done
 }
 run_tests(){
  local label="$1" expected="$2" status=0 stream='' bridge=''; shift 2
  echo "PHASE: $label — $expected required tests; no skips"
- prepare_test_installation
+ prepare_test_installation || return $?
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
    xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \

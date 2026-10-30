@@ -17,11 +17,18 @@ ALLOWED_CHANGES = {
     '.github/workflows/b11-clinical-release-gate.yml',
     'scripts/glass-audit/validate-macos.sh',
     'scripts/glass-audit/resume-build14.py',
+    # Only the failed/missing authenticated cases use this host-side bridge.
+    # Their actual Swift assertions still have to pass in the replay jobs.
+    'scripts/glass-audit/simulator-ready-bridge.py',
 }
-REUSED_UI = {'N2Build222ShellTests': 1, 'N2GlassClinicalTests': 3,
+BASE_UI = {'N2Build222ShellTests': 1, 'N2GlassClinicalTests': 3,
              'N2MenuInteractionTests': 1, 'N2PremiumRedesignTests': 2}
-REPLAY_UI = {'N2BiometricInteractionTests': 1, 'N3ClinicalJourneyTests-demo': 2,
-             'N3ClinicalJourneyTests-protected': 1}
+PROOF_RUN = 41067439602
+PROOF_SHA = '122b5ac82f42a62fc7faa15210c96ce6b20ddf7c'
+PROOF_ARTIFACT = 12982946604
+DEMO_ARTIFACT = 12984099322
+REUSED_UI = {**BASE_UI, 'N3ClinicalJourneyTests-demo': 2}
+REPLAY_UI = {'N2BiometricInteractionTests': 1, 'N3ClinicalJourneyTests-protected': 1}
 
 
 def git(*args):
@@ -66,34 +73,49 @@ def api(path):
 
 def baseline(root, out):
     head, digest = seal()
-    run = api('actions/runs/' + str(RUN))
-    assert run['head_sha'] == BASE and run['status'] == 'completed' and run['conclusion'] == 'failure'
-    artifacts = api('actions/runs/' + str(RUN) + '/artifacts')['artifacts']
-    assert ARTIFACTS <= {a['id'] for a in artifacts if not a['expired']}
-    jobs = api('actions/runs/' + str(RUN) + '/jobs')['jobs']
-    assert any(j['id'] == 123891957933 and j['conclusion'] == 'success' for j in jobs)
-    source = one(root, 'SOURCE_SHA.txt')
-    assert source.read_text().strip() == BASE
-    log = one(root, 'b11-linux-swift-test.log').read_text()
-    assert re.search(r'Executed 417 tests, with 0 failures \(0 unexpected\)', log)
-    assert not re.search(r'\b[1-9]\d* (?:tests? skipped|failures?)\b', log)
-    assert '** BUILD SUCCEEDED **' in one(root, 'b11-ios-compile.log').read_text()
-    evidence = source.parent
-    results = {label: passing(evidence, label, count) for label, count in REUSED_UI.items()}
+    subprocess.run(['git', 'merge-base', '--is-ancestor', PROOF_SHA, head], check=True)
+    run = api('actions/runs/' + str(PROOF_RUN))
+    assert run['head_sha'] == PROOF_SHA and run['status'] == 'completed' and run['conclusion'] == 'failure'
+    artifacts = api('actions/runs/' + str(PROOF_RUN) + '/artifacts')['artifacts']
+    assert {PROOF_ARTIFACT, DEMO_ARTIFACT} <= {a['id'] for a in artifacts if not a['expired']}
+    jobs = api('actions/runs/' + str(PROOF_RUN) + '/jobs')['jobs']
+    for job in (124102449939, 124102981421):
+        assert any(j['id'] == job and j['conclusion'] == 'success' for j in jobs)
+    prior = json.loads(one(root, 'BASELINE_PROOF.json').read_text())
+    assert prior['sourceSHA'] == PROOF_SHA and prior['baselineSHA'] == BASE and prior['baselineRun'] == RUN
+    assert set(prior['baselineArtifacts']) == ARTIFACTS
+    assert prior['swiftTests'] == 417 and prior['native']['count'] == 26
+    assert {k: v['count'] for k, v in prior['reusedUI'].items()} == BASE_UI
+    assert prior['priorRunPassed'] is False and prior['priorBiometricFailure']
+    # Verify the seal produced by the already-passing predecessor verifier.
+    # That verifier did not exclude the then-unchanged host readiness bridge.
+    original_allow = ALLOWED_CHANGES - {'scripts/glass-audit/simulator-ready-bridge.py'}
+    entries = subprocess.check_output(['git', 'ls-tree', '-rz', BASE]).split(b'\0')
+    retained = [e for e in entries if e and e.split(b'\t', 1)[1].decode() not in original_allow]
+    assert prior['testedInputsSHA256'] == hashlib.sha256(b'\0'.join(retained)).hexdigest()
+    original = api('actions/runs/' + str(RUN))
+    assert original['head_sha'] == BASE and original['conclusion'] == 'failure'
+    original_jobs = api('actions/runs/' + str(RUN) + '/jobs')['jobs']
+    assert any(j['id'] == 123891957933 and j['conclusion'] == 'success' for j in original_jobs)
+    demo_source = one(root, 'SOURCE_SHA.txt')
+    assert demo_source.read_text().strip() == PROOF_SHA
+    evidence = demo_source.parent
+    assert one(evidence, 'REPLAY_LABEL.txt').read_text().strip() == 'N3ClinicalJourneyTests-demo'
+    assert one(evidence, 'REPLAY_PASS_SHA.txt').read_text().strip() == PROOF_SHA
     passing(evidence, 'biometric-preflight', 1)
-    native = passing(evidence, 'native-26', 26)
-    # A known failed test must be recorded and rerun, never certified by reuse.
-    failed = json.loads(one(evidence, 'N2BiometricInteractionTests.xcresult.summary.json').read_text())
-    assert failed['totalTestCount'] == 1 and failed['failedTests'] == 1
-    assert any('Esperar al sensor REAL' in f['failureText'] for f in failed['testFailures'])
+    passing(evidence, 'seed-N3ClinicalJourneyTests-demo', 2)
+    results = dict(prior['reusedUI'])
+    results['N3ClinicalJourneyTests-demo'] = passing(evidence, 'N3ClinicalJourneyTests-demo', 2)
     proof = {'sourceSHA': head, 'baselineSHA': BASE, 'baselineRun': RUN,
              'baselineArtifacts': sorted(ARTIFACTS), 'testedInputsSHA256': digest,
-             'swiftTests': 417, 'native': native, 'reusedUI': results,
-             'mustReplay': REPLAY_UI, 'priorBiometricFailure': failed['testFailures'],
+             'proofRun': PROOF_RUN, 'proofSHA': PROOF_SHA,
+             'proofArtifact': PROOF_ARTIFACT, 'demoArtifact': DEMO_ARTIFACT,
+             'swiftTests': 417, 'native': prior['native'], 'reusedUI': results,
+             'mustReplay': REPLAY_UI, 'priorBiometricFailure': prior['priorBiometricFailure'],
              'priorRunPassed': False}
     Path(out).mkdir(parents=True, exist_ok=True)
     Path(out, 'BASELINE_PROOF.json').write_text(json.dumps(proof, indent=2))
-    print('PASS: 417 Swift, Xcode, 26 native and 7 UI reused from immutable evidence; 4 UI still required.')
+    print('PASS: verified chain of 417 Swift, Xcode, 26 native and 9 UI; 2 authenticated UI still required.')
 
 
 def final(root, out):
@@ -119,7 +141,7 @@ def final(root, out):
     Path(out, 'ALL_GATES.json').write_text(json.dumps({
         'sourceSHA': head, 'baselineSHA': BASE, 'baselineRun': RUN,
         'swift': 417, 'native': 26, 'ui': covered, 'failures': 0, 'skips': 0,
-        'priorBiometricFailureReplayed': True,
+        'priorBiometricFailureReplayed': True, 'proofRun': proof['proofRun'],
         'testedInputsSHA256': digest}, indent=2))
     Path(out, 'VALIDATED_SHA.txt').write_text(head + '\n')
     print('PASS: combined coverage 417 Swift, 26 native, all 11 UI; no failures/skips. IPA gate unlocked.')
