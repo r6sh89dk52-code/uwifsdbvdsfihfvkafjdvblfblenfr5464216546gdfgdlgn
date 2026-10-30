@@ -6,8 +6,15 @@ cd "$(dirname "$0")/../.."
 mkdir -p "$DANPER_AUDIT_OUT"
 OUT="$DANPER_AUDIT_OUT"
 MODE="${1:-all}"
+if test "$MODE" = replay; then
+ case "${DANPER_REPLAY_LABEL:-}" in
+  N2BiometricInteractionTests|N3ClinicalJourneyTests-demo|N3ClinicalJourneyTests-protected) ;;
+  *) echo 'Invalid or absent replay suite'; exit 1 ;;
+ esac
+ printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
+fi
 DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current; then
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -43,7 +50,7 @@ if test "$MODE" = resume-native; then
 fi
 # Current-branch CI: run every simulator suite from this checkout, without
 # reusing earlier evidence or packaging. Swift/Excel gates run independently.
-if test "$MODE" = current; then
+if test "$MODE" = current || test "$MODE" = replay; then
  git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
  git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
  xcodebuild -version > "$OUT/xcode-version.txt"
@@ -97,6 +104,7 @@ assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswit
 }
 run_tests(){
  local label="$1" expected="$2" status=0 stream='' bridge=''; shift 2
+ echo "PHASE: $label — $expected required tests; no skips"
  prepare_test_installation
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
@@ -106,7 +114,8 @@ run_tests(){
  esac
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
-  -derivedDataPath "$DD" -parallel-testing-enabled NO -resultBundlePath "$OUT/$label.xcresult" \
+  -derivedDataPath "$DD" -parallel-testing-enabled NO -test-timeouts-enabled YES \
+  -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 -resultBundlePath "$OUT/$label.xcresult" \
   ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
  if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
@@ -116,7 +125,7 @@ run_tests(){
 }
 if test "$MODE" != ui; then
  fresh native
- if test "$MODE" = resume-native || test "$MODE" = current; then
+ if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = replay; then
   # Compile for this actual Simulator architecture, not two unused slices.
   xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
@@ -125,8 +134,10 @@ if test "$MODE" != ui; then
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
- run_tests native-26 26 -only-testing:DANPERNativeTests
- git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
+ if test "$MODE" != replay; then
+  run_tests native-26 26 -only-testing:DANPERNativeTests
+  git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
+ fi
  if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
 fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
@@ -149,6 +160,7 @@ for p in sorted(Path('native-ios/InteractionTests').glob('*.swift')):
 PY
 overall=0
 while IFS=$'\t' read -r label count cls selectors; do
+ if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi
  fresh "$label"
  case "$label" in
   N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo)
@@ -162,6 +174,11 @@ import sys
 assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==11,'Review UI test inventory'
 PY
 test "$overall" = 0
+if test "$MODE" = replay; then
+ git rev-parse HEAD > "$OUT/REPLAY_PASS_SHA.txt"
+ echo "PASS: replay $DANPER_REPLAY_LABEL only; combined coverage must be verified before packaging."
+ exit 0
+fi
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
 echo 'PASS: current checkout, 26 native and all 11 UI cases; no failures/skips. Core/Excel results are validated separately.'

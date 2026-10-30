@@ -1,13 +1,5 @@
-name: B14 - Clinical Parity Gate and gated iLoader IPA
+name: B14 - resume verified gates and iLoader IPA
 on:
-  push:
-    branches:
-      - fix/b10-trabajadores-exportacion-ux-20261018
-    paths:
-      - 'native-ios/**'
-      - 'scripts/**'
-      - 'src/portableBackup.ts'
-      - '.github/workflows/b11-clinical-release-gate.yml'
   pull_request:
     paths:
       - 'native-ios/**'
@@ -15,148 +7,62 @@ on:
       - 'src/portableBackup.ts'
       - '.github/workflows/b11-clinical-release-gate.yml'
   workflow_dispatch:
-
 permissions:
   contents: read
-
+  actions: read
 concurrency:
-  group: b11-clinical-parity-${{ github.ref }}
+  group: b14-resume-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
-
 jobs:
-  linux-swift:
-    name: Swift core and synthetic clinical regression
+  verified-evidence:
+    if: github.head_ref == 'fix/kardex-opening-history-build14-20261029' || github.ref == 'refs/heads/fix/kardex-opening-history-build14-20261029'
+    name: Verify immutable 417 Swift, Excel, Xcode, 26 native and 7 UI results
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
+          fetch-depth: 0
+      - name: Recover original Linux evidence
+        uses: actions/download-artifact@v4
         with:
-          node-version: '22'
-          cache: npm
-      - name: Install dependencies and inspect static clinical gates
-        run: |
-          npm ci --ignore-scripts --no-fund
-          node scripts/audit-n2-workspace-routing.cjs
-          node scripts/audit-n2-personal-import.cjs
-          node scripts/audit-n2-build222-backup-restore.cjs
-          node scripts/audit-n2-joint-indicator.cjs
-      - name: Generate synthetic fixture source only (never personal data)
-        run: |
-          mkdir -p "$RUNNER_TEMP/danper-b11-fixtures"
-          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-b11-fixtures" >> "$GITHUB_ENV"
-          for generator in \
-            generate-native-compat-fixtures.cjs \
-            generate-n1e-clinical-fixtures.cjs \
-            generate-n1f-lossless-fixtures.cjs \
-            generate-n1h-clinical-parity.cjs \
-            generate-n1p-excel-parity.cjs \
-            generate-n1q-reconciliation-fixtures.cjs \
-            generate-n1r-stored-xlsx-template.cjs \
-            generate-n1s-official-excel-fixtures.cjs \
-            generate-n2-approved-fixture.cjs \
-            generate-n2-nursing-parity.cjs \
-            generate-n2-stock-commands-fixtures.cjs; do
-            DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node "scripts/$generator"
-          done
-          DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node scripts/generate-n2-procedure-parity.cjs
-      - name: Swift 6 Linux syntax of iOS views + all core XCTest suites
-        run: |
-          set -o pipefail
-          swift --version
-          swiftc -frontend -parse native-ios/App/*.swift
-          cd native-ios
-          swift test --jobs 2 2>&1 | tee "$RUNNER_TEMP/b11-linux-swift-test.log"
-      - name: Verify both native Excel workbooks against TypeScript originals
-        run: |
-          node scripts/test-n1r-native-xlsx.cjs
-          node scripts/test-n1s-full-native-workbooks.cjs
+          artifact-ids: 12954980903
+          run-id: 41003061702
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b14-baseline/linux
+      - name: Recover original simulator results, including the failed biometric case
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12957546521
+          run-id: 41003061702
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b14-baseline/macos
+      - name: Require unchanged application and test inputs; retain actual failure
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/glass-audit/resume-build14.py baseline "$RUNNER_TEMP/b14-baseline" "$RUNNER_TEMP/b14-proof"
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: B14_LINUX_SWIFT_EXCEL_DIAGNOSTICS
-          path: ${{ runner.temp }}/b11-linux-swift-test.log
-          retention-days: 7
-          if-no-files-found: ignore
+          name: B14_BASELINE_PROOF
+          path: ${{ runner.temp }}/b14-proof
+          if-no-files-found: error
+          retention-days: 14
 
-  macos-swiftui:
-    name: Xcode B11 compile + backup and UI XCTest
-    runs-on: macos-15-intel
+  replay-ui:
+    name: Replay ${{ matrix.suite }} on isolated ARM iPhone 16
+    needs: verified-evidence
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [N2BiometricInteractionTests, N3ClinicalJourneyTests-demo, N3ClinicalJourneyTests-protected]
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-    timeout-minutes: 100
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Xcode runtime and dependencies
-        run: |
-          xcodebuild -version
-          npm ci --ignore-scripts --no-fund
-          if ! command -v xcodegen >/dev/null 2>&1; then
-            brew install xcodegen
-          fi
-          xcodegen --version
-      - name: Check native source routing and encrypted backup compatibility
-        run: |
-          node scripts/audit-n2-workspace-routing.cjs
-          node scripts/audit-n2-personal-import.cjs
-          node scripts/audit-n2-build222-backup-restore.cjs
-          node scripts/audit-n2-joint-indicator.cjs
-          node scripts/prepare-n1s-ios-demo-resources.cjs
-          test "$(grep -c 'N2OfficialArea(site:' native-ios/App/N2GeneratedOfficialAreas.swift)" = 155
-      - name: Generate Xcode project
-        working-directory: native-ios
-        run: |
-          xcodegen generate --spec project.yml
-          xcodebuild -resolvePackageDependencies -project DANPERNative.xcodeproj -scheme DANPERNative
-      - name: Build actual SwiftUI native iPhone app for simulator (unsigned)
-        working-directory: native-ios
-        run: |
-          xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
-            -configuration Debug -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
-            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" build > "$RUNNER_TEMP/b11-ios-compile.log" 2>&1 || {
-              grep -nE '(error:|fatal error:|BUILD FAILED)' "$RUNNER_TEMP/b11-ios-compile.log" | tail -n 100 || true
-              exit 1
-            }
-          echo "PASS: B11 SwiftUI compiled with real Xcode type checker."
-      - name: All native and UI tests on isolated enrolled iPhone 16 simulators
-        timeout-minutes: 80
-        env:
-          DANPER_AUDIT_OUT: ${{ runner.temp }}/b14-simulator-evidence
-          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b11-xcode
-        run: bash scripts/glass-audit/validate-macos.sh current
-      - name: Reassert zero release artifacts and existing build222 isolation
-        run: |
-          grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview' native-ios/project.yml
-          test ! -d native-preview-artifacts
-          test ! -d native-ios/outputs
-          echo "PASS: B11 compile and simulator tests only, no IPA, no production overwrite."
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: B11_MACOS_XCODE_DIAGNOSTICS_ONLY
-          path: |
-            ${{ runner.temp }}/b11-ios-compile.log
-            ${{ runner.temp }}/b14-simulator-evidence
-            !${{ runner.temp }}/b14-simulator-evidence/DerivedData/**
-          retention-days: 7
-          if-no-files-found: warn
-
-  build14-ipa:
-    name: Build 14 unsigned iLoader IPA after all mandatory gates
-    needs: [linux-swift, macos-swiftui]
-    if: github.event.pull_request.head.ref == 'fix/kardex-opening-history-build14-20261029' || github.ref == 'refs/heads/fix/kardex-opening-history-build14-20261029'
-    runs-on: macos-15
-    timeout-minutes: 35
+      DANPER_AUDIT_OUT: ${{ runner.temp }}/b14-replay
+      DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b14-build
+      DANPER_REPLAY_LABEL: ${{ matrix.suite }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -165,9 +71,68 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify same Build 13 storage and signing identity
+          cache: npm
+      - name: Prepare identical resources and simulator test project
         run: |
           set -euo pipefail
+          test "$(uname -m)" = arm64
+          xcodebuild -version
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          node scripts/glass-audit/verify-build13-upgrade.cjs
+          node scripts/glass-audit/identity.cjs
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && xcodegen generate --spec project.yml)
+      - name: Genuine Face ID preflight and selected failed or missing UI suite
+        timeout-minutes: 35
+        run: bash scripts/glass-audit/validate-macos.sh replay
+      - name: Publish compact verdict before lengthy diagnostics upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: B14_REPLAY_RESULT_${{ matrix.suite }}
+          path: |
+            ${{ runner.temp }}/b14-replay/SOURCE_SHA.txt
+            ${{ runner.temp }}/b14-replay/REPLAY_LABEL.txt
+            ${{ runner.temp }}/b14-replay/REPLAY_PASS_SHA.txt
+            ${{ runner.temp }}/b14-replay/*.summary.json
+          retention-days: 14
+          if-no-files-found: error
+      - name: Preserve actual logs and screenshots, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: B14_REPLAY_DIAGNOSTICS_${{ matrix.suite }}
+          path: |
+            ${{ runner.temp }}/b14-replay
+            !${{ runner.temp }}/b14-replay/DerivedData/**
+          retention-days: 7
+          if-no-files-found: warn
+
+  build14-ipa:
+    name: Package Build 14 only after combined 417 Swift, 26 native and 11 UI pass
+    needs: [verified-evidence, replay-ui]
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: B14_BASELINE_PROOF
+          path: ${{ runner.temp }}/b14-combined/baseline
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: B14_REPLAY_RESULT_*
+          path: ${{ runner.temp }}/b14-combined
+      - name: Require exact source identity and full zero-failure combined coverage
+        run: |
+          python3 scripts/glass-audit/resume-build14.py final "$RUNNER_TEMP/b14-combined" "$RUNNER_TEMP/build14-release"
           node scripts/glass-audit/verify-build13-upgrade.cjs
           node scripts/glass-audit/identity.cjs
       - name: Prepare distribution resources and Xcode
@@ -177,17 +142,15 @@ jobs:
           if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
           node scripts/prepare-n1s-ios-demo-resources.cjs
           (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
-      - name: Require JavaScript regressions and package validated Release ARM64
+      - name: Require JavaScript regressions and build unsigned Release ARM64
         env:
           DANPER_AUDIT_OUT: ${{ runner.temp }}/build14-release
         run: |
           set -euo pipefail
-          mkdir -p "$DANPER_AUDIT_OUT"
           node scripts/glass-audit/javascript.cjs
-          # Both required jobs above tested precisely this source SHA.
-          git rev-parse HEAD > "$DANPER_AUDIT_OUT/VALIDATED_SHA.txt"
           bash scripts/glass-audit/package-macos.sh
           cp "$DANPER_AUDIT_OUT/javascript-results.json" "$DANPER_AUDIT_OUT/ipa/"
+          cp "$DANPER_AUDIT_OUT/ALL_GATES.json" "$DANPER_AUDIT_OUT/ipa/"
       - name: Publish verified Build 14 iLoader candidate
         uses: actions/upload-artifact@v4
         with:
@@ -204,4 +167,5 @@ jobs:
           path: |
             ${{ runner.temp }}/build14-release/*.log
             ${{ runner.temp }}/build14-release/*.json
+            ${{ runner.temp }}/build14-release/*.txt
           retention-days: 7
