@@ -78,8 +78,26 @@ fresh(){
  defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
  bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1
 }
+# Install explicitly before XCTest asks Xcode to launch its runner. New CI
+# images can fail in Xcode's placeholder/delta installer before any test runs.
+# Only the just-created synthetic device is eligible; install errors stay fatal.
+prepare_test_installation(){
+ xcrun simctl list devices -j | python3 -c 'import json,sys
+rows=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["udid"]==sys.argv[1]]
+assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswith("DANPER-SYNTHETIC-")' "$SIM_ID"
+ for app in "$DD/Build/Products/Debug-iphonesimulator/DANPERNative.app" \
+            "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app"; do
+  test -d "$app"
+  bundle=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
+  if ! xcrun simctl get_app_container "$SIM_ID" "$bundle" app >/dev/null 2>&1; then
+   xcrun simctl install "$SIM_ID" "$app" >> "$OUT/simulator-installation.log" 2>&1
+  fi
+  xcrun simctl get_app_container "$SIM_ID" "$bundle" app >> "$OUT/simulator-installation.log"
+ done
+}
 run_tests(){
  local label="$1" expected="$2" status=0 stream='' bridge=''; shift 2
+ prepare_test_installation
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
    xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \
