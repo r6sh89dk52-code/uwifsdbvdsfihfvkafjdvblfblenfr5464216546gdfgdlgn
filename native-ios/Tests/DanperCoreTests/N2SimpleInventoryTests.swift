@@ -278,6 +278,32 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertTrue(sheet.contains("NO VERIFICADO"));XCTAssertFalse(sheet.contains("<f>D7+E7</f>"))
         XCTAssertEqual(try N2SimpleInventory.read(raw).products.first?.quantity,70)
     }
+    func testNextPeriodNursingOpeningSurvivesOlderHistoricalClinicalUses()throws {
+        // Historical visits occur in October. The physical count is 15 Nov.
+        // It cannot prove the opening of 9 Nov, but it establishes a reliable
+        // balance for a later period starting 9 Dec (without intervening moves).
+        let raw=try active()
+        let n=try object(fixture("n2-nursing-parity.json"))
+        let template=try fixture("n1s-nursing-template-store.zip")
+        let catalogData=try JSONSerialization.data(withJSONObject:n["catalog"]!)
+        let mapping=try fixture("n2-reviewed-approved.json")
+        let before=try N2SimpleInventory.read(raw)
+        let first=try N2VerifiedNursingWorkbook.exportRange(
+            snapshot:raw,catalog:catalogData,template:template,
+            start:"2026-11-09",end:"2026-11-16",
+            responsible:"OPERADOR FICTICIO",mappings:mapping)
+        XCTAssertEqual(first.stockKnownRows,0,
+            "A late-November count must not certify November 9 retroactively")
+        let next=try N2VerifiedNursingWorkbook.exportRange(
+            snapshot:raw,catalog:catalogData,template:template,
+            start:"2026-12-09",end:"2026-12-16",
+            responsible:"OPERADOR FICTICIO",mappings:mapping)
+        XCTAssertGreaterThan(next.stockKnownRows,0,
+            "October clinical evidence must not block verified December openings")
+        XCTAssertEqual(try N2SimpleInventory.read(raw),before,
+            "Export must never change physical inventory")
+    }
+
     func testFormDraftRecoversExplicitRWithoutAnyLegacyPhysicalSelection()throws {
         let raw=try active(source:source(empty:true)),context=try N2NativeFormContextReader.read(snapshot:raw,revision:1,products:catalog())
         XCTAssertEqual(context.inventorySchemaVersion,2)
