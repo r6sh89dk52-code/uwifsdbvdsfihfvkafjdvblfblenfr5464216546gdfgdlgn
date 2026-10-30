@@ -1294,6 +1294,7 @@ struct N2NativeClinicalFormView:View {
     private func recordAllergy(_ dni:String) async {
         guard !editingAllergy,let current=context,form.dni==dni else{return}
         editingAllergy=true
+        var didCommit=false
         allergySaveFailed=false
         allergyFeedback=""
         // A draft autosave can race the journal revision; stop an outstanding
@@ -1301,6 +1302,7 @@ struct N2NativeClinicalFormView:View {
         autosaveTask?.cancel()
         defer {
             editingAllergy=false
+            if didCommit {scheduleDraft()}
         }
         do {
             let statusToSave=allergyStatus
@@ -1309,9 +1311,16 @@ struct N2NativeClinicalFormView:View {
             let committed=try await vault.reviewAllergiesRevision(
                 dni:dni,status:statusToSave,substances:normalized,
                 at:now,expectedRevision:revision)
-            context=current.withCommittedAllergy(
-                dni:dni,status:statusToSave,substances:normalized,
-                revision:committed)
+            if revision==current.revision {
+                context=current.withCommittedAllergy(
+                    dni:dni,status:statusToSave,substances:normalized,
+                    revision:committed)
+            } else {
+                // An independent draft, roster or inventory update happened
+                // while the form was open; never silently overwrite its context.
+                context=try await vault.clinicalFormContext()
+            }
+            didCommit=true
             status="Revisión de alergias guardada."
             allergyFeedback="Alergias revisadas y guardadas"
             allergySaveFailed=false
@@ -1369,10 +1378,13 @@ struct N2NativeClinicalFormView:View {
                 let patch=try version.makeDraftPatch(context:context,stage:step)
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
-                _=try await vault.saveDraft(
+                let committed=try await vault.saveDraft(
                     id:version.id,changes:patch,at:timestamp,
                     expectedRevision:latestRevision)
-                guard !Task.isCancelled,!saved,!busy else{return}
+                guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
+                if let existing=self.context,existing.revision==latestRevision {
+                    self.context=existing.withCommittedRevision(committed.revision)
+                }
                 lastAutosaveTimestamp=timestamp
                 await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
                 status="Borrador guardado."
