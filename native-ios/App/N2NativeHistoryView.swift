@@ -33,7 +33,9 @@ struct N2NativeHistoryView: View {
     var body:some View {
         Group {
             if let projection {
-                let matches=showWorkers ? projection.findWorkers(committedQuery) : []
+                let searchingWorkers=showWorkers &&
+                    committedQuery.trimmingCharacters(in:.whitespacesAndNewlines).count>=2
+                let matches=searchingWorkers ? projection.findWorkers(committedQuery) : []
                 let savedVisits=projection.visits.filter{
                     $0.status=="saved" &&
                     (committedQuery.isEmpty ||
@@ -59,8 +61,14 @@ struct N2NativeHistoryView: View {
                     if showWorkers {
                     DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
                         Color.clear.frame(height:1).id("roster-page-top")
-                        Text("\(matches.count) resultados · Página \(safePage+1) de \(totalPages)")
-                            .font(.caption).foregroundStyle(.secondary)
+                        if !searchingWorkers {
+                            Label("Escribe dos o más caracteres para buscar. No se carga el directorio completo en pantalla.",
+                                  systemImage:"magnifyingglass")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        } else {
+                            Text("\(matches.count) resultados · Página \(safePage+1) de \(totalPages)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         ForEach(Array(matches.dropFirst(safePage*pageSize).prefix(pageSize))) { w in
                             Button {
                                 selectedDNI = w.dni
