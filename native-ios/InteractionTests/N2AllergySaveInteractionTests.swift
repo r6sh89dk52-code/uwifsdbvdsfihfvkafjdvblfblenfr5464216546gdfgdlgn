@@ -53,6 +53,17 @@ final class N2AllergySaveInteractionTests:XCTestCase {
         tap(save,in:app)
         XCTAssertTrue(app.staticTexts["Alergias revisadas y guardadas"].waitForExistence(timeout:20),app.debugDescription)
         XCTAssertFalse(app.staticTexts["Reabre la atención para comprobar la revisión antes de volver a guardar."].exists)
+        // A previous persisted review must not authorize a newly changed,
+        // unsaved selection. Check the allergy-specific validation, even if
+        // other clinical fields are also incomplete in this synthetic form.
+        tap(app.buttons["choice-Revisión de alergias"],in:app)
+        app.buttons["No evaluado"].tap()
+        tap(app.buttons["Siguiente"],in:app)
+        let validation=app.alerts["Faltan datos para continuar"]
+        XCTAssertTrue(validation.waitForExistence(timeout:5),app.debugDescription)
+        XCTAssertTrue(validation.staticTexts.matching(NSPredicate(format:"label CONTAINS %@",
+            "Confirma la revisión de alergias.")).firstMatch.exists,app.debugDescription)
+        validation.buttons["Cerrar"].tap()
         // Let the independently encrypted autosave complete, then reopen the
         // editor. Its allergy status must come from confirmed persistence.
         Thread.sleep(forTimeInterval:2)

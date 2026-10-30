@@ -215,6 +215,7 @@ struct N2NativeClinicalFormView:View {
             if let context {
                 DanperScrollView(jumpRequest:scrollIssueRequest) {
                     formContents(context)
+                        .disabled(editingAllergy)
                 }
                 .id("\(step)-\(saved)")
                 .navigationTitle(saved ? "Atención registrada" : "Nueva atención")
@@ -1068,6 +1069,9 @@ struct N2NativeClinicalFormView:View {
     /// destinations from translated error strings or UI labels.
     private func issueCodes(for stage:Int,context:N2FormContext)->[String] {
         var issues=form.clinicalIssues(step:stage,context:context)
+        if stage==1,allergyReviewPending,!issues.contains("allergy-status") {
+            issues.append("allergy-status")
+        }
         if stage==2 {
             if form.procedures.isEmpty && form.items.isEmpty {
                 issues.append("treatment-selection")
@@ -1150,16 +1154,24 @@ struct N2NativeClinicalFormView:View {
         if form.hasWound && !form.photoReviewed {missing.append("Indica si se envió la foto.")}
         return missing
     }
+    private var allergyReviewPending:Bool {
+        if editingAllergy || allergySaveFailed {return true}
+        guard let context,!form.dni.isEmpty else{return false}
+        let persisted=context.allergies[form.dni]
+        guard allergyStatus==(persisted?.status ?? "unknown") else{return true}
+        return allergyStatus=="known" &&
+            allergySubstances.trimmingCharacters(in:.whitespacesAndNewlines) !=
+            (persisted?.substances ?? "").trimmingCharacters(in:.whitespacesAndNewlines)
+    }
     private var pendingRequirements:[String] {
         guard let context else{return ["Espera a que termine la verificación de los datos."]}
-        return (0...3).flatMap{form.clinicalIssues(step:$0,context:context)}
-            .map{N2ClinicalFormOptions.messages[$0] ?? $0}+extraTreatmentRequirements
+        return (0...3).flatMap{issueCodes(for:$0,context:context)}.map(issueMessage)
     }
     private var stepRequirements:[String] {
         guard let context else{return ["Espera a que termine la verificación de los datos."]}
-        let issues=form.clinicalIssues(step:step,context:context).map{N2ClinicalFormOptions.messages[$0] ?? $0}
-        let allergies=step==0 ? form.clinicalIssues(step:1,context:context).filter{$0.hasPrefix("allergy-")}.map{N2ClinicalFormOptions.messages[$0] ?? $0} : []
-        return issues+allergies+(step==2 ? extraTreatmentRequirements : [])
+        let issues=issueCodes(for:step,context:context).map(issueMessage)
+        let allergies=step==0 ? issueCodes(for:1,context:context).filter{$0.hasPrefix("allergy-")}.map(issueMessage) : []
+        return issues+allergies
     }
     private func reviewSection(_ context:N2FormContext)->some View {
         Group {
@@ -1243,6 +1255,7 @@ struct N2NativeClinicalFormView:View {
         .padding(.horizontal,16)
         .padding(.top,10)
         .padding(.bottom,6)
+        .disabled(editingAllergy)
         .background(.regularMaterial)
         .overlay(alignment:.top) {Rectangle().fill(.quaternary).frame(height:0.5)}
     }
@@ -1581,7 +1594,7 @@ struct N2NativeClinicalFormView:View {
 
     @MainActor
     private func confirm() async {
-        guard let context,!busy,!saved,!fault else{return}
+        guard let context,!busy,!saved,!fault,!allergyReviewPending else{return}
         let previousAutosave=autosaveTask
         autosaveTask=nil
         previousAutosave?.cancel()
