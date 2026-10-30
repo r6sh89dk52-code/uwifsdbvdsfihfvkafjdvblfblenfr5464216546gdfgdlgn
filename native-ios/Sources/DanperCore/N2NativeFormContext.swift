@@ -72,6 +72,23 @@ public struct N2FormContext:Sendable {
     public let allergies:[String:N2FormAllergy]
     public let lots:[N2FormLot]
     public let products:N2NativeCatalogIndex
+
+    /// Refresh only the one verified allergy and immutable journal revision.
+    /// Swift arrays/dictionaries retain copy-on-write buffers: no re-sorting
+    /// 10k people, reconstructing stock projections, or reading the vault.
+    /// Only call after the encrypted journal confirms a successful commit.
+    public func withCommittedAllergy(dni:String,status:String,
+                                     substances:String,revision:Int)->N2FormContext {
+        var records=allergies
+        records[dni]=N2FormAllergy(status:status,substances:substances,reviewed:true)
+        var next=N2FormContext(revision:revision,workers:workers,
+                               allergies:records,lots:lots,products:products)
+        next.inventorySchemaVersion=inventorySchemaVersion
+        next.simpleProducts=simpleProducts
+        next.operationalMappings=operationalMappings
+        next.auxiliaryProducts=auxiliaryProducts
+        return next
+    }
     /// Historical evidence is allowed for a catalogued, now-empty lot:
     /// the declaration records an old R=1/0 in the cut, not a new stock debit.
     /// Never use this method for current FEFO availability.
