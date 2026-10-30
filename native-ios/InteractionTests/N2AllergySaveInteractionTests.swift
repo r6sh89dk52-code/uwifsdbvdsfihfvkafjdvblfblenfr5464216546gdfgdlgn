@@ -52,7 +52,7 @@ final class N2AllergySaveInteractionTests:XCTestCase {
         let save=app.buttons["Guardar revisión de alergias"]
         tap(save,in:app)
         XCTAssertTrue(app.staticTexts["Alergias revisadas y guardadas"].waitForExistence(timeout:20),app.debugDescription)
-        XCTAssertFalse(app.staticTexts["No se guardaron los cambios. Intenta nuevamente."].exists)
+        XCTAssertFalse(app.staticTexts["Reabre la atención para comprobar la revisión antes de volver a guardar."].exists)
         // Let the independently encrypted autosave complete, then reopen the
         // editor. Its allergy status must come from confirmed persistence.
         Thread.sleep(forTimeInterval:2)

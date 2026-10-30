@@ -1370,8 +1370,10 @@ struct N2NativeClinicalFormView:View {
                 allergySaveFailed=false
                 fault=true
             } else {
-                status="No se pudo guardar la revisión de alergias."
-                allergyFeedback="No se guardaron los cambios. Intenta nuevamente."
+                // Verification can fail after a file write. Do not claim that
+                // nothing persisted or invite a duplicate write from this view.
+                status="No se pudo confirmar el guardado de la revisión de alergias."
+                allergyFeedback="Reabre la atención para comprobar la revisión antes de volver a guardar."
                 allergySaveFailed=true
             }
         }

@@ -8,10 +8,10 @@ TARGET="$CHECKOUT/native-ios/Tests/DanperCoreTests/N2PerformanceAuditTests.swift
 test ! -e "$TARGET"
 cp "$ROOT/scripts/performance/N2PerformanceAuditTests.swift" "$TARGET"
 trap 'rm -f "$TARGET"' EXIT
-FLAGS=()
+FLAGS=(-Xswiftc -enable-testing)
 case "$CONFIGURATION" in
  baseline) ;;
- optimized) FLAGS=(-Xswiftc -DDANPER_PERF_OPTIMIZED) ;;
+ optimized) FLAGS+=(-Xswiftc -DDANPER_PERF_OPTIMIZED) ;;
  *) exit 1 ;;
 esac
 # Compile outside the resource measurement. The timed process runs only the
