@@ -296,9 +296,10 @@ public enum N2VerifiedIndicatorWorkbook {
                   !string(visit["diagnosis"]).isEmpty,
                   let items=visit["items"] as? [[String:Any]],
                   items.count<=1000,
-                  (subdivision=="AMBAS" ?
-                    ["LA VENTUROSA","PLVENTUROSA"].contains(string(worker["site"])) :
-                    ["",subdivision].contains(string(worker["site"]))) else{
+                  // A report filter is not evidence of an encounter's site.
+                  // Never turn an unknown historical site into a verified one.
+                  ["LA VENTUROSA","PLVENTUROSA"].contains(string(worker["site"])),
+                  (subdivision=="AMBAS" || string(worker["site"])==subdivision) else{
                 throw Failure.invalidVisit
             }
             let sourceSite=subdivision=="AMBAS" ? string(worker["site"]) : subdivision

@@ -31,11 +31,13 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
         let mappings=try fixture("n2-reviewed-approved.json")
         let template=try fixture("n1s-indicator-template-store.zip")
         let ids:Set<String>=["fundo-unit","fundo-reuse"]
-        XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
-            snapshot:source,products:catalog,mappings:mappings,template:template,
-            start:"2026-10-09",end:"2026-11-08",
-            subdivision:"LA VENTUROSA",selectedVisitIDs:ids)) {
-            XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,.invalidVisit)
+        for site in ["LA VENTUROSA","AMBAS"] {
+            XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
+                snapshot:source,products:catalog,mappings:mappings,template:template,
+                start:"2026-10-09",end:"2026-11-08",
+                subdivision:site,selectedVisitIDs:ids)) {
+                XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,.invalidVisit)
+            }
         }
         let detail=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")
         let amended=try N2ClinicalCorrections.append(

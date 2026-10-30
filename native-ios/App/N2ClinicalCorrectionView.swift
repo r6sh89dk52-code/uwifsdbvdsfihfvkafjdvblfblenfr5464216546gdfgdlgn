@@ -140,8 +140,7 @@ struct N2ClinicalCorrectionView:View {
                     TextField("DNI del responsable",text:$responsibleDni)
                 }
                 }
-                if let detail {
-                    DanperPanel("Tratamientos y consumos de la atención") {
+                DanperPanel("Tratamientos y consumos de la atención") {
                         Text("Edita los datos de esta única atención. La apertura R=0/1 de un insumo anterior al conteo puede corregirse sin descontar otra vez las existencias actuales.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(detail.medications,id:\.id){ item in
@@ -180,7 +179,6 @@ struct N2ClinicalCorrectionView:View {
                 }
                         Text("Una corrección de cantidad no equivale a ajustar físicamente el Kardex. Se conserva el movimiento original y el Excel oficial bloqueará esta atención hasta resolver la discrepancia. Los cambios de producto o nuevas entregas requieren revisión por separado.")
                             .font(.caption).foregroundStyle(.orange)
-                    }
                 }
                 DanperPanel("Guardar cambios") {
                     Text("No tienes que escribir un motivo. Se guardará la edición de esta atención sin crear otra ni cambiar el stock físico actual.")
