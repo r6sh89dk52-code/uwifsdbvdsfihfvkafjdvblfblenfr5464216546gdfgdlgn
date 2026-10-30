@@ -200,9 +200,6 @@ struct N2NativeClinicalFormView:View {
             .onChange(of:form) {old,new in
                 if let context {formChanged(old,new,context)}
             }
-            .onChange(of:context?.revision) {_,_ in
-                if let context {indexWorkers(context)}
-            }
             .onChange(of:keyboard.visible) {_,visible in
                 if visible && focusedField=="diagnosis" {
                     scrollIssueRequest=DanperScrollRequest(fieldID:"clinical-diagnosis")
@@ -1035,7 +1032,9 @@ struct N2NativeClinicalFormView:View {
                                 Task { @MainActor in
                                     autosaveTask?.cancel()
                                     do {
-                                        self.context=try await vault.clinicalFormContext()
+                                        let refreshed=try await vault.clinicalFormContext()
+                                        self.context=refreshed
+                                        indexWorkers(refreshed)
                                         fault=false
                                     }
                                     catch {status="No se pudo actualizar el inventario. Vuelve a abrir la atención."}
@@ -1237,7 +1236,9 @@ struct N2NativeClinicalFormView:View {
         do {
             let current=try await vault.clinicalFormContext()
             if retry {_=try await vault.retryDispensing(visitID:form.id,expectedRevision:current.revision)}
-            context=try await vault.clinicalFormContext()
+            let refreshed=try await vault.clinicalFormContext()
+            context=refreshed
+            indexWorkers(refreshed)
             savedLines=try await vault.dispensingStatus(visitID:form.id)
             savedKardex=Dictionary(uniqueKeysWithValues:try await vault.dispensingLines(visitID:form.id).compactMap{line in line.kardexQuantity.map{(line.id,$0)}})
             status="Atención conservada. Consumos verificados nuevamente; revisa los pendientes."
@@ -1330,7 +1331,9 @@ struct N2NativeClinicalFormView:View {
             } else {
                 // An independent draft, roster or inventory update happened
                 // while the form was open; never silently overwrite its context.
-                context=try await vault.clinicalFormContext()
+                let refreshed=try await vault.clinicalFormContext()
+                context=refreshed
+                indexWorkers(refreshed)
             }
             status="Revisión de alergias guardada."
             allergyFeedback="Alergias revisadas y guardadas"
@@ -1357,6 +1360,7 @@ struct N2NativeClinicalFormView:View {
             let fresh=try await vault.clinicalFormContext()
             guard fresh.workers.contains(where:{$0.dni==dni}) else{return}
             context=fresh
+            indexWorkers(fresh)
             form.dni=dni
             allergyStatus=fresh.allergies[dni]?.status ?? "unknown"
             allergySubstances=fresh.allergies[dni]?.substances ?? ""
@@ -1598,6 +1602,7 @@ struct N2NativeClinicalFormView:View {
             let prepared=try await vault.prepareClinicalForm()
             drafts=prepared.drafts
             context=prepared.context
+            indexWorkers(prepared.context)
             if form.id==id {
                 autosaveTask?.cancel()
                 form=blankForm()
