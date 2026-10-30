@@ -227,7 +227,11 @@ overall=0
 while IFS=$'\t' read -r label count cls selectors; do
  if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi
  if test "$MODE" = b15-shard && test "$label" != "$DANPER_B15_UI_LABEL"; then continue; fi
- fresh "$label"
+ # A B15 shard already owns a fresh Simulator and has just proved real Face
+ # ID availability on it. The preflight only calls LAContext; it writes no
+ # clinical fixture. Keep that device for this shard's single selected suite.
+ # Other modes still create a separate device for each suite in their loop.
+ if test "$MODE" != b15-shard; then fresh "$label"; fi
  case "$label" in
   N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo|N2AllergySaveInteractionTests)
    if ! run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; continue; fi ;;
