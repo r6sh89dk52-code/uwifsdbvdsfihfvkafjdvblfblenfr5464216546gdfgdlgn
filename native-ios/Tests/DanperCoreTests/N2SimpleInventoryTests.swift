@@ -278,6 +278,55 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertTrue(sheet.contains("NO VERIFICADO"));XCTAssertFalse(sheet.contains("<f>D7+E7</f>"))
         XCTAssertEqual(try N2SimpleInventory.read(raw).products.first?.quantity,70)
     }
+    func testEditedHistoricalContainerRChangesCutOnlyNotPhysicalStock()throws {
+        let old=try source()
+        let verified=try proof(old)
+        let raw=try N2SimpleInventory.activate(
+            snapshot:old,backup:verified,
+            request:N2SimpleActivation(
+                id:regimeID,at:at("2026-10-29"),
+                operatorName:"OPERADOR FICTICIO",confirmed:true,
+                backupAvailable:true,initialProducts:[
+                    product("16000013",quantity:5)
+                ]),
+            catalog:catalog())
+        let prior=try N2SimpleInventory.read(raw)
+        let detail=try N2ClinicalCorrections.detail(
+            snapshot:raw,visitID:"planta-open")
+        let med=try XCTUnwrap(detail.medications.first{$0.id=="box-2"})
+        XCTAssertTrue(med.historicalOpeningEditable)
+        XCTAssertEqual(med.historicalOpeningR,1)
+        let before=try N2SimpleInventory.cutPreview(
+            snapshot:raw,code:"16000013",through:"2026-10-29",
+            catalog:catalog(),archive:verified)
+        let patch=try bytes(["itemHistoricalOpenings":["box-2":0]])
+        let edited=try N2ClinicalCorrections.append(
+            snapshot:raw,eventID:"A40B0C2F-A1D4-42D1-AF31-A1D87DF065E9",
+            visitID:"planta-open",changes:patch,
+            reason:"Corrección histórica sin sustento escrito del usuario",
+            operatorName:"OPERADOR FICTICIO",medicationDiscrepancy:"",
+            expectedEffectiveSHA:detail.effectiveSHA256,at:at("2026-11-01"))
+        XCTAssertEqual(try N2SimpleInventory.read(edited),prior,
+            "A historical R override must not create any new stock movement")
+        let effective=try N2ClinicalCorrections.detail(
+            snapshot:edited,visitID:"planta-open")
+        XCTAssertEqual(effective.medications.first(where:{$0.id=="box-2"})?.historicalOpeningR,0)
+        XCTAssertFalse(try N2ClinicalCorrections.pendingDiscrepancies(edited).contains("planta-open"))
+        let after=try N2SimpleInventory.cutPreview(
+            snapshot:edited,code:"16000013",through:"2026-10-29",
+            catalog:catalog(),archive:verified)
+        XCTAssertEqual(before.currentStock,after.currentStock)
+        XCTAssertEqual(after.verifiedOutflows,before.verifiedOutflows-1)
+        XCTAssertNoThrow(try N2SimpleInventory.audit(edited))
+        let unallowed=try bytes(["itemHistoricalOpenings":["unit-5":0]])
+        XCTAssertThrowsError(try N2ClinicalCorrections.append(
+            snapshot:edited,eventID:"1923B0DE-1FAD-4D78-B983-909E62F31235",
+            visitID:"planta-open",changes:unallowed,
+            reason:"Cambio histórico de unidad no permitido",
+            operatorName:"OPERADOR FICTICIO",medicationDiscrepancy:"",
+            expectedEffectiveSHA:effective.effectiveSHA256,at:at("2026-11-02")))
+    }
+
     func testNextPeriodNursingOpeningSurvivesOlderHistoricalClinicalUses()throws {
         // Historical visits occur in October. The physical count is 15 Nov.
         // It cannot prove the opening of 9 Nov, but it establishes a reliable
