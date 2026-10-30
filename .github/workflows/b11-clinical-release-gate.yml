@@ -83,7 +83,9 @@ jobs:
 
   macos-swiftui:
     name: Xcode B11 compile + backup and UI XCTest
-    runs-on: macos-15
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
