@@ -1,7 +1,7 @@
 name: DANPER Native - Swift Core Linux
 on:
   push:
-    branches: [native/swiftui-n1s-complete-excel-and-container-gate, fix/kardex-opening-history-build14-20261029]
+    branches: [native/swiftui-n1s-complete-excel-and-container-gate, fix/kardex-opening-history-build14-20261029, fix/indicator-historical-visit-site-build15-20261030]
     paths:
       - 'native-ios/**'
       - 'src/attentionStepValidation.ts'
