@@ -71,6 +71,30 @@ final class N2NativeClinicalFormTests:XCTestCase {
             code:"16000182",quantity:2,procedure:"OBSERVACION")]}
         return(draft,context)
     }
+    func testAllergyContextRefreshDoesNotRebuildOrDiscardRosterAndInventory()throws {
+        let (_,context)=try form(with:false,reviewed:false)
+        XCTAssertNil(context.allergies["00000001"])
+        let fresh=context.withCommittedAllergy(
+            dni:"00000001",status:"known",substances:"PENICILINA",revision:8)
+        XCTAssertEqual(fresh.revision,8)
+        XCTAssertEqual(fresh.allergies["00000001"]?.status,"known")
+        XCTAssertEqual(fresh.allergies["00000001"]?.substances,"PENICILINA")
+        XCTAssertEqual(fresh.allergies["00000001"]?.reviewed,true)
+        XCTAssertNil(context.allergies["00000001"])
+        XCTAssertEqual(fresh.workers,context.workers)
+        XCTAssertEqual(fresh.lots,context.lots)
+        XCTAssertEqual(fresh.products.clinical.count,context.products.clinical.count)
+        XCTAssertEqual(fresh.inventorySchemaVersion,context.inventorySchemaVersion)
+        XCTAssertEqual(fresh.operationalMappings,context.operationalMappings)
+        XCTAssertEqual(fresh.simpleProducts,context.simpleProducts)
+        let advanced=fresh.withCommittedRevision(9)
+        XCTAssertEqual(advanced.revision,9)
+        XCTAssertEqual(advanced.allergies["00000001"]?.substances,"PENICILINA")
+        XCTAssertEqual(advanced.workers,context.workers)
+        XCTAssertEqual(advanced.lots,context.lots)
+        XCTAssertEqual(fresh.revision,8)
+    }
+
     func testHistoricOptionsIncludeDocumentedEmptyBottlesWithoutFEFOAvailability()throws {
         let catalog=try self.catalog()
         let old=N2FormLot(id:"empty-lot-history",kardexCode:"E-86",
