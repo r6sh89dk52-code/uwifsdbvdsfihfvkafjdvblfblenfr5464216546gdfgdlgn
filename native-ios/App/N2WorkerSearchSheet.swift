@@ -10,6 +10,7 @@ struct N2WorkerSearchSheet:View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var searchFocused:Bool
     @State private var query=""
+    @State private var committedQuery=""
     @State private var page=0
     private let pageSize=25
 
@@ -18,8 +19,9 @@ struct N2WorkerSearchSheet:View {
     // records every time SwiftUI reevaluates the body was unnecessary.
     // Render only the requested page of 25 results below.
     private var matches:[N2FormWorker] {
-        let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard !q.isEmpty else {return workers}
+        let q=committedQuery.trimmingCharacters(in:.whitespacesAndNewlines)
+        // Nothing is enumerated or rendered until the user searches.
+        guard q.count>=2 else{return []}
         return workers.filter {
             $0.dni.contains(q) || $0.name.localizedStandardContains(q)
         }
@@ -53,7 +55,11 @@ struct N2WorkerSearchSheet:View {
                                     .accessibilityIdentifier("roster-global-search")
                             }
                         }
-                        if results.isEmpty {
+                        if committedQuery.trimmingCharacters(in:.whitespacesAndNewlines).count<2 {
+                            ContentUnavailableView("Escribe para buscar",
+                                systemImage:"magnifyingglass",
+                                description:Text("Introduce al menos dos caracteres del DNI o nombre. No se muestra el padrón completo."))
+                        } else if results.isEmpty {
                             ContentUnavailableView("No se encontraron trabajadores",
                                 systemImage:"person.crop.circle.badge.questionmark",
                                 description:Text("Revisa la búsqueda o registra a la persona manualmente."))
@@ -108,11 +114,13 @@ struct N2WorkerSearchSheet:View {
                     }
                 }.padding(16)
             }
-            .onChange(of:query) {_,_ in
+            .task(id:query) {
+                // Do not rescan 10k people on every keystroke.
+                do {try await Task.sleep(for:.milliseconds(180))}
+                catch{return}
+                guard !Task.isCancelled else{return}
+                committedQuery=query
                 page=0
-                withAnimation(.easeOut(duration:0.18)){
-                    proxy.scrollTo("worker-search-top",anchor:.top)
-                }
             }
         }
         .navigationTitle("Buscar en padrón")
