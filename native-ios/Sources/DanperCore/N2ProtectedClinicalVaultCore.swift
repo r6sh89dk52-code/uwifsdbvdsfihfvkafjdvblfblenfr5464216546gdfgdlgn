@@ -490,6 +490,31 @@ public final class N2ProtectedClinicalVaultCore {
             try N2SnapshotEditor.addWorker(snapshot:$0,worker:worker,at:at)
         }
     }
+    /// Fast acknowledgment for the allergy control in the clinical form.
+    /// Both journal recoveries still authenticate and validate the FULL
+    /// encrypted snapshot. This skips only the redundant summary re-audit
+    /// and expensive form-context reconstruction after a successful write.
+    /// A failed post-commit verification is never reported as saved.
+    public func reviewAllergiesRevision(dni:String,status:String,
+        substances:String,at:Int64,expectedRevision:Int)throws->Int {
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        guard active.revision==expectedRevision else{
+            throw N2ProtectedStoreError.staleRevision
+        }
+        let next=try N2SnapshotEditor.reviewAllergies(
+            snapshot:active.snapshot,dni:dni,status:status,
+            substances:substances,at:at)
+        guard next != active.snapshot else{return active.revision}
+        let revision=try journal.commit(next,expectedRevision:expectedRevision)
+        guard let verified=try journal.recover(),
+              verified.revision==revision,
+              verified.snapshot==next else{
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        return revision
+    }
     @discardableResult
     public func reviewAllergies(dni:String,status:String,substances:String,
                                at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
