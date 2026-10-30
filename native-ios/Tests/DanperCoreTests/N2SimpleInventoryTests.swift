@@ -288,7 +288,7 @@ final class N2SimpleInventoryTests:XCTestCase {
         return try XCTUnwrap(String(data:XCTUnwrap(entries.first{$0.name=="xl/worksheets/sheet2.xml"}).data,encoding:.utf8))
     }
     private func cell(_ sheet:String,_ address:String)throws->String {
-        let regex=try NSRegularExpression(pattern:"<c\\b[^>]*\\br=\""+address+"\"[^>]*(?:/>|>.*?</c>)")
+        let regex=try NSRegularExpression(pattern:"<c\\b[^>]*\\br=\""+address+"\"[^>]*?(?:/>|>.*?</c>)")
         let match=try XCTUnwrap(regex.firstMatch(in:sheet,range:NSRange(sheet.startIndex..<sheet.endIndex,in:sheet)))
         return String(sheet[try XCTUnwrap(Range(match.range,in:sheet))])
     }
