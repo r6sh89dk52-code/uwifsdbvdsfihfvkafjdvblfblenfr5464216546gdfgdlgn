@@ -59,7 +59,7 @@ jobs:
             generate-n2-stock-commands-fixtures.cjs; do
             DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node "scripts/$generator"
           done
-          node scripts/generate-n2-procedure-parity.cjs
+          DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node scripts/generate-n2-procedure-parity.cjs
       - name: Swift 6 Linux syntax of iOS views + all core XCTest suites
         run: |
           swift --version
@@ -112,7 +112,7 @@ jobs:
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
-            CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/b11-ios-compile.log" 2>&1 || {
+            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" build > "$RUNNER_TEMP/b11-ios-compile.log" 2>&1 || {
               grep -nE '(error:|fatal error:|BUILD FAILED)' "$RUNNER_TEMP/b11-ios-compile.log" | tail -n 100 || true
               exit 1
             }
@@ -128,14 +128,14 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIM" \
             -destination-timeout 180 -parallel-testing-enabled NO \
             -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
-            CODE_SIGNING_ALLOWED=NO test > "$RUNNER_TEMP/b11-ios-tests.log" 2>&1 || {
+            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" test > "$RUNNER_TEMP/b11-ios-tests.log" 2>&1 || {
               grep -nE '(error:|failed|FAIL|Testing failed)' "$RUNNER_TEMP/b11-ios-tests.log" | tail -n 120 || true
               exit 1
             }
           grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/b11-ios-tests.log"
       - name: Reassert zero release artifacts and existing build222 isolation
         run: |
-          grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.preview' native-ios/project.yml
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview' native-ios/project.yml
           test ! -d native-preview-artifacts
           test ! -d native-ios/outputs
           echo "PASS: B11 compile and simulator tests only, no IPA, no production overwrite."
