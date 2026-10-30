@@ -14,6 +14,7 @@ struct N2ClinicalCorrectionView:View {
     @State private var system=""
     @State private var segment=""
     @State private var diagnosis=""
+    @State private var visitSite=""
     @State private var permission="NO"
     @State private var permissionTime=""
     @State private var responsible=""
@@ -86,7 +87,26 @@ struct N2ClinicalCorrectionView:View {
                 Text(message).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
             }
-            if detail != nil && !saved {
+            if let detail, !saved {
+                DanperPanel("Sede de esta atención") {
+                    DanperChoiceField(title:"Lugar donde se atendió",
+                        selection:$visitSite,
+                        options:["","LA VENTUROSA","PLVENTUROSA"],
+                        labels:["":"Sin verificar",
+                                "LA VENTUROSA":"Fundo La Venturosa",
+                                "PLVENTUROSA":"Planta La Venturosa"])
+                    if ["LA VENTUROSA","PLVENTUROSA"].contains(detail.currentRosterSite) {
+                        Text("En Personal figura actualmente: "+detail.currentRosterSite+
+                             ". Confirma la sede donde se realizó ESTA atención; puede ser diferente.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if !["LA VENTUROSA","PLVENTUROSA"].contains(detail.workerSite) {
+                        Label("Esta atención tiene la sede pendiente. Elegirla aquí permitirá clasificarla en el Indicador Ambulatorio.",systemImage:"mappin.and.ellipse")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
+                    Text("La corrección es individual: no cambia otras atenciones del trabajador ni inventario.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 DanperPanel("Campos clínicos rectificables") {
                     DanperField(title:"Diagnóstico") {
                     TextField("Diagnóstico",text:$diagnosis,axis:.vertical)
@@ -260,7 +280,7 @@ struct N2ClinicalCorrectionView:View {
             id+"="+(itemHistoricalR[id] ?? "")
         }.joined(separator:"|")
         let fields:[String]=[
-            category,system,segment,diagnosis,permission,permissionTime,
+            category,system,segment,diagnosis,visitSite,permission,permissionTime,
             responsible,responsibleDni,workStatus,blueBandage.description,
             returned.description,photoSent.description,procedures,reason,
             discrepancy,operatorName,procedureFingerprint,quantityFingerprint,openingFingerprint
@@ -283,6 +303,10 @@ struct N2ClinicalCorrectionView:View {
             "itemProcedures":itemProcedures
         ]
         if let detail {
+            if visitSite != detail.workerSite,
+               ["LA VENTUROSA","PLVENTUROSA"].contains(visitSite) {
+                packet["visitWorkerSite"]=visitSite
+            }
             let corrected=Dictionary(uniqueKeysWithValues:detail.medications.compactMap {
                 item -> (String,Int)? in
                 guard let typed=itemQuantities[item.id],let q=Int(typed),
@@ -351,6 +375,7 @@ struct N2ClinicalCorrectionView:View {
             system=d.system
             segment=d.segment
             diagnosis=d.diagnosis
+            visitSite=d.workerSite
             permission=d.permission
             permissionTime=d.permissionTime
             responsible=d.responsible
@@ -376,6 +401,7 @@ struct N2ClinicalCorrectionView:View {
                 system=changes["system"] as? String ?? system
                 segment=changes["segment"] as? String ?? segment
                 diagnosis=changes["diagnosis"] as? String ?? diagnosis
+                visitSite=changes["visitWorkerSite"] as? String ?? visitSite
                 permission=changes["permission"] as? String ?? permission
                 permissionTime=changes["permissionTime"] as? String ?? permissionTime
                 responsible=changes["responsible"] as? String ?? responsible
