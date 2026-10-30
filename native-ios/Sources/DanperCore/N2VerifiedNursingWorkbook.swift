@@ -84,6 +84,7 @@ public enum N2VerifiedNursingWorkbook {
             guard let id=visit["id"] as? String,let day=visit["date"] as? String else{return nil}
             return (id,day)
         })
+        let historicalOverrides=try N2SimpleInventory.historicalOpeningOverrides(snapshot)
         let approved=try mappings.map{try JSONSerialization.jsonObject(with:$0) as? [[String:Any]] ?? []} ?? []
         var links=[String:Set<String>]()
         for row in approved {
@@ -111,12 +112,23 @@ public enum N2VerifiedNursingWorkbook {
                     let unresolved=state.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
                     if let final=events.last {row["final"]=final.after}
                     if let reference=state.metadataEvents.last(where:{$0.code==code && N2SimpleInventory.day($0.at)<=end}),reference.verified {row["expiry"]=reference.next}
-                    let historicalInPeriod=state.historicalUses.contains { item in
-                        guard item.code==code,let day=visitDates[item.visitID] else{return false}
+                    let historical=state.historicalUses.filter { item in
+                        guard item.code==code,item.unit==product.unit,
+                              let day=visitDates[item.visitID] else{return false}
                         return day>=start && day<=end
                     }
+                    // Known clinical consumption can be reported independently
+                    // of an unknown opening. Corrections never certify a balance
+                    // or debit the counted inventory for a second time.
+                    let historicalR=historical.map {
+                        historicalOverrides[N2SimpleInventory.key($0.visitID,$0.itemID)] ?? $0.verifiedR
+                    }
+                    if !historical.isEmpty,!unresolved,historicalR.allSatisfy({$0 != nil}) {
+                        row["consumed"]=historicalR.compactMap{$0}.reduce(0,+)
+                            - inRange.filter{$0.kind=="outflow"}.reduce(0){$0+$1.delta}
+                    }
                     if let opening,!unresolved,inRange.allSatisfy({$0.kind != "initial"}),
-                       !historicalInPeriod {
+                       historical.isEmpty {
                         let receipts=inRange.filter{$0.kind=="receipt"}.reduce(0){$0+$1.delta}
                         var uses = -inRange.filter{$0.kind=="outflow"}.reduce(0){$0+$1.delta}
                         for incident in state.incidents where incident.code==code && incident.resolutionEventID != nil && N2SimpleInventory.day(incident.clinicalAt)>=start && N2SimpleInventory.day(incident.clinicalAt)<=end {

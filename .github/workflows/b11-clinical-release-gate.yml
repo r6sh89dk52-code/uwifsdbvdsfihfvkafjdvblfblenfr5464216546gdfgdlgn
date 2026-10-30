@@ -30,6 +30,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -66,10 +68,14 @@ jobs:
           swiftc -frontend -parse native-ios/App/*.swift
           cd native-ios
           swift test --jobs 2 2>&1 | tee "$RUNNER_TEMP/b11-linux-swift-test.log"
+      - name: Verify both native Excel workbooks against TypeScript originals
+        run: |
+          node scripts/test-n1r-native-xlsx.cjs
+          node scripts/test-n1s-full-native-workbooks.cjs
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
-          name: B11_FAILED_LINUX_COMPILER_DIAGNOSTICS
+          name: B14_LINUX_SWIFT_EXCEL_DIAGNOSTICS
           path: ${{ runner.temp }}/b11-linux-swift-test.log
           retention-days: 7
           if-no-files-found: ignore
@@ -77,9 +83,11 @@ jobs:
   macos-swiftui:
     name: Xcode B11 compile + backup and UI XCTest
     runs-on: macos-15
-    timeout-minutes: 50
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -117,22 +125,12 @@ jobs:
               exit 1
             }
           echo "PASS: B11 SwiftUI compiled with real Xcode type checker."
-      - name: Test native backup cipher and UI with clean simulator
-        working-directory: native-ios
-        timeout-minutes: 20
-        run: |
-          SIM="$(xcrun simctl list devices available | sed -nE 's/.*iPhone[^()]*\(([0-9A-F-]{36})\).*/\1/p' | head -n 1)"
-          test -n "$SIM" || { echo "No suitable iPhone simulator: NOT PASS"; exit 1; }
-          xcodebuild -project DANPERNative.xcodeproj -scheme DANPERNative \
-            -configuration Debug -sdk iphonesimulator \
-            -destination "platform=iOS Simulator,id=$SIM" \
-            -destination-timeout 180 -parallel-testing-enabled NO \
-            -derivedDataPath "$RUNNER_TEMP/b11-xcode" \
-            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" test > "$RUNNER_TEMP/b11-ios-tests.log" 2>&1 || {
-              grep -nE '(error:|failed|FAIL|Testing failed)' "$RUNNER_TEMP/b11-ios-tests.log" | tail -n 120 || true
-              exit 1
-            }
-          grep -q 'TEST SUCCEEDED' "$RUNNER_TEMP/b11-ios-tests.log"
+      - name: All native and UI tests on isolated enrolled iPhone 16 simulators
+        timeout-minutes: 80
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b14-simulator-evidence
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b11-xcode
+        run: bash scripts/glass-audit/validate-macos.sh current
       - name: Reassert zero release artifacts and existing build222 isolation
         run: |
           grep -q 'PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview' native-ios/project.yml
@@ -145,6 +143,7 @@ jobs:
           name: B11_MACOS_XCODE_DIAGNOSTICS_ONLY
           path: |
             ${{ runner.temp }}/b11-ios-compile.log
-            ${{ runner.temp }}/b11-ios-tests.log
+            ${{ runner.temp }}/b14-simulator-evidence
+            !${{ runner.temp }}/b14-simulator-evidence/DerivedData/**
           retention-days: 7
           if-no-files-found: warn

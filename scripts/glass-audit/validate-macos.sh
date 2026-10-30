@@ -6,8 +6,8 @@ cd "$(dirname "$0")/../.."
 mkdir -p "$DANPER_AUDIT_OUT"
 OUT="$DANPER_AUDIT_OUT"
 MODE="${1:-all}"
-DD="$OUT/DerivedData"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native; then
+DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -40,6 +40,14 @@ if test "$MODE" = resume-native; then
  node scripts/prepare-n1s-ios-demo-resources.cjs > "$OUT/resources.log" 2>&1
  node scripts/glass-audit/identity.cjs
  (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml) > "$OUT/xcodegen.log" 2>&1
+fi
+# Current-branch CI: run every simulator suite from this checkout, without
+# reusing earlier evidence or packaging. Swift/Excel gates run independently.
+if test "$MODE" = current; then
+ git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
+ git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
+ xcodebuild -version > "$OUT/xcode-version.txt"
+ xcrun simctl list runtimes -j > "$OUT/runtimes.json"
 fi
 if test "$MODE" = scoped-native; then test "$(cat "$OUT/BUILD_SUCCESS_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 if test "$MODE" = ui; then test "$(cat "$OUT/CORE_NATIVE_SHA.txt")" = "$(git rev-parse HEAD)"; fi
@@ -81,7 +89,7 @@ run_tests(){
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
   -derivedDataPath "$DD" -parallel-testing-enabled NO -resultBundlePath "$OUT/$label.xcresult" \
-  "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
+  ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
  if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
@@ -90,11 +98,11 @@ run_tests(){
 }
 if test "$MODE" != ui; then
  fresh native
- if test "$MODE" = resume-native; then
+ if test "$MODE" = resume-native || test "$MODE" = current; then
   # Compile for this actual Simulator architecture, not two unused slices.
   xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
-   ONLY_ACTIVE_ARCH=YES build-for-testing > "$OUT/build-for-testing.log" 2>&1
+   ONLY_ACTIVE_ARCH=YES ASSETCATALOG_COMPILER_APPICON_NAME="" build-for-testing > "$OUT/build-for-testing.log" 2>&1
  fi
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
@@ -138,4 +146,4 @@ PY
 test "$overall" = 0
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
-echo 'PASS: 412 Swift, 26 native (23 original + 3 local greeting cases), all 11 UI, 50 JavaScript, 12 additional guards + 2 cross-workbook controls.'
+echo 'PASS: current checkout, 26 native and all 11 UI cases; no failures/skips. Core/Excel results are validated separately.'

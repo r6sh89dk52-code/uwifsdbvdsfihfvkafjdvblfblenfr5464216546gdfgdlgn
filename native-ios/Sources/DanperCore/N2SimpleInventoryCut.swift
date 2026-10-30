@@ -16,6 +16,23 @@ public struct N2SimpleCutPreview:Sendable,Equatable {
     public let evidenceSHA256:String?
 }
 extension N2SimpleInventory {
+    /// Clinical projection only; never changes the physical inventory ledger.
+    static func historicalOpeningOverrides(_ snapshot:Data)throws->[String:Double] {
+        let projected=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
+        let projectedVisits=try clinicalRows(object(projected))
+        var correctedR=[String:Double]()
+        for visit in projectedVisits {
+            guard let vid=visit["id"] as? String,let items=visit["items"] as? [[String:Any]]
+            else{continue}
+            for item in items {
+                guard let iid=item["id"] as? String,
+                      let value=item["correctedHistoricalR"] as? Int,
+                      [0,1].contains(value) else{continue}
+                correctedR[key(vid,iid)]=Double(value)
+            }
+        }
+        return correctedR
+    }
     public static func cutPreview(snapshot:Data,code:String,through:String,
                                   catalog:N2NativeCatalogIndex,archive:N2VerifiedInventoryBackup?=nil)throws->N2SimpleCutPreview {
         guard validDay(through) else{throw N2SimpleInventoryError.invalidDate}
@@ -38,22 +55,7 @@ extension N2SimpleInventory {
         let visitsByID=Dictionary(uniqueKeysWithValues:visits.compactMap {v->(String,[String:Any])? in
             guard let id=v["id"] as? String else{return nil};return(id,v)
         })
-        // The current clinical projection may contain explicitly corrected
-        // historical R=0/1 declarations. They change only retrospective
-        // accounting, never the stored counted stock or physical movements.
-        let projected=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
-        let projectedVisits=try clinicalRows(object(projected))
-        var correctedR=[String:Double]()
-        for visit in projectedVisits {
-            guard let vid=visit["id"] as? String,let items=visit["items"] as? [[String:Any]]
-            else{continue}
-            for item in items {
-                guard let iid=item["id"] as? String,
-                      let value=item["correctedHistoricalR"] as? Int,
-                      [0,1].contains(value) else{continue}
-                correctedR[key(vid,iid)]=Double(value)
-            }
-        }
+        let correctedR=try historicalOpeningOverrides(snapshot)
         func effectiveR(_ h:N2SimpleHistoricalUse)->Double? {
             correctedR[key(h.visitID,h.itemID)] ?? h.verifiedR
         }
