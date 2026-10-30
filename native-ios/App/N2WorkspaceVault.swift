@@ -85,6 +85,17 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.correctWorker(dni:dni,worker:worker,at:at,expectedRevision:expectedRevision)
     }
+    func reviewAllergiesRevision(dni:String,status:String,substances:String,
+                                 at:Int64,expectedRevision:Int) async throws -> Int {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.reviewAllergiesRevision(
+                dni:dni,status:status,substances:substances,
+                at:at,expectedRevision:expectedRevision)
+        }
+        return try await N2SyntheticTrialIOSVault.shared.reviewAllergiesRevision(
+            dni:dni,status:status,substances:substances,
+            at:at,expectedRevision:expectedRevision)
+    }
     func reviewAllergies(dni:String,status:String,substances:String,at:Int64,expectedRevision:Int) async throws -> N2ProtectedStoreSummary {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.reviewAllergies(dni:dni,status:status,substances:substances,at:at,expectedRevision:expectedRevision)
