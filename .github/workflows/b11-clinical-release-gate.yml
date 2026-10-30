@@ -64,6 +64,7 @@ jobs:
           DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-b11-fixtures" node scripts/generate-n2-procedure-parity.cjs
       - name: Swift 6 Linux syntax of iOS views + all core XCTest suites
         run: |
+          set -o pipefail
           swift --version
           swiftc -frontend -parse native-ios/App/*.swift
           cd native-ios

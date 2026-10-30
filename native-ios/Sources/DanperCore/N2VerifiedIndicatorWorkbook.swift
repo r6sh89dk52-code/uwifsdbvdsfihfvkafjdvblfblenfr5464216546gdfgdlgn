@@ -238,7 +238,14 @@ public enum N2VerifiedIndicatorWorkbook {
                 }
                 let key=aid+"\u{001F}"+string(item["id"])
                 guard parityR[key]==nil else{throw Failure.invalidVisit}
-                parityR[key]=historicalOverrides[key] ?? parity.consumptionR[pointer]
+                // Keep the nested optional dictionary semantics of the audit.
+                // Coalescing directly into Double?? can promote a missing
+                // override to .some(nil) and erase a genuine original R.
+                if let override=historicalOverrides[key] {
+                    parityR[key]=override
+                } else {
+                    parityR[key]=parity.consumptionR[pointer]
+                }
                 pointer+=1
             }
         }
