@@ -96,8 +96,7 @@ struct N2ClinicalCorrectionView:View {
                                 "LA VENTUROSA":"Fundo La Venturosa",
                                 "PLVENTUROSA":"Planta La Venturosa"])
                     if ["LA VENTUROSA","PLVENTUROSA"].contains(detail.currentRosterSite) {
-                        Text("En Personal figura actualmente: "+detail.currentRosterSite+
-                             ". Confirma la sede donde se realizó ESTA atención; puede ser diferente.")
+                        Text("En Personal figura actualmente: \(detail.currentRosterSite). Confirma la sede donde se realizó ESTA atención; puede ser diferente.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     if !["LA VENTUROSA","PLVENTUROSA"].contains(detail.workerSite) {
