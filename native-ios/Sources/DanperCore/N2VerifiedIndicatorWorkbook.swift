@@ -154,6 +154,8 @@ public enum N2VerifiedIndicatorWorkbook {
         }
         let clinical=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
         let parity=try N2VersionedSnapshotAudit.inspect(N2SimpleInventory.isActive(snapshot) ? snapshot:clinical)
+        let historicalOverrides=try N2SimpleInventory.isActive(snapshot)
+            ? N2SimpleInventory.historicalOpeningOverrides(snapshot) : [:]
         _=try N1fLosslessFieldGate.inspect(clinical)
         guard let source=try? JSONSerialization.jsonObject(with:clinical)
                     as? [String:Any],
@@ -217,7 +219,8 @@ public enum N2VerifiedIndicatorWorkbook {
             var index=0
             for visit in visits where string(visit["status"])=="saved" {
                 for item in visit["items"] as? [[String:Any]] ?? [] {
-                    if let value=parity.consumptionR[index] {linesByItem[string(visit["id"])+"\u{001F}"+string(item["id"])]=value}
+                    let key=string(visit["id"])+"\u{001F}"+string(item["id"])
+                    if let value=historicalOverrides[key] ?? parity.consumptionR[index] {linesByItem[key]=value}
                     index+=1
                 }
             }
@@ -235,7 +238,7 @@ public enum N2VerifiedIndicatorWorkbook {
                 }
                 let key=aid+"\u{001F}"+string(item["id"])
                 guard parityR[key]==nil else{throw Failure.invalidVisit}
-                parityR[key]=parity.consumptionR[pointer]
+                parityR[key]=historicalOverrides[key] ?? parity.consumptionR[pointer]
                 pointer+=1
             }
         }
@@ -325,6 +328,9 @@ public enum N2VerifiedIndicatorWorkbook {
                        let sum=linesByItem[key],abs(sum-value)<0.0001,
                        value.rounded()==value,value>=0 {
                         physical=value
+                        if historicalOverrides[key] != nil {
+                            pendingNotes.append("\(aid) / \(code): R histórico rectificado=\(Int(value)); sin nuevo descuento del inventario contado.")
+                        }
                         consumption[code,default:0]+=Int(value)
                         consumptionBySite[sourceSite+"|"+code,default:0]+=Int(value)
                     } else if linesByItem[key] != nil {

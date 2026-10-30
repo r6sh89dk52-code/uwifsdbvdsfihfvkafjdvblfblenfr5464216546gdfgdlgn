@@ -343,6 +343,19 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertTrue(try cell(newSheet,"H63").contains("<v>5</v>"))
         XCTAssertEqual(try cell(oldSheet,"H63"),try cell(newSheet,"H63"))
         XCTAssertFalse(try cell(newSheet,"H63").contains("<f>"))
+        let plan=try object(fixture("n1s-indicator-plan.json"))
+        for (snapshot,expectedR) in [(raw,1),(edited,0)] {
+            let indicator=try N2VerifiedIndicatorWorkbook.export(snapshot:snapshot,
+                products:JSONSerialization.data(withJSONObject:plan["catalog"]!),
+                mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+                start:"2026-10-09",end:"2026-11-08",subdivision:"PLVENTUROSA",
+                selectedVisitIDs:["planta-open"],allowPending:true)
+            XCTAssertEqual(indicator.visits,1);XCTAssertEqual(indicator.rows,1)
+            let parts=try N1rStoredZip.unpack(indicator.xlsx)
+            let consumption=try XCTUnwrap(String(data:XCTUnwrap(parts.first{$0.name=="xl/worksheets/sheet5.xml"}).data,encoding:.utf8))
+            XCTAssertTrue(try cell(consumption,"R2").contains("<v>\(expectedR)</v>"))
+        }
+        XCTAssertEqual(try N2SimpleInventory.read(edited),prior)
         let unallowed=try bytes(["itemHistoricalOpenings":["unit-5":0]])
         XCTAssertThrowsError(try N2ClinicalCorrections.append(
             snapshot:edited,eventID:"1923B0DE-1FAD-4D78-B983-909E62F31235",

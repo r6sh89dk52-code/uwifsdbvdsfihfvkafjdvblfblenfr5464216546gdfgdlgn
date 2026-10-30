@@ -18,6 +18,7 @@ public struct N2SimpleCutPreview:Sendable,Equatable {
 extension N2SimpleInventory {
     /// Clinical projection only; never changes the physical inventory ledger.
     static func historicalOpeningOverrides(_ snapshot:Data)throws->[String:Double] {
+        let archived=Set(try read(snapshot).historicalUses.map{key($0.visitID,$0.itemID)})
         let projected=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
         let projectedVisits=try clinicalRows(object(projected))
         var correctedR=[String:Double]()
@@ -27,7 +28,7 @@ extension N2SimpleInventory {
             for item in items {
                 guard let iid=item["id"] as? String,
                       let value=item["correctedHistoricalR"] as? Int,
-                      [0,1].contains(value) else{continue}
+                      [0,1].contains(value),archived.contains(key(vid,iid)) else{continue}
                 correctedR[key(vid,iid)]=Double(value)
             }
         }
