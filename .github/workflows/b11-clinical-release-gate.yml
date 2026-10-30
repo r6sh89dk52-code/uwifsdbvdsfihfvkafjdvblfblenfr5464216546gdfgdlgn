@@ -49,72 +49,13 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  replay-ui:
-    name: Replay ${{ matrix.suite }} on isolated ARM iPhone 16
-    needs: verified-evidence
-    runs-on: macos-15
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [N2BiometricInteractionTests, N3ClinicalJourneyTests-protected]
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-      DANPER_REPLAY_LABEL: ${{ matrix.suite }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Prepare identical resources and simulator test project
-        run: |
-          set -euo pipefail
-          test "$(uname -m)" = arm64
-          xcodebuild -version
-          npm ci --ignore-scripts --no-fund
-          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
-          node scripts/glass-audit/verify-build13-upgrade.cjs
-          node scripts/glass-audit/identity.cjs
-          node scripts/prepare-n1s-ios-demo-resources.cjs
-          (cd native-ios && xcodegen generate --spec project.yml)
-      - name: Genuine Face ID preflight and selected failed or missing UI suite
-        timeout-minutes: 35
-        env:
-          DANPER_AUDIT_OUT: ${{ runner.temp }}/b14-replay
-          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b14-build
-        run: bash scripts/glass-audit/validate-macos.sh replay
-      - name: Publish compact verdict before lengthy diagnostics upload
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: B14_REPLAY_RESULT_${{ matrix.suite }}
-          path: |
-            ${{ runner.temp }}/b14-replay/SOURCE_SHA.txt
-            ${{ runner.temp }}/b14-replay/REPLAY_LABEL.txt
-            ${{ runner.temp }}/b14-replay/REPLAY_PASS_SHA.txt
-            ${{ runner.temp }}/b14-replay/*.summary.json
-          retention-days: 14
-          if-no-files-found: error
-      - name: Preserve actual logs and screenshots, including failures
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: B14_REPLAY_DIAGNOSTICS_${{ matrix.suite }}
-          path: |
-            ${{ runner.temp }}/b14-replay
-            !${{ runner.temp }}/b14-replay/DerivedData/**
-          retention-days: 7
-          if-no-files-found: warn
-
   build14-ipa:
     name: Package Build 14 only after combined 417 Swift, 26 native and 11 UI pass
-    needs: [verified-evidence, replay-ui]
-    runs-on: macos-15
+    needs: verified-evidence
+    runs-on: macos-15-intel
     timeout-minutes: 40
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
         with:
@@ -127,11 +68,23 @@ jobs:
         with:
           name: B14_BASELINE_PROOF
           path: ${{ runner.temp }}/b14-combined/baseline
-      - uses: actions/download-artifact@v4
+      - name: Recover unchanged genuine biometric pass
+        uses: actions/download-artifact@v4
         with:
-          pattern: B14_REPLAY_RESULT_*
-          path: ${{ runner.temp }}/b14-combined
+          name: B14_REPLAY_RESULT_N2BiometricInteractionTests
+          run-id: 41078523104
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b14-combined/B14_REPLAY_RESULT_N2BiometricInteractionTests
+      - name: Recover unchanged protected clinical journey pass
+        uses: actions/download-artifact@v4
+        with:
+          name: B14_REPLAY_RESULT_N3ClinicalJourneyTests-protected
+          run-id: 41078523104
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b14-combined/B14_REPLAY_RESULT_N3ClinicalJourneyTests-protected
       - name: Require exact source identity and full zero-failure combined coverage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/glass-audit/resume-build14.py final "$RUNNER_TEMP/b14-combined" "$RUNNER_TEMP/build14-release"
           node scripts/glass-audit/verify-build13-upgrade.cjs

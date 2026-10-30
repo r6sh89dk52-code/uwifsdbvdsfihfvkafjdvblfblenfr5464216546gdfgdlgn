@@ -29,6 +29,10 @@ PROOF_ARTIFACT = 12982946604
 DEMO_ARTIFACT = 12984099322
 REUSED_UI = {**BASE_UI, 'N3ClinicalJourneyTests-demo': 2}
 REPLAY_UI = {'N2BiometricInteractionTests': 1, 'N3ClinicalJourneyTests-protected': 1}
+PASSED_UI_RUN = 41078523104
+PASSED_UI_SHA = '486750f1b30a692731b91d9ac488fca4947db9e4'
+PASSED_UI_ARTIFACTS = {12989348581: 'B14_REPLAY_RESULT_N2BiometricInteractionTests',
+                       12990535712: 'B14_REPLAY_RESULT_N3ClinicalJourneyTests-protected'}
 
 
 def git(*args):
@@ -125,12 +129,28 @@ def final(root, out):
     assert proof['testedInputsSHA256'] == digest and proof['mustReplay'] == REPLAY_UI
     assert proof['swiftTests'] == 417 and proof['native']['count'] == 26
     assert {k: v['count'] for k, v in proof['reusedUI'].items()} == REUSED_UI
+    # Only packaging orchestration may change after the two authentic UI passes.
+    # Keep the original source markers; never relabel old results as fresh runs.
+    subprocess.run(['git', 'merge-base', '--is-ancestor', PASSED_UI_SHA, head], check=True)
+    assert set(git('diff', '--name-only', PASSED_UI_SHA, head).splitlines()) <= {
+        '.github/workflows/b11-clinical-release-gate.yml',
+        'scripts/glass-audit/resume-build14.py'}
+    run = api('actions/runs/' + str(PASSED_UI_RUN) + '/attempts/1')
+    assert run['head_sha'] == PASSED_UI_SHA and run['conclusion'] == 'failure'
+    jobs = api('actions/runs/' + str(PASSED_UI_RUN) + '/attempts/1/jobs')['jobs']
+    for job in (124141108925, 124141225952, 124141226385):
+        assert any(j['id'] == job and j['conclusion'] == 'success' for j in jobs)
+    assert any(j['id'] == 124153862313 and j['conclusion'] == 'cancelled' for j in jobs)
+    artifacts = api('actions/runs/' + str(PASSED_UI_RUN) + '/artifacts')['artifacts']
+    for artifact, name in PASSED_UI_ARTIFACTS.items():
+        assert any(a['id'] == artifact and a['name'] == name and not a['expired']
+                   and a['workflow_run']['head_sha'] == PASSED_UI_SHA for a in artifacts)
     covered = dict(REUSED_UI)
     for label, count in REPLAY_UI.items():
         folder = Path(root, 'B14_REPLAY_RESULT_' + label)
-        assert one(folder, 'SOURCE_SHA.txt').read_text().strip() == head
+        assert one(folder, 'SOURCE_SHA.txt').read_text().strip() == PASSED_UI_SHA
         assert one(folder, 'REPLAY_LABEL.txt').read_text().strip() == label
-        assert one(folder, 'REPLAY_PASS_SHA.txt').read_text().strip() == head
+        assert one(folder, 'REPLAY_PASS_SHA.txt').read_text().strip() == PASSED_UI_SHA
         passing(folder, 'biometric-preflight', 1)
         passing(folder, label, count)
         if label.endswith('-demo'):
@@ -142,6 +162,9 @@ def final(root, out):
         'sourceSHA': head, 'baselineSHA': BASE, 'baselineRun': RUN,
         'swift': 417, 'native': 26, 'ui': covered, 'failures': 0, 'skips': 0,
         'priorBiometricFailureReplayed': True, 'proofRun': proof['proofRun'],
+        'authenticatedUIRun': PASSED_UI_RUN, 'authenticatedUISourceSHA': PASSED_UI_SHA,
+        'authenticatedUIArtifacts': sorted(PASSED_UI_ARTIFACTS),
+        'priorPackagingRunnerCancelled': True,
         'testedInputsSHA256': digest}, indent=2))
     Path(out, 'VALIDATED_SHA.txt').write_text(head + '\n')
     print('PASS: combined coverage 417 Swift, 26 native, all 11 UI; no failures/skips. IPA gate unlocked.')
