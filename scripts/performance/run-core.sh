@@ -14,5 +14,10 @@ case "$CONFIGURATION" in
  optimized) FLAGS=(-Xswiftc -DDANPER_PERF_OPTIMIZED) ;;
  *) exit 1 ;;
 esac
-DANPER_PERF_OUTPUT="$OUTPUT" swift test --package-path "$CHECKOUT/native-ios" -c release --jobs 2 \
+# Compile outside the resource measurement. The timed process runs only the
+# prepared workload, not the compiler. This is Core/XCTest RSS, not iPhone RAM.
+swift build --package-path "$CHECKOUT/native-ios" -c release --jobs 2 --build-tests "${FLAGS[@]}"
+LC_ALL=C /usr/bin/time -f '{"user_cpu_s":%U,"system_cpu_s":%S,"peak_rss_kib":%M,"wall_s":%e}' \
+  -o "$OUTPUT.resources.json" env DANPER_PERF_OUTPUT="$OUTPUT" \
+  swift test --package-path "$CHECKOUT/native-ios" -c release --jobs 2 --skip-build \
   "${FLAGS[@]}" --filter N2PerformanceAuditTests

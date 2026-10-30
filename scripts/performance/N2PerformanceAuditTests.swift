@@ -67,7 +67,8 @@ final class N2PerformanceAuditTests:XCTestCase {
                 times.append((ProcessInfo.processInfo.systemUptime-start)*1_000)
             }
             let ordered=times.sorted()
-            var row:[String:Any]=["action":name,"samples":times,"n":n,"p50_ms":ordered[n/2],"max_ms":ordered.last!]
+            let median=n%2==0 ? (ordered[n/2-1]+ordered[n/2])/2 : ordered[n/2]
+            var row:[String:Any]=["action":name,"samples":times,"n":n,"p50_ms":median,"max_ms":ordered.last!]
             // Small samples are not a credible tail estimate. Retain every raw value.
             if n>=20 {row["p95_ms"]=ordered[min(n-1,Int(ceil(Double(n)*0.95))-1)]}
             results.append(row)
