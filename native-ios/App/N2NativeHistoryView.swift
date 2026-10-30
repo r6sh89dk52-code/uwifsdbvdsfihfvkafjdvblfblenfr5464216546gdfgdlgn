@@ -283,6 +283,10 @@ private struct N2RecordedVisitDetailView:View {
                                 Text(med.name).font(.subheadline.weight(.semibold))
                                 Text("Cantidad clínica: \(med.quantity) · "+med.procedure)
                                     .font(.caption).foregroundStyle(.secondary)
+                                if med.historicalOpeningEditable {
+                                    Text("Apertura histórica: "+(med.historicalOpeningR.map{"R="+String($0)} ?? "sin verificar"))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                                 if med.quantity != med.originalQuantity {
                                     Label("Original: \(med.originalQuantity). El movimiento físico no se alteró.",
                                           systemImage:"info.circle")
