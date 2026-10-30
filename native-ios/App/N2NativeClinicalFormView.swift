@@ -1307,10 +1307,22 @@ struct N2NativeClinicalFormView:View {
         do {
             let statusToSave=allergyStatus
             let normalized=statusToSave=="known" ? allergySubstances : ""
-            let revision=try await vault.currentRevision()
-            let committed=try await vault.reviewAllergiesRevision(
-                dni:dni,status:statusToSave,substances:normalized,
-                at:now,expectedRevision:revision)
+            var revision=current.revision
+            let committed:Int
+            do {
+                committed=try await vault.reviewAllergiesRevision(
+                    dni:dni,status:statusToSave,substances:normalized,
+                    at:now,expectedRevision:revision)
+            } catch N2ProtectedStoreError.staleRevision {
+                // Another verified draft or worker edit advanced the journal.
+                // Re-read only the revision; retry once without touching
+                // the other data, then rebuild context only if necessary.
+                revision=try await vault.currentRevision()
+                committed=try await vault.reviewAllergiesRevision(
+                    dni:dni,status:statusToSave,substances:normalized,
+                    at:now,expectedRevision:revision)
+            }
+            didCommit=true
             if revision==current.revision {
                 context=current.withCommittedAllergy(
                     dni:dni,status:statusToSave,substances:normalized,
@@ -1320,17 +1332,23 @@ struct N2NativeClinicalFormView:View {
                 // while the form was open; never silently overwrite its context.
                 context=try await vault.clinicalFormContext()
             }
-            didCommit=true
             status="Revisión de alergias guardada."
             allergyFeedback="Alergias revisadas y guardadas"
             allergySaveFailed=false
             fault=false
         } catch {
-            // Never display a green success when the transaction was rejected.
-            // Retain user input to allow retry and avoid clobbering the draft.
-            status="No se pudo guardar la revisión de alergias."
-            allergyFeedback="No se guardaron los cambios. Intenta nuevamente."
-            allergySaveFailed=true
+            if didCommit {
+                // A successful encrypted commit must never be labeled failed
+                // just because the post-commit UI context refresh failed.
+                status="Alergias guardadas. No se pudo actualizar la ficha; vuelve a abrir la atención."
+                allergyFeedback="Guardado confirmado. Reabre la atención para continuar."
+                allergySaveFailed=false
+                fault=true
+            } else {
+                status="No se pudo guardar la revisión de alergias."
+                allergyFeedback="No se guardaron los cambios. Intenta nuevamente."
+                allergySaveFailed=true
+            }
         }
     }
     @MainActor
