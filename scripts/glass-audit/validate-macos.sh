@@ -146,8 +146,7 @@ run_tests(){
  prepare_test_installation || return $?
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
-   xcrun simctl spawn "$SIM_ID" log stream --level debug --style compact \
-    --predicate 'subsystem BEGINSWITH "com.apple.LocalAuthentication" OR (process == "coreauthd" AND eventMessage CONTAINS "simulateMatching") OR (process == "DANPERNative" AND subsystem == "com.apple.UIKit" AND category == "Application")' > "$OUT/$label-system.log" 2>&1 & stream=$!
+   python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$OUT/$label-system.log" 2>&1 & stream=$!
    python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;
  esac
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
