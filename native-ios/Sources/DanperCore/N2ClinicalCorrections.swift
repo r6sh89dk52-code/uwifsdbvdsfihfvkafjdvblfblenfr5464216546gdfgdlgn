@@ -24,6 +24,10 @@ public struct N2CorrectionField:Sendable,Equatable {
 public struct N2CorrectionDetail:Sendable {
     public let id:String
     public let workerName:String
+    /// Site recorded for THIS visit; never inferred from a later job transfer.
+    public let workerSite:String
+    /// Current roster site offered only as an explicit suggestion.
+    public let currentRosterSite:String
     public let date:String
     public let time:String
     public let category:String
@@ -96,7 +100,8 @@ public enum N2ClinicalCorrections {
                 editableText.contains($0) || editableBools.contains($0) ||
                 $0=="standaloneProcedures" || $0=="itemProcedures" ||
                 $0=="itemClinicalQuantities" ||
-                $0=="itemHistoricalOpenings"
+                $0=="itemHistoricalOpenings" ||
+                $0=="visitWorkerSite"
               }) else{throw N2CorrectionError.invalidChanges}
         for (key,v) in changes {
             if editableText.contains(key) {
@@ -131,6 +136,17 @@ public enum N2ClinicalCorrections {
                     }
                     return item
                 }
+            }else if key=="visitWorkerSite" {
+                // An explicit correction changes only the site on the
+                // projected clinical visit, not the current personnel roster
+                // and never an inventory/dispensing record.
+                guard let site=v as? String,
+                      ["LA VENTUROSA","PLVENTUROSA"].contains(site),
+                      var worker=next["worker"] as? [String:Any],
+                      let dni=worker["dni"] as? String,dni.count==8
+                else {throw N2CorrectionError.invalidChanges}
+                worker["site"]=site
+                next["worker"]=worker
             }else if key=="itemHistoricalOpenings" {
                 guard let entries=v as? [String:Int],!entries.isEmpty,entries.count<=100,
                       let items=next["items"] as? [[String:Any]],
@@ -280,7 +296,13 @@ public enum N2ClinicalCorrections {
                 historicalOpeningEditable:eligible)
         }
         func s(_ key:String)->String{visit[key] as? String ?? ""}
+        let dni=worker["dni"] as? String ?? ""
+        let roster=(obj["workers"] as? [[String:Any]])?
+            .first(where:{$0["dni"] as? String==dni})
+        let currentRosterSite=roster?["site"] as? String ?? ""
         return N2CorrectionDetail(id:visitID,workerName:worker["name"] as? String ?? "",
+            workerSite:worker["site"] as? String ?? "",
+            currentRosterSite:currentRosterSite,
             date:s("date"),time:s("time"),category:s("category"),system:s("system"),
             segment:s("segment"),diagnosis:s("diagnosis"),permission:s("permission"),
             permissionTime:s("permissionTime"),responsible:s("responsible"),
