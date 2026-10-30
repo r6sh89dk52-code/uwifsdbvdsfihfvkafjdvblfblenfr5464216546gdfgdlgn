@@ -73,6 +73,18 @@ public struct N2FormContext:Sendable {
     public let lots:[N2FormLot]
     public let products:N2NativeCatalogIndex
 
+    /// Update a context's journal revision after an unrelated saved draft.
+    /// Only the immutable revision changes; all cached records are shared COW.
+    public func withCommittedRevision(_ revision:Int)->N2FormContext {
+        var next=N2FormContext(revision:revision,workers:workers,
+                               allergies:allergies,lots:lots,products:products)
+        next.inventorySchemaVersion=inventorySchemaVersion
+        next.simpleProducts=simpleProducts
+        next.operationalMappings=operationalMappings
+        next.auxiliaryProducts=auxiliaryProducts
+        return next
+    }
+
     /// Refresh only the one verified allergy and immutable journal revision.
     /// Swift arrays/dictionaries retain copy-on-write buffers: no re-sorting
     /// 10k people, reconstructing stock projections, or reading the vault.
