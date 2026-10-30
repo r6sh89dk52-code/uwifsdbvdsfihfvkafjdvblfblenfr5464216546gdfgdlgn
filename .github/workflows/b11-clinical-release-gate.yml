@@ -27,14 +27,14 @@ jobs:
       - name: Recover original Linux evidence
         uses: actions/download-artifact@v4
         with:
-          artifact-ids: 12954980903
+          name: B14_LINUX_SWIFT_EXCEL_DIAGNOSTICS
           run-id: 41003061702
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/b14-baseline/linux
       - name: Recover original simulator results, including the failed biometric case
         uses: actions/download-artifact@v4
         with:
-          artifact-ids: 12957546521
+          name: B11_MACOS_XCODE_DIAGNOSTICS_ONLY
           run-id: 41003061702
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/b14-baseline/macos
@@ -60,8 +60,6 @@ jobs:
         suite: [N2BiometricInteractionTests, N3ClinicalJourneyTests-demo, N3ClinicalJourneyTests-protected]
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-      DANPER_AUDIT_OUT: ${{ runner.temp }}/b14-replay
-      DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b14-build
       DANPER_REPLAY_LABEL: ${{ matrix.suite }}
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +83,9 @@ jobs:
           (cd native-ios && xcodegen generate --spec project.yml)
       - name: Genuine Face ID preflight and selected failed or missing UI suite
         timeout-minutes: 35
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b14-replay
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b14-build
         run: bash scripts/glass-audit/validate-macos.sh replay
       - name: Publish compact verdict before lengthy diagnostics upload
         if: always()
