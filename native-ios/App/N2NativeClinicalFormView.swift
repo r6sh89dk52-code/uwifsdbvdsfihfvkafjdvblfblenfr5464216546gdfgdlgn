@@ -74,6 +74,7 @@ struct N2NativeClinicalFormView:View {
     @FocusState private var workerNameFocused:Bool
     @State private var editingWorkerDNI:String?
     @State private var allergyFeedback=""
+    @State private var allergySaveFailed=false
     @State private var chooseProduct=false
     @State private var showOtherProcedures=false
     @State private var chooseDraft=false
@@ -136,7 +137,10 @@ struct N2NativeClinicalFormView:View {
         return(date,formatter.string(from:Date()))
     }
     private var currentWorker:N2FormWorker? {
-        workersByDNI[form.dni] ?? context?.workers.first(where:{$0.dni==form.dni})
+        guard !form.dni.isEmpty else{return nil}
+        // A failed DNI lookup must not rescan 10k workers for every SwiftUI render.
+        if !workersByDNI.isEmpty {return workersByDNI[form.dni]}
+        return context?.workers.first(where:{$0.dni==form.dni})
     }
     private var nameSuggestions:[N2FormWorker] {
         let query=workerNameInput.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -156,6 +160,7 @@ struct N2NativeClinicalFormView:View {
         allergyStatus=context?.allergies[worker.dni]?.status ?? "unknown"
         allergySubstances=context?.allergies[worker.dni]?.substances ?? ""
         allergyFeedback=""
+        allergySaveFailed=false
     }
     private func workerAgeDescription(_ worker:N2FormWorker)->String {
         if let age=N2WorkerAge.years(birthDate:worker.birthDate,on:form.date) {
@@ -170,8 +175,7 @@ struct N2NativeClinicalFormView:View {
         dniLookupTask?.cancel()
         let digits=N2NativeWorkerLookup.numericDNI(value)
         if workerDNIInput != digits {workerDNIInput=digits}
-        if let worker=N2NativeWorkerLookup.exactDNI(digits,
-            in:context?.workers ?? []) {
+        if let worker=workersByDNI[digits] {
             selectWorker(worker)
             return
         }
@@ -182,8 +186,7 @@ struct N2NativeClinicalFormView:View {
         dniLookupTask=Task { @MainActor in
             do {try await Task.sleep(for:.milliseconds(400))}catch{return}
             guard workerDNIInput==digits,!Task.isCancelled else{return}
-            if let worker=N2NativeWorkerLookup.exactDNI(digits,
-                in:context?.workers ?? []) {
+            if let worker=workersByDNI[digits] {
                 selectWorker(worker)
             } else {
                 notFoundDNI=digits
@@ -718,9 +721,10 @@ struct N2NativeClinicalFormView:View {
                         }.id("allergy-substances")
                     }
                     if !allergyFeedback.isEmpty {
-                        Label(allergyFeedback,systemImage:"checkmark.circle.fill")
+                        Label(allergyFeedback,systemImage:allergySaveFailed
+                              ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(allergySaveFailed ? Color.orange : Color.green)
                     }
                     Button(editingAllergy
                            ? "Guardando…" : "Guardar revisión de alergias") {
@@ -1288,23 +1292,36 @@ struct N2NativeClinicalFormView:View {
 
     @MainActor
     private func recordAllergy(_ dni:String) async {
+        guard !editingAllergy,let current=context,form.dni==dni else{return}
         editingAllergy=true
-        defer{editingAllergy=false}
-        do{
-            let normalized=allergyStatus=="known" ? allergySubstances : ""
-            let fresh=try await vault.clinicalFormContext()
-            let updated=try await vault
-                .reviewAllergies(dni:dni,status:allergyStatus,
-                    substances:normalized,at:now,
-                    expectedRevision:fresh.revision)
-            context=try await vault.clinicalFormContext()
+        allergySaveFailed=false
+        allergyFeedback=""
+        // A draft autosave can race the journal revision; stop an outstanding
+        // debounced task before the short, verified allergy transaction.
+        autosaveTask?.cancel()
+        defer {
+            editingAllergy=false
+        }
+        do {
+            let statusToSave=allergyStatus
+            let normalized=statusToSave=="known" ? allergySubstances : ""
+            let revision=try await vault.currentRevision()
+            let committed=try await vault.reviewAllergiesRevision(
+                dni:dni,status:statusToSave,substances:normalized,
+                at:now,expectedRevision:revision)
+            context=current.withCommittedAllergy(
+                dni:dni,status:statusToSave,substances:normalized,
+                revision:committed)
             status="Revisión de alergias guardada."
             allergyFeedback="Alergias revisadas y guardadas"
+            allergySaveFailed=false
             fault=false
-        }catch{
+        } catch {
+            // Never display a green success when the transaction was rejected.
+            // Retain user input to allow retry and avoid clobbering the draft.
             status="No se pudo guardar la revisión de alergias."
             allergyFeedback="No se guardaron los cambios. Intenta nuevamente."
-            fault=true
+            allergySaveFailed=true
         }
     }
     @MainActor
@@ -1334,7 +1351,8 @@ struct N2NativeClinicalFormView:View {
         !form.items.isEmpty
     }
     private func scheduleDraft(immediate:Bool=false) {
-        guard !layoutOnly,let context,!busy,!saved,!fault,meaningfulDraft else{return}
+        guard !layoutOnly,let context,!busy,!saved,!fault,!editingAllergy,
+              meaningfulDraft else{return}
         autosaveTask?.cancel()
         let version=form
         autosaveTask=Task { @MainActor in
@@ -1342,12 +1360,12 @@ struct N2NativeClinicalFormView:View {
                 do {try await Task.sleep(for:.milliseconds(650))}
                 catch{return}
             }
-            guard !Task.isCancelled else{return}
+            guard !Task.isCancelled,!editingAllergy else{return}
             do{
                 let latestRevision=try await vault.currentRevision()
                 // A cancelled autosave must never race the final save with
                 // the same journal revision or replace its success banner.
-                guard !Task.isCancelled,!saved,!busy else{return}
+                guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
                 let patch=try version.makeDraftPatch(context:context,stage:step)
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
@@ -1359,7 +1377,7 @@ struct N2NativeClinicalFormView:View {
                 await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
                 status="Borrador guardado."
             }catch{
-                if !Task.isCancelled && !saved {
+                if !Task.isCancelled && !saved && !editingAllergy {
                     fault=true
                     status="No se pudo guardar el borrador. Edición bloqueada hasta verificar el almacenamiento."
                 }
