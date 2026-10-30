@@ -1,4 +1,4 @@
-name: B11 - Clinical Parity Gate (NO IPA)
+name: B14 - Clinical Parity Gate and gated iLoader IPA
 on:
   push:
     branches:
@@ -148,3 +148,58 @@ jobs:
             !${{ runner.temp }}/b14-simulator-evidence/DerivedData/**
           retention-days: 7
           if-no-files-found: warn
+
+  build14-ipa:
+    name: Build 14 unsigned iLoader IPA after all mandatory gates
+    needs: [linux-swift, macos-swiftui]
+    if: github.event.pull_request.head.ref == 'fix/kardex-opening-history-build14-20261029' || github.ref == 'refs/heads/fix/kardex-opening-history-build14-20261029'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify same Build 13 storage and signing identity
+        run: |
+          set -euo pipefail
+          node scripts/glass-audit/verify-build13-upgrade.cjs
+          node scripts/glass-audit/identity.cjs
+      - name: Prepare distribution resources and Xcode
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+      - name: Require JavaScript regressions and package validated Release ARM64
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/build14-release
+        run: |
+          set -euo pipefail
+          mkdir -p "$DANPER_AUDIT_OUT"
+          node scripts/glass-audit/javascript.cjs
+          # Both required jobs above tested precisely this source SHA.
+          git rev-parse HEAD > "$DANPER_AUDIT_OUT/VALIDATED_SHA.txt"
+          bash scripts/glass-audit/package-macos.sh
+          cp "$DANPER_AUDIT_OUT/javascript-results.json" "$DANPER_AUDIT_OUT/ipa/"
+      - name: Publish verified Build 14 iLoader candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_BUILD14_ILOADER_UNSIGNED_${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/build14-release/ipa
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Preserve packaging diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: B14_PACKAGING_DIAGNOSTICS
+          path: |
+            ${{ runner.temp }}/build14-release/*.log
+            ${{ runner.temp }}/build14-release/*.json
+          retention-days: 7

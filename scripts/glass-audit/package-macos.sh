@@ -20,7 +20,7 @@ from pathlib import Path
 import json,plistlib,sys,subprocess,hashlib,shutil
 app=Path(sys.argv[1]); p=plistlib.loads((app/'Info.plist').read_bytes())
 assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
-assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='13'
+assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='14'
 assert p['CFBundleSupportedPlatforms']==['iPhoneOS']
 assert p['NSFaceIDUsageDescription'] and p['UILaunchStoryboardName']=='LaunchScreen'
 assert list(app.rglob('LaunchScreen.storyboardc'))
@@ -60,7 +60,7 @@ PY
 mkdir -p "$OUT/package/Payload" "$OUT/ipa"
 cp -R "$APP" "$OUT/package/Payload/"
 cp "$DD/Build/Products/Release-iphoneos/APP_SHA256.json" "$OUT/ipa/APP_SHA256.json"
-IPA="$OUT/ipa/DANPER_GLASS_PRO_0.4.2_13_ILOADER_UNSIGNED.ipa"
+IPA="$OUT/ipa/DANPER_GLASS_PRO_0.4.2_14_ILOADER_UNSIGNED.ipa"
 (cd "$OUT/package" && /usr/bin/ditto -c -k --keepParent Payload "$IPA")
 unzip -t "$IPA" > "$OUT/ipa/zip-integrity.log"
 python3 - "$IPA" "$OUT/ipa/APP_SHA256.json" "$SHA" <<'PY'
@@ -71,7 +71,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  prefix='Payload/DANPERNative.app/'
  for f,digest in json.load(open(sys.argv[2])).items(): assert hashlib.sha256(z.read(prefix+f)).hexdigest()==digest,f
  p=plistlib.loads(z.read(prefix+'Info.plist'));assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
- assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='13'
+ assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='14'
  content=json.loads(z.read(prefix+'DANPER_CONTENTS.json'));assert content['testClockAbsentInRelease'] and not content['clinicalDatasetsBundled']
  provenance=json.loads(z.read(prefix+'DANPER_BUILD.json'));assert provenance['sourceSHA']==sys.argv[3]
 provenance['ipaSHA256']=hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest()
