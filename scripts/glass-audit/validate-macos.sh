@@ -87,7 +87,21 @@ fi
 SIM_ID=''
 INSTALL_RECOVERY_SIM=''
 cleanup(){ if test -n "$SIM_ID"; then xcrun simctl shutdown "$SIM_ID" || true; xcrun simctl delete "$SIM_ID" || true; fi; }
-trap cleanup EXIT
+finish(){
+ local result=$?
+ trap - EXIT
+ # Bash 3 can terminate on an expansion error before XCTest is launched.
+ # Cleanup must never turn an incomplete B15 run into a successful job.
+ if test "$MODE" = b15-shard && ! test -f "$OUT/SHARD_PASS_SHA.txt"; then
+  echo 'FAIL: UI shard did not produce its completion marker' >&2; result=1
+ fi
+ if test "$MODE" = b15-native && ! test -f "$OUT/CORE_NATIVE_SHA.txt"; then
+  echo 'FAIL: native suite did not produce its completion marker' >&2; result=1
+ fi
+ cleanup
+ exit "$result"
+}
+trap finish EXIT
 fresh(){
  cleanup
  SIM_ID=$(xcrun simctl create "DANPER-SYNTHETIC-$1" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
@@ -164,9 +178,10 @@ run_tests(){
    python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$OUT/$label-system.log" 2>&1 & stream=$!
    python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;
  esac
- local selection=(-project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug)
- local derived=(-derivedDataPath "$DD")
- if test -n "$TEST_RUN"; then selection=(-xctestrun "$TEST_RUN"); derived=(); fi
+ # Keep the argument array nonempty on macOS /bin/bash 3.2. Expanding an
+ # empty array under nounset aborts there before the command can execute.
+ local selection=(-project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug -derivedDataPath "$DD")
+ if test -n "$TEST_RUN"; then selection=(-xctestrun "$TEST_RUN"); fi
  if test "$label" = N2AllergySaveInteractionTests; then
   # Seed/preflight XCTest may leave its host alive. The UI suite explicitly
   # relaunches the app: profiling must observe that new process, not the seed.
@@ -175,7 +190,7 @@ run_tests(){
  fi
  xcodebuild "${selection[@]}" \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
-  "${derived[@]}" -parallel-testing-enabled NO -test-timeouts-enabled YES \
+  -parallel-testing-enabled NO -test-timeouts-enabled YES \
   -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 -resultBundlePath "$OUT/$label.xcresult" \
   ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
  if test -n "$profiler"; then wait "$profiler" || echo 'Profiler could not collect all diagnostics; inspect profiler-launch.log'; fi

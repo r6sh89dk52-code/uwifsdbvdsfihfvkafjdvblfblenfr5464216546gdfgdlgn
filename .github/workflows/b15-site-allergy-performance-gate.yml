@@ -30,6 +30,7 @@ jobs:
           node scripts/glass-audit/javascript.cjs
           git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
           python3 scripts/performance/inventory.py "$DANPER_AUDIT_OUT/action-inventory.json"
+          python3 -m unittest discover -s scripts/performance/tests -v
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -107,7 +108,10 @@ jobs:
           DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
           DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/TEST_PRODUCTS.json
           DANPER_B15_UI_LABEL: ${{ matrix.suite }}
-        run: bash scripts/glass-audit/validate-macos.sh b15-shard
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/validate-macos.sh b15-shard
+          python3 scripts/performance/verify-ui-shard.py "$DANPER_AUDIT_OUT" "$DANPER_B15_UI_LABEL"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

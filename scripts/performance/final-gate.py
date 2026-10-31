@@ -22,7 +22,7 @@ for p in Path('native-ios/InteractionTests').glob('*.swift'):
 assert sum(suites.values())==13
 for label,count in suites.items():
     folder=root/('B15_UI_RESULT_'+label)
-    marker(folder,'SOURCE_SHA.txt');marker(folder,'SHARD_PASS_SHA.txt')
+    marker(folder,'SOURCE_SHA.txt');marker(folder,'SHARD_PASS_SHA.txt');marker(folder,'SHARD_VERIFIED_SHA.txt')
     assert (folder/'SHARD_LABEL.txt').read_text().strip()==label
     passing(folder/'biometric-preflight.xcresult.summary.json',1)
     passing(folder/(label+'.xcresult.summary.json'),count)
