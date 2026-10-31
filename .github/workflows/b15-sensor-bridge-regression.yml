@@ -16,6 +16,6 @@ jobs:
       - name: Parse changed harness and interaction source
         run: |
           python3 -m py_compile scripts/glass-audit/simulator-ready-bridge.py scripts/performance/profile-simulator.py scripts/performance/tests/test_sensor_bridge.py
-          swiftc -frontend -parse native-ios/InteractionTests/N2AllergySaveInteractionTests.swift
+          swiftc -frontend -parse native-ios/InteractionTests/N2AllergySaveInteractionTests.swift native-ios/InteractionTests/N3ClinicalJourneyTests.swift
       - name: Run all Python evidence and sensor regressions
         run: python3 -m unittest discover -s scripts/performance/tests -v
