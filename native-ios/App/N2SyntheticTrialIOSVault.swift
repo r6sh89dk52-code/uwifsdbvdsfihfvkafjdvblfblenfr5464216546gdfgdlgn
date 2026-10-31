@@ -101,6 +101,9 @@ actor N2SyntheticTrialIOSVault {
         guard confirmation==N2SyntheticResetScope.confirmation else {
             throw Failure.blockedMigration
         }
+        // An explicitly erased demonstration must not retain its key or
+        // authenticated snapshot proofs in the session-owned core.
+        sessionStore=nil
         let fm=FileManager.default
         guard let support=fm.urls(for:.applicationSupportDirectory,
                                  in:.userDomainMask).first?.standardizedFileURL else {
