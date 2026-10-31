@@ -1,0 +1,77 @@
+name: B15 read-only source evidence inspection
+on:
+  push:
+    branches: ["audit/b15-evidence-0eb935b"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - name: Wait for exact application HEAD validation, never approve a stale SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.request
+          repo = os.environ["GITHUB_REPOSITORY"]
+          expected = "0eb935b8fa41078f0a52f9a88c72014008ecb9ca"
+          base = "https://api.github.com/repos/" + repo
+          headers = {"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json"}
+          def get(path):
+              with urllib.request.urlopen(urllib.request.Request(base + path, headers=headers), timeout=45) as response:
+                  return json.load(response)
+          def head():
+              value = get("/git/ref/heads/fix/indicator-historical-visit-site-build15-20261030")["object"]["sha"]
+              if value != expected:
+                  raise SystemExit("Source branch moved; inspection cannot certify the previous HEAD: " + value)
+          for attempt in range(150):
+              head()
+              run = get("/actions/runs/41169078356")
+              if run["head_sha"] != expected:
+                  raise SystemExit("Unexpected source workflow SHA")
+              print("Source workflow", run["status"], run["conclusion"], "source SHA", expected, flush=True)
+              if run["status"] == "completed":
+                  print("READ-ONLY EVIDENCE INSPECTION; source conclusion:", run["conclusion"], flush=True)
+                  break
+              time.sleep(30)
+          else:
+              raise SystemExit("Source workflow has not finished; no certification")
+          head()
+          PY
+      - name: Read artifacts from application workflow 41169078356
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 41169078356
+          pattern: B15_*
+          path: ${{ runner.temp }}/b15-evidence
+      - name: Print actual source evidence and profiling summaries
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/b15-evidence
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          root = pathlib.Path(os.environ["EVIDENCE_ROOT"])
+          print("APP_SOURCE_SHA=0eb935b8fa41078f0a52f9a88c72014008ecb9ca; auxiliary workflow SHA is NOT the application SHA")
+          selected = {"comparison.json", "before.json", "after.json", "compatibility.json", "FINAL_GATES.json", "profiling-status.json"}
+          for p in sorted(root.rglob("*")):
+              if not p.is_file(): continue
+              name = p.name
+              if name in selected or ("summary" in name.lower() and p.suffix == ".json") or (name.endswith(".txt") and any(k in name for k in ["SHA", "SHARD_PASS", "CORE_NATIVE"])):
+                  value = p.read_text(errors="replace")
+                  print("\nEVIDENCE_FILE", str(p.relative_to(root)), "BYTES", p.stat().st_size)
+                  if len(value) <= 120000: print(value)
+                  else: print("Too large to print completely; no abbreviated JSON used as approval")
+              elif p.suffix in {".log", ".txt"} and any(k in str(p).lower() for k in ["profil", "resource", "time", "ui", "compatib", "after", "before"]):
+                  matches = [s for s in p.read_text(errors="replace").splitlines() if re.search(r"measured|average:|CPU|Maximum resident|User time|System time|Elapsed|SHARD|Executed [0-9]+ tests|Test Suite.*(passed|failed)|error:|failed|FAIL|NoMedido|time-profile|os-signpost|allocation", s, re.I)]
+                  if matches:
+                      print("\nEVIDENCE_LOG", str(p.relative_to(root)))
+                      print("\n".join(matches[-120:]))
+          print("\nAvailable profiling files:")
+          for p in sorted(root.rglob("*")):
+              if p.is_file() and any(k in str(p).lower() for k in ["profiling", "toc", "allocation", "timeprofiler", "signpost"]):
+                  print(str(p.relative_to(root)), p.stat().st_size)
+          PY
