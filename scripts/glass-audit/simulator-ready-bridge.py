@@ -83,7 +83,7 @@ def main():
  assert 'interactiontests' in bundle_id.lower() and bundle_id.startswith('pe.danper.saludmovil.native.iloaderpreview.')
  report('RUNNER_BUNDLE',bundle_id)
  def lookup_container():
-  r=subprocess.run(['xcrun','simctl','get_app_container',sim,bundle_id,'data'],capture_output=True,text=True,timeout=5)
+  r=subprocess.run(['xcrun','simctl','get_app_container',sim,bundle_id,'data'],capture_output=True,text=True,timeout=30)
   if r.returncode==0 and r.stdout.strip():
    return Path(r.stdout.strip())/'Documents/DANPER_BIOMETRIC_READY'
   raise OSError('Runner container query failed: '+r.stderr.strip())
