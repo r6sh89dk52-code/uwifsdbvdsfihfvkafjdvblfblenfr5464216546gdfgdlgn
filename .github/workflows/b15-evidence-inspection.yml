@@ -6,6 +6,32 @@ permissions:
   contents: read
   actions: read
 jobs:
+  current-kardex-timeout-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 41169078356
+          name: B15_UI_RESULT_N3ClinicalJourneyTests-demo
+          path: ${{ runner.temp }}/journey
+      - name: Read exact Kardex timeout interaction log
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/journey
+        run: |
+          python3 - <<'PY'
+          import os, pathlib
+          root = pathlib.Path(os.environ["EVIDENCE_ROOT"])
+          assert (root / "SOURCE_SHA.txt").read_text().strip() == "0eb935b8fa41078f0a52f9a88c72014008ecb9ca"
+          for p in sorted(root.rglob("*")):
+              if p.suffix not in {".log", ".txt", ".json"}: continue
+              print("\\nEVIDENCE_FILE", str(p.relative_to(root)), p.stat().st_size, flush=True)
+              s = p.read_text(errors="replace")
+              if p.name.endswith("-system.log"):
+                  s = "\\n".join(x for x in s.splitlines() if any(k in x.lower() for k in ["biometr", "ready", "error", "face", "match", "sensor", "interlock"]))
+              print(s if len(s) <= 160000 else s[:20000] + "\\n[TRUNCATED MIDDLE]\\n" + s[-140000:], flush=True)
+          PY
   current-instruments-raw-evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 10
