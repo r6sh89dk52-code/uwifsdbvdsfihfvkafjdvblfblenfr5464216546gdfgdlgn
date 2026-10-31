@@ -2,6 +2,15 @@ import XCTest
 
 /// Real SwiftUI + DEMO vault, not a mocked save button. No clinical source.
 final class N2AllergySaveInteractionTests:XCTestCase {
+    private func waitForWorkerSelectionToSettle(_ app:XCUIApplication,file:StaticString = #filePath,line:UInt = #line) {
+        // Selecting a worker clears focus and dismisses the search sheet.
+        // Wait for that real transition before querying its disappearing toolbar.
+        let settled=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            !app.textFields["roster-global-search"].exists && !app.keyboards.firstMatch.exists
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[settled],timeout:10),.completed,
+            "La selección debe cerrar la búsqueda y su teclado antes de continuar",file:file,line:line)
+    }
     private func tap(_ element:XCUIElement,in app:XCUIApplication) {
         let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
         if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
@@ -46,6 +55,7 @@ final class N2AllergySaveInteractionTests:XCTestCase {
         XCTAssertTrue(result.waitForExistence(timeout:10),app.debugDescription)
         XCTAssertLessThanOrEqual(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","roster-result-")).count,25)
         result.tap()
+        waitForWorkerSelectionToSettle(app)
         tap(app.buttons["Siguiente"],in:app)
         tap(app.buttons["choice-Revisión de alergias"],in:app)
         app.buttons["Niega alergias conocidas"].tap()
@@ -71,6 +81,7 @@ final class N2AllergySaveInteractionTests:XCTestCase {
         app.buttons["demo-home-new-attention"].tap()
         let dni=app.textFields["attention-worker-dni"]
         XCTAssertTrue(dni.waitForExistence(timeout:15));dni.tap();dni.typeText("00000031")
+        waitForWorkerSelectionToSettle(app)
         tap(app.buttons["Siguiente"],in:app)
         XCTAssertTrue(app.staticTexts["Alergias revisadas"].waitForExistence(timeout:15),app.debugDescription)
         XCTAssertTrue(app.buttons["choice-Revisión de alergias"].label.contains("Niega alergias conocidas"),app.debugDescription)

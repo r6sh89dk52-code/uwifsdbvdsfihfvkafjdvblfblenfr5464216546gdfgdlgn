@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Observe ONLY a newly created synthetic Simulator. No auth events or PII logs."""
-import json,subprocess,sys,time,xml.etree.ElementTree as ET
+import json,os,subprocess,sys,time,xml.etree.ElementTree as ET
 from pathlib import Path
 
 sim,out=sys.argv[1],Path(sys.argv[2]);out.mkdir(parents=True,exist_ok=True)
@@ -19,6 +19,8 @@ def observe_app():
         for line in p.stdout.splitlines():
             fields=line.split()
             if fields and fields[0].isdigit() and 'UIKitApplication:'+bundle+'[' in line:
+                try:os.kill(int(fields[0]),0)
+                except ProcessLookupError:continue
                 return fields[0]
         time.sleep(1)
     return None
@@ -32,10 +34,13 @@ for template,seconds in [('Time Profiler',60),('Allocations',45)]:
         pid=observe_app()
         if not pid:
             entry['limitation']='No application process was observed before the bounded wait expired.';save();continue
+        entry['observedPID']=int(pid)
+        entry['attachTarget']='DANPERNative';entry['deviceUDID']=sim;entry['noPrompt']=True
+        save()
         with (out/(name+'.log')).open('w') as log:
             p=subprocess.run(['xcrun','xctrace','record','--template',template,'--device',sim,
-                '--attach',pid,'--time-limit',str(seconds)+'s','--output',str(trace)],
-                stdout=log,stderr=subprocess.STDOUT,timeout=seconds+45)
+                '--no-prompt','--attach','DANPERNative','--time-limit',str(seconds)+'s','--output',str(trace)],
+                stdout=log,stderr=subprocess.STDOUT,timeout=seconds+90)
         entry['exit']=p.returncode
         entry['captured']=p.returncode==0 and trace.exists()
         if entry['captured']:
@@ -60,6 +65,8 @@ for template,seconds in [('Time Profiler',60),('Allocations',45)]:
         else:entry['limitation']='Recording did not succeed; inspect the actual tool log. No metric is inferred.'
     except subprocess.TimeoutExpired:
         entry['limitation']='Instruments recording exceeded its bounded collection interval.'
+        with (out/(name+'.log')).open('a') as diagnostic:
+            diagnostic.write('\nRecording exceeded its bounded startup/collection interval; no metric inferred.\n')
     except (ET.ParseError,OSError) as error:
         entry['limitation']='Trace inspection failed: '+str(error)
     save()
