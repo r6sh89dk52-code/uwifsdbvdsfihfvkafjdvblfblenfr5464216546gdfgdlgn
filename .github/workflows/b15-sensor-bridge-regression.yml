@@ -1,0 +1,16 @@
+name: B15 sensor bridge isolated regression
+on:
+  push:
+    branches: ["audit/b15-sensor-bridge-regression"]
+permissions:
+  contents: read
+jobs:
+  regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse bridge and run all Python evidence regressions
+        run: |
+          python3 -m py_compile scripts/glass-audit/simulator-ready-bridge.py scripts/performance/tests/test_sensor_bridge.py
+          python3 -m unittest discover -s scripts/performance/tests -v

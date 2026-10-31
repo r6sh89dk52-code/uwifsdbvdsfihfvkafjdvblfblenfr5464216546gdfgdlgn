@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Observe real coreauthd sensor readiness. Never posts biometric events."""
-import json,os,plistlib,pty,re,select,signal,subprocess,sys,time
+import json,os,plistlib,pty,re,select,signal,subprocess,sys,time,threading
 from datetime import datetime,timezone
 from pathlib import Path
 
@@ -19,6 +19,27 @@ class SensorReadiness:
   if 'coreauthd[' in line and ('will stop biometric operation:' in line or 'MechanismUI' in line and 'willFinish' in line) and stamp>=self.transition:
    self.ready=False;self.transition=stamp
  def permits(self,minimum):return self.ready and self.generation>=minimum>0
+
+class AsyncRunnerContainer:
+ """Resolve registration off the sensor loop; simctl may stall on cold CI."""
+ def __init__(self,lookup,interval=2):
+  self.lookup=lookup;self.interval=interval;self._value=None;self._error=None
+  self._lock=threading.Lock();self._stop=threading.Event()
+  self._thread=threading.Thread(target=self._run,daemon=True);self._thread.start()
+ def _run(self):
+  while not self._stop.is_set():
+   try:
+    value=self.lookup()
+    with self._lock:
+     if value is not None:self._value=value
+     self._error=None
+   except (OSError,subprocess.TimeoutExpired) as error:
+    with self._lock:self._error=(type(error).__name__,str(error))
+   if self._stop.wait(self.interval):return
+ def snapshot(self):
+  with self._lock:return self._value,self._error
+ def close(self,timeout=0):
+  self._stop.set();self._thread.join(timeout)
 
 def stream(sim):
  # Unified log buffers output when its stdout is a regular file. A private PTY
@@ -61,7 +82,13 @@ def main():
  info=plistlib.loads(runner_info.read_bytes());bundle_id=info['CFBundleIdentifier']
  assert 'interactiontests' in bundle_id.lower() and bundle_id.startswith('pe.danper.saludmovil.native.iloaderpreview.')
  report('RUNNER_BUNDLE',bundle_id)
- container=None;probe=0;offset=0;pending=b'';seen=set();observed=set();last_error=None;state=SensorReadiness()
+ def lookup_container():
+  r=subprocess.run(['xcrun','simctl','get_app_container',sim,bundle_id,'data'],capture_output=True,text=True,timeout=5)
+  if r.returncode==0 and r.stdout.strip():
+   return Path(r.stdout.strip())/'Documents/DANPER_BIOMETRIC_READY'
+  raise OSError('Runner container query failed: '+r.stderr.strip())
+ resolver=AsyncRunnerContainer(lookup_container)
+ container=None;offset=0;pending=b'';seen=set();observed=set();last_error=None;probe_error=None;state=SensorReadiness()
  while True:
   if log.exists():
    with log.open('rb') as f:f.seek(offset);pending+=f.read();offset=f.tell()
@@ -69,17 +96,15 @@ def main():
    for raw in lines:
     event=state.observe(raw.decode('utf-8',errors='replace'))
     if event:report(*event)
-  now=time.monotonic()
-  # XCTest may replace the explicitly preinstalled runner's data container.
-  # Resolve its active registration throughout the test, not just before launch.
-  if now>=probe:
-   probe=now+2
-   r=subprocess.run(['xcrun','simctl','get_app_container',sim,bundle_id,'data'],capture_output=True,text=True)
-   if r.returncode==0:
-    active=Path(r.stdout.strip())/'Documents/DANPER_BIOMETRIC_READY'
-    if active!=container:
-     container=active
-     report('RUNNER_CONTAINER_ACTIVE',str(container))
+  # XCTest may replace the preinstalled runner's data container. Keep
+  # observing registration without blocking real sensor events or local ACKs.
+  active,error=resolver.snapshot()
+  if error!=probe_error:
+   probe_error=error
+   if error:report('RUNNER_CONTAINER_QUERY_ERROR',*error)
+  if active is not None and active!=container:
+   container=active
+   report('RUNNER_CONTAINER_ACTIVE',str(container))
   if container is not None:
    try:
     value=json.loads((container/'request.json').read_text());nonce=value['id'];minimum=value['minimumGeneration']
