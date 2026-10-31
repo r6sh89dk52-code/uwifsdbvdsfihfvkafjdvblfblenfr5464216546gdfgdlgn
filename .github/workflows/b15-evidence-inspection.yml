@@ -1,0 +1,202 @@
+name: B15 read-only live evidence for 90cb0ab
+on:
+  push:
+    branches: ["audit/b15-evidence-90cb0ab"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  ui-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 85
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        suite: [N2AllergySaveInteractionTests, N2BiometricInteractionTests, N2Build222ShellTests, N2GlassClinicalTests, N2MenuInteractionTests, N2PremiumRedesignTests, N3ClinicalJourneyTests-demo, N3ClinicalJourneyTests-protected]
+    steps:
+      - name: Wait for exact source ui result
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCOPE: ui
+          SUITE: ${{ matrix.suite }}
+        run: |
+          python3 - <<'PY'
+          import json,os,time,urllib.request
+          repo=os.environ["GITHUB_REPOSITORY"]; expected="90cb0aba7b553e536c9d3ad42d65eae9f7890fd5";run_id=41173716294
+          headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"}
+          def get(path):
+              with urllib.request.urlopen(urllib.request.Request("https://api.github.com/repos/"+repo+path,headers=headers),timeout=45) as response:return json.load(response)
+          label=os.environ.get("SUITE")
+          scope=os.environ["SCOPE"]
+          for attempt in range(150):
+              head=get("/git/ref/heads/fix/indicator-historical-visit-site-build15-20261030")["object"]["sha"]
+              if head!=expected:raise SystemExit("Source HEAD moved; this evidence cannot certify the new application")
+              run=get("/actions/runs/"+str(run_id))
+              if run["head_sha"]!=expected:raise SystemExit("Source workflow SHA mismatch")
+              conclusion=None
+              if scope=="all":
+                  done=run["status"]=="completed";conclusion=run["conclusion"]
+              else:
+                  name="performance" if scope=="performance" else "ui ("+label+")"
+                  jobs=get("/actions/runs/"+str(run_id)+"/jobs?per_page=100")["jobs"]
+                  found=next((j for j in jobs if j["name"]==name),None)
+                  done=found is not None and found["status"]=="completed"
+                  conclusion=found["conclusion"] if found else None
+              print("READ_ONLY",scope,label,"application",expected,"original result",conclusion,flush=True)
+              if done:
+                  with open(os.environ["GITHUB_OUTPUT"],"a") as output:output.write("conclusion="+str(conclusion)+"\n")
+                  break
+              time.sleep(30)
+          else:raise SystemExit("Original source workflow has not finished; no approval")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 41173716294
+          name: B15_UI_RESULT_${{ matrix.suite }}
+          path: ${{ runner.temp }}/evidence
+      - name: Read actual suite counts failures and metrics without approving them
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/evidence
+          SUITE: ${{ matrix.suite }}
+          ORIGINAL_RESULT: ${{ steps.wait.outputs.conclusion }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,re
+          root=pathlib.Path(os.environ["EVIDENCE_ROOT"]);label=os.environ["SUITE"]
+          assert (root/"SOURCE_SHA.txt").read_text().strip()=="90cb0aba7b553e536c9d3ad42d65eae9f7890fd5"
+          print("READ_ONLY_APP_SOURCE 90cb0aba7b553e536c9d3ad42d65eae9f7890fd5; ORIGINAL_SUITE_RESULT",label,os.environ["ORIGINAL_RESULT"])
+          for p in sorted(root.rglob("*")):
+              if not p.is_file():continue
+              name=p.name
+              if name.endswith(".summary.json") or name=="profiling-status.json" or name in {"SOURCE_SHA.txt","SHARD_PASS_SHA.txt","SHARD_VERIFIED_SHA.txt","SHARD_LABEL.txt"}:
+                  print("EVIDENCE_FILE",str(p.relative_to(root)));print(p.read_text(errors="replace"))
+              elif p.suffix==".log" and (name==label+".log" or name.endswith("-biometric-readiness.log") or "Instruments" in str(p)):
+                  value=p.read_text(errors="replace")
+                  print("EVIDENCE_LOG",str(p.relative_to(root)))
+                  if os.environ["ORIGINAL_RESULT"]=="success" and name==label+".log":
+                      value="\n".join(s for s in value.splitlines() if re.search(r"Test Case|Test Suite|Executed|measured|average:|error:|failed",s,re.I))
+                  print(value if len(value)<180000 else value[:20000]+"\n[truncated middle]\n"+value[-160000:])
+          PY
+  performance-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 85
+    steps:
+      - name: Wait for exact source performance result
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCOPE: performance
+        run: |
+          python3 - <<'PY'
+          import json,os,time,urllib.request
+          repo=os.environ["GITHUB_REPOSITORY"]; expected="90cb0aba7b553e536c9d3ad42d65eae9f7890fd5";run_id=41173716294
+          headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"}
+          def get(path):
+              with urllib.request.urlopen(urllib.request.Request("https://api.github.com/repos/"+repo+path,headers=headers),timeout=45) as response:return json.load(response)
+          label=os.environ.get("SUITE")
+          scope=os.environ["SCOPE"]
+          for attempt in range(150):
+              head=get("/git/ref/heads/fix/indicator-historical-visit-site-build15-20261030")["object"]["sha"]
+              if head!=expected:raise SystemExit("Source HEAD moved; this evidence cannot certify the new application")
+              run=get("/actions/runs/"+str(run_id))
+              if run["head_sha"]!=expected:raise SystemExit("Source workflow SHA mismatch")
+              conclusion=None
+              if scope=="all":
+                  done=run["status"]=="completed";conclusion=run["conclusion"]
+              else:
+                  name="performance" if scope=="performance" else "ui ("+label+")"
+                  jobs=get("/actions/runs/"+str(run_id)+"/jobs?per_page=100")["jobs"]
+                  found=next((j for j in jobs if j["name"]==name),None)
+                  done=found is not None and found["status"]=="completed"
+                  conclusion=found["conclusion"] if found else None
+              print("READ_ONLY",scope,label,"application",expected,"original result",conclusion,flush=True)
+              if done:
+                  with open(os.environ["GITHUB_OUTPUT"],"a") as output:output.write("conclusion="+str(conclusion)+"\n")
+                  break
+              time.sleep(30)
+          else:raise SystemExit("Original source workflow has not finished; no approval")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 41173716294
+          name: B15_PERFORMANCE_COMPARISON
+          path: ${{ runner.temp }}/evidence
+      - name: Read actual CPU RSS and Build 14 compatibility
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/evidence
+          ORIGINAL_RESULT: ${{ steps.wait.outputs.conclusion }}
+        run: |
+          python3 - <<'PY'
+          import os,pathlib
+          root=pathlib.Path(os.environ["EVIDENCE_ROOT"])
+          assert (root/"SOURCE_SHA.txt").read_text().strip()=="90cb0aba7b553e536c9d3ad42d65eae9f7890fd5"
+          print("READ_ONLY_APP_SOURCE 90cb0aba7b553e536c9d3ad42d65eae9f7890fd5; ORIGINAL_PERFORMANCE_RESULT",os.environ["ORIGINAL_RESULT"])
+          for name in ["comparison.json","compatibility.json","before.json","after.json"]:
+              p=root/name
+              print("EVIDENCE_FILE",name)
+              print(p.read_text() if p.exists() else "MISSING: not a passing result")
+          PY
+  complete-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 85
+    steps:
+      - name: Wait for exact source all result
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCOPE: all
+        run: |
+          python3 - <<'PY'
+          import json,os,time,urllib.request
+          repo=os.environ["GITHUB_REPOSITORY"]; expected="90cb0aba7b553e536c9d3ad42d65eae9f7890fd5";run_id=41173716294
+          headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json"}
+          def get(path):
+              with urllib.request.urlopen(urllib.request.Request("https://api.github.com/repos/"+repo+path,headers=headers),timeout=45) as response:return json.load(response)
+          label=os.environ.get("SUITE")
+          scope=os.environ["SCOPE"]
+          for attempt in range(150):
+              head=get("/git/ref/heads/fix/indicator-historical-visit-site-build15-20261030")["object"]["sha"]
+              if head!=expected:raise SystemExit("Source HEAD moved; this evidence cannot certify the new application")
+              run=get("/actions/runs/"+str(run_id))
+              if run["head_sha"]!=expected:raise SystemExit("Source workflow SHA mismatch")
+              conclusion=None
+              if scope=="all":
+                  done=run["status"]=="completed";conclusion=run["conclusion"]
+              else:
+                  name="performance" if scope=="performance" else "ui ("+label+")"
+                  jobs=get("/actions/runs/"+str(run_id)+"/jobs?per_page=100")["jobs"]
+                  found=next((j for j in jobs if j["name"]==name),None)
+                  done=found is not None and found["status"]=="completed"
+                  conclusion=found["conclusion"] if found else None
+              print("READ_ONLY",scope,label,"application",expected,"original result",conclusion,flush=True)
+              if done:
+                  with open(os.environ["GITHUB_OUTPUT"],"a") as output:output.write("conclusion="+str(conclusion)+"\n")
+                  break
+              time.sleep(30)
+          else:raise SystemExit("Original source workflow has not finished; no approval")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 41173716294
+          pattern: B15_*
+          path: ${{ runner.temp }}/evidence
+      - name: Read final approval or exact incomplete and failed evidence
+        env:
+          EVIDENCE_ROOT: ${{ runner.temp }}/evidence
+          ORIGINAL_RESULT: ${{ steps.wait.outputs.conclusion }}
+        run: |
+          python3 - <<'PY'
+          import os,pathlib,re
+          root=pathlib.Path(os.environ["EVIDENCE_ROOT"])
+          print("READ_ONLY_APP_SOURCE 90cb0aba7b553e536c9d3ad42d65eae9f7890fd5; ORIGINAL_WORKFLOW_RESULT",os.environ["ORIGINAL_RESULT"])
+          for p in sorted(root.rglob("*")):
+              if not p.is_file():continue
+              name=p.name
+              if name in {"FINAL_GATES.json","comparison.json","compatibility.json","profiling-status.json","swift-results.json"} or name.endswith(".summary.json") or name in {"SOURCE_SHA.txt","CORE_NATIVE_SHA.txt","SHARD_PASS_SHA.txt","SHARD_VERIFIED_SHA.txt","SHARD_LABEL.txt"}:
+                  print("EVIDENCE_FILE",str(p.relative_to(root)));print(p.read_text(errors="replace"))
+          PY
