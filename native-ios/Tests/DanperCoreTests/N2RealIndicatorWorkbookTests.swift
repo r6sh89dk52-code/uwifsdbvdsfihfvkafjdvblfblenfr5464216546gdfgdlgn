@@ -14,6 +14,57 @@ final class N2RealIndicatorWorkbookTests:XCTestCase {
             return event
         }
     }
+    func testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially()throws {
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1e-clinical-stock.json")) as? [String:Any])
+        var visits=try XCTUnwrap(root["attentions"] as? [[String:Any]])
+        let index=try XCTUnwrap(visits.firstIndex{$0["id"] as? String=="fundo-unit"})
+        var worker=try XCTUnwrap(visits[index]["worker"] as? [String:Any])
+        worker["site"]=""
+        visits[index]["worker"]=worker
+        root["attentions"]=visits
+        let proof=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture("n1q-reviewed-expected.json")) as? [String:Any])
+        root["ambulatoryReconciliation"]=proof["events"]!
+        let source=try JSONSerialization.data(withJSONObject:root)
+        let catalog=try JSONSerialization.data(withJSONObject:proof["catalog"]!)
+        let mappings=try fixture("n2-reviewed-approved.json")
+        let template=try fixture("n1s-indicator-template-store.zip")
+        let ids:Set<String>=["fundo-unit","fundo-reuse"]
+        for site in ["LA VENTUROSA","AMBAS"] {
+            XCTAssertThrowsError(try N2VerifiedIndicatorWorkbook.export(
+                snapshot:source,products:catalog,mappings:mappings,template:template,
+                start:"2026-10-09",end:"2026-11-08",
+                subdivision:site,selectedVisitIDs:ids)) {
+                XCTAssertEqual($0 as? N2VerifiedIndicatorWorkbook.Failure,.invalidVisit)
+            }
+        }
+        let detail=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")
+        let amended=try N2ClinicalCorrections.append(
+            snapshot:source,eventID:"534BA0DE-2CFA-4BC1-9BA7-DCB302DDCB0A",
+            visitID:"fundo-unit",
+            changes:JSONSerialization.data(withJSONObject:[
+                "visitWorkerSite":"LA VENTUROSA"
+            ]),reason:"Sede confirmada para la atención original",
+            operatorName:"RESPONSABLE DE ENFERMERÍA",medicationDiscrepancy:"",
+            expectedEffectiveSHA:detail.effectiveSHA256,at:1792060000000)
+        let exported=try N2VerifiedIndicatorWorkbook.export(
+            snapshot:amended,products:catalog,mappings:mappings,template:template,
+            start:"2026-10-09",end:"2026-11-08",
+            subdivision:"LA VENTUROSA",selectedVisitIDs:ids)
+        XCTAssertEqual(exported.visits,2)
+        XCTAssertEqual(exported.rows,2)
+        let parts=try N1rStoredZip.unpack(exported.xlsx)
+        XCTAssertEqual(parts.filter{$0.name.hasPrefix("xl/worksheets/sheet") &&
+            $0.name.hasSuffix(".xml")}.count,10)
+        let ledger=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:amended) as? [String:Any])
+        XCTAssertEqual(try JSONSerialization.data(
+            withJSONObject:root["stockMovements"]!,options:[.sortedKeys]),
+            try JSONSerialization.data(
+            withJSONObject:ledger["stockMovements"]!,options:[.sortedKeys]))
+    }
+
     func testProvisionalAllVisitsKeepsPendingContainerWithoutInventingR() throws {
         var snapshot=try XCTUnwrap(JSONSerialization.jsonObject(
             with:fixture("n1e-clinical-stock.json")) as? [String:Any])

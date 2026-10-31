@@ -51,6 +51,12 @@ struct N2WorkspaceVault:Sendable {
     /// Dashboard counters are computed from one fixed vault revision.
     /// The home counter needs only three integers, not a 9k-worker
     /// history read model. Preserve demo/clinical isolation.
+    func dashboardSnapshot(today:String,weekStart:String) async throws->N2DashboardSnapshot? {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.dashboardSnapshot(today:today,weekStart:weekStart)
+        }
+        return try await N2SyntheticTrialIOSVault.shared.dashboardSnapshot(today:today,weekStart:weekStart)
+    }
     func dashboardCounters(today:String,weekStart:String) async throws
         ->(today:Int,week:Int,month:Int,drafts:Int)? {
         if isClinical {
@@ -84,6 +90,17 @@ struct N2WorkspaceVault:Sendable {
             return try await N2ProtectedClinicalIOSVault.shared.correctWorker(dni:dni,worker:worker,at:at,expectedRevision:expectedRevision)
         }
         return try await N2SyntheticTrialIOSVault.shared.correctWorker(dni:dni,worker:worker,at:at,expectedRevision:expectedRevision)
+    }
+    func reviewAllergiesRevision(dni:String,status:String,substances:String,
+                                 at:Int64,expectedRevision:Int) async throws -> Int {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.reviewAllergiesRevision(
+                dni:dni,status:status,substances:substances,
+                at:at,expectedRevision:expectedRevision)
+        }
+        return try await N2SyntheticTrialIOSVault.shared.reviewAllergiesRevision(
+            dni:dni,status:status,substances:substances,
+            at:at,expectedRevision:expectedRevision)
     }
     func reviewAllergies(dni:String,status:String,substances:String,at:Int64,expectedRevision:Int) async throws -> N2ProtectedStoreSummary {
         if isClinical {
@@ -179,6 +196,10 @@ struct N2WorkspaceVault:Sendable {
             return try await N2ProtectedClinicalIOSVault.shared.readCorrectionHistory(visitID:visitID)
         }
         return try await N2SyntheticTrialIOSVault.shared.readCorrectionHistory(visitID:visitID)
+    }
+    func prepareClinicalCorrection(visitID:String) async throws->N2CorrectionReadContext {
+        if isClinical {return try await N2ProtectedClinicalIOSVault.shared.prepareClinicalCorrection(visitID:visitID)}
+        return try await N2SyntheticTrialIOSVault.shared.prepareClinicalCorrection(visitID:visitID)
     }
     func readCorrectionDetail(visitID:String) async throws -> N2CorrectionDetail {
         if isClinical {

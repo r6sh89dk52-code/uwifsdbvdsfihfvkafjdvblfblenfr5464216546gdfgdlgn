@@ -150,6 +150,7 @@ struct N2ClinicalWorkspaceRootView:View {
     @Environment(\.danperAuthenticatedSession) private var sessionAuthenticated
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.scenePhase) private var scenePhase
+    @State private var loadingHomeCounts=false
     @State private var homeRevision:Int?
     @State private var homeDay=""
     @State private var homeCounts:DanperHomeCounts?
@@ -249,13 +250,14 @@ struct N2ClinicalWorkspaceRootView:View {
         .refreshable {await refreshHomeCounts()}
     }
     @MainActor private func refreshHomeCounts() async {
-        guard !layoutOnly,sessionAuthenticated else{return}
+        guard !layoutOnly,sessionAuthenticated,!loadingHomeCounts else{return}
+        loadingHomeCounts=true
+        defer {loadingHomeCounts=false}
         do {
             let period=N2HomeCalendarPeriod(now:Date())
-            let revision=try await vault.currentRevision()
-            if revision==homeRevision,homeDay==period.today,homeCounts != nil {return}
-            let counters=try await vault.dashboardCounters(today:period.today,weekStart:period.weekStart)
-            homeRevision=revision;homeDay=period.today
+            let counters=try await vault.dashboardSnapshot(today:period.today,weekStart:period.weekStart)
+            guard sessionAuthenticated,scenePhase == .active else{return}
+            homeRevision=counters?.revision;homeDay=period.today
             homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
             countError=false
         }catch {

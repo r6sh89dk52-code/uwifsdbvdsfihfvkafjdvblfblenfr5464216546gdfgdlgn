@@ -13,6 +13,7 @@ struct N2NativeHistoryView: View {
     init(layoutProjection:N2NativeReadModel) {
         layoutOnly=true
         _projection=State(initialValue:layoutProjection)
+        _visitMatches=State(initialValue:layoutProjection.visits.filter{$0.status=="saved"})
     }
     #endif
     private var layoutOnly=false
@@ -22,6 +23,11 @@ struct N2NativeHistoryView: View {
     @State private var projection:N2NativeReadModel?
     @State private var query=""
     @State private var committedQuery=""
+    @State private var workerSearchIndex:N2SearchIndex<N2WorkerIndexRow>?
+    @State private var visitSearchIndex:N2SearchIndex<N2VisitIndexRow>?
+    @State private var workerMatches=[N2WorkerIndexRow]()
+    @State private var visitMatches=[N2VisitIndexRow]()
+    @State private var searchGeneration=UUID()
     @State private var selectedDNI:String?
     @State private var rosterPage=0
     @State private var visitsPage=0
@@ -33,15 +39,10 @@ struct N2NativeHistoryView: View {
     var body:some View {
         Group {
             if let projection {
-                let matches=showWorkers ? projection.findWorkers(committedQuery) : []
-                let savedVisits=projection.visits.filter{
-                    $0.status=="saved" &&
-                    (committedQuery.isEmpty ||
-                     $0.workerName.localizedStandardContains(committedQuery) ||
-                     $0.workerDNI.localizedStandardContains(committedQuery) ||
-                     $0.diagnosis.localizedStandardContains(committedQuery) ||
-                     $0.date.localizedStandardContains(committedQuery))
-                }
+                let searchingWorkers=showWorkers &&
+                    committedQuery.trimmingCharacters(in:.whitespacesAndNewlines).count>=2
+                let matches=searchingWorkers ? workerMatches : []
+                let savedVisits=showWorkers ? [] : visitMatches
                 let visitPages=max(1,(savedVisits.count+visitsPageSize-1)/visitsPageSize)
                 let safeVisitsPage=min(visitsPage,visitPages-1)
                 let totalPages=max(1,(matches.count+pageSize-1)/pageSize)
@@ -59,8 +60,14 @@ struct N2NativeHistoryView: View {
                     if showWorkers {
                     DanperPanel("Directorio · \(projection.searchableRoster.count) disponibles") {
                         Color.clear.frame(height:1).id("roster-page-top")
-                        Text("\(matches.count) resultados · Página \(safePage+1) de \(totalPages)")
-                            .font(.caption).foregroundStyle(.secondary)
+                        if !searchingWorkers {
+                            Label("Escribe dos o más caracteres para buscar. No se carga el directorio completo en pantalla.",
+                                  systemImage:"magnifyingglass")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        } else {
+                            Text("\(matches.count) resultados · Página \(safePage+1) de \(totalPages)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         ForEach(Array(matches.dropFirst(safePage*pageSize).prefix(pageSize))) { w in
                             Button {
                                 selectedDNI = w.dni
@@ -113,7 +120,7 @@ struct N2NativeHistoryView: View {
                             ForEach(Array(savedVisits.dropFirst(safeVisitsPage*visitsPageSize).prefix(visitsPageSize))) { visit in
                                 NavigationLink {
                                     N2RecordedVisitDetailView(visitID:visit.id,
-                                        visit:visit,realSource:useProtectedVault)
+                                        visit:visit,realSource:useProtectedVault,onVerifiedDetail:refreshOneVisit)
                                 } label: {
                                     HStack(alignment:.top,spacing:10) {
                                         VStack(alignment:.leading,spacing:5) {
@@ -163,14 +170,21 @@ struct N2NativeHistoryView: View {
                 .searchable(text:$query,placement:.navigationBarDrawer(displayMode:.always),prompt:showWorkers
                     ? "Buscar DNI, nombres o área"
                     : "Buscar trabajador, DNI, diagnóstico o fecha")
-                .task(id:query) {
+                .task(id:query+searchGeneration.uuidString) {
+                    guard !layoutOnly else{return}
                     // Do not filter and re-layout 9,648 workers on every
                     // keystroke. A brief cancellable debounce keeps search
                     // responsive without discarding the full roster.
                     do {try await Task.sleep(for:.milliseconds(140))}
                     catch{return}
                     guard !Task.isCancelled else{return}
-                    committedQuery=query
+                    let requested=query,w=workerSearchIndex,v=visitSearchIndex
+                    let result=await Task.detached(priority:.userInitiated) {
+                        (w?.matches(requested) ?? [],v?.matches(requested,minimumLength:0) ?? [])
+                    }.value
+                    guard !Task.isCancelled else{return}
+                    workerMatches=result.0;visitMatches=result.1
+                    committedQuery=requested
                     rosterPage=0
                     visitsPage=0
                     proxy.scrollTo(showWorkers ? "roster-page-top":"history-visits-top",anchor:.top)
@@ -220,6 +234,28 @@ struct N2NativeHistoryView: View {
         .padding(.vertical,3)
     }
 
+    @MainActor
+    private func refreshOneVisit(_ detail:N2CorrectionDetail) {
+        guard let projection,let row=projection.visits.first(where:{$0.id==detail.id}),
+              row.diagnosis != detail.diagnosis || row.workerSite != detail.workerSite else{return}
+        let next=projection.applyingClinicalDetail(detail)
+        Task {await installProjection(next)}
+    }
+    @MainActor
+    private func installProjection(_ records:N2NativeReadModel) async {
+        let directory=showWorkers
+        let indices=await Task.detached(priority:.userInitiated) {
+            let w=directory ? N2SearchIndex(rows:records.searchableRoster,fields:{[$0.dni,$0.name,$0.area,$0.site].joined(separator:"\u{1f}")}) : nil
+            let visits=directory ? [] : records.visits.filter{$0.status=="saved"}
+            let v=directory ? nil : N2SearchIndex(rows:visits,fields:{[$0.workerDNI,$0.workerName,$0.diagnosis,$0.date].joined(separator:"\u{1f}")})
+            return (w,v,visits)
+        }.value
+        guard !Task.isCancelled else{return}
+        workerSearchIndex=indices.0;visitSearchIndex=indices.1
+        workerMatches=[];visitMatches=indices.2
+        projection=records;searchGeneration=UUID()
+    }
+    @MainActor
     private func load(force:Bool=false) async {
         guard !layoutOnly else{return}
         guard force || projection==nil else {return}
@@ -228,14 +264,17 @@ struct N2NativeHistoryView: View {
                 guard let records=try await vault.readHistory() else {
                     hasError=true;return
                 }
-                projection=records
+                await installProjection(records)
                 return
             }
             guard let file=Bundle.main.url(forResource:"n2-synthetic-clinical",
                        withExtension:"json",subdirectory:"N1sDemoResources") else {
                 hasError=true;return
             }
-            projection=try N2NativeSnapshotReader.read(Data(contentsOf:file))
+            let records=try await Task.detached(priority:.userInitiated) {
+                try N2NativeSnapshotReader.read(Data(contentsOf:file))
+            }.value
+            await installProjection(records)
         } catch {
             hasError=true
         }
@@ -248,6 +287,7 @@ private struct N2RecordedVisitDetailView:View {
     let visitID:String
     let visit:N2VisitIndexRow
     let realSource:Bool
+    var onVerifiedDetail:((N2CorrectionDetail)->Void)?=nil
     @Environment(\.n2WorkspaceVault) private var vault
     @State private var detail:N2CorrectionDetail?
     @State private var loading=false
@@ -348,7 +388,9 @@ private struct N2RecordedVisitDetailView:View {
         loading=true
         defer {loading=false}
         do {
-            detail=try await vault.readCorrectionDetail(visitID:visitID)
+            let verified=try await vault.readCorrectionDetail(visitID:visitID)
+            detail=verified
+            onVerifiedDetail?(verified)
             failed=false
         } catch {failed=true}
     }
@@ -356,8 +398,11 @@ private struct N2RecordedVisitDetailView:View {
 
 private struct N2WorkerHistoryDetail:View {
     let dni:String
-    let model:N2NativeReadModel
+    @State private var model:N2NativeReadModel
     let realSource:Bool
+    init(dni:String,model:N2NativeReadModel,realSource:Bool) {
+        self.dni=dni;self.realSource=realSource;_model=State(initialValue:model)
+    }
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
@@ -394,7 +439,9 @@ private struct N2WorkerHistoryDetail:View {
                                 Label("Medicamentos y consumos",systemImage:"pills.fill")
                             }
                             NavigationLink {
-                                N2ClinicalCorrectionView(visitID:visit.id)
+                                N2ClinicalCorrectionView(visitID:visit.id,onVerifiedSave:{d in
+                                    model=model.applyingClinicalDetail(d)
+                                })
                             } label: {
                                 Label("Rectificar con historial auditado",
                                       systemImage:"square.and.pencil")

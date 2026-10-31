@@ -1,0 +1,255 @@
+{
+  "reviewed": 17,
+  "classification": {
+    "clinicalAssertion": 15,
+    "swiftPMPlanningCrash139": 1,
+    "swiftSyntax": 1
+  },
+  "runs": [
+    {
+      "run": 41109556873,
+      "sourceSHA": "7e1db355a7dea81755b08af99d37c4114f7da868",
+      "job": 124248136105,
+      "lines": [
+        "2026-10-30T18:48:27.5551995Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:55:36.5236521Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41109556873"
+    },
+    {
+      "run": 41109539595,
+      "sourceSHA": "876f2f1f44731d288bec1fdd64a60b2679ea61c8",
+      "job": 124248078557,
+      "lines": [
+        "2026-10-30T18:48:51.2035909Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:56:01.8979024Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41109539595"
+    },
+    {
+      "run": 41109407260,
+      "sourceSHA": "b7d7de972bb41eb9b01b3e270efd84e7a8d88235",
+      "job": 124247622167,
+      "lines": [
+        "2026-10-30T18:46:51.0381679Z 30 [async] [system] 0x00005618919bcb40 partial apply for thunk for @escaping @callee_guaranteed @Sendable @async (@guaranteed ProductPlanResultContext, @in_guaranteed TaskProducer) -> () in swift-package at //<compiler-generated>",
+        "2026-10-30T18:46:51.0383004Z 31 [async]          0x00005618911c7170 closure #1 in Sequence<>.parallelForEach<A>(group:maximumParallelism:_:) in swift-package",
+        "2026-10-30T18:46:51.0384155Z 32 [async] [thunk]  0x00005618911c6e10 partial apply for closure #1 in Sequence<>.parallelForEach<A>(group:maximumParallelism:_:) in swift-package at //<compiler-generated>",
+        "2026-10-30T18:46:51.0385384Z 33 [async] [thunk]  0x00005618911c6c70 thunk for @escaping @isolated(any) @callee_guaranteed @async () -> (@out A) in swift-package at //<compiler-generated>",
+        "2026-10-30T18:46:51.0386772Z 34 [async] [thunk]  0x00005618911c70f0 partial apply for thunk for @escaping @isolated(any) @callee_guaranteed @async () -> (@out A) in swift-package",
+        "2026-10-30T18:46:51.0630081Z 0x000056188feb9000–0x00005618933834c8 184e3719c821b22a25ae4aaaa49a5cd4f46a65c5 swift-package           /usr/share/swift/usr/bin/swift-package",
+        "2026-10-30T18:46:55.9951907Z /home/runner/work/_temp/72293b5e-743d-4fae-ad16-816088adb2eb.sh: line 1:  2543 Segmentation fault      (core dumped) swift test --jobs 2",
+        "2026-10-30T18:46:55.9968728Z ##[error]Process completed with exit code 139."
+      ],
+      "assertionFailure": false,
+      "signal139": true,
+      "swiftPackageCrash": true,
+      "classification": "SwiftPM internal planning crash; tests did not execute; exact environment root cause unproven",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41109407260"
+    },
+    {
+      "run": 41109182204,
+      "sourceSHA": "f88eabc37f1cf3c31d073a49275c58389f921744",
+      "job": 124246825163,
+      "lines": [
+        "2026-10-30T18:44:47.7814625Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:48:52.0989448Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41109182204"
+    },
+    {
+      "run": 41109085791,
+      "sourceSHA": "a99034d5bd401c00976ac132b832ac3dc5df6275",
+      "job": 124246444314,
+      "lines": [
+        "2026-10-30T18:45:15.2705710Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:52:33.9726814Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41109085791"
+    },
+    {
+      "run": 41108957752,
+      "sourceSHA": "0f453018d7c0a9075b798177f562d1d84cf1dc7a",
+      "job": 124245983266,
+      "lines": [
+        "2026-10-30T18:43:46.2549655Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:49:47.3455583Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108957752"
+    },
+    {
+      "run": 41108913195,
+      "sourceSHA": "c8f0b2aafa2e67e8a6b9f5312861ccffbd2e18c1",
+      "job": 124245867593,
+      "lines": [
+        "2026-10-30T18:42:43.1970931Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:46:57.7699945Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108913195"
+    },
+    {
+      "run": 41108815019,
+      "sourceSHA": "bec1689f3a2a70fa0f333472d47fe01a1e407e18",
+      "job": 124245551509,
+      "lines": [
+        "2026-10-30T18:41:43.1938679Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:45:47.8667774Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108815019"
+    },
+    {
+      "run": 41108689879,
+      "sourceSHA": "1978cc33871fdff23ad105db5db778e54d3df593",
+      "job": 124245055227,
+      "lines": [
+        "2026-10-30T18:41:03.9212083Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:45:16.9209228Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108689879"
+    },
+    {
+      "run": 41108656568,
+      "sourceSHA": "3a55cdb7bb927f5ceb73663c3e87cfec6b1bf909",
+      "job": 124244910029,
+      "lines": [
+        "2026-10-30T18:42:13.7518557Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:49:23.2732607Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108656568"
+    },
+    {
+      "run": 41108573296,
+      "sourceSHA": "b0361d00f8e3f05c7363f00d5da2a49b43f6a64c",
+      "job": 124244673025,
+      "lines": [
+        "2026-10-30T18:41:29.1166063Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:48:50.9320022Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108573296"
+    },
+    {
+      "run": 41108447736,
+      "sourceSHA": "94a7a897282d3b0dcba769983663944fa8e8b00a",
+      "job": 124244309031,
+      "lines": [
+        "2026-10-30T18:40:20.9087387Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:47:32.6948806Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108447736"
+    },
+    {
+      "run": 41108412966,
+      "sourceSHA": "8eddc840610ac874adecff7323b7fbbeb9de3796",
+      "job": 124244199207,
+      "lines": [
+        "2026-10-30T18:40:05.6904858Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:47:12.0872685Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108412966"
+    },
+    {
+      "run": 41108339756,
+      "sourceSHA": "8ca3c0b5bdf09c4e70ba2b49d76e7a3571d85421",
+      "job": 124243938921,
+      "lines": [
+        "2026-10-30T18:39:52.2437824Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:47:01.4815750Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108339756"
+    },
+    {
+      "run": 41108019303,
+      "sourceSHA": "f6f691edcb893fbf235c98ac5835df4dad0c0f8b",
+      "job": 124242853377,
+      "lines": [
+        "2026-10-30T18:37:30.6839620Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2RealIndicatorWorkbookTests.swift:34: error: N2RealIndicatorWorkbookTests.testMissingSiteCanBeConfirmedForOneVisitAndExportedOfficially : XCTAssertThrowsError failed: did not throw error - ",
+        "2026-10-30T18:44:33.9358237Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41108019303"
+    },
+    {
+      "run": 41101360886,
+      "sourceSHA": "e17fce9b1a7b16d9e878695d9408dbb24923ee81",
+      "job": 124218980668,
+      "lines": [
+        "2026-10-30T17:46:24.6280885Z native-ios/App/N2ClinicalCorrectionView.swift:99:90: error: expected ',' separator",
+        "2026-10-30T17:46:24.6282276Z     |                                                                                          `- error: expected ',' separator",
+        "2026-10-30T17:46:24.7712319Z ##[error]Process completed with exit code 1."
+      ],
+      "assertionFailure": false,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "classification": "Swift syntax failure",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41101360886"
+    },
+    {
+      "run": 41110840139,
+      "sourceSHA": "cc45aa27013922a68301be01eaa1f1a16ad9e910",
+      "job": 124252987131,
+      "assertionFailure": true,
+      "signal139": false,
+      "swiftPackageCrash": false,
+      "lines": [
+        "N2RealIndicatorWorkbookTests.swift:34: XCTAssertThrowsError failed: did not throw error",
+        "Executed 422 tests, with 1 failure; exit code 1"
+      ],
+      "classification": "Application behavior failure: blank historical site was accepted",
+      "url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41110840139"
+    }
+  ]
+}

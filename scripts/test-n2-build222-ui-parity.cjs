@@ -193,9 +193,12 @@ assert(form.includes('let freshRevision=try await vault.currentRevision()') &&
        form.includes('drafts=prepared.drafts') &&
        form.includes('context=prepared.context'),
   'Eliminar en el formulario debe refrescar borradores y contexto en una sola lectura');
-assert(form.includes('let latestRevision=try await vault.currentRevision()') &&
-       !form.includes('let latest=try await vault.clinicalFormContext()'),
-  'Autosave debe consultar revisión cifrada sin reconstruir el padrón de trabajadores');
+const autosave=form.slice(form.indexOf('private func scheduleDraft('),form.indexOf('private func containerCodes('));
+assert(autosave.includes('expectedRevision:source.revision') &&
+       autosave.includes('catch N2ProtectedStoreError.staleRevision') &&
+       autosave.includes('lastPersistedDraft') &&
+       !autosave.includes('vault.currentRevision()'),
+  'Autosave debe usar revisión verificada, evitar escritura idéntica y recuperar contexto solo ante conflicto real');
 for(const filePath of [
   'native-ios/App/N2ProtectedClinicalIOSVault.swift',
   'native-ios/App/N2SyntheticTrialIOSVault.swift',
@@ -214,9 +217,9 @@ const homeRefreshEnd=clinicalHome.indexOf('    private func homeTile',homeRefres
 assert(homeRefreshStart>=0 && homeRefreshEnd>homeRefreshStart,
   'No se pudo delimitar la actualización de contadores de Inicio');
 const homeRefresh=clinicalHome.slice(homeRefreshStart,homeRefreshEnd);
-must(homeRefresh,'vault.dashboardCounters(',
+must(homeRefresh,'vault.dashboardSnapshot(',
   'Inicio debe consultar los contadores directos y cifrados');
-assert(!homeRefresh.includes('vault.readDashboard()') &&
+assert(!homeRefresh.includes('vault.currentRevision()') && !homeRefresh.includes('vault.readDashboard()') &&
        !homeRefresh.includes('vault.readHistory()'),
   'Inicio no debe reconstruir el padrón ni el historial para mostrar las cifras');
 console.log('PASS: Inicio y Nueva atención aprovechan una sola lectura cifrada, sin cachear datos clínicos.');
@@ -236,7 +239,7 @@ assert(!workerSearch.includes('.sorted{'),
 for(const source of [core,workspace,vaultSource,demo]) {
   must(source,'dashboardCounters(','contador rápido por estado validado');
 }
-must(clinicalHome,'vault.dashboardCounters(',
+must(clinicalHome,'vault.dashboardSnapshot(',
   'Inicio calcula contadores sin generar el historial completo');
 console.log('PASS: padrón 9k con orden único, 25 visibles, y contadores directos del diario cifrado.');
 for(const marker of [
@@ -529,7 +532,7 @@ assert(!form.includes('Actualizar verificación'),
        'La atención se guarda y descuenta sin verificación manual');
 must(form,'step=record.stage','volver al paso del borrador recuperado');
 must(form,'step=recovered.stage','cargar borrador en su paso anterior');
-must(form,'makeDraftPatch(context:context,stage:step)',
+must(form,'makeDraftPatch(context:source,stage:stage)',
      'guardar etapa en borrador cifrado');
 must(clinicalTx,'Sin existencias FEFO disponibles en el inventario único.',
      'no segmentar FEFO por sede');
@@ -551,7 +554,8 @@ assert(!form.includes('Button("Verificar cantidad y apertura pendiente")'),
 assert(!form.includes('Button("Resolver correspondencia")'),
        'No mostrar vinculación redundante cuando el motivo real es stock');
 
-must(history,'committedQuery=query','búsqueda clínica conservada');
+must(history,'committedQuery=requested','búsqueda clínica conservada tras cancelación');
+assert(history.includes('workerSearchIndex') && history.includes('visitSearchIndex') && history.includes('Task.detached'), 'Búsquedas de personal/historial fuera del render y del hilo principal');
 for (const key of [
   'private var clinicalOnlyMatches:',
   'context.products.authorizedNursingOptions(for:product.code).isEmpty',
@@ -561,7 +565,7 @@ for (const key of [
 for (const key of [
   'await previousAutosave?.value',
   'let lines=try await vault.dispensingLines(visitID:form.id)',
-  'guard !Task.isCancelled,!saved,!busy else{return}',
+  'guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}',
   'drafts.removeAll(where:{$0.id==form.id})'
 ]) must(form,key,'guardado atómico sin carrera con borrador y sin lecturas redundantes');
 

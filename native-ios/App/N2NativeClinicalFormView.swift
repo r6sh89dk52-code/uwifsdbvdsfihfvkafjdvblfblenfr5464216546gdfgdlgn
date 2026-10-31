@@ -35,6 +35,11 @@ struct N2NativeClinicalFormView:View {
     private let systems=N2ClinicalFormOptions.systems
     private let procedures=N2ProcedureRules.procedures
     @State private var workersByDNI=[String:N2FormWorker]()
+    @State private var workerSearchIndex:N2SearchIndex<N2FormWorker>?
+    @State private var cachedNameSuggestions=[N2FormWorker]()
+    @State private var cachedSuggestionQuery=""
+    @State private var lastPersistedDraft:N2NativeFormDraft?
+    @State private var lastPersistedStage:Int?
     @State private var context:N2FormContext?
     @State private var pendingMappingItemID:String?
     @State private var pendingPhysicalItemID:String?
@@ -74,6 +79,7 @@ struct N2NativeClinicalFormView:View {
     @FocusState private var workerNameFocused:Bool
     @State private var editingWorkerDNI:String?
     @State private var allergyFeedback=""
+    @State private var allergySaveFailed=false
     @State private var chooseProduct=false
     @State private var showOtherProcedures=false
     @State private var chooseDraft=false
@@ -136,13 +142,15 @@ struct N2NativeClinicalFormView:View {
         return(date,formatter.string(from:Date()))
     }
     private var currentWorker:N2FormWorker? {
-        workersByDNI[form.dni] ?? context?.workers.first(where:{$0.dni==form.dni})
+        guard !form.dni.isEmpty else{return nil}
+        // A failed DNI lookup must not rescan 10k workers for every SwiftUI render.
+        if !workersByDNI.isEmpty {return workersByDNI[form.dni]}
+        return context?.workers.first(where:{$0.dni==form.dni})
     }
     private var nameSuggestions:[N2FormWorker] {
         let query=workerNameInput.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard query.count>=2,form.dni.isEmpty else{return []}
-        return N2NativeWorkerLookup.nameMatches(query,
-            in:context?.workers ?? [],limit:5)
+        guard query.count>=2,form.dni.isEmpty,query==cachedSuggestionQuery else{return []}
+        return cachedNameSuggestions
     }
     private func selectWorker(_ worker:N2FormWorker) {
         dniLookupTask?.cancel()
@@ -156,6 +164,7 @@ struct N2NativeClinicalFormView:View {
         allergyStatus=context?.allergies[worker.dni]?.status ?? "unknown"
         allergySubstances=context?.allergies[worker.dni]?.substances ?? ""
         allergyFeedback=""
+        allergySaveFailed=false
     }
     private func workerAgeDescription(_ worker:N2FormWorker)->String {
         if let age=N2WorkerAge.years(birthDate:worker.birthDate,on:form.date) {
@@ -170,8 +179,7 @@ struct N2NativeClinicalFormView:View {
         dniLookupTask?.cancel()
         let digits=N2NativeWorkerLookup.numericDNI(value)
         if workerDNIInput != digits {workerDNIInput=digits}
-        if let worker=N2NativeWorkerLookup.exactDNI(digits,
-            in:context?.workers ?? []) {
+        if let worker=workersByDNI[digits] {
             selectWorker(worker)
             return
         }
@@ -182,8 +190,7 @@ struct N2NativeClinicalFormView:View {
         dniLookupTask=Task { @MainActor in
             do {try await Task.sleep(for:.milliseconds(400))}catch{return}
             guard workerDNIInput==digits,!Task.isCancelled else{return}
-            if let worker=N2NativeWorkerLookup.exactDNI(digits,
-                in:context?.workers ?? []) {
+            if let worker=workersByDNI[digits] {
                 selectWorker(worker)
             } else {
                 notFoundDNI=digits
@@ -197,9 +204,6 @@ struct N2NativeClinicalFormView:View {
             .onChange(of:form) {old,new in
                 if let context {formChanged(old,new,context)}
             }
-            .onChange(of:context?.revision) {_,_ in
-                if let context {indexWorkers(context)}
-            }
             .onChange(of:keyboard.visible) {_,visible in
                 if visible && focusedField=="diagnosis" {
                     scrollIssueRequest=DanperScrollRequest(fieldID:"clinical-diagnosis")
@@ -211,6 +215,7 @@ struct N2NativeClinicalFormView:View {
             if let context {
                 DanperScrollView(jumpRequest:scrollIssueRequest) {
                     formContents(context)
+                        .disabled(editingAllergy)
                 }
                 .id("\(step)-\(saved)")
                 .navigationTitle(saved ? "Atención registrada" : "Nueva atención")
@@ -380,7 +385,7 @@ struct N2NativeClinicalFormView:View {
                     }
                 }
                 .onChange(of:form.dni) {_,dni in
-                    if let worker=context.workers.first(where:{$0.dni==dni}) {
+                    if let worker=workersByDNI[dni] {
                         workerDNIInput=dni
                         workerNameInput=worker.name
                     }
@@ -409,6 +414,21 @@ struct N2NativeClinicalFormView:View {
             }
         }
         .tint(brand)
+        .task(id:workerNameInput) {
+            let requested=workerNameInput
+            guard requested.trimmingCharacters(in:.whitespacesAndNewlines).count>=2,form.dni.isEmpty else {
+                cachedNameSuggestions=[];return
+            }
+            do {try await Task.sleep(for:.milliseconds(140))}catch{return}
+            let prior=workerSearchIndex,rows=context?.workers ?? []
+            let result=await Task.detached(priority:.userInitiated) {
+                let index=prior ?? N2SearchIndex(rows:rows,fields:{$0.dni+"\u{1f}"+$0.name})
+                return (index,index.matches(requested,limit:5))
+            }.value
+            guard !Task.isCancelled,form.dni.isEmpty else{return}
+            workerSearchIndex=result.0;cachedNameSuggestions=result.1
+            cachedSuggestionQuery=requested.trimmingCharacters(in:.whitespacesAndNewlines)
+        }
     }
 
     @ViewBuilder private func formContents(_ context:N2FormContext)->some View {
@@ -718,9 +738,10 @@ struct N2NativeClinicalFormView:View {
                         }.id("allergy-substances")
                     }
                     if !allergyFeedback.isEmpty {
-                        Label(allergyFeedback,systemImage:"checkmark.circle.fill")
+                        Label(allergyFeedback,systemImage:allergySaveFailed
+                              ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                             .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(allergySaveFailed ? Color.orange : Color.green)
                     }
                     Button(editingAllergy
                            ? "Guardando…" : "Guardar revisión de alergias") {
@@ -1031,7 +1052,9 @@ struct N2NativeClinicalFormView:View {
                                 Task { @MainActor in
                                     autosaveTask?.cancel()
                                     do {
-                                        self.context=try await vault.clinicalFormContext()
+                                        let refreshed=try await vault.clinicalFormContext()
+                                        self.context=refreshed
+                                        indexWorkers(refreshed)
                                         fault=false
                                     }
                                     catch {status="No se pudo actualizar el inventario. Vuelve a abrir la atención."}
@@ -1046,6 +1069,9 @@ struct N2NativeClinicalFormView:View {
     /// destinations from translated error strings or UI labels.
     private func issueCodes(for stage:Int,context:N2FormContext)->[String] {
         var issues=form.clinicalIssues(step:stage,context:context)
+        if stage==1,allergyReviewPending,!issues.contains("allergy-status") {
+            issues.append("allergy-status")
+        }
         if stage==2 {
             if form.procedures.isEmpty && form.items.isEmpty {
                 issues.append("treatment-selection")
@@ -1128,16 +1154,24 @@ struct N2NativeClinicalFormView:View {
         if form.hasWound && !form.photoReviewed {missing.append("Indica si se envió la foto.")}
         return missing
     }
+    private var allergyReviewPending:Bool {
+        if editingAllergy || allergySaveFailed {return true}
+        guard let context,!form.dni.isEmpty else{return false}
+        let persisted=context.allergies[form.dni]
+        guard allergyStatus==(persisted?.status ?? "unknown") else{return true}
+        return allergyStatus=="known" &&
+            allergySubstances.trimmingCharacters(in:.whitespacesAndNewlines) !=
+            (persisted?.substances ?? "").trimmingCharacters(in:.whitespacesAndNewlines)
+    }
     private var pendingRequirements:[String] {
         guard let context else{return ["Espera a que termine la verificación de los datos."]}
-        return (0...3).flatMap{form.clinicalIssues(step:$0,context:context)}
-            .map{N2ClinicalFormOptions.messages[$0] ?? $0}+extraTreatmentRequirements
+        return (0...3).flatMap{issueCodes(for:$0,context:context)}.map(issueMessage)
     }
     private var stepRequirements:[String] {
         guard let context else{return ["Espera a que termine la verificación de los datos."]}
-        let issues=form.clinicalIssues(step:step,context:context).map{N2ClinicalFormOptions.messages[$0] ?? $0}
-        let allergies=step==0 ? form.clinicalIssues(step:1,context:context).filter{$0.hasPrefix("allergy-")}.map{N2ClinicalFormOptions.messages[$0] ?? $0} : []
-        return issues+allergies+(step==2 ? extraTreatmentRequirements : [])
+        let issues=issueCodes(for:step,context:context).map(issueMessage)
+        let allergies=step==0 ? issueCodes(for:1,context:context).filter{$0.hasPrefix("allergy-")}.map(issueMessage) : []
+        return issues+allergies
     }
     private func reviewSection(_ context:N2FormContext)->some View {
         Group {
@@ -1221,6 +1255,7 @@ struct N2NativeClinicalFormView:View {
         .padding(.horizontal,16)
         .padding(.top,10)
         .padding(.bottom,6)
+        .disabled(editingAllergy)
         .background(.regularMaterial)
         .overlay(alignment:.top) {Rectangle().fill(.quaternary).frame(height:0.5)}
     }
@@ -1233,13 +1268,16 @@ struct N2NativeClinicalFormView:View {
         do {
             let current=try await vault.clinicalFormContext()
             if retry {_=try await vault.retryDispensing(visitID:form.id,expectedRevision:current.revision)}
-            context=try await vault.clinicalFormContext()
+            let refreshed=try await vault.clinicalFormContext()
+            context=refreshed
+            indexWorkers(refreshed)
             savedLines=try await vault.dispensingStatus(visitID:form.id)
             savedKardex=Dictionary(uniqueKeysWithValues:try await vault.dispensingLines(visitID:form.id).compactMap{line in line.kardexQuantity.map{(line.id,$0)}})
             status="Atención conservada. Consumos verificados nuevamente; revisa los pendientes."
         } catch {status="No se pudo conciliar. La atención original permanece registrada; revisa los datos físicos y la cronología."}
     }
     private func indexWorkers(_ context:N2FormContext) {
+        workerSearchIndex=nil;cachedNameSuggestions=[]
         workersByDNI=Dictionary(context.workers.map{($0.dni,$0)},uniquingKeysWith:{first,_ in first})
     }
     private func blankForm()->N2NativeFormDraft {
@@ -1288,23 +1326,69 @@ struct N2NativeClinicalFormView:View {
 
     @MainActor
     private func recordAllergy(_ dni:String) async {
+        guard !editingAllergy,let current=context,form.dni==dni else{return}
         editingAllergy=true
-        defer{editingAllergy=false}
-        do{
-            let normalized=allergyStatus=="known" ? allergySubstances : ""
-            let fresh=try await vault.clinicalFormContext()
-            let updated=try await vault
-                .reviewAllergies(dni:dni,status:allergyStatus,
-                    substances:normalized,at:now,
-                    expectedRevision:fresh.revision)
-            context=try await vault.clinicalFormContext()
+        var didCommit=false
+        allergySaveFailed=false
+        allergyFeedback=""
+        // A draft autosave can race the journal revision; stop an outstanding
+        // debounced task before the short, verified allergy transaction.
+        autosaveTask?.cancel()
+        defer {
+            editingAllergy=false
+            // A failed allergy transaction must not discard the draft which
+            // was waiting when its debounce was cancelled.
+            if !fault {scheduleDraft()}
+        }
+        do {
+            let statusToSave=allergyStatus
+            let normalized=statusToSave=="known" ? allergySubstances : ""
+            var revision=current.revision
+            let committed:Int
+            do {
+                committed=try await vault.reviewAllergiesRevision(
+                    dni:dni,status:statusToSave,substances:normalized,
+                    at:now,expectedRevision:revision)
+            } catch N2ProtectedStoreError.staleRevision {
+                // Another verified draft or worker edit advanced the journal.
+                // Re-read only the revision; retry once without touching
+                // the other data, then rebuild context only if necessary.
+                revision=try await vault.currentRevision()
+                committed=try await vault.reviewAllergiesRevision(
+                    dni:dni,status:statusToSave,substances:normalized,
+                    at:now,expectedRevision:revision)
+            }
+            didCommit=true
+            if revision==current.revision {
+                context=current.withCommittedAllergy(
+                    dni:dni,status:statusToSave,substances:normalized,
+                    revision:committed)
+            } else {
+                // An independent draft, roster or inventory update happened
+                // while the form was open; never silently overwrite its context.
+                let refreshed=try await vault.clinicalFormContext()
+                context=refreshed
+                indexWorkers(refreshed)
+            }
             status="Revisión de alergias guardada."
             allergyFeedback="Alergias revisadas y guardadas"
+            allergySaveFailed=false
             fault=false
-        }catch{
-            status="No se pudo guardar la revisión de alergias."
-            allergyFeedback="No se guardaron los cambios. Intenta nuevamente."
-            fault=true
+        } catch {
+            if didCommit {
+                // A successful encrypted commit must never be labeled failed
+                // just because the post-commit UI context refresh failed.
+                status="Alergias guardadas. No se pudo actualizar la ficha; vuelve a abrir la atención."
+                allergyFeedback="Guardado confirmado. Reabre la atención para continuar."
+                allergySaveFailed=false
+                fault=true
+            } else {
+                // Verification can fail after a file write. Do not claim that
+                // nothing persisted or invite a duplicate write from this view.
+                status="No se pudo confirmar el guardado de la revisión de alergias."
+                allergyFeedback="Reabre la atención para comprobar la revisión antes de volver a guardar."
+                allergySaveFailed=true
+            }
         }
     }
     @MainActor
@@ -1313,6 +1397,7 @@ struct N2NativeClinicalFormView:View {
             let fresh=try await vault.clinicalFormContext()
             guard fresh.workers.contains(where:{$0.dni==dni}) else{return}
             context=fresh
+            indexWorkers(fresh)
             form.dni=dni
             allergyStatus=fresh.allergies[dni]?.status ?? "unknown"
             allergySubstances=fresh.allergies[dni]?.substances ?? ""
@@ -1334,32 +1419,53 @@ struct N2NativeClinicalFormView:View {
         !form.items.isEmpty
     }
     private func scheduleDraft(immediate:Bool=false) {
-        guard !layoutOnly,let context,!busy,!saved,!fault,meaningfulDraft else{return}
+        guard !layoutOnly,let context,!busy,!saved,!fault,!editingAllergy,
+              meaningfulDraft else{return}
         autosaveTask?.cancel()
-        let version=form
+        let version=form,stage=step
+        guard version != lastPersistedDraft || stage != lastPersistedStage else{return}
         autosaveTask=Task { @MainActor in
             if !immediate {
                 do {try await Task.sleep(for:.milliseconds(650))}
                 catch{return}
             }
-            guard !Task.isCancelled else{return}
+            guard !Task.isCancelled,!editingAllergy else{return}
             do{
-                let latestRevision=try await vault.currentRevision()
-                // A cancelled autosave must never race the final save with
-                // the same journal revision or replace its success banner.
-                guard !Task.isCancelled,!saved,!busy else{return}
-                let patch=try version.makeDraftPatch(context:context,stage:step)
+                var source=context
+                var refreshedContext=false
                 let timestamp=max(Int64(Date().timeIntervalSince1970*1000),
                                   lastAutosaveTimestamp+1)
-                _=try await vault.saveDraft(
-                    id:version.id,changes:patch,at:timestamp,
-                    expectedRevision:latestRevision)
-                guard !Task.isCancelled,!saved,!busy else{return}
+                let committed:N2ProtectedStoreSummary
+                do {
+                    guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
+                    committed=try await vault.saveDraft(id:version.id,
+                        changes:version.makeDraftPatch(context:source,stage:stage),
+                        at:timestamp,expectedRevision:source.revision)
+                } catch N2ProtectedStoreError.staleRevision {
+                    // Common path performs ONE transaction, without a separate
+                    // currentRevision recovery. Only an actual conflict needs
+                    // a new authenticated context and one bounded retry.
+                    source=try await vault.clinicalFormContext()
+                    guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
+                    committed=try await vault.saveDraft(id:version.id,
+                        changes:version.makeDraftPatch(context:source,stage:stage),
+                        at:timestamp,expectedRevision:source.revision)
+                    refreshedContext=true
+                }
+                let latestRevision=source.revision
+                guard !Task.isCancelled,!saved,!busy,!editingAllergy else{return}
+                if refreshedContext {
+                    self.context=source.withCommittedRevision(committed.revision)
+                    indexWorkers(source)
+                } else if let existing=self.context,existing.revision==latestRevision {
+                    self.context=existing.withCommittedRevision(committed.revision)
+                }
                 lastAutosaveTimestamp=timestamp
+                lastPersistedDraft=version;lastPersistedStage=stage
                 await N2DraftReminder.schedule(id:version.id,mode:vault.mode)
                 status="Borrador guardado."
             }catch{
-                if !Task.isCancelled && !saved {
+                if !Task.isCancelled && !saved && !editingAllergy {
                     fault=true
                     status="No se pudo guardar el borrador. Edición bloqueada hasta verificar el almacenamiento."
                 }
@@ -1488,7 +1594,7 @@ struct N2NativeClinicalFormView:View {
 
     @MainActor
     private func confirm() async {
-        guard let context,!busy,!saved,!fault else{return}
+        guard let context,!busy,!saved,!fault,!allergyReviewPending else{return}
         let previousAutosave=autosaveTask
         autosaveTask=nil
         previousAutosave?.cancel()
@@ -1550,6 +1656,7 @@ struct N2NativeClinicalFormView:View {
             let prepared=try await vault.prepareClinicalForm()
             drafts=prepared.drafts
             context=prepared.context
+            indexWorkers(prepared.context)
             if form.id==id {
                 autosaveTask?.cancel()
                 form=blankForm()

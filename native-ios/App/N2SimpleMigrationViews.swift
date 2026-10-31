@@ -14,12 +14,8 @@ struct N2EncryptedBackupDocument:FileDocument {
     }
     func fileWrapper(configuration:WriteConfiguration)throws->FileWrapper {FileWrapper(regularFileWithContents:bytes)}
 }
-private func n2ReadBackup(_ url:URL)throws->Data {
-    let scoped=url.startAccessingSecurityScopedResource();defer{if scoped {url.stopAccessingSecurityScopedResource()}}
-    let info=try url.resourceValues(forKeys:[.isRegularFileKey,.isSymbolicLinkKey,.fileSizeKey])
-    guard info.isRegularFile==true,info.isSymbolicLink != true,
-          let size=info.fileSize,(100...42*1024*1024).contains(size) else{throw N2InventoryBackupCodec.Failure.envelope}
-    return try Data(contentsOf:url)
+private func n2ReadBackup(_ url:URL) async throws->Data {
+    try await N2WorkspaceFileIO.shared.readBackup(url)
 }
 struct N2SimpleMigrationSetup:View {
     let context:N2SimpleInventoryContext
@@ -147,7 +143,7 @@ struct N2SimpleMigrationSetup:View {
     @MainActor private func verifySaved(_ url:URL) async {
         busy=true;defer{busy=false};let nonce=cycle
         do {
-            let data=try n2ReadBackup(url)
+            let data=try await n2ReadBackup(url)
             let result=try await vault.inspectSimpleBackup(data,password:password)
             guard nonce==cycle else{throw CancellationError()}
             savedURL=url;verified=result;status="Respaldo disponible y verificado. Revisa los conteos antes de autorizar."
@@ -161,7 +157,7 @@ struct N2SimpleMigrationSetup:View {
             guard accepted,nonce==cycle else{throw CancellationError()}
             // Read the saved destination again. An unavailable/deleted/changed
             // archive never authorizes the reset, even if export once succeeded.
-            let archive=try n2ReadBackup(url)
+            let archive=try await n2ReadBackup(url)
             guard SHA256.hash(data:archive).map({String(format:"%02x",$0)}).joined()==verified?.archiveSHA256 else {
                 throw N2SimpleInventoryError.sourceChanged
             }
@@ -270,7 +266,7 @@ struct N2SimpleRestoreView:View {
     @MainActor private func inspect() async {
         guard let file,!busy else{return};busy=true;defer{busy=false};let nonce=cycle
         do {
-            let result=try await vault.inspectSimpleBackup(n2ReadBackup(file),password:password)
+            let result=try await vault.inspectSimpleBackup(try await n2ReadBackup(file),password:password)
             guard nonce==cycle else{throw CancellationError()}
             review=result;status="Revisa el alcance antes de confirmar."
         }catch {review=nil;status=n2SimpleMessage(error)}
@@ -281,7 +277,7 @@ struct N2SimpleRestoreView:View {
             let id=LAContext();identity=id
             let accepted=try await id.evaluatePolicy(.deviceOwnerAuthentication,localizedReason:"Autorizar restauración cifrada de DANPER")
             guard accepted,nonce==cycle else{throw CancellationError()}
-            let archive=try n2ReadBackup(file)
+            let archive=try await n2ReadBackup(file)
             guard SHA256.hash(data:archive).map({String(format:"%02x",$0)}).joined()==review?.archiveSHA256 else {
                 throw N2SimpleInventoryError.sourceChanged
             }

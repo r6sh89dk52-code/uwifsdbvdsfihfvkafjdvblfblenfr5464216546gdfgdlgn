@@ -18,6 +18,56 @@ final class N2ClinicalCorrectionsTests:XCTestCase {
                 try amendment(["stockLots":root["stockLots"]!]),
                 try amendment(["stockMovements":root["stockMovements"]!]))
     }
+    func testConfirmedVisitSiteIsIndependentOfRosterAndDoesNotChangeStock()throws {
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(
+            with:fixture()) as? [String:Any])
+        var visits=try XCTUnwrap(root["attentions"] as? [[String:Any]])
+        let index=try XCTUnwrap(visits.firstIndex{$0["id"] as? String=="fundo-unit"})
+        var originalWorker=try XCTUnwrap(visits[index]["worker"] as? [String:Any])
+        originalWorker["site"]=""
+        visits[index]["worker"]=originalWorker
+        root["attentions"]=visits
+        let raw=try amendment(root)
+        let detail=try N2ClinicalCorrections.detail(snapshot:raw,visitID:"fundo-unit")
+        XCTAssertEqual(detail.workerSite,"")
+        XCTAssertEqual(detail.currentRosterSite,"LA VENTUROSA")
+        XCTAssertEqual(try N2NativeSnapshotReader.read(raw).visits
+            .first{$0.id=="fundo-unit"}?.workerSite,"")
+        let before=try originalStocks(raw)
+        let patched=try N2ClinicalCorrections.append(
+            snapshot:raw,eventID:"AD0677F7-8EAA-44BC-8988-7114F1D75D0C",
+            visitID:"fundo-unit",
+            changes:amendment(["visitWorkerSite":"LA VENTUROSA"]),
+            reason:"Confirmación de sede de la atención histórica",
+            operatorName:"RESPONSABLE ENFERMERÍA",medicationDiscrepancy:"",
+            expectedEffectiveSHA:detail.effectiveSHA256,at:1792060000000)
+        XCTAssertEqual(try N2ClinicalCorrections.detail(
+            snapshot:patched,visitID:"fundo-unit").workerSite,"LA VENTUROSA")
+        XCTAssertEqual(try N2NativeSnapshotReader.read(patched).visits
+            .first{$0.id=="fundo-unit"}?.workerSite,"LA VENTUROSA")
+        XCTAssertFalse(try N2ClinicalCorrections.pendingDiscrepancies(patched)
+            .contains("fundo-unit"))
+        // The source, roster and inventory are byte-for-byte unchanged.
+        let old=try XCTUnwrap(JSONSerialization.jsonObject(with:raw) as? [String:Any])
+        let new=try XCTUnwrap(JSONSerialization.jsonObject(with:patched) as? [String:Any])
+        XCTAssertEqual(try amendment(["workers":old["workers"]!]),
+                       try amendment(["workers":new["workers"]!]))
+        XCTAssertEqual(try amendment(["attentions":old["attentions"]!]),
+                       try amendment(["attentions":new["attentions"]!]))
+        let after=try originalStocks(patched)
+        XCTAssertEqual(before.0,after.0)
+        XCTAssertEqual(before.1,after.1)
+        XCTAssertEqual(before.2,after.2)
+        let latest=try N2ClinicalCorrections.detail(snapshot:patched,visitID:"fundo-unit")
+        XCTAssertThrowsError(try N2ClinicalCorrections.append(
+            snapshot:patched,eventID:"CE32D474-8C78-4280-833E-073AF5B76CDA",
+            visitID:"fundo-unit",
+            changes:amendment(["visitWorkerSite":"OTRA SEDE"]),
+            reason:"Sede inexistente, rechazar",
+            operatorName:"RESPONSABLE ENFERMERÍA",medicationDiscrepancy:"",
+            expectedEffectiveSHA:latest.effectiveSHA256,at:1792060001000))
+    }
+
     func testClinicalCorrectionNeverReissuesDrugsAndKeepsOriginalImmutable()throws {
         let source=try fixture()
         let before=try N2ClinicalCorrections.detail(snapshot:source,visitID:"fundo-unit")

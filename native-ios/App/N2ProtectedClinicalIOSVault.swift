@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import CryptoKit
 import Security
 import DanperCore
@@ -7,6 +8,24 @@ import DanperCore
 /// Keychain. No view starts migration or activation automatically.
 actor N2ProtectedClinicalIOSVault {
     static let shared=N2ProtectedClinicalIOSVault()
+    private var sessionStore:(secret:Data,store:N2ProtectedClinicalVaultCore)?
+    private init() {
+        // Singleton lifetime observers, no patient fields in notifications.
+        for name in [UIApplication.didEnterBackgroundNotification,
+                     UIApplication.protectedDataWillBecomeUnavailableNotification] {
+            _=NotificationCenter.default.addObserver(forName:name,object:nil,queue:nil) { [weak self] _ in
+                Task {await self?.clearSessionCaches()}
+            }
+        }
+    }
+    func clearSessionCaches() {sessionStore=nil}
+    private func sessionStore(for secret:Data)throws->N2ProtectedClinicalVaultCore {
+        if let current=sessionStore,current.secret==secret {return current.store}
+        sessionStore=nil
+        let store=try N2ProtectedClinicalVaultCore(keyData:secret)
+        sessionStore=(secret,store)
+        return store
+    }
     private let service="pe.danper.saludmovil.native.iloaderpreview.n2.clinical"
     private let account="n2-one-source-clinical-aes256-v1"
     enum Failure:LocalizedError {
@@ -66,8 +85,10 @@ actor N2ProtectedClinicalIOSVault {
     /// Counts only. Requires no key creation, no decryption unless encrypted
     /// vault is already present, and no access to the old application.
     func inspect()throws->N2ProtectedStoreSummary? {
-        guard let secret=try deviceKey(create:false) else{return nil}
-        return try N2ProtectedClinicalVaultCore(keyData:secret).inspect()
+        do {
+            guard let secret=try deviceKey(create:false) else {sessionStore=nil;return nil}
+            return try sessionStore(for:secret).inspect()
+        } catch {sessionStore=nil;throw error}
     }
     /// This is intentionally uncalled by the present evaluation screens.
     /// A future explicit restore review will pass ONE locally decrypted,
@@ -119,6 +140,9 @@ actor N2ProtectedClinicalIOSVault {
     func dispensingStatus(visitID:String)throws->[String:String] {
         try protectedStore().dispensingStatus(visitID:visitID)
     }
+    func dashboardSnapshot(today:String,weekStart:String)throws->N2DashboardSnapshot? {
+        try protectedStore().dashboardSnapshot(today:today,weekStart:weekStart)
+    }
     func dashboardCounters(today:String,weekStart:String)throws
         ->(today:Int,week:Int,month:Int,drafts:Int)? {
         try protectedStore().dashboardCounters(today:today,weekStart:weekStart)
@@ -128,14 +152,18 @@ actor N2ProtectedClinicalIOSVault {
         try protectedStore().readDashboard()
     }
     func readHistory()throws->N2NativeReadModel? {
-        guard let secret=try deviceKey(create:false) else{return nil}
-        return try N2ProtectedClinicalVaultCore(keyData:secret).readIndex()
+        do {
+            guard let secret=try deviceKey(create:false) else {sessionStore=nil;return nil}
+            return try sessionStore(for:secret).readIndex()
+        } catch {sessionStore=nil;throw error}
     }
     private func protectedStore()throws->N2ProtectedClinicalVaultCore {
-        guard let secret=try deviceKey(create:false) else{
-            throw Failure.missingKey
-        }
-        return try N2ProtectedClinicalVaultCore(keyData:secret)
+        do {
+            // Always check the device-only Keychain. Cached proof cannot
+            // bypass a locked device, a missing key or another key.
+            guard let secret=try deviceKey(create:false) else{throw Failure.missingKey}
+            return try sessionStore(for:secret)
+        } catch {sessionStore=nil;throw error}
     }
     private func resource(_ name:String)throws->Data {
         if let cached=resourceCache[name] {return cached}
@@ -155,6 +183,12 @@ actor N2ProtectedClinicalIOSVault {
                        expectedRevision:Int)throws->N2ProtectedStoreSummary {
         try protectedStore().correctWorker(dni:dni,worker:worker,
                                            at:at,expectedRevision:expectedRevision)
+    }
+    func reviewAllergiesRevision(dni:String,status:String,substances:String,
+                        at:Int64,expectedRevision:Int)throws->Int {
+        try protectedStore().reviewAllergiesRevision(
+            dni:dni,status:status,substances:substances,
+            at:at,expectedRevision:expectedRevision)
     }
     func reviewAllergies(dni:String,status:String,substances:String,
                         at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
@@ -235,6 +269,9 @@ actor N2ProtectedClinicalIOSVault {
     func readCorrectionHistory(visitID:String)throws
         ->[N2CorrectionHistoryEntry] {
         try protectedStore().readCorrectionHistory(visitID:visitID)
+    }
+    func prepareClinicalCorrection(visitID:String)throws->N2CorrectionReadContext {
+        try protectedStore().prepareClinicalCorrection(visitID:visitID)
     }
     func readCorrectionDetail(visitID:String)throws->N2CorrectionDetail {
         try protectedStore().readCorrectionDetail(visitID:visitID)

@@ -24,6 +24,10 @@ public struct N2CorrectionField:Sendable,Equatable {
 public struct N2CorrectionDetail:Sendable {
     public let id:String
     public let workerName:String
+    /// Site recorded for THIS visit; never inferred from a later job transfer.
+    public let workerSite:String
+    /// Current roster site offered only as an explicit suggestion.
+    public let currentRosterSite:String
     public let date:String
     public let time:String
     public let category:String
@@ -61,6 +65,12 @@ public struct N2PendingClinicalCorrection:Sendable {
     public let medicationDiscrepancy:String
     public let updatedAt:Int64
 }
+public struct N2CorrectionReadContext:Sendable {
+    public let revision:Int
+    public let detail:N2CorrectionDetail
+    public let history:[N2CorrectionHistoryEntry]
+    public let draft:N2PendingClinicalCorrection?
+}
 public enum N2ClinicalCorrections {
     private static let editableText:Set<String> = [
         "category","system","segment","diagnosis","permission",
@@ -96,7 +106,8 @@ public enum N2ClinicalCorrections {
                 editableText.contains($0) || editableBools.contains($0) ||
                 $0=="standaloneProcedures" || $0=="itemProcedures" ||
                 $0=="itemClinicalQuantities" ||
-                $0=="itemHistoricalOpenings"
+                $0=="itemHistoricalOpenings" ||
+                $0=="visitWorkerSite"
               }) else{throw N2CorrectionError.invalidChanges}
         for (key,v) in changes {
             if editableText.contains(key) {
@@ -131,6 +142,17 @@ public enum N2ClinicalCorrections {
                     }
                     return item
                 }
+            }else if key=="visitWorkerSite" {
+                // An explicit correction changes only the site on the
+                // projected clinical visit, not the current personnel roster
+                // and never an inventory/dispensing record.
+                guard let site=v as? String,
+                      ["LA VENTUROSA","PLVENTUROSA"].contains(site),
+                      var worker=next["worker"] as? [String:Any],
+                      let dni=worker["dni"] as? String,dni.count==8
+                else {throw N2CorrectionError.invalidChanges}
+                worker["site"]=site
+                next["worker"]=worker
             }else if key=="itemHistoricalOpenings" {
                 guard let entries=v as? [String:Int],!entries.isEmpty,entries.count<=100,
                       let items=next["items"] as? [[String:Any]],
@@ -193,8 +215,8 @@ public enum N2ClinicalCorrections {
         }
         return next
     }
-    private static func project(_ original:[String:Any])throws->
-        (rows:[[String:Any]],history:[[String:Any]],pending:Set<String>) {
+    private typealias Evaluation=(rows:[[String:Any]],history:[[String:Any]],pending:Set<String>)
+    private static func project(_ original:[String:Any])throws->Evaluation {
         guard let visits=original["attentions"] as? [[String:Any]] else{
             throw N2CorrectionError.brokenHistory
         }
@@ -251,7 +273,9 @@ public enum N2ClinicalCorrections {
     }
     public static func detail(snapshot:Data,visitID:String)throws->N2CorrectionDetail {
         let obj=try json(snapshot)
-        let evaluated=try project(obj)
+        return try makeDetail(obj,evaluated:project(obj),visitID:visitID)
+    }
+    private static func makeDetail(_ obj:[String:Any],evaluated:Evaluation,visitID:String)throws->N2CorrectionDetail {
         guard let visit=evaluated.rows.first(where:{$0["id"] as? String==visitID})
         else{throw N2CorrectionError.missingVisit}
         guard visit["status"] as? String=="saved" else{throw N2CorrectionError.notSaved}
@@ -259,9 +283,8 @@ public enum N2ClinicalCorrections {
               let items=visit["items"] as? [[String:Any]] else{
             throw N2CorrectionError.invalidSnapshot
         }
-        let priorHistorical=N2SimpleInventory.isActive(snapshot)
-            ? (try N2SimpleInventory.read(snapshot).historicalUses)
-            : []
+        let priorHistorical=obj["inventorySchemaVersion"] as? Int == 2
+            ? (try N2SimpleInventory.state(obj).historicalUses) : []
         let lines=try items.map{v -> N2CorrectionField in
             guard let id=v["id"] as? String,let code=v["code"] as? String,
                   let name=v["name"] as? String,let quantity=v["quantity"] as? Int else{
@@ -280,7 +303,13 @@ public enum N2ClinicalCorrections {
                 historicalOpeningEditable:eligible)
         }
         func s(_ key:String)->String{visit[key] as? String ?? ""}
+        let dni=worker["dni"] as? String ?? ""
+        let roster=(obj["workers"] as? [[String:Any]])?
+            .first(where:{$0["dni"] as? String==dni})
+        let currentRosterSite=roster?["site"] as? String ?? ""
         return N2CorrectionDetail(id:visitID,workerName:worker["name"] as? String ?? "",
+            workerSite:worker["site"] as? String ?? "",
+            currentRosterSite:currentRosterSite,
             date:s("date"),time:s("time"),category:s("category"),system:s("system"),
             segment:s("segment"),diagnosis:s("diagnosis"),permission:s("permission"),
             permissionTime:s("permissionTime"),responsible:s("responsible"),
@@ -299,7 +328,9 @@ public enum N2ClinicalCorrections {
     public static func history(snapshot:Data,visitID:String)throws
         ->[N2CorrectionHistoryEntry] {
         let source=try json(snapshot)
-        let inspected=try project(source)
+        return try makeHistory(source,inspected:project(source),visitID:visitID)
+    }
+    private static func makeHistory(_ source:[String:Any],inspected:Evaluation,visitID:String)throws->[N2CorrectionHistoryEntry] {
         guard let originals=source["attentions"] as? [[String:Any]],
               let original=originals.first(where:{$0["id"] as? String==visitID}),
               original["status"] as? String=="saved" else{
@@ -327,12 +358,26 @@ public enum N2ClinicalCorrections {
     }
     /// For history/export projections only; the encrypted saved source stays
     /// immutable and its original physical R links are authoritative.
-    public static func effectiveSnapshot(_ snapshot:Data)throws->Data {
-        let obj=try json(snapshot)
+    static func effectiveProjection(_ snapshot:Data)throws->(snapshot:Data,pending:Set<String>) {
+        try projection(json(snapshot),original:nil)
+    }
+    /// Authenticated proof is internal and bound to the exact recovered bytes.
+    /// Correction-chain signatures and visit identities are still checked.
+    static func authenticatedProjection(_ record:N2EncryptedClinicalJournal.Recovered)throws->(snapshot:Data,pending:Set<String>) {
+        guard let obj=try JSONSerialization.jsonObject(with:record.snapshot) as? [String:Any] else {
+            throw N2CorrectionError.invalidSnapshot
+        }
+        return try projection(obj,original:record.snapshot)
+    }
+    private static func projection(_ obj:[String:Any],original:Data?)throws->(snapshot:Data,pending:Set<String>) {
         let projected=try project(obj)
+        if projected.history.isEmpty,let original {return (original,projected.pending)}
         var next=obj
         next["attentions"]=projected.rows
-        return try JSONSerialization.data(withJSONObject:next,options:[.sortedKeys])
+        return (try JSONSerialization.data(withJSONObject:next,options:[.sortedKeys]),projected.pending)
+    }
+    public static func effectiveSnapshot(_ snapshot:Data)throws->Data {
+        try effectiveProjection(snapshot).snapshot
     }
     public static func pendingDiscrepancies(_ snapshot:Data)throws->Set<String> {
         try project(json(snapshot)).pending
@@ -342,7 +387,9 @@ public enum N2ClinicalCorrections {
     public static func pendingDraft(snapshot:Data,visitID:String)throws
         ->N2PendingClinicalCorrection? {
         let root=try json(snapshot)
-        let current=try project(root)
+        return try makePendingDraft(root,current:project(root),visitID:visitID)
+    }
+    private static func makePendingDraft(_ root:[String:Any],current:Evaluation,visitID:String)throws->N2PendingClinicalCorrection? {
         guard let original=current.rows.first(where:{$0["id"] as? String==visitID}),
               original["status"] as? String=="saved" else{
             throw N2CorrectionError.missingVisit
@@ -373,6 +420,19 @@ public enum N2ClinicalCorrections {
             changes:try JSONSerialization.data(withJSONObject:patch),
             reason:reason,operatorName:user,medicationDiscrepancy:note,
             updatedAt:millis.int64Value)
+    }
+    static func prepareAuthenticated(_ record:N2EncryptedClinicalJournal.Recovered,visitID:String)throws->N2CorrectionReadContext {
+        let span=N2PerformanceSpan("Prepare clinical correction");defer{span.end()}
+        guard let obj=try JSONSerialization.jsonObject(with:record.snapshot) as? [String:Any] else{throw N2CorrectionError.invalidSnapshot}
+        let evaluated=try project(obj)
+        return N2CorrectionReadContext(revision:record.revision,
+            detail:try makeDetail(obj,evaluated:evaluated,visitID:visitID),
+            history:try makeHistory(obj,inspected:evaluated,visitID:visitID),
+            draft:try makePendingDraft(obj,current:evaluated,visitID:visitID))
+    }
+    static func detailAuthenticated(_ record:N2EncryptedClinicalJournal.Recovered,visitID:String)throws->N2CorrectionDetail {
+        guard let obj=try JSONSerialization.jsonObject(with:record.snapshot) as? [String:Any] else{throw N2CorrectionError.invalidSnapshot}
+        return try makeDetail(obj,evaluated:project(obj),visitID:visitID)
     }
     public static func savePendingDraft(snapshot:Data,visitID:String,changes:Data,
         reason:String,operatorName:String,medicationDiscrepancy:String,

@@ -152,6 +152,10 @@ public enum N2SnapshotEditor {
 
     public static func reviewAllergies(snapshot:Data,dni:String,status:String,
                                        substances:String,at:Int64)throws->Data {
+        try reviewedAllergies(snapshot:snapshot,dni:dni,status:status,substances:substances,at:at).bytes
+    }
+    static func reviewedAllergies(snapshot:Data,dni:String,status:String,
+                                 substances:String,at:Int64)throws->N2AuditedSnapshot {
         try clock(at)
         var root=try parse(snapshot)
         guard isDni(dni),["unknown","none","known"].contains(status),
@@ -170,7 +174,12 @@ public enum N2SnapshotEditor {
         record["updatedAt"]=at
         allergies[dni]=record
         root["allergies"]=allergies
-        return try finish(root)
+        guard JSONSerialization.isValidJSONObject(root),
+              let raw=try? JSONSerialization.data(withJSONObject:root,options:.sortedKeys),
+              let proof=try? N2AuditedSnapshot(validating:raw) else {
+            throw N2SnapshotEditError.validationFailed
+        }
+        return proof
     }
     /// Creates or patches a draft without altering saved visits or movement rows.
     /// patch is whitelisted to avoid silently rewriting future metadata fields.
