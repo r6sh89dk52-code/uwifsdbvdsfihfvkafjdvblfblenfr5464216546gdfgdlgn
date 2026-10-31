@@ -10,7 +10,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Parse bridge and run all Python evidence regressions
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0.3'
+      - name: Parse changed harness and interaction source
         run: |
-          python3 -m py_compile scripts/glass-audit/simulator-ready-bridge.py scripts/performance/tests/test_sensor_bridge.py
-          python3 -m unittest discover -s scripts/performance/tests -v
+          python3 -m py_compile scripts/glass-audit/simulator-ready-bridge.py scripts/performance/profile-simulator.py scripts/performance/tests/test_sensor_bridge.py
+          swiftc -frontend -parse native-ios/InteractionTests/N2AllergySaveInteractionTests.swift
+      - name: Run all Python evidence and sensor regressions
+        run: python3 -m unittest discover -s scripts/performance/tests -v
