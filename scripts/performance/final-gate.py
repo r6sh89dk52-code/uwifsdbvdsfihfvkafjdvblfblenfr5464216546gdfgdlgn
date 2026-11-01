@@ -33,7 +33,7 @@ assert swift['sourceSHA']==head and swift['tests']>=426 and swift['failures']==s
 marker(root/'javascript','SOURCE_SHA.txt');js=json.loads((root/'javascript'/'javascript-results.json').read_text())
 assert len(js)==62 and all(x['exit']==0 for x in js)
 marker(root/'performance','SOURCE_SHA.txt');perf=json.loads((root/'performance'/'comparison.json').read_text())
-assert perf['workers']==9_648 and len(perf['operations'])==11
+assert perf['workers']==9_648 and len(perf['operations'])==13
 assert set(perf['resources'])=={'before','after'}
 assert all(x['peak_rss_kib']>0 and x['wall_s']>0 for x in perf['resources'].values())
 report={'sourceSHA':head,'swift':swift['tests'],'native':n,'ui':suites,'javascript':62,

@@ -104,6 +104,24 @@ final class N2PerformanceAuditTests:XCTestCase {
             _=try store().readPendingClinicalCorrection(visitID:"fundo-unit")
             #endif
         }
+        try measure("dispensing_readonly_refresh",3) {
+            #if !DANPER_PERF_OPTIMIZED
+            _=try store().clinicalFormContext(products:products,nursing:catalog,mappings:mappings)
+            #endif
+            _=try store().clinicalFormContext(products:products,nursing:catalog,mappings:mappings)
+            _=try store().dispensingStatus(visitID:"fundo-unit")
+            _=try store().dispensingLines(visitID:"fundo-unit")
+        }
+        try measure("inventory_catalog_only",3) {
+            #if DANPER_PERF_OPTIMIZED
+            let loaded=try N2NativeCatalogLoader.load(products:products,nursing:catalog,approvedMappings:mappings)
+            #else
+            let loaded=try store().clinicalFormContext(products:products,nursing:catalog,mappings:mappings).products
+            #endif
+            XCTAssertEqual(loaded.clinical,context.products.clinical)
+            XCTAssertEqual(loaded.nursing,context.products.nursing)
+            XCTAssertEqual(loaded.approvals,context.products.approvals)
+        }
         #if DANPER_PERF_OPTIMIZED
         let indexStart=ProcessInfo.processInfo.systemUptime
         let index=N2SearchIndex(rows:context.workers,fields:{$0.dni+"\u{1f}"+$0.name})

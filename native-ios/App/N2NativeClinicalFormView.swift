@@ -1266,8 +1266,10 @@ struct N2NativeClinicalFormView:View {
         busy=true
         defer {busy=false}
         do {
-            let current=try await vault.clinicalFormContext()
-            if retry {_=try await vault.retryDispensing(visitID:form.id,expectedRevision:current.revision)}
+            if retry {
+                let revision=try await vault.currentRevision()
+                _=try await vault.retryDispensing(visitID:form.id,expectedRevision:revision)
+            }
             let refreshed=try await vault.clinicalFormContext()
             context=refreshed
             indexWorkers(refreshed)

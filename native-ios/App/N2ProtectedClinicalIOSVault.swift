@@ -218,8 +218,9 @@ actor N2ProtectedClinicalIOSVault {
     }
     func auxiliaryAccounting()throws->String {try protectedStore().auxiliaryAccounting()}
     func registerAuxiliaryLot(clinicalCode:String,lot:Data,operatorName:String,evidence:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
-        let context=try clinicalFormContext()
-        return try protectedStore().registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,catalog:context.products,
+        let catalog=try N2NativeCatalogLoader.load(products:resource("n2-ambulatory-products"),
+            nursing:resource("n2-nursing-catalog"),approvedMappings:resource("n2-approved-mappings"))
+        return try protectedStore().registerAuxiliaryLot(clinicalCode:clinicalCode,lot:lot,catalog:catalog,
             operatorName:operatorName,evidence:evidence,at:Int64(Date().timeIntervalSince1970*1000),expectedRevision:expectedRevision)
     }
     func retryDispensing(visitID:String,expectedRevision:Int)throws->N2ProtectedStoreSummary {
@@ -227,8 +228,9 @@ actor N2ProtectedClinicalIOSVault {
             at:Int64(Date().timeIntervalSince1970*1000),expectedRevision:expectedRevision)
     }
     func confirmOperationalMapping(_ rule:N2OperationalMapping,expectedRevision:Int)throws->N2ProtectedStoreSummary {
-        let context=try clinicalFormContext()
-        return try protectedStore().confirmOperationalMapping(rule,catalog:context.products,
+        let catalog=try N2NativeCatalogLoader.load(products:resource("n2-ambulatory-products"),
+            nursing:resource("n2-nursing-catalog"),approvedMappings:resource("n2-approved-mappings"))
+        return try protectedStore().confirmOperationalMapping(rule,catalog:catalog,
             explicitConsent:true,expectedRevision:expectedRevision)
     }
     /// Load both form inputs from one verified snapshot/revision.
