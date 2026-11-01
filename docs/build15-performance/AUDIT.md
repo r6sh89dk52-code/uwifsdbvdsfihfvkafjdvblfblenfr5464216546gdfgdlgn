@@ -57,3 +57,18 @@ La tabla final procede del artefacto `B15_PERFORMANCE_COMPARISON/comparison.json
 No hay IPA de Build 15 autorizada por este documento. La versión instalada Build 14 permanece intacta. Se debe revisar el resultado completo de la ejecución actual, las métricas y cualquier limitación de Instruments antes de evaluar distribución.
 
 La firma iLoader y la conservación del contenedor en una actualización física no pueden certificarse con Simulator. Conservar el respaldo original de Build 14 y la misma identidad de firma; no desinstalar la app que contiene los datos reales. No se ha accedido a datos del iPhone durante estas pruebas.
+
+
+## Continuación desde el HEAD real 90cb0ab — 1 de noviembre
+
+La solicitud volvió a citar cc45aa2, pero la rama ya contenía toda la auditoría anterior. Se conservan los cambios. El workflow 41173716294 terminó FAILURE: 428 Swift, 27 nativas, ambos Excel, 62 controles JS, 15 Python, benchmark de once operaciones y compatibilidad Build 14 pasaron; UI 9 PASS y 4 FAIL. Ninguna cifra anterior certifica un candidato nuevo.
+
+Diagnóstico de los fallos actuales:
+- Los dos casos de autenticación no observaron el sensor porque CoreAuthUI terminó su arranque después del watchdog de 5 s de coreauthd: código -1000 y `UI activation timed out`. No fue un ACK falso ni una autenticación exitosa. Se prepara el ejecutable del servicio antes de solicitar la política, se observa su arranque real y se retira su escena independiente. La espera real del sensor y todos los eventos/aserciones de los casos permanecen obligatorios.
+- El caso de alergias seguía en Inicio después de tocar Nueva atención. Se elimina la captura de Instruments concurrente con esa prueba funcional y se exige que el formulario esté presente antes de buscar sus controles. Se conserva la regresión de persistencia y de alergia modificada sin confirmar.
+- El recorrido R1/R0 consumió diez minutos con consultas XCTest redundantes. Los botones ya visibles usan su hit point real sin múltiples lecturas de geometría y pie de página. La entrada de texto conserva el control de posición/foco. Se mantienen stock, R1/R0, relanzamiento, historial y el límite de 600 s.
+- Instruments no había llegado a obtener PID: la consulta `simctl spawn launchctl list` agotaba su propio timeout. Se selecciona el proceso host por ruta del simulador propio (con cuatro regresiones de aislamiento), se adjunta por PID y se ejecuta en un job separado. El alcance de esa captura es Inicio ficticio, no todas las acciones ni el iPhone físico. Si falla, queda No medido.
+
+Optimización productiva adicional: `N2SearchIndex` pasa de recorrer todas las filas normalizadas a elegir la lista de candidatos del fragmento de dos caracteres menos frecuente y verificar la subcadena completa. Conserva orden, acentos/anchura, límites y búsqueda por DNI/nombre. El índice sigue siendo un valor de sesión en memoria. Dos regresiones Swift comprueban equivalencia, Unicode, falsos candidatos, paginación y el último registro de 9.648. El benchmark repite el harness original e informa además el coste inicial de construcción; ese coste no se confunde con latencia de consulta. No se declara una mejora hasta leer la medición nueva. CPU y RSS del workload se vuelven a medir para mostrar el coste de memoria del índice.
+
+El job de UI se serializa para reducir contención de CI. Esto no cambia la aplicación, los tiempos límite, las pruebas ni su verificador de evidencia. El job de Instruments conserva su SHA y binarios del mismo HEAD. La versión instalada y el PR en borrador permanecen intactos; no se genera IPA mientras falten controles.

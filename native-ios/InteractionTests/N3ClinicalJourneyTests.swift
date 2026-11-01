@@ -20,30 +20,19 @@ final class N3ClinicalJourneyTests:XCTestCase {
     private func capture(_ app:XCUIApplication,_ name:String) {
         let image=XCTAttachment(screenshot:app.screenshot());image.name="KardexV2-"+name;image.lifetime = .keepAlways;add(image)
     }
-    private func tap(_ element:XCUIElement,in app:XCUIApplication) {
-        let exists=element.exists
-        let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
-        if !exists && app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
-        XCTAssertTrue(exists || element.waitForExistence(timeout:10),app.debugDescription)
-        let identifier=element.identifier
-        let fixed=identifier.hasPrefix("premium-tab-") || identifier=="premium-close-attention" || identifier=="attention-step-actions"
-        if fixed {
-            XCTAssertTrue(element.isHittable,app.debugDescription);element.tap();return
-        }
-        let kind=element.elementType
-        let safeTop:CGFloat=(kind == .textField || kind == .textView) ? 170:130
+    private func tap(_ element:XCUIElement,in app:XCUIApplication,field:Bool=false) {
+        XCTAssertTrue(element.exists || element.waitForExistence(timeout:10),app.debugDescription)
+        // Visible buttons need no repeated frame, footer, type and navigation
+        // snapshots. XCTest chooses their real hit point. Text fields retain
+        // the safe geometry check which prevents typing into a prior responder.
+        if !field && element.isHittable {element.tap();return}
+        let safeTop:CGFloat=field ? 170:130
         let bounds=app.frame
         for _ in 0..<8 {
-            // Every property query crosses the XCTest automation connection.
-            // Capture this iteration's geometry once, and refresh after scrolling.
             let frame=element.frame
             let hittable=element.isHittable
-            let footer=app.buttons["Anterior"]
-            let bottom=footer.exists && footer.isHittable ? footer.frame.minY-8:bounds.maxY-70
-            if hittable && frame.minY>safeTop && frame.maxY<bottom {break}
-            if hittable && app.navigationBars.allElementsBoundByIndex.contains(where:{
-                $0.frame.contains(CGPoint(x:frame.midX,y:frame.midY))
-            }) {break}
+            if hittable && (!field || (frame.minY>safeTop && frame.maxY<bounds.maxY-110)) {break}
+            let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
             if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
             else {scrollShort(in:app,up:frame.minY>=safeTop)}
         }
@@ -69,7 +58,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
             let hidden=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:keyboard)
             XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:5),.completed)
         }
-        tap(element,in:app)
+        tap(element,in:app,field:true)
         XCTAssertTrue(keyboard.waitForExistence(timeout:5),app.debugDescription)
         if let old=element.value as? String,old != element.placeholderValue,!old.isEmpty {
             element.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:old.count))

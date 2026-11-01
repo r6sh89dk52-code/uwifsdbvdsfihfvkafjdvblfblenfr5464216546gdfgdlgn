@@ -105,7 +105,9 @@ final class N2PerformanceAuditTests:XCTestCase {
             #endif
         }
         #if DANPER_PERF_OPTIMIZED
+        let indexStart=ProcessInfo.processInfo.systemUptime
         let index=N2SearchIndex(rows:context.workers,fields:{$0.dni+"\u{1f}"+$0.name})
+        let searchIndexBuildMS=(ProcessInfo.processInfo.systemUptime-indexStart)*1_000
         #endif
         try measure("worker_search_last",100) {
             #if DANPER_PERF_OPTIMIZED
@@ -146,7 +148,12 @@ final class N2PerformanceAuditTests:XCTestCase {
         #else
         let lifecycle="New journal/core per operation, matching the initial iOS adaptors"
         #endif
-        let report:[String:Any]=["storeLifecycle":lifecycle,"workers":9_648,"initialVisits":visits.count,"snapshotBytes":source.count,
+        #if DANPER_PERF_OPTIMIZED
+        let indexMetric:Any=searchIndexBuildMS
+        #else
+        let indexMetric:Any=NSNull()
+        #endif
+        let report:[String:Any]=["searchIndexBuild_ms":indexMetric,"storeLifecycle":lifecycle,"workers":9_648,"initialVisits":visits.count,"snapshotBytes":source.count,
             "configuration":"SwiftPM Release; x86_64 Linux; fictitious v1 snapshot; same fabricated dataset; no UI/device latency claim",
             "host":ProcessInfo.processInfo.operatingSystemVersionString,"actions":results]
         try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:URL(fileURLWithPath:out),options:.atomic)

@@ -14,7 +14,7 @@ if test "$MODE" = replay; then
  printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
 fi
 DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay && test "$MODE" != b15-native && test "$MODE" != b15-shard; then
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay && test "$MODE" != b15-native && test "$MODE" != b15-shard && test "$MODE" != b15-profile; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -50,7 +50,7 @@ if test "$MODE" = resume-native; then
 fi
 # Current-branch CI: run every simulator suite from this checkout, without
 # reusing earlier evidence or packaging. Swift/Excel gates run independently.
-if test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native || test "$MODE" = b15-shard; then
+if test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native || test "$MODE" = b15-shard || test "$MODE" = b15-profile; then
  git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
  git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
  xcodebuild -version > "$OUT/xcode-version.txt"
@@ -70,7 +70,7 @@ print(r[0]['identifier'])
 PY
 )
 TEST_RUN=''
-if test "$MODE" = b15-shard; then
+if test "$MODE" = b15-shard || test "$MODE" = b15-profile; then
  : "${DANPER_B15_UI_LABEL:?Set one discovered UI suite}"
  : "${DANPER_TEST_PROOF:?Set same-HEAD compiled product proof}"
  python3 scripts/performance/test-products.py verify "$DD/Build/Products" "$DANPER_TEST_PROOF"
@@ -182,18 +182,11 @@ run_tests(){
  # empty array under nounset aborts there before the command can execute.
  local selection=(-project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug -derivedDataPath "$DD")
  if test -n "$TEST_RUN"; then selection=(-xctestrun "$TEST_RUN"); fi
- if test "$label" = N2AllergySaveInteractionTests; then
-  # Seed/preflight XCTest may leave its host alive. The UI suite explicitly
-  # relaunches the app: profiling must observe that new process, not the seed.
-  xcrun simctl terminate "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview > "$OUT/profiler-process-reset.log" 2>&1 || true
-  python3 scripts/performance/profile-simulator.py "$SIM_ID" "$OUT/Instruments" > "$OUT/profiler-launch.log" 2>&1 & profiler=$!
- fi
  xcodebuild "${selection[@]}" \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
   -parallel-testing-enabled NO -test-timeouts-enabled YES \
   -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 -resultBundlePath "$OUT/$label.xcresult" \
   ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
- if test -n "$profiler"; then wait "$profiler" || echo 'Profiler could not collect all diagnostics; inspect profiler-launch.log'; fi
  if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
@@ -210,6 +203,13 @@ if test "$MODE" != ui; then
  fi
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
+ if test "$MODE" = b15-profile; then
+  run_tests seed-profile 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests
+  xcrun simctl launch --terminate-running-process "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview --danper-redesign-demo > "$OUT/profile-owned-launch.log"
+  python3 scripts/performance/profile-simulator.py "$SIM_ID" "$OUT/Instruments"
+  git rev-parse HEAD > "$OUT/PROFILE_SOURCE_SHA.txt"
+  exit 0
+ fi
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  if test "$MODE" != replay && test "$MODE" != b15-shard; then
   NATIVE_COUNT=$(python3 - <<'PYCOUNT'

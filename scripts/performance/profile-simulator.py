@@ -2,27 +2,30 @@
 """Observe ONLY a newly created synthetic Simulator. No auth events or PII logs."""
 import json,os,subprocess,sys,time,xml.etree.ElementTree as ET
 from pathlib import Path
+from owned_process import find_owned_app
 
 sim,out=sys.argv[1],Path(sys.argv[2]);out.mkdir(parents=True,exist_ok=True)
 rows=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','-j']))
 devices=[d for group in rows['devices'].values() for d in group if d['udid']==sim]
 assert len(devices)==1 and devices[0]['name'].startswith('DANPER-SYNTHETIC-') and devices[0]['state']=='Booted'
 bundle='pe.danper.saludmovil.native.iloaderpreview'
-report={'syntheticSimulatorOnly':True,'containsPatientIdentifiers':False,'captures':[]}
+report={'syntheticSimulatorOnly':True,'containsPatientIdentifiers':False,'scope':'Separate synthetic Home process; not concurrent with functional UI tests; not physical iPhone latency','captures':[]}
 def save(): (out/'profiling-status.json').write_text(json.dumps(report,indent=2))
 save()
 subprocess.run(['xcrun','xctrace','help','record'],stdout=(out/'xctrace-record-help.txt').open('w'),stderr=subprocess.STDOUT,timeout=20)
 def observe_app():
-    deadline=time.monotonic()+180
+    # Simulator executables are host processes. Avoid simctl/launchctl queries
+    # which stalled for >15 s in the actual failed capture. Select only the
+    # executable installed inside our explicitly validated device's container.
+    deadline=time.monotonic()+30
     while time.monotonic()<deadline:
-        p=subprocess.run(['xcrun','simctl','spawn',sim,'launchctl','list'],capture_output=True,text=True,timeout=15)
-        for line in p.stdout.splitlines():
-            fields=line.split()
-            if fields and fields[0].isdigit() and 'UIKitApplication:'+bundle+'[' in line:
-                try:os.kill(int(fields[0]),0)
-                except ProcessLookupError:continue
-                return fields[0]
-        time.sleep(1)
+        p=subprocess.run(['ps','-axo','pid=,command='],capture_output=True,text=True,timeout=5)
+        pid=find_owned_app(p.stdout,sim)
+        if pid:
+            try:os.kill(int(pid),0)
+            except ProcessLookupError:pass
+            else:return pid
+        time.sleep(0.25)
     return None
 for template,seconds in [('Time Profiler',60),('Allocations',45)]:
     name=template.replace(' ','-');trace=out/(name+'.trace')
@@ -35,11 +38,11 @@ for template,seconds in [('Time Profiler',60),('Allocations',45)]:
         if not pid:
             entry['limitation']='No application process was observed before the bounded wait expired.';save();continue
         entry['observedPID']=int(pid)
-        entry['attachTarget']='DANPERNative';entry['deviceUDID']=sim;entry['noPrompt']=True
+        entry['attachTarget']=int(pid);entry['deviceUDID']=sim;entry['noPrompt']=True
         save()
         with (out/(name+'.log')).open('w') as log:
-            p=subprocess.run(['xcrun','xctrace','record','--template',template,'--device',sim,
-                '--no-prompt','--attach','DANPERNative','--time-limit',str(seconds)+'s','--output',str(trace)],
+            p=subprocess.run(['xcrun','xctrace','record','--template',template,
+                '--no-prompt','--attach',pid,'--time-limit',str(seconds)+'s','--output',str(trace)],
                 stdout=log,stderr=subprocess.STDOUT,timeout=seconds+90)
         entry['exit']=p.returncode
         entry['captured']=p.returncode==0 and trace.exists()

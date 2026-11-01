@@ -44,7 +44,9 @@ final class N2AllergySaveInteractionTests:XCTestCase {
         let app=XCUIApplication();app.launchArguments=["--danper-redesign-demo"]
         app.launch()
         let new=app.buttons["demo-home-new-attention"]
-        XCTAssertTrue(new.waitForExistence(timeout:25),app.debugDescription);new.tap()
+        XCTAssertTrue(new.waitForExistence(timeout:25),app.debugDescription)
+        XCTAssertTrue(new.isHittable,app.debugDescription);new.tap()
+        XCTAssertTrue(app.textFields["attention-worker-dni"].waitForExistence(timeout:20),app.debugDescription)
         tap(app.buttons["attention-browse-workers"],in:app)
         let search=app.textFields["roster-global-search"]
         XCTAssertTrue(search.waitForExistence(timeout:15))
