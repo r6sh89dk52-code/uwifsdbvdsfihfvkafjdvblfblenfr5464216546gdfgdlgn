@@ -8,7 +8,8 @@ assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswit
 SIM_APP="${DEVELOPER_DIR:-$(xcode-select -p)}/Applications/Simulator.app"
 test -d "$SIM_APP"
 open -a "$SIM_APP" --args -CurrentDeviceUDID "$SIM_ID"
-# Do not manually launch/terminate CoreAuthUI: it is a system-hosted service.
+# Normally LocalAuthentication launches CoreAuthUI. Targeted cold-start CI
+# preparation below warms only the executable, never an authentication result.
 # An existing Simulator may ignore --args; no display binding is claimed.
 echo "SYSTEM_UI_LIFECYCLE_OWNED_BY_LOCALAUTHENTICATION $SIM_ID"
 
@@ -20,6 +21,17 @@ case "${DANPER_B15_UI_LABEL:-}" in
   WARM_LOG="${DANPER_AUDIT_OUT:?}/auth-ui-cold-start.log"
   python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$WARM_LOG" 2>&1 & WARM_STREAM=$!
   trap 'kill "$WARM_STREAM" 2>/dev/null || true; wait "$WARM_STREAM" 2>/dev/null || true' EXIT
+  # Subscribe before launching: otherwise the cold-start event can precede
+  # the log stream's own simctl startup and produce a false readiness failure.
+  python3 - "$WARM_LOG" <<'PYSTREAM'
+import sys,time
+from pathlib import Path
+p=Path(sys.argv[1]);deadline=time.monotonic()+30
+while time.monotonic()<deadline:
+    if p.exists() and 'Filtering the log data' in p.read_text(errors='replace'):break
+    time.sleep(0.1)
+else:raise SystemExit('Authentication diagnostic stream did not start')
+PYSTREAM
   xcrun simctl launch "$SIM_ID" com.apple.CoreAuthUI
   python3 - "$WARM_LOG" <<'PYREADY'
 import sys,time
