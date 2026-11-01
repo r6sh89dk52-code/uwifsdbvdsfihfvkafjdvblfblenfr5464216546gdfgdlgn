@@ -26,4 +26,26 @@ final class N2SearchIndexTests:XCTestCase {
         XCTAssertEqual(old.matches("ANTIGUA"),[original[0]])
         XCTAssertEqual(original,["PERSONA ANTIGUA","OTRA PERSONA"])
     }
+    func testPostingCandidatesPreserveSubstringSemanticsOrderingAndLimits() {
+        let rows=["ABXYCD", "ABCD", "CDAB", "ÁBCDE", "００００９６４８", "👩‍⚕️ ALERGIA", "PERSONA 09648"]
+        let index=N2SearchIndex(rows:rows,fields:{$0})
+        let locale=Locale(identifier:"es_PE")
+        for query in ["ABCD","CD","ab","09648","00009648","ábc","👩‍⚕️", "XYC","ausente"] {
+            let folded=query.folding(options:[.caseInsensitive,.diacriticInsensitive,.widthInsensitive],locale:locale)
+            let expected=rows.filter{$0.folding(options:[.caseInsensitive,.diacriticInsensitive,.widthInsensitive],locale:locale).contains(folded)}
+            for limit in [1,2,25] {
+                XCTAssertEqual(index.matches(query,minimumLength:1,limit:limit),Array(expected.prefix(limit)),query)
+            }
+        }
+        XCTAssertTrue(index.matches("ABCD").contains("ABCD"))
+        XCTAssertFalse(index.matches("ABCD").contains("ABXYCD"),"Pair candidates must still verify the complete substring")
+    }
+    func testRareFinalRecordMatchesWithoutLosingCommonPaginationOrder() {
+        let rows=(1...9_648).map{String(format:"PERSONA FICTICIA PERF %05d",$0)}
+        let index=N2SearchIndex(rows:rows,fields:{$0})
+        XCTAssertEqual(index.matches("PERF 09648",limit:25),[rows.last!])
+        XCTAssertEqual(index.matches("PERSONA",limit:25),Array(rows.prefix(25)))
+        XCTAssertEqual(index.matches("PERSONA").count,rows.count)
+    }
+
 }
