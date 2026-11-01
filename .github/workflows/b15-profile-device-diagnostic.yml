@@ -1,0 +1,60 @@
+name: B15 - device-scoped Instruments diagnostic (same app SHA)
+on:
+  push:
+    branches: [audit/b15-profile-device-9143997-20261101]
+    paths: [.github/workflows/b15-profile-device-diagnostic.yml]
+permissions:
+  contents: read
+  actions: read
+env:
+  DANPER_EXPECTED_BUILD: '15'
+jobs:
+  profile-owned-simulator:
+    runs-on: macos-15-intel
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 9143997ddab5fe31b50fc540fb2e3dc50a451434
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_SAME_HEAD
+          run-id: 41360378278
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b15-compiled
+      - name: Verify exact app binary and record the diagnostic-only harness variation
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b15-derived/Build" "$RUNNER_TEMP/b15-device-profile"
+          tar -xzf "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+          python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.json"
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          expected='9143997ddab5fe31b50fc540fb2e3dc50a451434'
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==expected
+          p=Path('scripts/performance/profile-simulator.py');old=p.read_text()
+          target="'--template',template,\n                '--no-prompt'"
+          assert target in old
+          p.write_text(old.replace(target,"'--template',template,'--device',sim,\n                '--no-prompt'"))
+          changed=subprocess.check_output(['git','diff','--name-only'],text=True).splitlines()
+          assert changed==['scripts/performance/profile-simulator.py'],changed
+          out=Path(os.environ['RUNNER_TEMP'])/'b15-device-profile'
+          (out/'HARNESS_VARIATION.diff').write_text(subprocess.check_output(['git','diff','--',str(p)],text=True))
+          (out/'ORCHESTRATION_PROOF.json').write_text(json.dumps({'appSourceSHA':expected,'workflowSHA':os.environ['GITHUB_SHA'],'diagnosticOnly':True,'modifiedHarnessPaths':changed,'compiledAppUnchanged':True,'doesNotCertifyFunctionalUI':True},indent=2))
+          PY
+      - name: Profile only an owned synthetic Home process; actual capture failures stay unmeasured
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-device-profile
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+          DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/TEST_PRODUCTS.json
+          DANPER_B15_UI_LABEL: Instruments-Home
+        run: bash scripts/glass-audit/validate-macos.sh b15-profile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_DEVICE_SCOPED_INSTRUMENTS_DIAGNOSTIC
+          path: ${{ runner.temp }}/b15-device-profile
+          retention-days: 14
