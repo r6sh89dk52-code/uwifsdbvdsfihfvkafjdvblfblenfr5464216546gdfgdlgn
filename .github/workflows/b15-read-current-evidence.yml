@@ -1,0 +1,42 @@
+name: B15 - read current Instruments evidence only
+on:
+  push:
+    branches: [audit/b15-evidence-9143997-20261101]
+    paths: [.github/workflows/b15-read-current-evidence.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_INSTRUMENTS_RESULTS
+          run-id: 41360378278
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b15-proof
+      - name: Read actual capture outcomes; never certify an old app SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVIDENCE_DIR: ${{ runner.temp }}/b15-proof
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          from pathlib import Path
+          expected='9143997ddab5fe31b50fc540fb2e3dc50a451434'
+          request=urllib.request.Request('https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/pulls/10',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          pr=json.load(urllib.request.urlopen(request))
+          assert pr['head']['sha']==expected,pr['head']['sha']
+          root=Path(os.environ['EVIDENCE_DIR'])
+          markers=list(root.rglob('SOURCE_SHA.txt'));assert len(markers)==1
+          assert markers[0].read_text().strip()==expected
+          print('APP_SOURCE_SHA_VERIFIED',expected,'DRAFT',pr['draft'])
+          for name in ['profiling-status.json','Time-Profiler.log','Allocations.log','profile-owned-launch.log']:
+              for p in root.rglob(name):
+                  print('EVIDENCE_FILE',p.name)
+                  print(p.read_text(errors='replace')[-9000:])
+          for p in root.rglob('*-toc.xml'):
+              print('TRACE_TOC',p.name,p.read_text(errors='replace')[:5000])
+          PY
