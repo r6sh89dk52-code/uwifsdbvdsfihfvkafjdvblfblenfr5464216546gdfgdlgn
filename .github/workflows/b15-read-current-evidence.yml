@@ -23,10 +23,17 @@ jobs:
           run-id: 41360378278
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/b15-allergy-proof
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_DEVICE_SCOPED_INSTRUMENTS_DIAGNOSTIC
+          run-id: 41364605278
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b15-device-proof
       - name: Read actual capture outcomes; never certify an old app SHA
         env:
           GH_TOKEN: ${{ github.token }}
           EVIDENCE_DIR: ${{ runner.temp }}/b15-proof
+          DEVICE_EVIDENCE_DIR: ${{ runner.temp }}/b15-device-proof
           UI_EVIDENCE_DIR: ${{ runner.temp }}/b15-allergy-proof
         run: |
           python3 - <<'PY'
@@ -35,7 +42,7 @@ jobs:
           expected='9143997ddab5fe31b50fc540fb2e3dc50a451434'
           request=urllib.request.Request('https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/pulls/10',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
           pr=json.load(urllib.request.urlopen(request))
-          assert pr['head']['sha']==expected,pr['head']['sha']
+          assert pr['head']['sha']=='c274140aa631a7e9c262381dbff3f6a1f9a62582',pr['head']['sha']
           root=Path(os.environ['EVIDENCE_DIR'])
           markers=list(root.rglob('SOURCE_SHA.txt'));assert len(markers)==1
           assert markers[0].read_text().strip()==expected
@@ -59,4 +66,14 @@ jobs:
           request=urllib.request.Request('https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/jobs/125017394518',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
           job=json.load(urllib.request.urlopen(request))
           print('CI_JOB_RESULT_DISTINCT_FROM_TESTS',job['conclusion'],'START',job['started_at'],'END',job['completed_at'])
+          device=Path(os.environ['DEVICE_EVIDENCE_DIR'])
+          assert (device/'SOURCE_SHA.txt').read_text().strip()==expected
+          print('DIAGNOSTIC_APP_SHA',expected,'PR_CURRENT_HEAD',pr['head']['sha'])
+          proof=json.loads((device/'ORCHESTRATION_PROOF.json').read_text());print('ORCHESTRATION_PROOF',proof)
+          assert proof['appSourceSHA']==expected and proof['compiledAppUnchanged']
+          for name in ['profiling-status.json','Time-Profiler.log','Allocations.log']:
+              for p in device.rglob(name):print('DEVICE_EVIDENCE',p.name,p.read_text(errors='replace')[-12000:])
+          for p in device.rglob('*-toc.xml'):print('DEVICE_TOC',p.name,p.read_text(errors='replace')[:9000])
+          for p in device.rglob('*.xml'):
+              if '-toc.' not in p.name:print('DEVICE_DATA_XML',p.name,'BYTES',p.stat().st_size,'PREFIX',p.read_text(errors='replace')[:1800])
           PY
