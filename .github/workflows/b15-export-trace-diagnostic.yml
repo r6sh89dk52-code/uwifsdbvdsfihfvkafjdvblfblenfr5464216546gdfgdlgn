@@ -1,4 +1,4 @@
-name: B15 - inspect exported CPU samples from recorded synthetic trace
+name: B15 - inspect actual allocations in recorded active synthetic trace
 on:
   push:
     branches: [audit/b15-profile-device-9143997-20261101]
@@ -8,18 +8,18 @@ permissions:
   actions: read
 jobs:
   export:
-    runs-on: macos-15-intel
-    timeout-minutes: 12
+    runs-on: macos-15
+    timeout-minutes: 20
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: B15_DEVICE_SCOPED_INSTRUMENTS_DIAGNOSTIC
-          run-id: 41364605278
+          name: B15_ACTIVE_CURRENT_HEAD_PROFILE_DIAGNOSTIC
+          run-id: 41390330778
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/b15-existing-trace
-      - name: Inspect actual time-sample rows; do not infer zero CPU from empty tables
+      - name: Export captured allocation tables without repeating clinical actions
         env:
           TRACE_ROOT: ${{ runner.temp }}/b15-existing-trace
           EXPORT_ROOT: ${{ runner.temp }}/b15-sample-export
@@ -28,26 +28,46 @@ jobs:
           import json,os,subprocess,xml.etree.ElementTree as ET
           from pathlib import Path
           root=Path(os.environ['TRACE_ROOT']);out=Path(os.environ['EXPORT_ROOT']);out.mkdir()
-          expected='9143997ddab5fe31b50fc540fb2e3dc50a451434'
+          expected='67c4ec8d8d7a382471945e88a59f3e499a11f555'
           assert (root/'SOURCE_SHA.txt').read_text().strip()==expected
-          traces=list(root.rglob('Time-Profiler.trace'));assert len(traces)==1
-          report={'appSourceSHA':expected,'workflowSHA':os.environ['GITHUB_SHA'],'scope':'Existing synthetic idle Home trace; not clinical action latency, physical iPhone or current-head UI certification','tables':[]}
-          for schema in ['time-sample','time-profile','runloop-events','potential-hangs']:
-              target=out/(schema+'.xml')
-              result=subprocess.run(['xcrun','xctrace','export','--input',str(traces[0]),'--xpath','/trace-toc/run/data/table[@schema="'+schema+'"]','--output',str(target)],capture_output=True,text=True,timeout=70)
-              (out/(schema+'.log')).write_text(result.stdout+result.stderr)
-              row={'schema':schema,'exit':result.returncode}
-              if result.returncode==0:
-                  tree=ET.parse(target);rows=list(tree.iter('row'));row['rows']=len(rows)
-                  row['columns']=[e.text for e in tree.iter('mnemonic')]
-                  if rows:print('FIRST_ROW',schema,ET.tostring(rows[0],encoding='unicode')[:2500])
-              report['tables'].append(row)
-          print('ACTUAL_EXPORTED_SAMPLES',json.dumps(report,indent=2))
-          (out/'sample-evidence.json').write_text(json.dumps(report,indent=2))
+          proof=json.loads((root/'ORCHESTRATION_PROOF.json').read_text())
+          assert proof['appSourceSHA']==expected and proof['seedWorkers']==2
+          traces=list(root.rglob('Allocations.trace'));assert len(traces)==1
+          report={'appSourceSHA':expected,'workflowSHA':os.environ['GITHUB_SHA'],'scope':'Existing active fictional allergy trace with two workers; prior-source diagnostic, not final-HEAD certification or iPhone latency','tables':[],'allocationMetricsAvailable':False}
+          def run(args,log):
+              try:
+                  p=subprocess.run(args,capture_output=True,text=True,timeout=180)
+                  (out/log).write_text(p.stdout+p.stderr)
+                  return p.returncode
+              except subprocess.TimeoutExpired:
+                  (out/log).write_text('Export timed out after 180 seconds; no metric inferred.')
+                  return 124
+          toc=out/'allocations-toc.xml'
+          code=run(['xcrun','xctrace','export','--input',str(traces[0]),'--toc','--output',str(toc)],'toc.log')
+          report['tocExit']=code
+          if code==0:
+              schemas=sorted({t.attrib.get('schema','') for t in ET.parse(toc).iter('table')})
+              report['availableSchemas']=schemas
+              candidates=[s for s in schemas if any(k in s.lower() for k in ('alloc','heap','vm-tracker'))]
+              for schema in candidates[:4]:
+                  safe=''.join(c if c.isalnum() or c in '-_' else '_' for c in schema)
+                  target=out/(safe+'.xml')
+                  code=run(['xcrun','xctrace','export','--input',str(traces[0]),'--xpath','/trace-toc/run/data/table[@schema="'+schema+'"]','--output',str(target)],safe+'.log')
+                  row={'schema':schema,'exit':code}
+                  if code==0:
+                      tree=ET.parse(target);rows=list(tree.iter('row'));row['rows']=len(rows)
+                      row['columns']=[e.text for e in tree.iter('mnemonic')]
+                      if rows:
+                          report['allocationMetricsAvailable']=True
+                          print('FIRST_ROW',schema,ET.tostring(rows[0],encoding='unicode')[:2500])
+                  report['tables'].append(row)
+          if not report['allocationMetricsAvailable']:report['limitation']='No exported allocation measurements; do not infer zero allocations.'
+          (out/'allocation-evidence.json').write_text(json.dumps(report,indent=2))
+          print('ACTUAL_ALLOCATION_EVIDENCE',json.dumps(report,indent=2))
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: B15_EXPORTED_SAMPLE_DIAGNOSTIC
+          name: B15_EXPORTED_ALLOCATION_DIAGNOSTIC
           path: ${{ runner.temp }}/b15-sample-export
           retention-days: 14
