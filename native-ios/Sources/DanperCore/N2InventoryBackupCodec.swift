@@ -81,8 +81,7 @@ public enum N2InventoryBackupCodec {
         guard (e.version==2)==N2SimpleInventory.isActive(raw) else{throw Failure.payload}
         let report:N1eClinicalParityReport
         do {
-            report=try N2VersionedSnapshotAudit.inspect(raw,allowEmptySynthetic:true)
-            _=try N1fLosslessFieldGate.inspect(raw)
+            report=try N2VersionedSnapshotAudit.reports(raw,allowEmptySynthetic:true).parity
             _=try N2ClinicalCorrections.pendingDiscrepancies(raw)
         }catch{throw Failure.payload}
         let domain:N2InventoryBackupDomain
@@ -97,8 +96,7 @@ public enum N2InventoryBackupCodec {
             sourceSHA256:try N2SimpleInventory.fingerprint(raw),schemaVersion:e.version,report:report,snapshot:raw)
     }
     public static func createVerified(snapshot:Data,password:String,domain:N2InventoryBackupDomain = .unspecified)throws->Data {
-        _=try N2VersionedSnapshotAudit.inspect(snapshot,allowEmptySynthetic:true)
-        _=try N1fLosslessFieldGate.inspect(snapshot)
+        _=try N2VersionedSnapshotAudit.reports(snapshot,allowEmptySynthetic:true)
         let version=N2SimpleInventory.isActive(snapshot) ? 2:1
         let plain=try N2SimpleInventory.bytes(["schema":version,"sourceDomain":domain.rawValue,
             "exportedAt":ISO8601DateFormatter().string(from:Date()),"snapshot":try N2SimpleInventory.object(snapshot)])

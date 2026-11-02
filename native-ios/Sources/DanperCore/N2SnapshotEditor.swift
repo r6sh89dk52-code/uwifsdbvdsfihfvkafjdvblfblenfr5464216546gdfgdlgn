@@ -185,6 +185,10 @@ public enum N2SnapshotEditor {
     /// patch is whitelisted to avoid silently rewriting future metadata fields.
     public static func upsertDraft(snapshot:Data,id:String,changes:Data,
                                    at:Int64)throws->Data {
+        try upsertedDraft(snapshot:snapshot,id:id,changes:changes,at:at).bytes
+    }
+    static func upsertedDraft(snapshot:Data,id:String,changes:Data,
+                             at:Int64)throws->N2AuditedSnapshot {
         try clock(at)
         guard !id.isEmpty,id.utf8.count<=128,
               let patch=try? JSONSerialization.jsonObject(with:changes) as? [String:Any],
@@ -214,7 +218,12 @@ public enum N2SnapshotEditor {
         }
         if let idx {visits[idx]=row}else{visits.append(row)}
         root["attentions"]=visits
-        return try finish(root)
+        guard JSONSerialization.isValidJSONObject(root),
+              let raw=try? JSONSerialization.data(withJSONObject:root,options:.sortedKeys),
+              let proof=try? N2AuditedSnapshot(validating:raw) else {
+            throw N2SnapshotEditError.validationFailed
+        }
+        return proof
     }
     public static func deleteDraft(snapshot:Data,id:String)throws->Data {
         var root=try parse(snapshot)

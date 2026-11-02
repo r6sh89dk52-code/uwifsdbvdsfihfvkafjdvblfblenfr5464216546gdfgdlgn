@@ -18,7 +18,14 @@ public struct N2SimpleCutPreview:Sendable,Equatable {
 extension N2SimpleInventory {
     /// Clinical projection only; never changes the physical inventory ledger.
     static func historicalOpeningOverrides(_ snapshot:Data)throws->[String:Double] {
-        let archived=Set(try read(snapshot).historicalUses.map{key($0.visitID,$0.itemID)})
+        try readWithHistoricalOpeningOverrides(snapshot).overrides
+    }
+    /// Validate once, and verify the correction chain for the same snapshot.
+    /// Accept bytes only; callers cannot supply an arbitrary trusted state.
+    static func readWithHistoricalOpeningOverrides(_ snapshot:Data)throws
+        ->(state:N2SimpleInventoryState,overrides:[String:Double]) {
+        let state=try read(snapshot)
+        let archived=Set(state.historicalUses.map{key($0.visitID,$0.itemID)})
         let projected=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
         let projectedVisits=try clinicalRows(object(projected))
         var correctedR=[String:Double]()
@@ -32,12 +39,13 @@ extension N2SimpleInventory {
                 correctedR[key(vid,iid)]=Double(value)
             }
         }
-        return correctedR
+        return (state,correctedR)
     }
     public static func cutPreview(snapshot:Data,code:String,through:String,
                                   catalog:N2NativeCatalogIndex,archive:N2VerifiedInventoryBackup?=nil)throws->N2SimpleCutPreview {
         guard validDay(through) else{throw N2SimpleInventoryError.invalidDate}
-        let s=try read(snapshot),root=try object(snapshot),period=try N2KardexCutPreview.period(for:through)
+        let checked=try readWithHistoricalOpeningOverrides(snapshot)
+        let s=checked.state,root=try object(snapshot),period=try N2KardexCutPreview.period(for:through)
         guard let p=s.products.first(where:{$0.code==code}) else{throw N2SimpleInventoryError.invalidProduct}
         if let archive {
             guard archive.sourceSHA256==s.regime.sourceSHA256 || s.clinicalImports.contains(where:{$0.sourceSHA256==archive.sourceSHA256}) else {throw N2SimpleInventoryError.sourceChanged}
@@ -56,7 +64,7 @@ extension N2SimpleInventory {
         let visitsByID=Dictionary(uniqueKeysWithValues:visits.compactMap {v->(String,[String:Any])? in
             guard let id=v["id"] as? String else{return nil};return(id,v)
         })
-        let correctedR=try historicalOpeningOverrides(snapshot)
+        let correctedR=checked.overrides
         func effectiveR(_ h:N2SimpleHistoricalUse)->Double? {
             correctedR[key(h.visitID,h.itemID)] ?? h.verifiedR
         }

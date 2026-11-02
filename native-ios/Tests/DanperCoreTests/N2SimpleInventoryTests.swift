@@ -60,6 +60,77 @@ final class N2SimpleInventoryTests:XCTestCase {
             operatorName:"OPERADOR FICTICIO",reason:"Operación ficticia verificada",expiry:expiry,
             expiryVerified:verified,incidentID:incident,declaredR:r)
     }
+    func testV2SharedReportsKeepCompleteFieldAndPhysicalValidation()throws {
+        let raw=try active(),proof=try N2AuditedSnapshot(validating:raw)
+        XCTAssertEqual(proof.parity,try N2VersionedSnapshotAudit.inspect(raw))
+        XCTAssertEqual(proof.fields,try N1fLosslessFieldGate.inspect(raw))
+        XCTAssertEqual(proof.parity.sourceSHA256,proof.fields.sourceSHA256)
+        var invalidFields=try object(raw)
+        invalidFields["allergies"]=["00000001":["status":"none","substances":7,"updatedAt":at()]]
+        XCTAssertThrowsError(try N2AuditedSnapshot(validating:bytes(invalidFields)))
+        var invalidStock=try object(raw)
+        var state=try N2SimpleInventory.read(raw)
+        state.products[0].quantity+=1
+        invalidStock["simpleInventory"]=try JSONSerialization.jsonObject(with:JSONEncoder().encode(state))
+        XCTAssertThrowsError(try N2AuditedSnapshot(validating:bytes(invalidStock)))
+        var future=try object(raw);future["inventorySchemaVersion"]=3
+        XCTAssertThrowsError(try N2AuditedSnapshot(validating:bytes(future)))
+    }
+    func testV2ConfirmedDraftProofPreservesPhysicalLedgerAndSavedVisits()throws {
+        let raw=try active(),folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-v2-draft-"+UUID().uuidString)
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:false)
+        defer{try? FileManager.default.removeItem(at:folder)}
+        let key=Data(repeating:0x63,count:32)
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:key)
+        _=try journal.commit(raw,expectedRevision:0)
+        let validations=journal.semanticValidationCount
+        let core=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let patch=try bytes(["diagnosis":"BORRADOR FICTICIO V2","nativeDraftStep":2])
+        let summary=try core.saveDraft(id:"DRAFT-V2-PROOF",changes:patch,at:at(),expectedRevision:1)
+        XCTAssertEqual(summary.revision,2)
+        XCTAssertEqual(journal.semanticValidationCount,validations,
+            "The editor's complete proof must survive commit/readback without a second journal audit")
+        XCTAssertThrowsError(try core.saveDraft(id:"DRAFT-V2-PROOF",changes:patch,at:at(),expectedRevision:1)) {
+            XCTAssertEqual($0 as? N2ProtectedStoreError,.staleRevision)
+        }
+        let reopened=try N2EncryptedClinicalJournal(directory:folder,secret:key)
+        let after=try XCTUnwrap(reopened.recover())
+        XCTAssertEqual(after.revision,2)
+        XCTAssertEqual(try N2SimpleInventory.read(after.snapshot),try N2SimpleInventory.read(raw))
+        let before=try object(raw),next=try object(after.snapshot)
+        XCTAssertEqual(try bytes(["workers":before["workers"]!]),try bytes(["workers":next["workers"]!]))
+        let original=try XCTUnwrap(before["attentions"] as? [[String:Any]])
+        let visits=try XCTUnwrap(next["attentions"] as? [[String:Any]])
+        XCTAssertEqual(try bytes(["saved":original.filter{$0["status"] as? String=="saved"}]),
+                       try bytes(["saved":visits.filter{$0["status"] as? String=="saved"}]))
+        let draft=try XCTUnwrap(visits.first{$0["id"] as? String=="DRAFT-V2-PROOF"})
+        XCTAssertEqual(draft["nativeDraftStep"] as? Int,2)
+        XCTAssertEqual(draft["diagnosis"] as? String,"BORRADOR FICTICIO V2")
+    }
+    func testV2DispensingReadUsesAuthenticatedParityWithoutChangingGeneration()throws {
+        let raw=try active(),folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-v2-lines-"+UUID().uuidString)
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:false)
+        defer{try? FileManager.default.removeItem(at:folder)}
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:0x64,count:32))
+        _=try journal.commit(raw,expectedRevision:0)
+        let core=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let lines=try core.dispensingLines(visitID:"fundo-unit")
+        let visits=try XCTUnwrap(object(raw)["attentions"] as? [[String:Any]])
+        var offset=0
+        for visit in visits where visit["status"] as? String=="saved" {
+            let items=try XCTUnwrap(visit["items"] as? [[String:Any]])
+            if visit["id"] as? String=="fundo-unit" {
+                XCTAssertEqual(lines.count,items.count)
+                let audit=try N2VersionedSnapshotAudit.inspect(raw)
+                XCTAssertEqual(lines.map(\.kardexQuantity),Array(audit.consumptionR[offset..<(offset+items.count)]))
+                break
+            }
+            offset+=items.count
+        }
+        XCTAssertFalse(lines.isEmpty)
+        let after=try XCTUnwrap(journal.recover())
+        XCTAssertEqual(after.revision,1);XCTAssertEqual(after.snapshot,raw)
+    }
     func testActivationPreservesEveryClinicalDictionaryAndRetiresOldOperations()throws {
         let old=try source(),next=try active(),a=try object(old),b=try object(next)
         for key in ["workers","attentions","allergies","catalogMappings"] {
@@ -322,6 +393,15 @@ final class N2SimpleInventoryTests:XCTestCase {
             expectedEffectiveSHA:detail.effectiveSHA256,at:at("2026-11-01"))
         XCTAssertEqual(try N2SimpleInventory.read(edited),prior,
             "A historical R override must not create any new stock movement")
+        let checked=try N2SimpleInventory.readWithHistoricalOpeningOverrides(edited)
+        XCTAssertEqual(checked.state,prior)
+        XCTAssertEqual(checked.overrides[N2SimpleInventory.key("planta-open","box-2")],0)
+        var forged=try object(edited)
+        var log=try XCTUnwrap(forged["clinicalCorrectionLog"] as? [[String:Any]])
+        log[0]["reason"]="ALTERACION FICTICIA SIN FIRMA"
+        forged["clinicalCorrectionLog"]=log
+        XCTAssertThrowsError(try N2SimpleInventory.readWithHistoricalOpeningOverrides(bytes(forged)),
+            "Sharing the stock read must never bypass verification of the clinical correction chain")
         let effective=try N2ClinicalCorrections.detail(
             snapshot:edited,visitID:"planta-open")
         XCTAssertEqual(effective.medications.first(where:{$0.id=="box-2"})?.historicalOpeningR,0)

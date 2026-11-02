@@ -11,9 +11,10 @@ struct N2AuditedSnapshot {
         guard bytes.count>0,bytes.count<=30*1024*1024 else {
             throw N2EncryptedClinicalJournal.Failure.invalidSnapshot
         }
-        parity=try N2VersionedSnapshotAudit.inspect(bytes,
+        let reports=try N2VersionedSnapshotAudit.reports(bytes,
             allowEmptySynthetic:N2EmptyDemoSnapshot.matches(bytes))
-        fields=try N1fLosslessFieldGate.inspect(bytes)
+        parity=reports.parity
+        fields=reports.fields
         self.bytes=bytes
     }
 }

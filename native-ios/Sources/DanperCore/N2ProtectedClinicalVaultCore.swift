@@ -162,8 +162,10 @@ public final class N2ProtectedClinicalVaultCore {
             throw N2ProtectedStoreError.absentSource
         }
         if N2SimpleInventory.isActive(active.snapshot) {
-            let state=try N2SimpleInventory.read(active.snapshot)
-            let audit=try N2VersionedSnapshotAudit.inspect(active.snapshot)
+            // The journal's reports belong to these exact authenticated bytes.
+            // Decode their state without repeating both full clinical audits.
+            let state=try N2SimpleInventory.state(root)
+            let audit=active.parity
             var offset=0
             for saved in visits where saved["status"] as? String=="saved" {
                 let rows=saved["items"] as? [[String:Any]] ?? []
@@ -542,9 +544,16 @@ public final class N2ProtectedClinicalVaultCore {
     @discardableResult
     public func saveDraft(id:String,changes:Data,at:Int64,
                           expectedRevision:Int)throws->N2ProtectedStoreSummary {
-        try modify(expectedRevision:expectedRevision) {
-            try N2SnapshotEditor.upsertDraft(snapshot:$0,id:id,changes:changes,at:at)
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        guard active.revision==expectedRevision else{throw N2ProtectedStoreError.staleRevision}
+        let next=try N2SnapshotEditor.upsertedDraft(snapshot:active.snapshot,id:id,changes:changes,at:at)
+        guard next.bytes != active.snapshot else{return try summary(active)}
+        let revision=try journal.commit(next,expectedRevision:expectedRevision)
+        guard let verified=try journal.recover(),verified.revision==revision,
+              verified.snapshot==next.bytes else {
+            throw N2ProtectedStoreError.unsafeSource
         }
+        return try summary(verified)
     }
     @discardableResult
     public func removeDraft(id:String,
