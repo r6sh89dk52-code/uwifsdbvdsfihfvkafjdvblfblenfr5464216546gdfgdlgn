@@ -1,0 +1,40 @@
+name: B15 - read final candidate performance and Build 14 compatibility
+on:
+  push:
+    branches: [audit/b15-evidence-9143997-20261101]
+    paths: [.github/workflows/b15-read-final-performance.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_PERFORMANCE_COMPARISON
+          run-id: 41366450170
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b15-final-proof
+      - name: Verify app SHA and print only fictional measurement evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROOF_ROOT: ${{ runner.temp }}/b15-final-proof
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          from pathlib import Path
+          root=Path(os.environ['PROOF_ROOT'])
+          expected='c274140aa631a7e9c262381dbff3f6a1f9a62582'
+          assert (root/'SOURCE_SHA.txt').read_text().strip()==expected
+          request=urllib.request.Request('https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/pulls/10',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          pr=json.load(urllib.request.urlopen(request));assert pr['head']['sha']==expected and pr['draft']
+          compat=json.loads((root/'compatibility.json').read_text())
+          assert compat['sourceSHA']==expected and compat['tests']==1 and compat['failures']==0
+          print('CURRENT_APP_SHA',expected,'ORCHESTRATION_SHA',os.environ['GITHUB_SHA'])
+          print('FINAL_COMPARISON_JSON', (root/'comparison.json').read_text())
+          print('FINAL_COMPATIBILITY_JSON',json.dumps(compat,indent=2))
+          print('FINAL_SEARCH_INDEX_BUILD_MS',json.loads((root/'after.json').read_text())['searchIndexBuild_ms'])
+          print('CONDITIONS',(root/'swift-version.txt').read_text())
+          PY
