@@ -1,6 +1,8 @@
+> Cierre actualizado 2026-11-02T18:07:44.300Z:799dc5f no fue aprobado. La nueva fuente9a4cad1 está en [validación independiente](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41497381071); ningún resultado de esta página certifica ese SHA.
+
 # DANPER Build15 — estado técnico de 799dc5f
 
-**Validación incompleta. NO IPA.** Corte de este informe: 2026-11-02T17:48:49.744Z. [PR10](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/pull/10) en borrador, sin merge. Los resultados futuros deben comprobarse en los enlaces; este documento no aprueba un job pendiente.
+**Resultado definitivo: FAILURE. NO IPA.** Corte de este informe: 2026-11-02T17:48:49.744Z. [PR10](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/pull/10) en borrador, sin merge. Los resultados futuros deben comprobarse en los enlaces; este documento no aprueba un job pendiente.
 
 ## Fuente, continuidad y cambios publicados
 
@@ -23,12 +25,12 @@ Desde90cb0ab se conservan14commits en orden:4079122,69e75ad,911e49e,9143997,c274
 | TypeScript y Excel oficiales |PASS, indicador10hojas y enfermeras98productos | Mismo job Swift, logs y artifact |
 | Benchmarks v1/v2 |13/12operaciones medidas; invariantesPASS | [v1](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490125275/artifacts/13165172544), [v2](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490125275/artifacts/13166080038) |
 | Compatibilidad Build14 |1PASS/0FAIL; cifrado y estado conservados | compatibility-799dc5f.json y jobperformance |
-| Xcode/28nativas |EN EJECUCIÓN; no aprobado todavía | [job125431383716](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490125275/job/125431383716) |
-|13casos UI |PENDIENTES del job nativo | [ejecución principal](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490125275) |
-| Instruments actual |PENDIENTE | Misma ejecución principal |
-| Release ARM64 actual |Reintento en ejecución; primer intento fallido sin pasos | [41490193045](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490193045) |
+| Xcode/28nativas |27PASS/1FAIL/0SKIP; compilaciónPASS | [job125431383716](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490125275/job/125431383716) |
+|13casos UI |SKIPPED por fallo nativo; ninguno aprobado | [ejecución principal](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490125275) |
+| Instruments actual |SKIPPED por fallo nativo | Misma ejecución principal |
+| Release ARM64 actual |Segundo intentoSUCCESS; primeroCANCELLED sin pasos | [41490193045](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490193045) |
 
-Los13/12son operaciones de benchmark, no13/12casos unitarios adicionales. Las semillas/preflights repetidos tampoco se suman como nuevos casos únicos. El estado global del workflow aún no es SUCCESS.
+Los13/12son operaciones de benchmark, no13/12casos unitarios adicionales. Las semillas/preflights repetidos tampoco se suman como nuevos casos únicos. El estado global del workflow es FAILURE.
 
 ## Mediciones v2: existencias físicas ficticias
 
@@ -109,3 +111,8 @@ El BundleID por sí solo no garantiza conservar el contenedor físico: depende t
 
 
 [Artifact completo de recopilación](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41494225210/artifacts/13164943582) conserva READ_ONLY_EVIDENCE.json y RAW_SAMPLES.json. Las muestras proceden de los artifacts anteriores del mismo SHA; el verde del recopilador no es el verde de la aplicación.
+
+
+## Cierre del fallo nativo y continuación
+
+El log native-28 registra disponibilidad, evaluación e invalidación, sin respuesta de LAContext en18s. La espera asíncrona evitó el stall previo y ejecutó todos los casos, pero la cancelación real no pasó:27PASS/1FAIL/0SKIP. UI e Instruments se omitieron. [Artifact de diagnóstico nativo](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41490125275/artifacts/13167150581) conserva logs, resumen y capturas sintéticas. El nuevo commit9a4cad1 añade ventana pública de prueba/escena foreground y MainActor con APIasync, restaura la ventana anterior y registra el servicio de autenticación del Simulator propio. Conserva política, plazos12s/18s, máximo dos intentos y exigencia deappCancel sin autenticar;28casos nativos/13UI. Aún sin validar. No cambia App/Sources/datos/cifrado/BundleID. La Release799dc5f sí terminóSUCCESS y no generó IPA.
