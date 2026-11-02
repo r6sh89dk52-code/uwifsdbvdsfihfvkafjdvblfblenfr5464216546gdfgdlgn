@@ -1,0 +1,113 @@
+name: B15 - profile active fictional allergy journey on exact current app
+on:
+  push:
+    branches: [audit/b15-profile-device-9143997-20261101]
+    paths: [.github/workflows/b15-active-profile-diagnostic.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  active-profile:
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    env:
+      DANPER_EXPECTED_BUILD: '15'
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c274140aa631a7e9c262381dbff3f6a1f9a62582
+      - name: Wait for only the exact current-HEAD compiled artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,os,time,urllib.request
+          base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'
+          def get(path):
+              request=urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              return json.load(urllib.request.urlopen(request))
+          for _ in range(40):
+              pr=get('pulls/10');assert pr['head']['sha']=='c274140aa631a7e9c262381dbff3f6a1f9a62582' and pr['draft']
+              run=get('actions/runs/41366450170');assert run['head_sha']==pr['head']['sha']
+              if any(a['name']=='B15_COMPILED_SAME_HEAD' and not a['expired'] for a in get('actions/runs/41366450170/artifacts')['artifacts']):break
+              time.sleep(30)
+          else:raise RuntimeError('Same-HEAD binary did not become available; no older binary accepted')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_SAME_HEAD
+          run-id: 41366450170
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b15-active-compiled
+      - name: Verify exact binaries and record diagnostic harness changes only
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-active-profile
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b15-active-derived/Build" "$DANPER_AUDIT_OUT"
+          tar -xzf "$RUNNER_TEMP/b15-active-compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-active-derived/Build"
+          python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/b15-active-derived/Build/Products" "$RUNNER_TEMP/b15-active-compiled/TEST_PRODUCTS.json"
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          path=Path('scripts/performance/profile-simulator.py');text=path.read_text()
+          old="for template,seconds in [('Time Profiler',60),('Allocations',45)]:"
+          assert text.count(old)==1
+          text=text.replace(old,old+"\n    if template!=os.environ['DANPER_PROFILE_TEMPLATE']:continue")
+          text=text.replace('deadline=time.monotonic()+30','deadline=time.monotonic()+180')
+          text=text.replace("('time-profile','allocation','os-signpost')","('time-profile','time-sample','runloop-events','potential-hangs','allocation','os-signpost')")
+          path.write_text(text)
+          path=Path('scripts/glass-audit/validate-macos.sh');text=path.read_text()
+          start=text.index('  xcrun simctl launch --terminate-running-process "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview --danper-redesign-demo > "$OUT/profile-owned-launch.log"')
+          end=text.index('  git rev-parse HEAD > "$OUT/PROFILE_SOURCE_SHA.txt"',start)
+          text=text[:start]+"""  for template in 'Time Profiler' 'Allocations'; do
+           label="active-${template// /-}"
+           xcrun simctl terminate "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview >/dev/null 2>&1 || true
+           run_tests "$label" 1 -only-testing:DANPERInteractionTests/N2AllergySaveInteractionTests/testEmptyRosterSearchAndConfirmedAllergySaveSurviveDraftAndReopen &
+           workload_pid=$!
+           DANPER_PROFILE_TEMPLATE="$template" python3 scripts/performance/profile-simulator.py "$SIM_ID" "$OUT/Instruments/$label"
+           workload_status=0
+           wait "$workload_pid" || workload_status=$?
+           printf '%s %s\\n' "$label" "$workload_status" >> "$OUT/WORKLOAD_EXIT.txt"
+          done
+          """+text[end:]
+          path.write_text(text)
+          out=Path(os.environ['DANPER_AUDIT_OUT'])
+          (out/'HARNESS.diff').write_bytes(subprocess.check_output(['git','diff','--','scripts/glass-audit/validate-macos.sh','scripts/performance/profile-simulator.py']))
+          proof={'appSourceSHA':'c274140aa631a7e9c262381dbff3f6a1f9a62582','workflowSHA':os.environ['GITHUB_SHA'],'compiledAppAndUITestsUnchanged':True,'diagnosticOnly':True,'doesNotReplaceFunctionalUIGates':True,'workload':'Existing fictional allergy save/persist/reopen UI journey; profiler overhead is included'}
+          (out/'ORCHESTRATION_PROOF.json').write_text(json.dumps(proof,indent=2))
+          PY
+          bash -n scripts/glass-audit/validate-macos.sh
+          python3 -m py_compile scripts/performance/profile-simulator.py
+      - name: Observe active synthetic app without accessing a clinical iPhone
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-active-profile
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-active-derived
+          DANPER_TEST_PROOF: ${{ runner.temp }}/b15-active-compiled/TEST_PRODUCTS.json
+          DANPER_B15_UI_LABEL: Instruments-Active-Allergy-Diagnostic
+        run: bash scripts/glass-audit/validate-macos.sh b15-profile
+      - name: Print actual diagnostic results without inventing a metric
+        if: always()
+        env:
+          PROOF_ROOT: ${{ runner.temp }}/b15-active-profile
+        run: |
+          python3 - <<'PY'
+          import json,os,xml.etree.ElementTree as ET
+          from pathlib import Path
+          root=Path(os.environ['PROOF_ROOT'])
+          for name in ['SOURCE_SHA.txt','PROFILE_SOURCE_SHA.txt','WORKLOAD_EXIT.txt','ORCHESTRATION_PROOF.json']:
+              p=root/name
+              if p.exists():print('PROOF',name,p.read_text())
+          for p in root.rglob('profiling-status.json'):print('ACTIVE_PROFILE_RESULT',str(p.relative_to(root)),p.read_text())
+          for p in (root/'Instruments').glob('*/*.xml'):
+              if '-toc.' in p.name:continue
+              tree=ET.parse(p);rows=list(tree.iter('row'))
+              print('ACTIVE_SAMPLE_TABLE',str(p.relative_to(root)),'ROWS',len(rows),'BYTES',p.stat().st_size)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_ACTIVE_CURRENT_HEAD_PROFILE_DIAGNOSTIC
+          path: ${{ runner.temp }}/b15-active-profile
+          retention-days: 14
