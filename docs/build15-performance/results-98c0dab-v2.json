@@ -1,0 +1,144 @@
+{
+  "resourceScope": "Whole prepared Core/XCTest workload, compiler excluded; not physical iPhone memory",
+  "resources": {
+    "before": {
+      "user_cpu_s": 301.06,
+      "system_cpu_s": 1.59,
+      "peak_rss_kib": 222632,
+      "wall_s": 302.28
+    },
+    "after": {
+      "user_cpu_s": 203.19,
+      "system_cpu_s": 1.38,
+      "peak_rss_kib": 224532,
+      "wall_s": 204.26
+    }
+  },
+  "workers": 9648,
+  "initialVisits": 1005,
+  "conditions": "SwiftPM Release; x86_64 Linux; fictitious v2 snapshot; same fabricated dataset; no UI/device latency claim",
+  "beforeStoreLifecycle": "Session-owned journal/core; actual HMAC, AEAD, file reads and revision checks on every operation",
+  "afterStoreLifecycle": "Session-owned journal/core; actual HMAC, AEAD, file reads and revision checks on every operation",
+  "operations": [
+    {
+      "action": "allergy_confirmed_encrypted_save",
+      "before_p50_ms": 5591.2969400000065,
+      "after_p50_ms": 3518.5328180000397,
+      "change_percent": 37.07125813997574,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 7,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "draft_confirmed_encrypted_save",
+      "before_p50_ms": 9664.154306,
+      "after_p50_ms": 3814.594434000014,
+      "change_percent": 60.528419629726734,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 7,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "form_prepare_9648",
+      "before_p50_ms": 267.4878200000421,
+      "after_p50_ms": 278.1010310000056,
+      "change_percent": -3.9677361757861775,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 7,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "history_read_1005",
+      "before_p50_ms": 160.74605500000416,
+      "after_p50_ms": 161.92262700008087,
+      "change_percent": -0.731944556945222,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 7,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "dashboard_refresh",
+      "before_p50_ms": 108.26007900004697,
+      "after_p50_ms": 110.85399600005985,
+      "change_percent": -2.3960050869829446,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 7,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "correction_editor_load",
+      "before_p50_ms": 58.644761999971706,
+      "after_p50_ms": 58.68922699994528,
+      "change_percent": -0.07582092322855992,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 3,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "dispensing_readonly_refresh",
+      "before_p50_ms": 4848.933218999946,
+      "after_p50_ms": 388.1458419999717,
+      "change_percent": 91.99523226100392,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 3,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "inventory_catalog_only",
+      "before_p50_ms": 1.8338500000254498,
+      "after_p50_ms": 1.9209099999670798,
+      "change_percent": -4.74738936883724,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 3,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "worker_search_last",
+      "before_p50_ms": 0.20922499993503152,
+      "after_p50_ms": 0.20598500003643494,
+      "change_percent": 1.5485720633780202,
+      "before_p95_ms": 0.22078199992847658,
+      "after_p95_ms": 0.21577499990144133,
+      "samples": 100,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "worker_search_common",
+      "before_p50_ms": 9.062357000061638,
+      "after_p50_ms": 9.047628499956772,
+      "change_percent": 0.16252394498214578,
+      "before_p95_ms": 9.455258000002686,
+      "after_p95_ms": 9.240363000003526,
+      "samples": 100,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "nursing_98_export",
+      "before_p50_ms": 10358.679669000026,
+      "after_p50_ms": 8005.572198999971,
+      "change_percent": 22.71628764660132,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 3,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    },
+    {
+      "action": "encrypted_backup_verified",
+      "before_p50_ms": 20224.98301200005,
+      "after_p50_ms": 16178.178625999975,
+      "change_percent": 20.008938368941983,
+      "before_p95_ms": null,
+      "after_p95_ms": null,
+      "samples": 3,
+      "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+    }
+  ]
+}
