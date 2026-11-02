@@ -15,10 +15,12 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       DANPER_EXPECTED_BUILD: '15'
+      DANPER_SOURCE_SHA: 59e6773dafdc2e08d291bd7e33b5c6ffd685f1fd
+      DANPER_SOURCE_GATE_RUN: '41528135555'
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: 59e6773dafdc2e08d291bd7e33b5c6ffd685f1fd
+        ref: ${{ env.DANPER_SOURCE_SHA }}
         fetch-depth: 0
         path: current
     - name: Require current-source binaries with all native cases passed
@@ -31,9 +33,9 @@ jobs:
         def get(path):
          return json.load(urllib.request.urlopen(urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30))
         for _ in range(40):
-         pr=get('pulls/10');assert pr['head']['sha']=='59e6773dafdc2e08d291bd7e33b5c6ffd685f1fd' and pr['draft'] and not pr['merged']
-         run=get('actions/runs/41528135555');assert run['head_sha']==pr['head']['sha']
-         artifacts=get('actions/runs/41528135555/artifacts')['artifacts']
+         pr=get('pulls/10');assert pr['head']['sha']==os.environ['DANPER_SOURCE_SHA'] and pr['draft'] and not pr['merged']
+         run=get('actions/runs/'+os.environ['DANPER_SOURCE_GATE_RUN']);assert run['head_sha']==pr['head']['sha']
+         artifacts=get('actions/runs/'+os.environ['DANPER_SOURCE_GATE_RUN']+'/artifacts')['artifacts']
          if any(a['name']=='B15_COMPILED_SAME_HEAD' and not a['expired'] for a in artifacts):break
          if run['status']=='completed':raise RuntimeError('Native build did not provide approved current-source binaries')
          time.sleep(30)
@@ -48,7 +50,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: B15_COMPILED_SAME_HEAD
-        run-id: 41521115084
+        run-id: ${{ env.DANPER_SOURCE_GATE_RUN }}
         github-token: ${{ github.token }}
         path: ${{ runner.temp }}/profile-compiled-after
     - name: Restore compiled binaries; never use baseline as current certification
