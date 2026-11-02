@@ -1,0 +1,87 @@
+name: B15 - exact-source ARM64 Release and update identity check (NO IPA)
+on:
+  push:
+    branches: [audit/b15-profile-device-9143997-20261101]
+    paths: [.github/workflows/b15-arm64-release-check.yml]
+permissions:
+  contents: read
+jobs:
+  arm64-release:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c274140aa631a7e9c262381dbff3f6a1f9a62582
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Prepare approved distribution resources and unchanged application identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = c274140aa631a7e9c262381dbff3f6a1f9a62582
+          npm ci --ignore-scripts --no-fund
+          node scripts/glass-audit/identity.cjs
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          git diff --exit-code HEAD -- '*.swift' native-ios/project.yml
+          mkdir -p "$RUNNER_TEMP/b15-release-proof"
+          git rev-parse HEAD > "$RUNNER_TEMP/b15-release-proof/SOURCE_SHA.txt"
+          xcodebuild -version > "$RUNNER_TEMP/b15-release-proof/xcode-version.txt"
+      - name: Compile real Release iPhoneOS ARM64; do not package an IPA
+        run: |
+          set -euo pipefail
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Release             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/b15-device-derived"             ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO             build > "$RUNNER_TEMP/b15-release-proof/release-iphoneos.log" 2>&1 || {
+              tail -n 100 "$RUNNER_TEMP/b15-release-proof/release-iphoneos.log"
+              exit 1
+            }
+      - name: Verify update identifier, architecture, resources and absence of clinical datasets
+        env:
+          APP_PATH: ${{ runner.temp }}/b15-device-derived/Build/Products/Release-iphoneos/DANPERNative.app
+          PROOF_ROOT: ${{ runner.temp }}/b15-release-proof
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,plistlib,subprocess
+          from pathlib import Path
+          app=Path(os.environ['APP_PATH']);out=Path(os.environ['PROOF_ROOT'])
+          source=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert source=='c274140aa631a7e9c262381dbff3f6a1f9a62582'
+          p=plistlib.loads((app/'Info.plist').read_bytes())
+          assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
+          assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='15'
+          assert p['CFBundleSupportedPlatforms']==['iPhoneOS']
+          assert p['MinimumOSVersion']=='17.0'
+          assert p['NSFaceIDUsageDescription'] and p['UILaunchStoryboardName']=='LaunchScreen'
+          assert list(app.rglob('LaunchScreen.storyboardc'))
+          assert not (app/'embedded.mobileprovision').exists() and not (app/'_CodeSignature').exists()
+          assert not list(app.rglob('*.xctest')) and not list(app.rglob('SyntheticFixtures'))
+          exe=app/p['CFBundleExecutable']
+          archs=subprocess.check_output(['lipo','-archs',str(exe)],text=True).strip()
+          assert archs=='arm64'
+          assert subprocess.run(['codesign','--verify',str(app)],capture_output=True).returncode != 0
+          assert b'DANPER_GREETING_TEST_LOCAL' not in exe.read_bytes()
+          expected={'n1s-indicator-plan.json','n1s-indicator-template-store.zip','n1s-nursing-plan.json','n1s-nursing-template-store.zip','n2-ambulatory-products.json','n2-nursing-catalog.json','n2-approved-mappings.json','n2-organization-areas.json'}
+          assert {x.name for x in (app/'N1sDemoResources').iterdir()}==expected
+          baseline=subprocess.check_output(['git','show','9b1da6d4cdead4729bcade6843abcbcfc287e870:native-ios/project.yml'],text=True)
+          assert 'PRODUCT_BUNDLE_IDENTIFIER: '+p['CFBundleIdentifier'] in baseline
+          assert 'iOS: "17.0"' in baseline
+          manifest={str(f.relative_to(app)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(app.rglob('*')) if f.is_file()}
+          (out/'APP_SHA256.json').write_text(json.dumps(manifest,indent=2))
+          report={'sourceSHA':source,'workflowSHA':os.environ['GITHUB_SHA'],'bundleID':p['CFBundleIdentifier'],'sameBundleAsBuild14':True,'version':p['CFBundleShortVersionString'],'build':p['CFBundleVersion'],'minimumOS':p['MinimumOSVersion'],'architecture':archs,'signed':False,'clinicalDatasetsBundled':False,'testClockAbsent':True,'physicalContainerValidated':False,'IPA':False,'packagingStillRequiresAllMandatoryGates':True}
+          (out/'RELEASE_IDENTITY.json').write_text(json.dumps(report,indent=2))
+          print('RELEASE_VERIFIED',json.dumps(report,indent=2))
+          PY
+      - name: Retain compiled app only for later same-source gated packaging
+        env:
+          APP_PARENT: ${{ runner.temp }}/b15-device-derived/Build/Products/Release-iphoneos
+        run: tar -czf "$RUNNER_TEMP/b15-release-proof/COMPILED_ARM64_APP.tgz" -C "$APP_PARENT" DANPERNative.app
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_ARM64_RELEASE_IDENTITY_NO_IPA
+          path: ${{ runner.temp }}/b15-release-proof
+          retention-days: 14
