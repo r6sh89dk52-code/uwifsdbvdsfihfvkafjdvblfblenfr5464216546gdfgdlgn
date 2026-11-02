@@ -4,7 +4,7 @@ HEAD inicial real de la auditoría90cb0aba7b553e536c9d3ad42d65eae9f7890fd5; entr
 
 ## Estado actual, sin certificación anticipada
 
-Swift433PASS/0FAIL/0omitidas, JavaScript62PASS, Python22PASS, compatibilidad1PASS y comparaciones oficiales Excel PASS para98c0dab. Benchmarks v1 trece operaciones y v2 doce, ambos completos. Release ARM64 PASS en41465269363, identidad y22 archivos verificados contra manifiesto. Xcode/nativas27/UI13 están pendientes. No hay IPA. No se presenta ningún resultado de67c4ec8 como aprobación de98c0dab.
+Swift433PASS/0FAIL/0omitidas, JavaScript62PASS, Python22PASS, compatibilidad1PASS y comparaciones oficiales Excel PASS para98c0dab. Benchmarks v1 trece operaciones y v2 doce, ambos completos. Release ARM64 PASS en41465269363, identidad y22 archivos verificados contra manifiesto. Xcode SwiftUI y27 nativas PASS, sin fallos/omitidas. UI13 y gate final están pendientes. No hay IPA. No se presenta ningún resultado de67c4ec8 como aprobación de98c0dab.
 
 La ejecución41461695918 terminó FAILURE: contiene los cuatro jobs Linux aprobados del candidato. Su native-build se canceló sin runner ni pasos tras15min en cola; UI/Instruments/final quedaron omitidos. Release41461827215 y exportación41461991137 también terminaron FAILURE, con sus trabajos cancelados sin runner ni pasos. Las anotaciones públicas de GitHub consultadas después confirmaron limitación de capacidad de runners macOS ARM64 y un error interno al adquirir la máquina; no llegó a ejecutar Xcode. La API usada no detallaba ese motivo. Fallback41465269363 usa una rama auxiliar creada desde98c0dab y checkouts explícitos del mismo98c0dab: macos-15-intel, Xcode16.4/SDK18.5, iPhone16/iOS18.5, todas las suites originales, Release iPhoneOS arm64. Su gate verifica SHA/recuentos/cero fallos de cada artefacto y los cuatro jobs Linux aprobados; no sustituye pruebas por resultados antiguos. Simulador x86_64 no equivale a iPhone ARM64 físico.
 
@@ -95,7 +95,7 @@ Comparación acumulada v1 cc45aa2→98c0dab: incluye cambios ya publicados antes
 
 La prueba usa el código real congelado de Build14 para producir diario/respaldo cifrados completamente ficticios. El candidato los abre, corrige una apertura histórica R1→R0, guarda alergias, reabre el diario y verifica un respaldo nuevo. Stock completo, trabajadores y atenciones originales permanecen idénticos; sin duplicar consumo ni descontar historial. PASS1/0 para98c0dab. Es compatibilidad hacia delante, no promesa de downgrade.
 
-Comparaciones oficiales: indicador10hojas/19tablas/432materiales y todas sus fórmulas; enfermeras98filas/7columnas con celdas combinadas/impresión/fórmulas; interoperabilidad XLSX A–AD en modos stock/frecuencia. PASS del SHA actual. Regresiones Swift cubren saldos desconocidos, primer conteo posterior, corte9–8, R1/R0 sin segunda salida y sede histórica pendiente/rectificada, respaldos/correcciones y revisión concurrente. Los casos nativos de concurrencia y UI deben aprobarse todavía para este SHA.
+Comparaciones oficiales: indicador10hojas/19tablas/432materiales y todas sus fórmulas; enfermeras98filas/7columnas con celdas combinadas/impresión/fórmulas; interoperabilidad XLSX A–AD en modos stock/frecuencia. PASS del SHA actual. Regresiones Swift cubren saldos desconocidos, primer conteo posterior, corte9–8, R1/R0 sin segunda salida y sede histórica pendiente/rectificada, respaldos/correcciones y revisión concurrente. Los casos nativos de concurrencia están aprobados para este SHA; faltan las pruebas UI.
 
 Cifrado AES-GCM/AAD, HMAC, SHA, Keychain y revisión se comprueban en cada recuperación. La caché semántica interna requiere bytes descifrados exactamente iguales, máximo dos entradas de8MiB; no persiste índices sensibles en texto plano. Las modificaciones generan pruebas completas propias. No se cambian esquema v2, codec, servicios Keychain, BundleID ni grupos compartidos.
 
@@ -109,7 +109,7 @@ No se accedió a datos del iPhone ni se ejecutó una instalación física. FaceI
 
 ## Distribución y actualización
 
-IPA no generada: faltan Xcode/UI/gate final actuales. Build14 instalada intacta. BundleID esperado pe.danper.saludmovil.native.iloaderpreview, versión0.4.2/build15/iOS17. La coincidencia de identificador no certifica conservación del contenedor al cambiar de firma.
+IPA no generada: faltan UI/gate final actuales. Build14 instalada intacta. BundleID esperado pe.danper.saludmovil.native.iloaderpreview, versión0.4.2/build15/iOS17. La coincidencia de identificador no certifica conservación del contenedor al cambiar de firma.
 
 Antes de cualquier actualización aprobada: respaldo cifrado reciente verificado y contraseña conservados fuera del iPhone; misma cuenta/equipo de firma que la app instalada; instalar sobre la app existente, sin desinstalar, borrar bóveda, restaurar ni reimportar historial automáticamente. Detenerse si iLoader propone otra identidad/segunda app o si aparece una fuente vacía inesperada. Verificar tras actualizar trabajadores, atenciones, alergias, conteos/ingresos/consumos, borradores y saldo compartido Fundo/Planta antes de trabajar.
 
@@ -124,3 +124,5 @@ Antes de cualquier actualización aprobada: respaldo cifrado reciente verificado
 - [Perfilado activo67c4ec8](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41390330778)
 
 [Swift actual](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41461695918/artifacts/13150950105), [JavaScript/Python](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41461695918/artifacts/13150131224), [v1/compatibilidad](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41461695918/artifacts/13150314678), [v2/estado físico](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41461695918/artifacts/13149598246).
+
+Diagnóstico auxiliar de arranque:41470753089 FAILURE de validación del workflow (runner.temp en contexto job-env, cero trabajos/tests ejecutados). Corregido en48be5391;41471227122 está pendiente y no reemplaza ninguna prueba clínica. La validación nativa real41465269363 terminó27/27PASS; sus resultados están en artifact13155085864, binarios de prueba del mismo98c0dab en13155115868. El tiempo prolongado de la etapa anterior al preflight no se presenta como latencia de la aplicación.
