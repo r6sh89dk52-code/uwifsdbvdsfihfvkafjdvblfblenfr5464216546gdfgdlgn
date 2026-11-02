@@ -77,7 +77,7 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertThrowsError(try N2AuditedSnapshot(validating:bytes(future)))
     }
     func testV2ConfirmedDraftProofPreservesPhysicalLedgerAndSavedVisits()throws {
-        let raw=try active(),folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-v2-draft-"+UUID().uuidString)
+        let raw=try active(),folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-v2-draft-"+UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:false)
         defer{try? FileManager.default.removeItem(at:folder)}
         let key=Data(repeating:0x63,count:32)
@@ -108,7 +108,7 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertEqual(draft["diagnosis"] as? String,"BORRADOR FICTICIO V2")
     }
     func testV2DispensingReadUsesAuthenticatedParityWithoutChangingGeneration()throws {
-        let raw=try active(),folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-v2-lines-"+UUID().uuidString)
+        let raw=try active(),folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-v2-lines-"+UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:false)
         defer{try? FileManager.default.removeItem(at:folder)}
         let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:0x64,count:32))
