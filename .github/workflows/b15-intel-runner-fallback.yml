@@ -1,0 +1,318 @@
+name: B15 - exact 98c0dab Xcode fallback, all UI and ARM64 Release (NO IPA)
+'on':
+  push:
+    branches:
+    - audit/b15-intel-runner-fallback-98c0dab-20261102
+    paths:
+    - .github/workflows/b15-intel-runner-fallback.yml
+permissions:
+  contents: read
+  actions: read
+env:
+  DANPER_EXPECTED_BUILD: '15'
+jobs:
+  native-build:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 98c0dab7f7e8138b799062d5aefc894bcafefd9e
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Prepare production resources, never a patient dataset
+      run: |
+        set -euo pipefail
+        npm ci --ignore-scripts --no-fund
+        if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+        node scripts/prepare-n1s-ios-demo-resources.cjs
+        (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+    - name: Real signed SwiftUI typecheck, Face ID preflight and ALL native tests
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-native
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+      run: |
+        set -euo pipefail
+        mkdir -p "$DANPER_AUDIT_OUT"
+        uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
+        test "$(uname -m)" = x86_64
+        bash scripts/glass-audit/validate-macos.sh b15-native
+        python3 scripts/performance/test-products.py seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
+        tar -czf "$DANPER_AUDIT_OUT/TEST_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
+    - uses: actions/upload-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        path: |
+          ${{ runner.temp }}/b15-native/TEST_PRODUCTS.json
+          ${{ runner.temp }}/b15-native/TEST_PRODUCTS.tgz
+        retention-days: 7
+        compression-level: 0
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_NATIVE_RESULTS
+        path: |
+          ${{ runner.temp }}/b15-native/*.json
+          ${{ runner.temp }}/b15-native/*.txt
+          ${{ runner.temp }}/b15-native/*.log
+        retention-days: 14
+  ui:
+    needs: native-build
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        suite:
+        - N2AllergySaveInteractionTests
+        - N2BiometricInteractionTests
+        - N2Build222ShellTests
+        - N2GlassClinicalTests
+        - N2MenuInteractionTests
+        - N2PremiumRedesignTests
+        - N3ClinicalJourneyTests-demo
+        - N3ClinicalJourneyTests-protected
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 98c0dab7f7e8138b799062d5aefc894bcafefd9e
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        path: ${{ runner.temp }}/b15-compiled
+    - name: Restore executable permissions and verify exact current-HEAD binaries
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/b15-derived/Build"
+        tar -xzf "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+        python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.json"
+    - name: Real isolated iPhone 16 UI suite and Face ID preflight
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-ui
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+        DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/TEST_PRODUCTS.json
+        DANPER_B15_UI_LABEL: ${{ matrix.suite }}
+      run: |
+        set -euo pipefail
+        bash scripts/glass-audit/validate-macos.sh b15-shard
+        python3 scripts/performance/verify-ui-shard.py "$DANPER_AUDIT_OUT" "$DANPER_B15_UI_LABEL"
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_UI_RESULT_${{ matrix.suite }}
+        path: |
+          ${{ runner.temp }}/b15-ui/*.json
+          ${{ runner.temp }}/b15-ui/*.txt
+          ${{ runner.temp }}/b15-ui/*.log
+          ${{ runner.temp }}/b15-ui/Instruments/*.json
+          ${{ runner.temp }}/b15-ui/Instruments/*.log
+          ${{ runner.temp }}/b15-ui/Instruments/*.xml
+        retention-days: 14
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_UI_RAW_${{ matrix.suite }}
+        path: |
+          ${{ runner.temp }}/b15-ui/*.xcresult
+          ${{ runner.temp }}/b15-ui/*-attachments
+          ${{ runner.temp }}/b15-ui/Instruments
+        retention-days: 7
+  instruments:
+    needs: native-build
+    runs-on: macos-15-intel
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 98c0dab7f7e8138b799062d5aefc894bcafefd9e
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        path: ${{ runner.temp }}/b15-compiled
+    - name: Restore and verify current-HEAD binary only
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/b15-derived/Build"
+        tar -xzf "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+        python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.json"
+    - name: Profile a separate synthetic app process without disrupting functional UI tests
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-instruments
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+        DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/TEST_PRODUCTS.json
+        DANPER_B15_UI_LABEL: Instruments-Home
+      run: bash scripts/glass-audit/validate-macos.sh b15-profile
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_INSTRUMENTS_RESULTS
+        path: ${{ runner.temp }}/b15-instruments
+        retention-days: 14
+  arm64-release:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 98c0dab7f7e8138b799062d5aefc894bcafefd9e
+        fetch-depth: 0
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Prepare approved distribution resources and unchanged application identity
+      run: |
+        set -euo pipefail
+        test "$(git rev-parse HEAD)" = 98c0dab7f7e8138b799062d5aefc894bcafefd9e
+        npm ci --ignore-scripts --no-fund
+        node scripts/glass-audit/identity.cjs
+        if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+        node scripts/prepare-n1s-ios-demo-resources.cjs
+        (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+        git diff --exit-code HEAD -- '*.swift' native-ios/project.yml
+        mkdir -p "$RUNNER_TEMP/b15-release-proof"
+        git rev-parse HEAD > "$RUNNER_TEMP/b15-release-proof/SOURCE_SHA.txt"
+        xcodebuild -version > "$RUNNER_TEMP/b15-release-proof/xcode-version.txt"
+    - name: Compile real Release iPhoneOS ARM64; do not package an IPA
+      run: |
+        set -euo pipefail
+        xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Release             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/b15-device-derived"             ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO             build > "$RUNNER_TEMP/b15-release-proof/release-iphoneos.log" 2>&1 || {
+            tail -n 100 "$RUNNER_TEMP/b15-release-proof/release-iphoneos.log"
+            exit 1
+          }
+    - name: Verify update identifier, architecture, resources and absence of clinical datasets
+      env:
+        APP_PATH: ${{ runner.temp }}/b15-device-derived/Build/Products/Release-iphoneos/DANPERNative.app
+        PROOF_ROOT: ${{ runner.temp }}/b15-release-proof
+      run: |
+        python3 - <<'PY'
+        import hashlib,json,os,plistlib,subprocess
+        from pathlib import Path
+        app=Path(os.environ['APP_PATH']);out=Path(os.environ['PROOF_ROOT'])
+        source=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+        assert source=='98c0dab7f7e8138b799062d5aefc894bcafefd9e'
+        p=plistlib.loads((app/'Info.plist').read_bytes())
+        assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
+        assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='15'
+        assert p['CFBundleSupportedPlatforms']==['iPhoneOS']
+        assert p['MinimumOSVersion']=='17.0'
+        assert p['NSFaceIDUsageDescription'] and p['UILaunchStoryboardName']=='LaunchScreen'
+        assert list(app.rglob('LaunchScreen.storyboardc'))
+        assert not (app/'embedded.mobileprovision').exists() and not (app/'_CodeSignature').exists()
+        assert not list(app.rglob('*.xctest')) and not list(app.rglob('SyntheticFixtures'))
+        exe=app/p['CFBundleExecutable']
+        archs=subprocess.check_output(['lipo','-archs',str(exe)],text=True).strip()
+        assert archs=='arm64'
+        assert subprocess.run(['codesign','--verify',str(app)],capture_output=True).returncode != 0
+        assert b'DANPER_GREETING_TEST_LOCAL' not in exe.read_bytes()
+        expected={'n1s-indicator-plan.json','n1s-indicator-template-store.zip','n1s-nursing-plan.json','n1s-nursing-template-store.zip','n2-ambulatory-products.json','n2-nursing-catalog.json','n2-approved-mappings.json','n2-organization-areas.json'}
+        assert {x.name for x in (app/'N1sDemoResources').iterdir()}==expected
+        baseline=subprocess.check_output(['git','show','9b1da6d4cdead4729bcade6843abcbcfc287e870:native-ios/project.yml'],text=True)
+        assert 'PRODUCT_BUNDLE_IDENTIFIER: '+p['CFBundleIdentifier'] in baseline
+        assert 'iOS: "17.0"' in baseline
+        manifest={str(f.relative_to(app)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(app.rglob('*')) if f.is_file()}
+        (out/'APP_SHA256.json').write_text(json.dumps(manifest,indent=2))
+        report={'sourceSHA':source,'workflowSHA':os.environ['GITHUB_SHA'],'bundleID':p['CFBundleIdentifier'],'sameBundleAsBuild14':True,'version':p['CFBundleShortVersionString'],'build':p['CFBundleVersion'],'minimumOS':p['MinimumOSVersion'],'architecture':archs,'signed':False,'clinicalDatasetsBundled':False,'testClockAbsent':True,'physicalContainerValidated':False,'IPA':False,'packagingStillRequiresAllMandatoryGates':True}
+        (out/'RELEASE_IDENTITY.json').write_text(json.dumps(report,indent=2))
+        print('RELEASE_VERIFIED',json.dumps(report,indent=2))
+        PY
+    - name: Retain compiled app only for later same-source gated packaging
+      env:
+        APP_PARENT: ${{ runner.temp }}/b15-device-derived/Build/Products/Release-iphoneos
+      run: tar -czf "$RUNNER_TEMP/b15-release-proof/COMPILED_ARM64_APP.tgz" -C "$APP_PARENT" DANPERNative.app
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_ARM64_RELEASE_IDENTITY_NO_IPA
+        path: ${{ runner.temp }}/b15-release-proof
+        retention-days: 14
+  complete:
+    needs:
+    - native-build
+    - ui
+    - instruments
+    - arm64-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 98c0dab7f7e8138b799062d5aefc894bcafefd9e
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: B15_*RESULT*
+        path: ${{ runner.temp }}/b15-final
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_SWIFT_RESULTS
+        path: ${{ runner.temp }}/b15-final/swift
+        run-id: 41461695918
+        github-token: ${{ github.token }}
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_JAVASCRIPT
+        path: ${{ runner.temp }}/b15-final/javascript
+        run-id: 41461695918
+        github-token: ${{ github.token }}
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_PERFORMANCE_COMPARISON
+        path: ${{ runner.temp }}/b15-final/performance
+        run-id: 41461695918
+        github-token: ${{ github.token }}
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_V2_PERFORMANCE_COMPARISON
+        path: ${{ runner.temp }}/b15-final/performance-v2
+        run-id: 41461695918
+        github-token: ${{ github.token }}
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_ARM64_RELEASE_IDENTITY_NO_IPA
+        path: ${{ runner.temp }}/b15-final/release
+    - name: Require current draft HEAD and all four same-source Linux jobs plus ARM64 identity
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PROOF_ROOT: ${{ runner.temp }}/b15-final
+      run: |
+        python3 - <<'PYVERIFY'
+        import json,os,urllib.request
+        from pathlib import Path
+        base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'
+        def get(path):
+            return json.load(urllib.request.urlopen(urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})))
+        expected='98c0dab7f7e8138b799062d5aefc894bcafefd9e'
+        pr=get('pulls/10');assert pr['head']['sha']==expected and pr['draft'] and not pr['merged']
+        run=get('actions/runs/41461695918');assert run['head_sha']==expected
+        jobs=get('actions/runs/41461695918/jobs?per_page=30')['jobs']
+        required={'javascript','swift-core / swift-core','performance','performance-v2'}
+        assert required<={j['name'] for j in jobs}
+        assert all(j['conclusion']=='success' for j in jobs if j['name'] in required)
+        p=Path(os.environ['PROOF_ROOT']);r=json.loads((p/'release'/'RELEASE_IDENTITY.json').read_text())
+        assert r['sourceSHA']==expected and r['sameBundleAsBuild14'] and r['architecture']=='arm64'
+        assert r['bundleID']=='pe.danper.saludmovil.native.iloaderpreview' and r['version']=='0.4.2' and r['build']=='15'
+        assert not r['IPA'] and not r['signed'] and not r['clinicalDatasetsBundled'] and r['testClockAbsent']
+        proof={'appSourceSHA':expected,'workflowSHA':os.environ['GITHUB_SHA'],'linuxRun':41461695918,'nativeUIAndReleaseRun':os.environ['GITHUB_RUN_ID'],'simulatorArchitecture':'x86_64','deviceReleaseArchitecture':'arm64','reason':'Previous macos-15 jobs cancelled without runner or steps; cancellation cause not exposed','originalCancelledJobsRetained':True,'sameSourceOnly':True,'IPA':False}
+        (p/'ORCHESTRATION_SOURCE.json').write_text(json.dumps(proof,indent=2))
+        PYVERIFY
+    - name: Require all fresh source markers, zero failures and complete counts
+      run: python3 scripts/performance/final-gate.py "$RUNNER_TEMP/b15-final"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: B15_CURRENT_HEAD_AUDIT
+        path: |-
+          ${{ runner.temp }}/b15-final/FINAL_GATES.json
+          ${{ runner.temp }}/b15-final/ORCHESTRATION_SOURCE.json
+          ${{ runner.temp }}/b15-final/release/RELEASE_IDENTITY.json
+        retention-days: 14
+
