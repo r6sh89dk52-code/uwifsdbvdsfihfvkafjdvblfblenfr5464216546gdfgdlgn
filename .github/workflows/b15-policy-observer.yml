@@ -1,4 +1,4 @@
-name: B15 - isolated policy observer on unchanged 9a4cad1 (DIAGNOSTIC ONLY)
+name: B15 - real Face ID consent then unchanged native cancellation (DIAGNOSTIC ONLY)
 'on':
   push:
     branches:
@@ -16,8 +16,7 @@ jobs:
       DANPER_EXPECTED_BUILD: '15'
     steps:
     - uses: actions/checkout@v4
-      with:
-        ref: 9a4cad1d1463eee5b0ae118b3c14fe58b73a7710
+      with: {}
     - uses: actions/setup-node@v4
       with:
         node-version: '22'
@@ -45,6 +44,10 @@ jobs:
         assert s.count(old)==1
         s=s.replace(old,'  run_tests native-policy-diagnostic 1 -only-testing:DANPERNativeTests/N2ColdAuthenticationPreflightTests/testRealDeviceOwnerPolicyCanBeCancelledAfterColdLaunch')
         s=s.replace('CORE_NATIVE_SHA.txt','POLICY_DIAGNOSTIC_PASS_SHA.txt')
+        needle=' run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests'
+        assert s.count(needle)==1
+        s=s.replace(needle,needle+'\n run_tests permission-preflight 1 -only-testing:DANPERInteractionTests/N2BiometricInteractionTests/testFaceIDPermissionDoesNotAuthenticateOrExposeClinicalData')
+
         s=s.replace("stream='' bridge='' profiler=''", "stream='' bridge='' profiler='' observer=''")
         needle=' local selection=(-project native-ios/DANPERNative.xcodeproj'
         assert s.count(needle)==1
@@ -63,14 +66,16 @@ jobs:
         p.write_text('\n'.join(lines)+'\n')
         out=Path(os.environ['DANPER_AUDIT_OUT']);out.mkdir(parents=True,exist_ok=True)
         (out/'HARNESS.diff').write_bytes(subprocess.check_output(['git','diff','--','scripts/glass-audit/validate-macos.sh','scripts/glass-audit/simulator-ready-bridge.py']))
-        proof={'sourceSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'workflowSHA':os.environ['GITHUB_SHA'],'nativeCasesSelected':1,'nativeCaseUnmodified':True,'diagnosticOnly':True,'releaseApproval':False,'physicalDeviceValidated':False,'IPA':False}
+        proof={'sourceSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'workflowSHA':os.environ['GITHUB_SHA'],'nativeCasesSelected':1,'permissionUICasesSelected':1,'applicationSourceSHA':'9a4cad1d1463eee5b0ae118b3c14fe58b73a7710','nativeCaseUnmodified':True,'diagnosticOnly':True,'releaseApproval':False,'physicalDeviceValidated':False,'IPA':False}
         (out/'ORCHESTRATION.json').write_text(json.dumps(proof,indent=2))
 
         PYPATCH
         bash -n scripts/glass-audit/validate-macos.sh
         python3 -m py_compile scripts/glass-audit/simulator-ready-bridge.py
         git diff --exit-code HEAD -- '*.swift' native-ios/project.yml
-    - name: Run genuine unchanged cancellation case on own fresh iPhone 16
+        git diff --exit-code 9a4cad1d1463eee5b0ae118b3c14fe58b73a7710 HEAD -- native-ios/App native-ios/Sources native-ios/NativeTests native-ios/project.yml
+        git diff 9a4cad1d1463eee5b0ae118b3c14fe58b73a7710 HEAD -- native-ios/InteractionTests > "$DANPER_AUDIT_OUT/TEST_SCOPE.diff"
+    - name: Accept real Face ID feature permission without authentication, then run unchanged native case
       env:
         DANPER_AUDIT_OUT: ${{ runner.temp }}/policy-observer
         DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/policy-derived
@@ -81,4 +86,3 @@ jobs:
         name: B15_POLICY_OBSERVER_DIAGNOSTIC_NOT_APPROVAL
         path: ${{ runner.temp }}/policy-observer
         retention-days: 14
-

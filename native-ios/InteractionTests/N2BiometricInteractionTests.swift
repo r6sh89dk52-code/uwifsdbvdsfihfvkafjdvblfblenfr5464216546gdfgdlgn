@@ -21,6 +21,54 @@ final class N2BiometricInteractionTests:XCTestCase {
         let attachment=XCTAttachment(screenshot:app.screenshot())
         attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)
     }
+    /// Consent to using Face ID is not identity authentication. This public
+    /// UI setup handles the real first-use alert on an owned fresh Simulator.
+    func testFaceIDPermissionDoesNotAuthenticateOrExposeClinicalData() {
+        #if !targetEnvironment(simulator)
+        XCTFail("Synthetic permission preparation requires an isolated Simulator")
+        return
+        #endif
+        continueAfterFailure=false
+        let app=XCUIApplication()
+        app.launchArguments=["-danper.native.onboarding.v1.finished","YES"]
+        app.launch()
+        let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+        let alert=springboard.alerts.firstMatch
+        let ownFaceID=alert.staticTexts.matching(NSPredicate(format:
+            "label CONTAINS[c] %@ AND label CONTAINS[c] %@ AND label CONTAINS[c] %@",
+            "DANPER","Face","ID")).firstMatch
+        var acceptedPermission=false
+        if ownFaceID.waitForExistence(timeout:15) {
+            let allow=alert.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
+            XCTAssertTrue(allow.waitForExistence(timeout:5))
+            XCTAssertTrue(allow.isHittable)
+            allow.tap();acceptedPermission=true
+            let dismissed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:ownFaceID)
+            XCTAssertEqual(XCTWaiter.wait(for:[dismissed],timeout:5),.completed)
+        }
+        let checking=app.staticTexts["Verificando identidad…"]
+        let retry=app.buttons["Reintentar Face ID"]
+        let gated=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            checking.exists || retry.exists
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[gated],timeout:15),.completed,
+            "The app must reach its genuine authentication gate")
+        let source=app.buttons["clinical-first-run-import-personal"]
+        let home=app.buttons["premium-tab-home"]
+        let noAccess=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            (source.exists && source.isHittable) || (home.exists && home.isHittable)
+        },object:nil)
+        noAccess.isInverted=true
+        XCTAssertEqual(XCTWaiter.wait(for:[noAccess],timeout:2),.completed,
+            "Accepting Face ID permission must not authenticate or expose clinical controls")
+        let proof=XCTAttachment(string:"permissionPromptAccepted=\(acceptedPermission); biometricEventsSent=0; clinicalAccessGranted=false; SimulatorOnly=true")
+        proof.name="FaceID-permission-is-not-authentication";proof.lifetime = .keepAlways;add(proof)
+        // No match/nomatch event is sent. Termination releases this setup
+        // context; the independent native case must still prove appCancel.
+        app.terminate()
+        XCTAssertTrue(app.wait(for:.notRunning,timeout:10))
+    }
+
     func testAutomaticBiometryCancellationRetryAndForeground() {
         #if !targetEnvironment(simulator)
         XCTFail("Esta prueba usa exclusivamente biometría simulada; no valida Face ID físico")
