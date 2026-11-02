@@ -8,7 +8,7 @@ permissions:
   actions: read
 jobs:
   active-profile:
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 60
     env:
       DANPER_EXPECTED_BUILD: '15'
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: c274140aa631a7e9c262381dbff3f6a1f9a62582
+          ref: 67c4ec8d8d7a382471945e88a59f3e499a11f555
       - name: Wait for only the exact current-HEAD compiled artifact
         env:
           GH_TOKEN: ${{ github.token }}
@@ -28,16 +28,16 @@ jobs:
               request=urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
               return json.load(urllib.request.urlopen(request))
           for _ in range(40):
-              pr=get('pulls/10');assert pr['head']['sha']=='c274140aa631a7e9c262381dbff3f6a1f9a62582' and pr['draft']
-              run=get('actions/runs/41366450170');assert run['head_sha']==pr['head']['sha']
-              if any(a['name']=='B15_COMPILED_SAME_HEAD' and not a['expired'] for a in get('actions/runs/41366450170/artifacts')['artifacts']):break
+              pr=get('pulls/10');assert pr['head']['sha']=='67c4ec8d8d7a382471945e88a59f3e499a11f555' and pr['draft']
+              run=get('actions/runs/41389072346');assert run['head_sha']==pr['head']['sha']
+              if any(a['name']=='B15_COMPILED_SAME_HEAD' and not a['expired'] for a in get('actions/runs/41389072346/artifacts')['artifacts']):break
               time.sleep(30)
           else:raise RuntimeError('Same-HEAD binary did not become available; no older binary accepted')
           PY
       - uses: actions/download-artifact@v4
         with:
           name: B15_COMPILED_SAME_HEAD
-          run-id: 41366450170
+          run-id: 41389072346
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/b15-active-compiled
       - name: Verify exact binaries and record diagnostic harness changes only
@@ -55,6 +55,7 @@ jobs:
           old="for template,seconds in [('Time Profiler',60),('Allocations',45)]:"
           assert text.count(old)==1
           text=text.replace(old,old+"\n    if template!=os.environ['DANPER_PROFILE_TEMPLATE']:continue")
+          text=text.replace("('Time Profiler',60),('Allocations',45)","('Time Profiler',180),('Allocations',180)")
           text=text.replace('deadline=time.monotonic()+30','deadline=time.monotonic()+180')
           text=text.replace("('time-profile','allocation','os-signpost')","('time-profile','time-sample','runloop-events','potential-hangs','allocation','os-signpost')")
           path.write_text(text)
@@ -75,7 +76,7 @@ jobs:
           path.write_text(text)
           out=Path(os.environ['DANPER_AUDIT_OUT'])
           (out/'HARNESS.diff').write_bytes(subprocess.check_output(['git','diff','--','scripts/glass-audit/validate-macos.sh','scripts/performance/profile-simulator.py']))
-          proof={'appSourceSHA':'c274140aa631a7e9c262381dbff3f6a1f9a62582','workflowSHA':os.environ['GITHUB_SHA'],'compiledAppAndUITestsUnchanged':True,'diagnosticOnly':True,'doesNotReplaceFunctionalUIGates':True,'workload':'Existing fictional allergy save/persist/reopen UI journey; profiler overhead is included'}
+          proof={'appSourceSHA':'67c4ec8d8d7a382471945e88a59f3e499a11f555','workflowSHA':os.environ['GITHUB_SHA'],'compiledAppAndUITestsUnchanged':True,'diagnosticOnly':True,'runnerArchitecture':'arm64','seedWorkers':2,'physicalDeviceValidated':False,'recordingSecondsPerTemplate':180,'doesNotReplaceFunctionalUIGates':True,'workload':'Existing fictional allergy save/persist/reopen UI journey; profiler overhead is included'}
           (out/'ORCHESTRATION_PROOF.json').write_text(json.dumps(proof,indent=2))
           PY
           bash -n scripts/glass-audit/validate-macos.sh
