@@ -1,0 +1,81 @@
+name: B15 - bounded Intel cold Simulator readiness diagnostic (NO IPA)
+on:
+  push:
+    branches: [audit/b15-intel-runner-fallback-98c0dab-20261102]
+    paths: [.github/workflows/b15-intel-simulator-readiness.yml]
+permissions:
+  contents: read
+jobs:
+  readiness:
+    runs-on: macos-15-intel
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        startup: [headless, gui-first]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      STARTUP_MODE: ${{ matrix.startup }}
+      PROOF_ROOT: ${{ runner.temp }}/b15-cold-boot
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 98c0dab7f7e8138b799062d5aefc894bcafefd9e
+      - name: Time each cold startup phase on a new owned synthetic device
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess,time,uuid
+          from pathlib import Path
+          out=Path(os.environ['PROOF_ROOT']);out.mkdir()
+          report={'sourceSHA':'98c0dab7f7e8138b799062d5aefc894bcafefd9e','mode':os.environ['STARTUP_MODE'],'containsClinicalData':False,'diagnosticOnly':True,'phases':[]}
+          sim=None
+          def save(): (out/'READINESS.json').write_text(json.dumps(report,indent=2))
+          def run(label,args,timeout=30,required=True):
+              print('PHASE',label,flush=True);t=time.monotonic()
+              try:
+                  r=subprocess.run(args,capture_output=True,text=True,timeout=timeout)
+                  row={'phase':label,'seconds':time.monotonic()-t,'exit':r.returncode}
+                  (out/(label+'.log')).write_text(r.stdout+r.stderr)
+                  report['phases'].append(row);save()
+                  if required and r.returncode:raise RuntimeError(label+' failed')
+                  return r.stdout
+              except subprocess.TimeoutExpired as e:
+                  report['phases'].append({'phase':label,'seconds':time.monotonic()-t,'timeout':True})
+                  (out/(label+'.log')).write_bytes((e.stdout or b'')+(e.stderr or b''))
+                  save()
+                  if required:raise
+                  return ''
+          try:
+              sdk=run('sdk',['xcrun','--sdk','iphonesimulator','--show-sdk-version']).strip()
+              runtimes=json.loads(run('runtimes',['xcrun','simctl','list','runtimes','-j']))['runtimes']
+              runtime=next(r['identifier'] for r in runtimes if r.get('isAvailable') and r['version'].split('.')[:2]==sdk.split('.')[:2] and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-'))
+              name='DANPER-SYNTHETIC-BOOT-'+report['mode']+'-'+str(uuid.uuid4())[:8]
+              sim=run('create',['xcrun','simctl','create',name,'com.apple.CoreSimulator.SimDeviceType.iPhone-16',runtime]).strip()
+              assert str(uuid.UUID(sim)).upper()==sim.upper()
+              report['deviceUDID']=sim;report['deviceName']=name;save()
+              if report['mode']=='gui-first':run('open-simulator',['open','-a','Simulator','--args','-CurrentDeviceUDID',sim])
+              run('boot',['xcrun','simctl','boot',sim],required=False)
+              if report['phases'][-1]['exit']:
+                  rows=json.loads(run('owned-device-after-gui',['xcrun','simctl','list','devices','-j']))
+                  owned=[d for g in rows['devices'].values() for d in g if d['udid']==sim]
+                  assert len(owned)==1 and owned[0]['name']==name and owned[0]['state']=='Booted','Boot failed without a GUI-started owned device'
+                  report['bootAlreadyStartedByGUI']=True;save()
+              run('bootstatus',['xcrun','simctl','bootstatus',sim,'-b'],timeout=240)
+              run('appearance',['xcrun','simctl','ui',sim,'appearance','dark'],timeout=30)
+              run('language',['xcrun','simctl','spawn',sim,'defaults','write','.GlobalPreferences','AppleLanguages','-array','es'],timeout=30)
+              run('enroll',['bash','scripts/glass-audit/enroll-simulator.sh',sim],timeout=90)
+              run('prepare-auth-ui',['bash','scripts/glass-audit/prepare-auth-ui.sh',sim],timeout=45)
+              report['startupCompleted']=True;save()
+          finally:
+              if sim:
+                  run('final-device-state',['xcrun','simctl','list','devices','-j'],required=False)
+                  run('shutdown',['xcrun','simctl','shutdown',sim],timeout=30,required=False)
+                  run('delete',['xcrun','simctl','delete',sim],timeout=30,required=False)
+              save()
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_COLD_SIMULATOR_${{ matrix.startup }}
+          path: ${{ runner.temp }}/b15-cold-boot
+          retention-days: 14
