@@ -73,3 +73,10 @@ Antecedentes:98c0dab/fallback41465269363 FAILURE,27nativasPASS/UI10PASS3FAIL; su
 ## Distribución
 
 **No IPA** porque hay fallos obligatorios sin resolver/validar. El BundleID coincide pero no basta para garantizar contenedor físico: también depende de la firma/equipo usados por iLoader. No se instala ni se reemplaza Build14 en el teléfono. Cuando haya candidato aprobado: respaldo cifrado reciente verificado y contraseña fuera del teléfono; misma cuenta/equipo/firma/BundleID; actualizar sobre instalación existente sin desinstalar/borrar/reimportar historia. Si aparece otra app o datos vacíos, detenerse. Revisar personas/visitas/alergias/borradores/stock compartidoFundoPlanta después de actualizar. No hay garantía de downgrade.
+
+
+## Coste inicial del índice y commits de continuación
+
+La creación del índice se mide aparte de las consultas: v2 71,410→87,724ms en esta pasada; v1 inicial no tenía esta métrica (null, no cero), candidato92,667ms. El coste se amortiza en la sesión y no se presenta como apertura fría gratuita ni como mejora v2. La memoria máxima agregada subió948KiB.
+
+Desde el HEAD real90cb0ab se publicaron14commits de fuente, conservados en orden:4079122,69e75ad,911e49e,9143997,c274140,bdc27f1,df10938,e909ca6,6f74d66,67c4ec8,98c0dab,eeea540,7524c1b,799dc5f. Los dos últimos son posteriores a esta medición y requieren su propia validación; los commits de infraestructura intermedios no implican que sus estrategias abandonadas sigan vigentes. El estado final del código y la explicación de AUDIT.md tienen precedencia sobre mensajes históricos.
