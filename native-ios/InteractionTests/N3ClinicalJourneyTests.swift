@@ -22,16 +22,18 @@ final class N3ClinicalJourneyTests:XCTestCase {
     }
     private func tap(_ element:XCUIElement,in app:XCUIApplication,field:Bool=false) {
         XCTAssertTrue(element.exists || element.waitForExistence(timeout:10),app.debugDescription)
-        // Visible buttons need no repeated frame, footer, type and navigation
-        // snapshots. XCTest chooses their real hit point. Text fields retain
-        // the safe geometry check which prevents typing into a prior responder.
-        if !field && element.isHittable {element.tap();return}
+        // XCTest can report a scroll item as hittable below the fixed footer.
+        // The failed Tipo de atención tap targeted y=838 behind that footer;
+        // its menu never opened. Require visible content geometry as well.
+        let fixed=element.identifier.hasPrefix("premium-tab-") ||
+            element.identifier=="attention-step-actions" ||
+            element.identifier=="premium-close-attention" || element.label=="Inicio"
         let safeTop:CGFloat=field ? 170:130
         let bounds=app.frame
         for _ in 0..<8 {
             let frame=element.frame
             let hittable=element.isHittable
-            if hittable && (!field || (frame.minY>safeTop && frame.maxY<bounds.maxY-110)) {break}
+            if hittable && (fixed || (frame.minY>safeTop && frame.maxY<bounds.maxY-110)) {break}
             let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
             if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
             else {scrollShort(in:app,up:frame.minY>=safeTop)}

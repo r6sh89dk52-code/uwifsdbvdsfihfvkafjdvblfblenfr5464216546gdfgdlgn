@@ -34,11 +34,13 @@ for template,seconds in [('Time Profiler',60),('Allocations',45)]:
     try:
         # XCUIApplication.launch can replace the process between test methods.
         # Never reuse the previous capture's PID for the next template.
+        entry['phase']='observing-owned-process';save()
         pid=observe_app()
         if not pid:
             entry['limitation']='No application process was observed before the bounded wait expired.';save();continue
         entry['observedPID']=int(pid)
         entry['attachTarget']=int(pid);entry['deviceUDID']=sim;entry['noPrompt']=True
+        entry['phase']='recording'
         save()
         with (out/(name+'.log')).open('w') as log:
             p=subprocess.run(['xcrun','xctrace','record','--template',template,
@@ -47,6 +49,7 @@ for template,seconds in [('Time Profiler',60),('Allocations',45)]:
         entry['exit']=p.returncode
         entry['captured']=p.returncode==0 and trace.exists()
         if entry['captured']:
+            entry['phase']='exporting'
             toc=out/(name+'-toc.xml')
             e=subprocess.run(['xcrun','xctrace','export','--input',str(trace),'--toc','--output',str(toc)],
                 capture_output=True,text=True,timeout=30)
@@ -67,7 +70,7 @@ for template,seconds in [('Time Profiler',60),('Allocations',45)]:
                     (out/(name+'-'+safe+'-export.log')).write_text(exported.stdout+exported.stderr)
         else:entry['limitation']='Recording did not succeed; inspect the actual tool log. No metric is inferred.'
     except subprocess.TimeoutExpired:
-        entry['limitation']='Instruments recording exceeded its bounded collection interval.'
+        entry['limitation']='Timeout during '+entry.get('phase','capture')+'; no metric inferred.'
         with (out/(name+'.log')).open('a') as diagnostic:
             diagnostic.write('\nRecording exceeded its bounded startup/collection interval; no metric inferred.\n')
     except (ET.ParseError,OSError) as error:
