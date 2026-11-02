@@ -16,13 +16,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import io,json,os,pathlib,time,urllib.request,zipfile
+          import io,json,os,pathlib,time,urllib.parse,urllib.request,zipfile
           repo='r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn'
           source='799dc5f9a2812ed01f82ed28c78eb90d0750e09f'
           runid=41490125275
           base='https://api.github.com/repos/'+repo+'/'
+          class ArtifactRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl):
+                  assert urllib.parse.urlsplit(newurl).scheme=='https'
+                  redirected=super().redirect_request(req,fp,code,msg,headers,newurl)
+                  if redirected is not None and urllib.parse.urlsplit(req.full_url).netloc!=urllib.parse.urlsplit(newurl).netloc:
+                      redirected.remove_header('Authorization')
+                  return redirected
+          opener=urllib.request.build_opener(ArtifactRedirect())
           def request(path):
-              return urllib.request.urlopen(urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30)
+              return opener.open(urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30)
           def get(path):return json.load(request(path))
           required={'B15_PERFORMANCE_COMPARISON','B15_V2_PERFORMANCE_COMPARISON','B15_SWIFT_RESULTS','B15_JAVASCRIPT'}
           for _ in range(26):
