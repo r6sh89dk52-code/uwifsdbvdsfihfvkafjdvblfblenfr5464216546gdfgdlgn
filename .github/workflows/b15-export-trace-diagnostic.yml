@@ -1,0 +1,53 @@
+name: B15 - inspect exported CPU samples from recorded synthetic trace
+on:
+  push:
+    branches: [audit/b15-profile-device-9143997-20261101]
+    paths: [.github/workflows/b15-export-trace-diagnostic.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export:
+    runs-on: macos-15-intel
+    timeout-minutes: 12
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_DEVICE_SCOPED_INSTRUMENTS_DIAGNOSTIC
+          run-id: 41364605278
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b15-existing-trace
+      - name: Inspect actual time-sample rows; do not infer zero CPU from empty tables
+        env:
+          TRACE_ROOT: ${{ runner.temp }}/b15-existing-trace
+          EXPORT_ROOT: ${{ runner.temp }}/b15-sample-export
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess,xml.etree.ElementTree as ET
+          from pathlib import Path
+          root=Path(os.environ['TRACE_ROOT']);out=Path(os.environ['EXPORT_ROOT']);out.mkdir()
+          expected='9143997ddab5fe31b50fc540fb2e3dc50a451434'
+          assert (root/'SOURCE_SHA.txt').read_text().strip()==expected
+          traces=list(root.rglob('Time-Profiler.trace'));assert len(traces)==1
+          report={'appSourceSHA':expected,'workflowSHA':os.environ['GITHUB_SHA'],'scope':'Existing synthetic idle Home trace; not clinical action latency, physical iPhone or current-head UI certification','tables':[]}
+          for schema in ['time-sample','time-profile','runloop-events','potential-hangs']:
+              target=out/(schema+'.xml')
+              result=subprocess.run(['xcrun','xctrace','export','--input',str(traces[0]),'--xpath','/trace-toc/run/data/table[@schema="'+schema+'"]','--output',str(target)],capture_output=True,text=True,timeout=70)
+              (out/(schema+'.log')).write_text(result.stdout+result.stderr)
+              row={'schema':schema,'exit':result.returncode}
+              if result.returncode==0:
+                  tree=ET.parse(target);rows=list(tree.iter('row'));row['rows']=len(rows)
+                  row['columns']=[e.text for e in tree.iter('mnemonic')]
+                  if rows:print('FIRST_ROW',schema,ET.tostring(rows[0],encoding='unicode')[:2500])
+              report['tables'].append(row)
+          print('ACTUAL_EXPORTED_SAMPLES',json.dumps(report,indent=2))
+          (out/'sample-evidence.json').write_text(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_EXPORTED_SAMPLE_DIAGNOSTIC
+          path: ${{ runner.temp }}/b15-sample-export
+          retention-days: 14
