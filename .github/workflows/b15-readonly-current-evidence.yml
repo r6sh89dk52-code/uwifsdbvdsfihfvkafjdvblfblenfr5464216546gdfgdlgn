@@ -1,0 +1,77 @@
+name: B15 - read-only current source performance evidence (NOT release approval)
+on:
+  push:
+    branches: [audit/b15-validation-799dc5f-20261102]
+    paths: [.github/workflows/b15-readonly-current-evidence.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  report-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Read only exact 799dc5f artifacts; never build or package an IPA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import io,json,os,pathlib,time,urllib.request,zipfile
+          repo='r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn'
+          source='799dc5f9a2812ed01f82ed28c78eb90d0750e09f'
+          runid=41490125275
+          base='https://api.github.com/repos/'+repo+'/'
+          def request(path):
+              return urllib.request.urlopen(urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30)
+          def get(path):return json.load(request(path))
+          required={'B15_PERFORMANCE_COMPARISON','B15_V2_PERFORMANCE_COMPARISON','B15_SWIFT_RESULTS','B15_JAVASCRIPT'}
+          for _ in range(26):
+              pr=get('pulls/10');assert pr['head']['sha']==source and pr['draft'] and not pr['merged']
+              run=get('actions/runs/'+str(runid));assert run['head_sha']==source
+              artifacts=get('actions/runs/'+str(runid)+'/artifacts?per_page=100')['artifacts']
+              byname={a['name']:a for a in artifacts if not a['expired']}
+              if required <= byname.keys():break
+              if run['status']=='completed':raise RuntimeError('Source run finished without every required artifact; report not complete')
+              time.sleep(30)
+          else:raise RuntimeError('Exact-source artifacts not available within report deadline; not approved')
+          data={}
+          for name in sorted(required):
+              a=byname[name]
+              assert a['workflow_run']['head_sha']==source
+              z=zipfile.ZipFile(io.BytesIO(request('actions/artifacts/'+str(a['id'])+'/zip').read()))
+              assert len(z.namelist())==len(set(z.namelist()))
+              assert all(not pathlib.PurePosixPath(n).is_absolute() and '..' not in pathlib.PurePosixPath(n).parts for n in z.namelist())
+              data[name]={n:z.read(n) for n in z.namelist() if not n.endswith('/')}
+          v1=data['B15_PERFORMANCE_COMPARISON'];v2=data['B15_V2_PERFORMANCE_COMPARISON']
+          for x in [v1,v2,data['B15_JAVASCRIPT']]:assert x['SOURCE_SHA.txt'].decode().strip()==source
+          assert v2['BASELINE_SHA.txt'].decode().strip()=='c274140aa631a7e9c262381dbff3f6a1f9a62582'
+          swift=json.loads(data['B15_SWIFT_RESULTS']['swift-results.json'])
+          assert swift['sourceSHA']==source and swift['tests']==433 and swift['failures']==swift['skips']==0
+          js=json.loads(data['B15_JAVASCRIPT']['javascript-results.json'])
+          assert len(js)==62 and all(x['exit']==0 for x in js)
+          compat=json.loads(v1['compatibility.json'])
+          assert compat['sourceSHA']==source and compat['tests']==1 and compat['failures']==0
+          assert all(compat[k] for k in ['build14BackupRead','build14JournalRead','historicalRectificationPersisted','newBackupRoundTrip','stockUnchanged','workersAndOriginalVisitsUnchanged'])
+          comparisons={};samples={};physical={}
+          for label,files,count in [('v1',v1,13),('v2',v2,12)]:
+              comparisons[label]=json.loads(files['comparison.json'])
+              assert comparisons[label]['workers']==9648 and len(comparisons[label]['operations'])==count
+              samples[label]={n:json.loads(files[n+'.json']) for n in ['before','after']}
+              if label=='v2':
+                  for n,d in samples[label].items():
+                      assert d['workers']==9648 and d['initialVisits']==1005 and d['inventorySchemaVersion']==2
+                      assert d['physicalBalancePreserved'] and d['physicalQuantity']==78 and not d['indicatorExportMeasured']
+                      physical[n]={k:d[k] for k in ['workers','initialVisits','inventorySchemaVersion','physicalBalancePreserved','physicalQuantity','searchIndexBuild_ms','snapshotBytes']}
+          jobs=get('actions/runs/'+str(runid)+'/jobs?per_page=100')['jobs']
+          report={'status':'REPORT_ONLY_NOT_RELEASE_APPROVAL','sourceSHA':source,'workflowSHA':os.environ['GITHUB_SHA'],'sourceRun':runid,'sourceRunStatus':run['status'],'sourceRunConclusion':run['conclusion'],'jobs':[{'id':j['id'],'name':j['name'],'status':j['status'],'conclusion':j['conclusion']} for j in jobs],'swift':swift,'javascript':62,'compatibility':compat,'comparisons':comparisons,'physicalV2':physical,'artifacts':{n:byname[n]['id'] for n in sorted(required)},'physicalDeviceValidated':False,'IPA':False}
+          print('EVIDENCE_JSON '+json.dumps(report,separators=(',',':')))
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'report-only';out.mkdir()
+          (out/'READ_ONLY_EVIDENCE.json').write_text(json.dumps(report,indent=2))
+          (out/'RAW_SAMPLES.json').write_text(json.dumps(samples,indent=2))
+          assert get('pulls/10')['head']['sha']==source,'PR changed while reading; do not attribute to current HEAD'
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: B15_READ_ONLY_CURRENT_SOURCE_EVIDENCE_NOT_APPROVAL
+          path: ${{ runner.temp }}/report-only
+          retention-days: 14
