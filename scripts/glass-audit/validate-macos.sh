@@ -202,6 +202,12 @@ if test "$MODE" != ui; then
  fi
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
+ if test "$MODE" = b15-shard; then
+  case "$DANPER_B15_UI_LABEL" in
+   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
+    run_tests system-auth-preflight 1 -only-testing:DANPERNativeTests/N2ColdAuthenticationPreflightTests ;;
+  esac
+ fi
  if test "$MODE" = b15-profile; then
   run_tests seed-profile 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests
   xcrun simctl launch --terminate-running-process "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview --danper-redesign-demo > "$OUT/profile-owned-launch.log"

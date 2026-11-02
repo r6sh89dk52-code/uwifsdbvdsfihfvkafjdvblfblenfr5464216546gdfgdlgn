@@ -25,6 +25,8 @@ for label,count in suites.items():
     marker(folder,'SOURCE_SHA.txt');marker(folder,'SHARD_PASS_SHA.txt');marker(folder,'SHARD_VERIFIED_SHA.txt')
     assert (folder/'SHARD_LABEL.txt').read_text().strip()==label
     passing(folder/'biometric-preflight.xcresult.summary.json',1)
+    if label in ('N2BiometricInteractionTests','N3ClinicalJourneyTests-protected'):
+        passing(folder/'system-auth-preflight.xcresult.summary.json',1)
     passing(folder/(label+'.xcresult.summary.json'),count)
     if label in ('N2GlassClinicalTests','N2PremiumRedesignTests','N3ClinicalJourneyTests-demo','N2AllergySaveInteractionTests'):
         passing(folder/('seed-'+label+'.xcresult.summary.json'),2)

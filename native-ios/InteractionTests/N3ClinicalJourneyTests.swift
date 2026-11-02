@@ -20,37 +20,34 @@ final class N3ClinicalJourneyTests:XCTestCase {
     private func capture(_ app:XCUIApplication,_ name:String) {
         let image=XCTAttachment(screenshot:app.screenshot());image.name="KardexV2-"+name;image.lifetime = .keepAlways;add(image)
     }
-    private func tap(_ element:XCUIElement,in app:XCUIApplication,field:Bool=false) {
-        // Form actions are intentionally absent while the keyboard is visible.
-        // Dismiss the responder before looking up a navigation button; waiting
-        // for Siguiente first can never succeed after typing a diagnosis.
-        if !field && app.keyboards.firstMatch.exists {
-            let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
-            if hide.exists {
-                hide.tap()
-                let hidden=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.keyboards.firstMatch)
-                XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:5),.completed,
-                    "El teclado debe cerrarse antes de buscar los controles de navegación")
-            }
-        }
+    private func tap(_ element:XCUIElement,in app:XCUIApplication,field:Bool=false,content:Bool=false) {
         XCTAssertTrue(element.exists || element.waitForExistence(timeout:10),app.debugDescription)
-        // XCTest can report a scroll item as hittable below the fixed footer.
-        // The failed Tipo de atención tap targeted y=838 behind that footer;
-        // its menu never opened. Require visible content geometry as well.
-        let fixed=element.identifier.hasPrefix("premium-tab-") ||
-            element.identifier=="attention-step-actions" ||
-            element.identifier=="premium-close-attention" || element.label=="Inicio"
-        let safeTop:CGFloat=field ? 170:130
-        let bounds=app.frame
-        for _ in 0..<8 {
-            let frame=element.frame
-            let hittable=element.isHittable
-            if hittable && (fixed || (frame.minY>safeTop && frame.maxY<bounds.maxY-110)) {break}
-            let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
-            if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
-            else {scrollShort(in:app,up:frame.minY>=safeTop)}
+        // Only scroll actual form content. Native menu options and the fixed
+        // footer have their own hit regions; do not query the entire keyboard
+        // hierarchy or drag the form behind an already open native menu.
+        if field || content {
+            let safeTop:CGFloat=field ? 170:130
+            let bottom=app.frame.maxY-110
+            var visible=false
+            for _ in 0..<8 {
+                let frame=element.frame
+                if frame.minY>safeTop && frame.maxY<bottom && element.isHittable {
+                    visible=true;break
+                }
+                scrollShort(in:app,up:frame.minY>=safeTop)
+            }
+            XCTAssertTrue(visible,"El control debe estar dentro del contenido visible, fuera del pie fijo: "+app.debugDescription)
         }
         XCTAssertTrue(element.isHittable,app.debugDescription);element.tap()
+    }
+    private func dismissKeyboard(in app:XCUIApplication) {
+        let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
+        if hide.exists {
+            hide.tap()
+            let hidden=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.keyboards.firstMatch)
+            XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:5),.completed,
+                "El teclado debe cerrarse antes de buscar los controles de navegación")
+        }
     }
     /// Screen-wide inertial flicks can jump a short inline field past both
     /// viewport edges. Drag the empty outer gutter so date/menu controls never
@@ -64,14 +61,8 @@ final class N3ClinicalJourneyTests:XCTestCase {
         // Finish the previous responder before moving to a different field.
         // Otherwise a just-scrolled search near the navigation edge can leave
         // the quantity field focused while XCTest starts typing into search.
+        dismissKeyboard(in:app)
         let keyboard=app.keyboards.firstMatch
-        if keyboard.exists {
-            let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
-            XCTAssertTrue(hide.waitForExistence(timeout:5),app.debugDescription)
-            hide.tap()
-            let hidden=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:keyboard)
-            XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:5),.completed)
-        }
         tap(element,in:app,field:true)
         XCTAssertTrue(keyboard.waitForExistence(timeout:5),app.debugDescription)
         if let old=element.value as? String,old != element.placeholderValue,!old.isEmpty {
@@ -81,10 +72,11 @@ final class N3ClinicalJourneyTests:XCTestCase {
         if element.identifier=="inline-catalog-query" {
             XCTAssertEqual(element.value as? String,value,"La consulta debe escribirse en el buscador, nunca en la cantidad clínica")
         }
+        dismissKeyboard(in:app)
     }
     private func inventory(_ app:XCUIApplication) {
         tap(app.buttons["premium-tab-home"],in:app)
-        tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Kardex:")).firstMatch,in:app)
+        tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Kardex:")).firstMatch,in:app,content:true)
         XCTAssertTrue(app.textFields["simple-inventory-search"].waitForExistence(timeout:10),"Ejecuta primero la fixture DEMO v2 en este dispositivo: "+app.debugDescription)
     }
     private func stock(_ app:XCUIApplication,_ code:String)->String {
@@ -97,28 +89,28 @@ final class N3ClinicalJourneyTests:XCTestCase {
         tap(app.buttons["premium-tab-home"],in:app)
         let back=app.navigationBars.buttons["Inicio"]
         if back.exists {tap(back,in:app)}
-        tap(app.buttons["demo-home-new-attention"],in:app)
+        tap(app.buttons["demo-home-new-attention"],in:app,content:true)
         enter(app.textFields["attention-worker-dni"],"00000031",in:app)
         tap(app.buttons["Siguiente"],in:app)
-        tap(app.buttons["choice-Revisión de alergias"],in:app)
+        tap(app.buttons["choice-Revisión de alergias"],in:app,content:true)
         tap(app.buttons["Niega alergias conocidas"],in:app)
-        tap(app.buttons["Guardar revisión de alergias"],in:app)
-        tap(app.buttons["choice-Tipo de atención"],in:app);tap(app.buttons["Enfermedad"],in:app)
-        tap(app.buttons["choice-Sistema afectado"],in:app);tap(app.buttons["Respiratorio"],in:app)
+        tap(app.buttons["Guardar revisión de alergias"],in:app,content:true)
+        tap(app.buttons["choice-Tipo de atención"],in:app,content:true);tap(app.buttons["Enfermedad"],in:app)
+        tap(app.buttons["choice-Sistema afectado"],in:app,content:true);tap(app.buttons["Respiratorio"],in:app)
         enter(app.descendants(matching:.any)["clinical-diagnosis-input"],"DIAGNOSTICO FICTICIO KARDEX R"+r,in:app)
         tap(app.buttons["Siguiente"],in:app)
         if units {
             addProduct(app,query:"PARACETAMOL",code:"16000182")
-            tap(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label CONTAINS %@","medication-row-","PARACETAMOL")).firstMatch,in:app)
+            tap(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label CONTAINS %@","medication-row-","PARACETAMOL")).firstMatch,in:app,content:true)
             enter(app.textFields["clinical-quantity-16000182"],"2",in:app)
         }
         addProduct(app,query:"ALCOHOL MEDICO",code:"16000025")
-        tap(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label CONTAINS %@","medication-row-","ALCOHOL")).firstMatch,in:app)
-        tap(app.buttons["choice-Procedimiento"].firstMatch,in:app)
+        tap(app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@ AND label CONTAINS %@","medication-row-","ALCOHOL")).firstMatch,in:app,content:true)
+        tap(app.buttons["choice-Procedimiento"].firstMatch,in:app,content:true)
         tap(app.buttons["Curacion De Herida"],in:app)
         let choice=app.buttons["simple-r-16000025"].exists ? app.buttons["simple-r-16000025"]:app.buttons["choice-¿Abriste una presentación nueva?"]
-        tap(choice,in:app);tap(app.buttons[r=="1" ? "Sí — Kardex R=1":"No — Kardex R=0"],in:app)
-        tap(app.buttons["choice-¿Se envió la foto?"],in:app);tap(app.buttons["No se envió"],in:app)
+        tap(choice,in:app,content:true);tap(app.buttons[r=="1" ? "Sí — Kardex R=1":"No — Kardex R=0"],in:app)
+        tap(app.buttons["choice-¿Se envió la foto?"],in:app,content:true);tap(app.buttons["No se envió"],in:app)
         tap(app.buttons["Siguiente"],in:app);tap(app.buttons["Guardar atención"],in:app)
         XCTAssertTrue(app.staticTexts["Atención registrada"].firstMatch.waitForExistence(timeout:15),app.debugDescription)
         XCTAssertTrue(app.staticTexts["Kardex R: "+r].firstMatch.exists,app.debugDescription)
@@ -126,9 +118,9 @@ final class N3ClinicalJourneyTests:XCTestCase {
         tap(app.buttons["premium-close-attention"],in:app)
     }
     private func addProduct(_ app:XCUIApplication,query:String,code:String) {
-        if !app.textFields["inline-catalog-query"].exists {tap(app.buttons["add-clinical-product"],in:app)}
+        if !app.textFields["inline-catalog-query"].exists {tap(app.buttons["add-clinical-product"],in:app,content:true)}
         enter(app.textFields["inline-catalog-query"],query,in:app)
-        tap(app.buttons["suggestion-"+code],in:app)
+        tap(app.buttons["suggestion-"+code],in:app,content:true)
     }
     func testConsolidatedClinicalUnitsAndManualRThenRelaunch() {
         continueAfterFailure=false
@@ -188,7 +180,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
             tap(manual,in:app)
             enter(app.textFields["first-manual-worker-dni"],"00000031",in:app)
             enter(app.textFields["first-manual-worker-name"],"PERSONAL AUTORIZADO DE PRUEBA N3",in:app)
-            tap(app.buttons["choice-Sede verificada"],in:app);tap(app.buttons["Fundo La Venturosa"],in:app)
+            tap(app.buttons["choice-Sede verificada"],in:app,content:true);tap(app.buttons["Fundo La Venturosa"],in:app)
             tap(app.buttons["first-manual-worker-activate"],in:app)
             tap(app.buttons["Crear e ingresar primer trabajador"],in:app)
             Thread.sleep(forTimeInterval:2)

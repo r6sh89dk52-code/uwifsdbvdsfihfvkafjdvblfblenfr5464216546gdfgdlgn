@@ -48,5 +48,13 @@ class UIEvidenceTests(unittest.TestCase):
         label='N2AllergySaveInteractionTests';self.prepare(label,2)
         self.summary('seed-'+label,2)
         self.assertEqual(evidence.verify(self.folder,label,self.head),2)
+    def test_missing_real_policy_cancellation_preflight_is_rejected(self):
+        label='N2BiometricInteractionTests';self.prepare(label,1)
+        self.reject(label)
+    def test_real_policy_preflight_does_not_replace_failed_sensor_case(self):
+        label='N2BiometricInteractionTests';self.prepare(label,1)
+        self.summary('system-auth-preflight')
+        self.summary(label,passedTests=0,failedTests=1)
+        self.reject(label)
 
 if __name__=='__main__':unittest.main()
