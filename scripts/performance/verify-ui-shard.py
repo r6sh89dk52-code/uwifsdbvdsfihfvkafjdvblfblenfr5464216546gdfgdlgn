@@ -19,7 +19,7 @@ def counts():
             suites[kind[1]+'-protected']=1
             suites[kind[1]+'-demo']=len(methods)-1
         else:suites[kind[1]]=len(methods)
-    assert sum(suites.values())==13
+    assert sum(suites.values())==14
     return suites
 
 def passing(path,expected):
@@ -37,6 +37,7 @@ def verify(folder,label,head):
     assert (folder/'SHARD_LABEL.txt').read_text().strip()==label
     passing(folder/'biometric-preflight.xcresult.summary.json',1)
     if label in ('N2BiometricInteractionTests','N3ClinicalJourneyTests-protected'):
+        passing(folder/'permission-preflight.xcresult.summary.json',1)
         passing(folder/'system-auth-preflight.xcresult.summary.json',1)
     passing(folder/(label+'.xcresult.summary.json'),expected)
     if label in SEEDED:

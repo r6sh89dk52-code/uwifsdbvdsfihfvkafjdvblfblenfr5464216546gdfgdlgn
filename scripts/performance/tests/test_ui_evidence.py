@@ -49,12 +49,21 @@ class UIEvidenceTests(unittest.TestCase):
         self.summary('seed-'+label,2)
         self.assertEqual(evidence.verify(self.folder,label,self.head),2)
     def test_missing_real_policy_cancellation_preflight_is_rejected(self):
-        label='N2BiometricInteractionTests';self.prepare(label,1)
+        label='N2BiometricInteractionTests';self.prepare(label,2)
+        self.summary('permission-preflight')
         self.reject(label)
     def test_real_policy_preflight_does_not_replace_failed_sensor_case(self):
-        label='N2BiometricInteractionTests';self.prepare(label,1)
-        self.summary('system-auth-preflight')
-        self.summary(label,passedTests=0,failedTests=1)
+        label='N2BiometricInteractionTests';self.prepare(label,2)
+        self.summary('permission-preflight');self.summary('system-auth-preflight')
+        self.summary(label,2,passedTests=1,failedTests=1)
         self.reject(label)
+
+    def test_missing_faceid_permission_preparation_is_rejected(self):
+        label='N2BiometricInteractionTests';self.prepare(label,2)
+        self.summary('system-auth-preflight');self.reject(label)
+    def test_permission_and_real_policy_preflights_require_complete_biometric_suite(self):
+        label='N2BiometricInteractionTests';self.prepare(label,2)
+        self.summary('permission-preflight');self.summary('system-auth-preflight')
+        self.assertEqual(evidence.verify(self.folder,label,self.head),2)
 
 if __name__=='__main__':unittest.main()

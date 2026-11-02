@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """No previous SHA is accepted as certification for this candidate."""
-import json,re,subprocess,sys
+import json,re,subprocess,sys,runpy
 from pathlib import Path
 
 root=Path(sys.argv[1]);head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
@@ -12,6 +12,7 @@ def marker(folder,name):assert (folder/name).read_text().strip()==head,(folder,n
 native=root/'B15_NATIVE_RESULTS';marker(native,'SOURCE_SHA.txt');marker(native,'CORE_NATIVE_SHA.txt')
 n=sum(len(re.findall(r'func (test\w+)\(',p.read_text())) for p in Path('native-ios/NativeTests').glob('*.swift'))
 passing(native/('native-'+str(n)+'.xcresult.summary.json'),n)
+passing(native/'permission-preflight.xcresult.summary.json',1)
 suites={}
 for p in Path('native-ios/InteractionTests').glob('*.swift'):
     s=p.read_text();c=re.search(r'final class (\w+):XCTestCase',s)
@@ -19,13 +20,14 @@ for p in Path('native-ios/InteractionTests').glob('*.swift'):
     methods=re.findall(r'func (test\w+)\(',s)
     if c[1]=='N3ClinicalJourneyTests':suites.update({c[1]+'-demo':len(methods)-1,c[1]+'-protected':1})
     else:suites[c[1]]=len(methods)
-assert sum(suites.values())==13
+assert sum(suites.values())==14
 for label,count in suites.items():
     folder=root/('B15_UI_RESULT_'+label)
     marker(folder,'SOURCE_SHA.txt');marker(folder,'SHARD_PASS_SHA.txt');marker(folder,'SHARD_VERIFIED_SHA.txt')
     assert (folder/'SHARD_LABEL.txt').read_text().strip()==label
     passing(folder/'biometric-preflight.xcresult.summary.json',1)
     if label in ('N2BiometricInteractionTests','N3ClinicalJourneyTests-protected'):
+        passing(folder/'permission-preflight.xcresult.summary.json',1)
         passing(folder/'system-auth-preflight.xcresult.summary.json',1)
     passing(folder/(label+'.xcresult.summary.json'),count)
     if label in ('N2GlassClinicalTests','N2PremiumRedesignTests','N3ClinicalJourneyTests-demo','N2AllergySaveInteractionTests'):
@@ -54,6 +56,9 @@ for name in ['before','after']:
 v2perf=json.loads((v2/'comparison.json').read_text())
 assert len(v2perf['operations'])==12 and set(v2perf['resources'])=={'before','after'}
 report['physicalV2Performance']=v2perf
+budget=runpy.run_path('scripts/performance/core-budgets.py')['validate'](v2perf)
+assert json.loads((v2/'core-budgets.json').read_text())==budget
+report['corePerformanceBudgets']=budget
 profiles=list(root.rglob('profiling-status.json'))
 report['instruments']=[json.loads(p.read_text()) for p in profiles]
 (root/'FINAL_GATES.json').write_text(json.dumps(report,indent=2))

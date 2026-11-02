@@ -211,6 +211,20 @@ if test "$MODE" != ui; then
  fi
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
+ # A new Simulator has not answered the system's Face ID feature-consent
+ # alert. Accept only that real DANPER permission through XCTest UI before
+ # asking the native host to prove cancellation. Consent is not identity.
+ permission_needed=no
+ if test "$MODE" != replay && test "$MODE" != b15-shard && test "$MODE" != b15-profile; then
+  permission_needed=yes
+ elif test "$MODE" = b15-shard; then
+  case "$DANPER_B15_UI_LABEL" in
+   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected) permission_needed=yes ;;
+  esac
+ fi
+ if test "$permission_needed" = yes; then
+  run_tests permission-preflight 1 -only-testing:DANPERInteractionTests/N2BiometricInteractionTests/testFaceIDPermissionDoesNotAuthenticateOrExposeClinicalData
+ fi
  if test "$MODE" = b15-shard; then
   case "$DANPER_B15_UI_LABEL" in
    N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
@@ -288,4 +302,4 @@ if test "$MODE" = replay; then
 fi
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
-echo 'PASS: current checkout, 26 native and all 11 UI cases; no failures/skips. Core/Excel results are validated separately.'
+echo 'PASS: all required native and UI cases for the current checkout; no failures/skips. Core/Excel results are validated separately.'
