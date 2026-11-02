@@ -1,0 +1,108 @@
+name: B15 - large v2 physical inventory workload with confirmed encrypted saves
+on:
+  push:
+    branches: [audit/b15-incremental-c274140-20261102]
+    paths: [.github/workflows/b15-v2-load-diagnostic.yml]
+permissions:
+  contents: read
+jobs:
+  v2-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c274140aa631a7e9c262381dbff3f6a1f9a62582
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: swift-actions/setup-swift@v2
+        with: {swift-version: '6.0.3'}
+      - name: Prepare only fabricated workers, visits and stock
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-v2-load
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/prepare.sh
+          printf 'DANPER_AUDIT_OUT=%s\nDANPER_N1_FIXTURE_DIR=%s/fixtures\n' "$DANPER_AUDIT_OUT" "$DANPER_AUDIT_OUT" >> "$GITHUB_ENV"
+          git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
+          swift --version > "$DANPER_AUDIT_OUT/swift-version.txt"
+      - name: Add v2 physical setup only to the temporary benchmark harness
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          path=Path('scripts/performance/N2PerformanceAuditTests.swift');text=path.read_text()
+          needle='        var results=[[String:Any]]()'
+          assert text.count(needle)==1
+          insert="""        let beforeActivation=try XCTUnwrap(journal().recover())
+                  let password="FICTICIO-V2-PERFORMANCE-2026"
+                  let archive=try N2InventoryBackupCodec.createVerified(snapshot:beforeActivation.snapshot,password:password,domain:.demo)
+                  let backup=try N2InventoryBackupCodec.verify(archive:archive,password:password)
+                  func physicalProduct(_ code:String,_ quantity:Double)throws->N2SimpleProduct {
+                      let item=try XCTUnwrap(context.products.clinical.first{$0.code==code})
+                      return N2SimpleProduct(code:item.code,name:item.name,unit:item.unit,
+                          mode:N2SimpleInventory.suggestedMode(unit:item.unit) ?? .units,
+                          quantity:quantity,expiry:"2027-02-10",expiryVerified:true)
+                  }
+                  revision=try store().activateSimpleInventory(backup:backup,
+                      request:N2SimpleActivation(id:"3E380B51-8D4D-4A18-AD00-A4E28A4D5266",at:1_793_370_000_000,
+                          operatorName:"OPERADOR FICTICIO V2",confirmed:true,backupAvailable:true,
+                          initialProducts:[physicalProduct("16000182",70),physicalProduct("16000025",12)]),
+                      catalog:context.products,expectedRevision:revision).revision
+                  for (kind,quantity,id,time) in [(N2SimpleInventoryCommand.Operation.receipt,10.0,"V2-PERF-RECEIPT",Int64(1_793_370_000_010)),
+                                                 (N2SimpleInventoryCommand.Operation.outflow,2.0,"V2-PERF-OUTFLOW",Int64(1_793_370_000_020))] {
+                      revision=try store().applySimpleInventoryCommand(
+                          N2SimpleInventoryCommand(id:id,operation:kind,code:"16000182",quantity:quantity,
+                              at:time,operatorName:"OPERADOR FICTICIO V2",reason:"MOVIMIENTO FICTICIO DE RENDIMIENTO"),
+                          catalog:context.products,expectedRevision:revision).revision
+                  }
+                  let initialV2=try XCTUnwrap(journal().recover())
+                  XCTAssertTrue(N2SimpleInventory.isActive(initialV2.snapshot))
+                  XCTAssertEqual(try N2VersionedSnapshotAudit.inspect(initialV2.snapshot).workers,9648)
+                  let physicalBefore=try N2SimpleInventory.read(initialV2.snapshot)
+                  XCTAssertEqual(physicalBefore.products.first{$0.code=="16000182"}?.quantity,78)
+                  root=try XCTUnwrap(JSONSerialization.jsonObject(with:initialV2.snapshot) as? [String:Any])
+                  let stateEncoder=JSONEncoder();stateEncoder.outputFormatting = .sortedKeys
+                  let physicalBeforeBytes=try stateEncoder.encode(physicalBefore)
+          """
+          text=text.replace(needle,insert+needle)
+          start=text.index('        try measure("indicator_10_sheets_export",3) {')
+          end=text.index('        try measure("encrypted_backup_verified",3)',start)
+          text=text[:start]+'        // This v2 load test does not certify unresolved historical indicator rows.\\n'+text[end:]
+          needle='        #if DANPER_PERF_OPTIMIZED\\n        let lifecycle='
+          assert text.count(needle)==1
+          text=text.replace(needle,'        XCTAssertEqual(try stateEncoder.encode(N2SimpleInventory.read(after.snapshot)),physicalBeforeBytes)\\n'+needle)
+          text=text.replace('"snapshotBytes":source.count','"snapshotBytes":initialV2.snapshot.count,"inventorySchemaVersion":2,"physicalBalancePreserved":true,"physicalQuantity":78')
+          text=text.replace('fictitious v1 snapshot','fictitious v2 physical inventory snapshot')
+          path.write_text(text)
+          out=Path(os.environ['DANPER_AUDIT_OUT'])
+          (out/'HARNESS.diff').write_bytes(subprocess.check_output(['git','diff','--','scripts/performance/N2PerformanceAuditTests.swift']))
+          (out/'ORCHESTRATION_PROOF.json').write_text(json.dumps({'appSourceSHA':'c274140aa631a7e9c262381dbff3f6a1f9a62582','workflowSHA':os.environ['GITHUB_SHA'],'appFilesModified':False,'workload':'9648 fictional workers,1005 visits,v2 physical counts70/12,receipt10,outflow2,expected78','indicatorExportNotMeasured':True,'comparisonBaseline':'No medido; additional current-source v2 workload'},indent=2))
+          PY
+      - name: Measure v2 encrypted saves and assert physical stock remains identical
+        run: |
+          set -euo pipefail
+          bash scripts/performance/run-core.sh "$GITHUB_WORKSPACE" "$DANPER_AUDIT_OUT/v2.json" optimized > "$DANPER_AUDIT_OUT/v2.log" 2>&1
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ['DANPER_AUDIT_OUT'])
+          result=json.loads((root/'v2.json').read_text())
+          assert result['workers']==9648 and result['initialVisits']==1005 and result['inventorySchemaVersion']==2
+          assert result['physicalBalancePreserved'] and result['physicalQuantity']==78 and len(result['actions'])==12
+          print('CURRENT_APP_SOURCE_SHA',(root/'SOURCE_SHA.txt').read_text().strip())
+          print('V2_MEASURED_RESULTS',json.dumps(result,indent=2))
+          print('V2_MEASURED_RESOURCES',(root/'v2.json.resources.json').read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_V2_9648_PHYSICAL_LOAD_DIAGNOSTIC
+          path: |
+            ${{ runner.temp }}/b15-v2-load/*.json
+            ${{ runner.temp }}/b15-v2-load/*.txt
+            ${{ runner.temp }}/b15-v2-load/*.log
+            ${{ runner.temp }}/b15-v2-load/*.diff
+          retention-days: 14
