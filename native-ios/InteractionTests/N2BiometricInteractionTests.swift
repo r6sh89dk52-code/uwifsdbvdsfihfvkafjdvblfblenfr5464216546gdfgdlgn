@@ -38,13 +38,20 @@ final class N2BiometricInteractionTests:XCTestCase {
             "label CONTAINS[c] %@ AND label CONTAINS[c] %@ AND label CONTAINS[c] %@",
             "DANPER","Face","ID")).firstMatch
         var acceptedPermission=false
+        var permissionDismissalSeconds:TimeInterval?
         if ownFaceID.waitForExistence(timeout:15) {
             let allow=alert.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
             XCTAssertTrue(allow.waitForExistence(timeout:5))
             XCTAssertTrue(allow.isHittable)
+            let permissionStarted=Date()
             allow.tap();acceptedPermission=true
             let dismissed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:ownFaceID)
-            XCTAssertEqual(XCTWaiter.wait(for:[dismissed],timeout:5),.completed)
+            // Run 41521115084's recording shows the genuine TCC alert still
+            // present 15 seconds after the tap and gone by 23 seconds. This
+            // bounds only system consent acknowledgement, never identity or
+            // the independent native cancellation case's 12s/18s deadlines.
+            XCTAssertEqual(XCTWaiter.wait(for:[dismissed],timeout:30),.completed)
+            permissionDismissalSeconds=Date().timeIntervalSince(permissionStarted)
         }
         let checking=app.staticTexts["Verificando identidad…"]
         let retry=app.buttons["Reintentar Face ID"]
@@ -61,7 +68,8 @@ final class N2BiometricInteractionTests:XCTestCase {
         noAccess.isInverted=true
         XCTAssertEqual(XCTWaiter.wait(for:[noAccess],timeout:2),.completed,
             "Accepting Face ID permission must not authenticate or expose clinical controls")
-        let proof=XCTAttachment(string:"permissionPromptAccepted=\(acceptedPermission); biometricEventsSent=0; clinicalAccessGranted=false; SimulatorOnly=true")
+        let dismissalTiming=permissionDismissalSeconds.map{String($0)} ?? "not required"
+        let proof=XCTAttachment(string:"permissionPromptAccepted=\(acceptedPermission); permissionDismissalObservedSeconds=\(dismissalTiming); biometricEventsSent=0; clinicalAccessGranted=false; SimulatorOnly=true")
         proof.name="FaceID-permission-is-not-authentication";proof.lifetime = .keepAlways;add(proof)
         // No match/nomatch event is sent. Termination releases this setup
         // context; the independent native case must still prove appCancel.
