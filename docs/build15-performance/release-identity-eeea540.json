@@ -1,0 +1,16 @@
+{
+  "sourceSHA": "eeea540c94b6023684f56598c709cd8498d9bff8",
+  "workflowSHA": "4999181a8aaae5785e9f649e7eeb188c8c197db9",
+  "bundleID": "pe.danper.saludmovil.native.iloaderpreview",
+  "sameBundleAsBuild14": true,
+  "version": "0.4.2",
+  "build": "15",
+  "minimumOS": "17.0",
+  "architecture": "arm64",
+  "signed": false,
+  "clinicalDatasetsBundled": false,
+  "testClockAbsent": true,
+  "physicalContainerValidated": false,
+  "IPA": false,
+  "packagingStillRequiresAllMandatoryGates": true
+}
