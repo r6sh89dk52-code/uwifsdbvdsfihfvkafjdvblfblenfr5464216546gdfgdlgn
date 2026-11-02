@@ -46,7 +46,9 @@ struct N2ClinicalWorkspaceGateView:View {
             }
         }
         .background(DanperBackdrop())
-        .task {if !checked {await refresh()}}
+        .task(id:sourceInspectionAllowed) {
+            if sourceInspectionAllowed && (!checked || invalidSource) {await refresh()}
+        }
         .onChange(of:sessionUnlocked) {_,unlocked in
             if unlocked && summary != nil {Task {await verifyRevision()}}
         }
@@ -56,6 +58,9 @@ struct N2ClinicalWorkspaceGateView:View {
                 if !authenticatedLaunch {authorized=false}
             }
         }
+    }
+    private var sourceInspectionAllowed:Bool {
+        scenePhase == .active && (!authenticatedLaunch || sessionUnlocked)
     }
     private var initialSetup:some View {
         ScrollView {
@@ -100,7 +105,8 @@ struct N2ClinicalWorkspaceGateView:View {
         .danperFormChrome()
     }
     @MainActor private func refresh() async {
-        guard !busy else{return}
+        guard !busy,sourceInspectionAllowed else{return}
+        let span=N2PerformanceSpan("Clinical gate refresh");defer{span.end()}
         busy=true
         defer {busy=false;checked=true}
         do {

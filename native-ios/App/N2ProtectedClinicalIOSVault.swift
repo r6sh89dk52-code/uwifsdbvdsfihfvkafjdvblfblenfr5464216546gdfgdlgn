@@ -9,6 +9,10 @@ import DanperCore
 actor N2ProtectedClinicalIOSVault {
     static let shared=N2ProtectedClinicalIOSVault()
     private var sessionStore:(secret:Data,store:N2ProtectedClinicalVaultCore)?
+    #if DEBUG
+    private var diagnosticKeychainReads=0
+    func diagnosticKeychainReadCount()->Int {diagnosticKeychainReads}
+    #endif
     private init() {
         // Singleton lifetime observers, no patient fields in notifications.
         for name in [UIApplication.didEnterBackgroundNotification,
@@ -49,12 +53,13 @@ actor N2ProtectedClinicalIOSVault {
             return true // Fail closed.
         }
         let dir=base.appendingPathComponent("DANPER-N2-CLINICAL-VAULT")
-        guard FileManager.default.fileExists(atPath:dir.path) else{return false}
-        guard let items=try? FileManager.default.contentsOfDirectory(
-            atPath:dir.path) else{return true}
-        return !items.isEmpty
+        return N2ClinicalSourceEvidence.hasFiles(at:dir)
     }
     private func readKey()throws->Data? {
+        let span=N2PerformanceSpan("Clinical Keychain lookup");defer{span.end()}
+        #if DEBUG
+        diagnosticKeychainReads+=1
+        #endif
         var q=query()
         q[kSecReturnData as String]=kCFBooleanTrue
         q[kSecMatchLimit as String]=kSecMatchLimitOne
@@ -85,6 +90,11 @@ actor N2ProtectedClinicalIOSVault {
     /// Counts only. Requires no key creation, no decryption unless encrypted
     /// vault is already present, and no access to the old application.
     func inspect()throws->N2ProtectedStoreSummary? {
+        let span=N2PerformanceSpan("Clinical source inspection");defer{span.end()}
+        // No encrypted source exists only when filesystem evidence confirms
+        // absence. Unknown/inaccessible storage still requires the actual key,
+        // authenticated recovery and all existing checks below.
+        guard hasClinicalFiles() else {sessionStore=nil;return nil}
         do {
             guard let secret=try deviceKey(create:false) else {sessionStore=nil;return nil}
             return try sessionStore(for:secret).inspect()

@@ -33,7 +33,7 @@ for label,count in suites.items():
     if label in ('N2GlassClinicalTests','N2PremiumRedesignTests','N3ClinicalJourneyTests-demo','N2AllergySaveInteractionTests'):
         passing(folder/('seed-'+label+'.xcresult.summary.json'),2)
 swift=json.loads((root/'swift'/'swift-results.json').read_text())
-assert swift['sourceSHA']==head and swift['tests']>=433 and swift['failures']==swift['skips']==0
+assert swift['sourceSHA']==head and swift['tests']>=437 and swift['failures']==swift['skips']==0
 marker(root/'javascript','SOURCE_SHA.txt');js=json.loads((root/'javascript'/'javascript-results.json').read_text())
 assert len(js)==62 and all(x['exit']==0 for x in js)
 marker(root/'performance','SOURCE_SHA.txt');perf=json.loads((root/'performance'/'comparison.json').read_text())
