@@ -21,6 +21,18 @@ final class N3ClinicalJourneyTests:XCTestCase {
         let image=XCTAttachment(screenshot:app.screenshot());image.name="KardexV2-"+name;image.lifetime = .keepAlways;add(image)
     }
     private func tap(_ element:XCUIElement,in app:XCUIApplication,field:Bool=false) {
+        // Form actions are intentionally absent while the keyboard is visible.
+        // Dismiss the responder before looking up a navigation button; waiting
+        // for Siguiente first can never succeed after typing a diagnosis.
+        if !field && app.keyboards.firstMatch.exists {
+            let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
+            if hide.exists {
+                hide.tap()
+                let hidden=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.keyboards.firstMatch)
+                XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:5),.completed,
+                    "El teclado debe cerrarse antes de buscar los controles de navegación")
+            }
+        }
         XCTAssertTrue(element.exists || element.waitForExistence(timeout:10),app.debugDescription)
         // XCTest can report a scroll item as hittable below the fixed footer.
         // The failed Tipo de atención tap targeted y=838 behind that footer;

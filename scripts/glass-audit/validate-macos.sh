@@ -138,15 +138,14 @@ assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswit
    xcrun simctl install "$SIM_ID" "$app" > "$attempt" 2>&1 || status=$?
    cat "$attempt" >> "$OUT/simulator-installation.log"
    if test "$status" != 0; then
-    # Recover one known, pre-test InstallCoordination failure. Never retry an
+    # Recover one recorded, pre-test installer failure. Never retry an
     # XCTest assertion, erase data, alter entitlements, or inject authentication.
     if test "$INSTALL_RECOVERY_SIM" = "$SIM_ID" ||
-       ! grep -q 'domain=IXErrorDomain, code=2' "$attempt" ||
-       ! grep -q 'Failed to create promise' "$attempt"; then
+       ! python3 scripts/performance/installer_failure.py "$attempt"; then
      cat "$attempt"; return "$status"
     fi
     INSTALL_RECOVERY_SIM="$SIM_ID"
-    echo "RECOVERY: reboot owned synthetic Simulator after recorded IXErrorDomain code=2" | tee -a "$OUT/simulator-installation.log"
+    echo "RECOVERY: reboot owned synthetic Simulator once after recorded installer helper failure; original log retained" | tee -a "$OUT/simulator-installation.log"
     python3 - "$SIM_ID" "$OUT/installer-system-$SIM_ID.log" <<'PYINSTALL'
 import subprocess,sys
 try:
