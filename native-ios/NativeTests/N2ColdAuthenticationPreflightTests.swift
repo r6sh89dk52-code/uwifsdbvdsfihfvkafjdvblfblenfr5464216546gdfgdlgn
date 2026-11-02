@@ -33,6 +33,7 @@ final class N2ColdAuthenticationPreflightTests:XCTestCase {
                 print("SYNTHETIC_POLICY_AVAILABILITY",attempt)
                 var availabilityError:NSError?
                 guard context.canEvaluatePolicy(.deviceOwnerAuthentication,error:&availabilityError) else {
+                    XCTFail("Simulator device-owner policy unavailable: "+String(describing:availabilityError))
                     result.record(false,availabilityError);finished.fulfill();return
                 }
                 print("SYNTHETIC_POLICY_EVALUATE",attempt)
