@@ -15,14 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: eeea540c94b6023684f56598c709cd8498d9bff8
+          ref: 7524c1b48ae27ac3f1a8a4ea857484fa61713ef3
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - name: Prepare approved distribution resources and unchanged application identity
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = eeea540c94b6023684f56598c709cd8498d9bff8
+          test "$(git rev-parse HEAD)" = 7524c1b48ae27ac3f1a8a4ea857484fa61713ef3
           npm ci --ignore-scripts --no-fund
           node scripts/glass-audit/identity.cjs
           if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
@@ -49,7 +49,7 @@ jobs:
           from pathlib import Path
           app=Path(os.environ['APP_PATH']);out=Path(os.environ['PROOF_ROOT'])
           source=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-          assert source=='eeea540c94b6023684f56598c709cd8498d9bff8'
+          assert source=='7524c1b48ae27ac3f1a8a4ea857484fa61713ef3'
           p=plistlib.loads((app/'Info.plist').read_bytes())
           assert p['CFBundleIdentifier']=='pe.danper.saludmovil.native.iloaderpreview'
           assert p['CFBundleShortVersionString']=='0.4.2' and p['CFBundleVersion']=='15'
