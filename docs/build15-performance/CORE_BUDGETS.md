@@ -1,6 +1,6 @@
 # Controles reproducibles de rendimiento Core y permiso FaceID
 
-Esta preparación de rama auxiliar no aprueba la aplicación ni genera IPA. La aprobación requiere Swift/Xcode/nativas/UI/Excel/compatibilidad y métricas del HEAD definitivo. Código de App/Sources, formato, clave, inventario y BundleID permanecen intactos.
+Estos controles no aprueban la aplicación por sí solos ni generan IPA. La aprobación requiere Swift/Xcode/nativas/UI/Excel/compatibilidad y métricas del HEAD definitivo. Código de App/Sources, formato, clave, inventario y BundleID permanecen intactos.
 
 Los nueve límites se fijan después de comparar varios runs v2 c274140→candidato:9648trabajadores/1005atenciones ficticias, mismo job y ciclo de sesión, estado físico completo conservado y saldo78. Son objetivos de regresión del benchmark Core Linux; no de latencia SwiftUI/iPhone.
 
@@ -22,4 +22,4 @@ El diagnóstico41509657892 confirmó mediante screenshot y AUTHREQ_PROMPTING que
 
 La preparación añade un caso UI (total14) y mantiene28nativas. Dos regresiones del verificador rechazan evidencia sin preparación de permiso o sin cancelación real; pasar ambas no sustituye un caso biométrico fallido. Python total33 (24anteriores+7presupuestos+2evidencia). Los resultados locales no sustituyen la ejecución completa del SHA publicado.
 
-Trazabilidad: presupuesto/testsbcbf7a0, UIpermiso267bfe4, checkoutdiagnóstico7841f58. El trial41516039780 aún debe comprobar la secuencia real. No se modificó main ni la Build14 instalada, no se accedió al teléfono y no existe IPA aprobada.
+Trazabilidad: presupuesto/testsbcbf7a0, UIpermiso267bfe4, checkoutdiagnóstico7841f58. El trial41516039780 aprobó permisoUI1/1 y cancelación nativa1/1, sin fallos/omisiones; appCancel-9 real en12,433s. Es validación acotada, no aprobación de28nativas/14UI del HEAD nuevo. No se modificó main ni la Build14 instalada, no se accedió al teléfono y no existe IPA aprobada.
