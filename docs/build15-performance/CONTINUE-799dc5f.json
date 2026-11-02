@@ -1,0 +1,75 @@
+{
+  "status": "INCOMPLETE_NOT_RELEASE_APPROVED",
+  "checkedAt": "2026-11-02T17:36:55.812Z",
+  "repository": "r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn",
+  "applicationBranch": "fix/indicator-historical-visit-site-build15-20261030",
+  "sourceSHA": "799dc5f9a2812ed01f82ed28c78eb90d0750e09f",
+  "continuationInitialSHA": "eeea540c94b6023684f56598c709cd8498d9bff8",
+  "stableBuild14": "9b1da6d4cdead4729bcade6843abcbcfc287e870",
+  "pr": 10,
+  "draft": true,
+  "merged": false,
+  "sourceCommitsPublishedThisContinuation": [
+    "7524c1b48ae27ac3f1a8a4ea857484fa61713ef3",
+    "799dc5f9a2812ed01f82ed28c78eb90d0750e09f"
+  ],
+  "currentGateRun": 41490125275,
+  "currentReleaseRun": 41490193045,
+  "readOnlyEvidenceRun": 41492441801,
+  "confirmedCurrent": {
+    "swift": {
+      "passed": 433,
+      "failed": 0,
+      "skipped": 0
+    },
+    "javascript": {
+      "passed": 62
+    },
+    "python": {
+      "passed": 24
+    },
+    "officialIndicatorExcel": "PASS",
+    "officialNursing98Excel": "PASS"
+  },
+  "pending": [
+    "native28 runtime including asynchronous cancellation case",
+    "UI13 current source",
+    "current source v1/v2 performance and Build14 compatibility",
+    "current source Instruments",
+    "current Release ARM64 identity"
+  ],
+  "releaseFirstAttempt": {
+    "conclusion": "failure",
+    "job": 125430886262,
+    "jobConclusion": "cancelled",
+    "stepsExecuted": 0,
+    "log": "not available; BlobNotFound",
+    "retryRequested": true,
+    "exactReason": "not confirmed"
+  },
+  "priorGate": {
+    "source": "eeea540c94b6023684f56598c709cd8498d9bff8",
+    "run": 41482409677,
+    "conclusion": "failure",
+    "native": {
+      "passed": 12,
+      "caseFailures": 1,
+      "additionalRunnerErrors": 1,
+      "incomplete": 15
+    },
+    "UI": "skipped",
+    "fix": "Asynchronous XCTest fulfillment and independent pre-scheduled cancellation; preserve explicit availability failure"
+  },
+  "priorEvidenceReport": "docs/build15-performance/REPORT-eeea540.md on audit/b15-evidence-eeea540-20261102",
+  "currentCountsRequired": {
+    "swift": 433,
+    "native": 28,
+    "ui": 13,
+    "javascript": 62,
+    "python": 24
+  },
+  "IPA": false,
+  "physicalDeviceValidated": false,
+  "realIPhoneDataAccessed": false,
+  "distributionRule": "No IPA until every mandatory current-source gate passes; preserve BundleID and encrypted format. A matching BundleID alone cannot certify iLoader signing identity or physical container retention."
+}
