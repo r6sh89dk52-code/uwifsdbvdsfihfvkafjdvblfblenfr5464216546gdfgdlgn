@@ -1,0 +1,89 @@
+name: B15 - isolate new performance changes from real starting HEAD
+on:
+  push:
+    branches: [audit/b15-incremental-c274140-20261102]
+    paths: [.github/workflows/b15-incremental-comparison.yml]
+permissions:
+  contents: read
+jobs:
+  incremental:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      DANPER_EXPECTED_BUILD: '15'
+      DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-incremental
+      DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/b15-incremental/fixtures
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c274140aa631a7e9c262381dbff3f6a1f9a62582
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: swift-actions/setup-swift@v2
+        with: {swift-version: '6.0.3'}
+      - name: Record source identities and prepare identical fictional inputs
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/prepare.sh
+          git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
+          printf '%s\n' '90cb0aba7b553e536c9d3ad42d65eae9f7890fd5' > "$DANPER_AUDIT_OUT/BASELINE_SHA.txt"
+          swift --version > "$DANPER_AUDIT_OUT/swift-version.txt"
+          git worktree add --detach "$RUNNER_TEMP/b15-entry" 90cb0aba7b553e536c9d3ad42d65eae9f7890fd5
+          git worktree add --detach "$RUNNER_TEMP/b15-candidate" c274140aa631a7e9c262381dbff3f6a1f9a62582
+      - name: Adapt only the benchmark to pre-incremental call paths
+        run: |
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          path=Path('scripts/performance/N2PerformanceAuditTests.swift')
+          text=path.read_text()
+          old='#if !DANPER_PERF_OPTIMIZED\n            _=try store().clinicalFormContext'
+          assert text.count(old)==1
+          text=text.replace(old,'#if !DANPER_PERF_OPTIMIZED || DANPER_PERF_BEFORE_INCREMENT\n            _=try store().clinicalFormContext')
+          old='#if DANPER_PERF_OPTIMIZED\n            let loaded=try N2NativeCatalogLoader.load'
+          assert text.count(old)==1
+          text=text.replace(old,'#if DANPER_PERF_OPTIMIZED && !DANPER_PERF_BEFORE_INCREMENT\n            let loaded=try N2NativeCatalogLoader.load')
+          path.write_text(text)
+          path=Path('scripts/performance/run-core.sh');text=path.read_text()
+          old=' baseline) ;;'
+          assert text.count(old)==1
+          text=text.replace(old,' incremental-before) FLAGS+=(-Xswiftc -DDANPER_PERF_OPTIMIZED -Xswiftc -DDANPER_PERF_BEFORE_INCREMENT) ;;\n'+old)
+          path.write_text(text)
+          out=Path(os.environ['DANPER_AUDIT_OUT'])
+          (out/'HARNESS.diff').write_bytes(subprocess.check_output(['git','diff','--','scripts/performance/N2PerformanceAuditTests.swift','scripts/performance/run-core.sh']))
+          proof={'appSourceSHA':'c274140aa631a7e9c262381dbff3f6a1f9a62582','baselineSourceSHA':'90cb0aba7b553e536c9d3ad42d65eae9f7890fd5','workflowSHA':os.environ['GITHUB_SHA'],'bothUseSessionOwnedCore':True,'appFilesModified':False,'baselineOnlyEmulatesDuplicateDispensingContextAndFullContextCatalog':True,'doesNotCertifyFunctionalUI':True}
+          (out/'ORCHESTRATION_PROOF.json').write_text(json.dumps(proof,indent=2))
+          PY
+      - name: Measure actual entry implementation with its existing session optimizations
+        run: bash scripts/performance/run-core.sh "$RUNNER_TEMP/b15-entry" "$DANPER_AUDIT_OUT/before.json" incremental-before > "$DANPER_AUDIT_OUT/before.log" 2>&1
+      - name: Measure final candidate with the same session lifecycle and workload
+        run: |
+          set -euo pipefail
+          bash scripts/performance/run-core.sh "$RUNNER_TEMP/b15-candidate" "$DANPER_AUDIT_OUT/after.json" optimized > "$DANPER_AUDIT_OUT/after.log" 2>&1
+          python3 scripts/performance/compare.py "$DANPER_AUDIT_OUT/before.json" "$DANPER_AUDIT_OUT/after.json" "$DANPER_AUDIT_OUT/comparison.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ['DANPER_AUDIT_OUT'])
+          before=json.loads((root/'before.json').read_text());after=json.loads((root/'after.json').read_text())
+          assert before['storeLifecycle']==after['storeLifecycle']
+          assert before['workers']==after['workers']==9648
+          assert before['initialVisits']==after['initialVisits']==1005
+          assert len(before['actions'])==len(after['actions'])==13
+          print('INCREMENTAL_SOURCE_SHA', (root/'SOURCE_SHA.txt').read_text().strip())
+          print('BASELINE_SOURCE_SHA',(root/'BASELINE_SHA.txt').read_text().strip())
+          print('IDENTICAL_SESSION_LIFECYCLE',before['storeLifecycle'])
+          print('INCREMENTAL_COMPARISON',(root/'comparison.json').read_text())
+          print('SEARCH_INDEX_BUILD_MS',before['searchIndexBuild_ms'],after['searchIndexBuild_ms'])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_INCREMENTAL_90cb0ab_TO_c274140
+          path: |
+            ${{ runner.temp }}/b15-incremental/*.json
+            ${{ runner.temp }}/b15-incremental/*.txt
+            ${{ runner.temp }}/b15-incremental/*.log
+            ${{ runner.temp }}/b15-incremental/*.diff
+          retention-days: 14
