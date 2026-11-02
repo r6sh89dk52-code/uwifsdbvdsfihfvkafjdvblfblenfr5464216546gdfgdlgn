@@ -26,7 +26,9 @@ Los cambios anteriores al inicio real se mantienen: sesión autenticada, caché 
 
 ## Estado de validación
 
-Estado provisional: Swift433/433, nativas27/27, JavaScript62/62, Python19/19, compatibilidad1/1, trece operaciones v1 y doce v2 aprobadas. Cero fallos en estas comprobaciones del candidato. Un caso UI aprobado; los otros12 y el perfilado siguen pendientes. No es cierre de auditoría ni autorización de IPA.
+Resultado definitivo de67c4ec8: ejecución41389072346 FAILURE. Swift433/433, nativas27/27, JavaScript62/62, Python19/19, compatibilidad1/1, trece operaciones v1 y doce v2 aprobadas. UI11PASS/1FAIL/1no ejecutado: el recorrido R buscó Siguiente con teclado abierto; biometría no llegó a XCTest por fallo del instalador NSCocoaErrorDomain4097/helper. No se reinterpretan como pruebas aprobadas.
+
+Corrección posterior publicada en98c0dab7f7e8138b799062d5aefc894bcafefd9e: cerrar/comprobar teclado antes de buscar botones y reconocer exclusivamente ese fallo previo de instalación para un único reinicio del simulador sintético propio.22 Python locales PASS. Ejecución41461695918 repite todo para98c0dab; sus resultados están pendientes y no se certifica con este informe de67c4ec8. Build14 instalada sigue intacta; IPA bloqueada.
 
 Compilación Release iPhoneOS ARM64 actual: ejecución41389127133 SUCCESS. Su SOURCE_SHA y RELEASE_IDENTITY apuntan al candidato; se verificaron localmente los 22 archivos contra APP_SHA256.json. Bundle ID `pe.danper.saludmovil.native.iloaderpreview`, versión0.4.2/build15, iOS17, sin firma, sin dataset clínico ni reloj de pruebas. No es IPA.
 
@@ -99,3 +101,7 @@ Artifacts actuales: v1/compatibilidad13117191634; v2/estado físico13117296756, 
 - [Perfilado activo actual, diagnóstico](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41390330778)
 - [Diagnóstico natural previo, no certifica candidato](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41388727286)
 - [Regresiones de fixture previas, no certifican candidato](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41388149441)
+
+## Perfilado activo de67c4ec8
+
+Ejecución41390330778/artifact13117703641: ambos recorridos reales de guardar/reabrir alergias PASS con dos trabajadores ficticios. TimeProfiler6907 filas ponderadas; peso de muestras corriendo6907ms,5794ms en hilo principal. Son estimaciones por muestreo, no contabilidad exacta de CPU; no sumar pesos inclusivos de funciones. Cuatro marcadores de pausa potencial:502,074/511,092/506,208/294,768ms. No se declara ausencia de bloqueos ni se atribuye su causa sin análisis suficiente. Primera/última muestra0,610/22,511s: la salida del proceso terminó la captura antes del plazo nominal180s. El intervalo no contiene una pareja de signposts Confirmed allergy save: latencia exacta del guardado UI No medido. Allocations grabó pero agotó el plazo al exportar; cuantificación de asignaciones No medido, pendiente diagnóstico41461991137 sobre la misma traza. No es comparación UI antes/después ni medición física.
