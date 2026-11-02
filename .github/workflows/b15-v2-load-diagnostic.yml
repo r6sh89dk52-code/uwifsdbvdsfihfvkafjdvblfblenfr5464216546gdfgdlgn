@@ -70,10 +70,10 @@ jobs:
           text=text.replace(needle,insert+needle)
           start=text.index('        try measure("indicator_10_sheets_export",3) {')
           end=text.index('        try measure("encrypted_backup_verified",3)',start)
-          text=text[:start]+'        // This v2 load test does not certify unresolved historical indicator rows.\\n'+text[end:]
-          needle='        #if DANPER_PERF_OPTIMIZED\\n        let lifecycle='
+          text=text[:start]+'        // This v2 load test does not certify unresolved historical indicator rows.\n'+text[end:]
+          needle='        #if DANPER_PERF_OPTIMIZED\n        let lifecycle='
           assert text.count(needle)==1
-          text=text.replace(needle,'        XCTAssertEqual(try stateEncoder.encode(N2SimpleInventory.read(after.snapshot)),physicalBeforeBytes)\\n'+needle)
+          text=text.replace(needle,'        XCTAssertEqual(try stateEncoder.encode(N2SimpleInventory.read(after.snapshot)),physicalBeforeBytes)\n'+needle)
           text=text.replace('"snapshotBytes":source.count','"snapshotBytes":initialV2.snapshot.count,"inventorySchemaVersion":2,"physicalBalancePreserved":true,"physicalQuantity":78')
           text=text.replace('fictitious v1 snapshot','fictitious v2 physical inventory snapshot')
           path.write_text(text)
