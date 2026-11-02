@@ -1,0 +1,36 @@
+name: B15 - Core budget regressions over measured 9a4 evidence (NOT app approval)
+'on':
+  push:
+    branches:
+    - audit/b15-core-budgets-9a4cad1-20261102
+    paths:
+    - scripts/performance/core-budgets.py
+    - scripts/performance/tests/test_core_budgets.py
+    - .github/workflows/b15-core-budget-regressions.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  budget-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run original 24 harness tests plus 7 budget regressions
+      run: python3 -m unittest discover -s scripts/performance/tests -v
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_V2_PERFORMANCE_COMPARISON
+        run-id: 41497381071
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/v2-measured
+    - name: Verify exact observed source and evaluate Core-only limits
+      run: |
+        set -euo pipefail
+        test "$(cat "$RUNNER_TEMP/v2-measured/SOURCE_SHA.txt")" = 9a4cad1d1463eee5b0ae118b3c14fe58b73a7710
+        python3 scripts/performance/core-budgets.py "$RUNNER_TEMP/v2-measured/comparison.json" "$RUNNER_TEMP/v2-measured/CORE_BUDGETS.json"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: B15_CORE_BUDGETS_NOT_APPLICATION_APPROVAL
+        path: ${{ runner.temp }}/v2-measured/CORE_BUDGETS.json
+        retention-days: 14
