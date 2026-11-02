@@ -75,3 +75,14 @@ El job de UI se serializa para reducir contención de CI. Esto no cambia la apli
 
 
 Se hallaron además dos rutas secundarias de producción no cubiertas por la optimización previa: revisar consumos sin reintento reconstruía dos veces el contexto completo; registrar lote auxiliar y confirmar asociación operativa obtenían el catálogo estático reconstruyendo también trabajadores, alergias y lotes. La revisión usa una sola carga de contexto; al reintentar usa la revisión autenticada, y las dos transacciones auxiliares cargan el mismo catálogo revisado directamente. Sus validaciones y commits cifrados permanecen en el núcleo existente. El harness incorpora `dispensing_readonly_refresh` e `inventory_catalog_only` (tres muestras cada una); el gate final exige ahora trece operaciones comparadas. No se afirma una mejora cuantitativa antes de revisar sus muestras. El tiempo de construir el índice se conserva además en el JSON bruto, separado de la búsqueda caliente.
+
+
+## Presupuesto de CI y selección de Instruments
+
+En `9143997`, Xcode/27 nativas, 430 Swift, JS62/Python19, los dos Excel y las trece operaciones medidas pasaron. Las dos pruebas de alergias y su verificador pasaron, pero GitHub concluyó su job CANCELLED al llegar a 30 minutos globales; no se presenta como un job verde. La preparación/preflight del simulador consumió la mayor parte de ese presupuesto. Se amplía exclusivamente el job UI a 45 minutos y se restauran cuatro runners independientes; el timeout XCTest de 600 s y las esperas del sensor no cambian. Instruments recibe 35 minutos globales de preparación/captura.
+
+El proceso de Inicio ficticio fue observado, pero xctrace sin selección de dispositivo no encontró el PID (salida 21). El arnés vuelve a especificar el UDID del simulador propio al adjuntarse por PID. La nueva ejecución debe confirmar si permite capturar: el cambio de parámetros por sí solo no demuestra una captura ni mide acciones clínicas.
+
+El benchmark previo compara de forma acumulada cc45aa2 frente a 9143997, no aísla las mejoras nuevas frente al HEAD real de entrada 90cb0ab. En el artefacto de 9143997, guardar alergias cifradas pasó de p50 9831,402 a 2349,057 ms (7 muestras Linux Release), búsqueda del último trabajador de 12,192 a 0,126 ms (100), formulario Core de 1616,834 a 209,665 ms (7). Son cifras del núcleo con datos ficticios, no latencia física de iPhone. La medición XCTest UI de cinco ciclos abrir/cerrar formulario tuvo media 5,803 s y CPU 3,011 s, memoria física máxima media 55.810,458 kB; incluye automatización y solo dos trabajadores sintéticos. No tiene línea base UI ni equivale al tiempo del botón Guardar alergias. Los contadores de ciclos/instrucciones cero del simulador se consideran No medido.
+
+Este commit de infraestructura cambia el HEAD: las evidencias de 9143997 quedan como antecedentes y se requieren comprobaciones frescas para el candidato siguiente. PR en borrador, sin IPA y sin cambios a Build 14 instalada.

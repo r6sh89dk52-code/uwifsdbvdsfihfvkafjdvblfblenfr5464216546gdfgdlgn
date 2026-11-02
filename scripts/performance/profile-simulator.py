@@ -42,7 +42,7 @@ for template,seconds in [('Time Profiler',60),('Allocations',45)]:
         save()
         with (out/(name+'.log')).open('w') as log:
             p=subprocess.run(['xcrun','xctrace','record','--template',template,
-                '--no-prompt','--attach',pid,'--time-limit',str(seconds)+'s','--output',str(trace)],
+                '--device',sim,'--no-prompt','--attach',pid,'--time-limit',str(seconds)+'s','--output',str(trace)],
                 stdout=log,stderr=subprocess.STDOUT,timeout=seconds+90)
         entry['exit']=p.returncode
         entry['captured']=p.returncode==0 and trace.exists()
