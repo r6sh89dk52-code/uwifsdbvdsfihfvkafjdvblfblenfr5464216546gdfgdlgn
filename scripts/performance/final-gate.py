@@ -29,7 +29,7 @@ for label,count in suites.items():
     if label in ('N2GlassClinicalTests','N2PremiumRedesignTests','N3ClinicalJourneyTests-demo','N2AllergySaveInteractionTests'):
         passing(folder/('seed-'+label+'.xcresult.summary.json'),2)
 swift=json.loads((root/'swift'/'swift-results.json').read_text())
-assert swift['sourceSHA']==head and swift['tests']>=426 and swift['failures']==swift['skips']==0
+assert swift['sourceSHA']==head and swift['tests']>=433 and swift['failures']==swift['skips']==0
 marker(root/'javascript','SOURCE_SHA.txt');js=json.loads((root/'javascript'/'javascript-results.json').read_text())
 assert len(js)==62 and all(x['exit']==0 for x in js)
 marker(root/'performance','SOURCE_SHA.txt');perf=json.loads((root/'performance'/'comparison.json').read_text())
@@ -42,6 +42,16 @@ compat=json.loads((root/'performance'/'compatibility.json').read_text())
 assert compat['sourceSHA']==head and compat['tests']==1 and compat['failures']==0
 assert compat['build14JournalRead'] and compat['build14BackupRead'] and compat['stockUnchanged']
 report['build14ForwardCompatibility']=compat
+v2=root/'performance-v2';marker(v2,'SOURCE_SHA.txt')
+assert (v2/'BASELINE_SHA.txt').read_text().strip()=='c274140aa631a7e9c262381dbff3f6a1f9a62582'
+for name in ['before','after']:
+    sample=json.loads((v2/(name+'.json')).read_text())
+    assert sample['inventorySchemaVersion']==2 and sample['physicalBalancePreserved'] and sample['physicalQuantity']==78
+    assert sample['workers']==9648 and sample['initialVisits']==1005 and len(sample['actions'])==12
+    assert not sample['indicatorExportMeasured']
+v2perf=json.loads((v2/'comparison.json').read_text())
+assert len(v2perf['operations'])==12 and set(v2perf['resources'])=={'before','after'}
+report['physicalV2Performance']=v2perf
 profiles=list(root.rglob('profiling-status.json'))
 report['instruments']=[json.loads(p.read_text()) for p in profiles]
 (root/'FINAL_GATES.json').write_text(json.dumps(report,indent=2))

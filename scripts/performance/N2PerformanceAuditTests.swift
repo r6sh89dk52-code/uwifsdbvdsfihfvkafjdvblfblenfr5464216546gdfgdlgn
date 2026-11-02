@@ -58,6 +58,42 @@ final class N2PerformanceAuditTests:XCTestCase {
         let mappings=try fixture("n2-reviewed-approved.json")
         let context=try store().clinicalFormContext(products:products,nursing:catalog,mappings:mappings)
         XCTAssertEqual(context.workers.count,9_648)
+        let physicalV2=ProcessInfo.processInfo.environment["DANPER_PERF_V2"]=="1"
+        var physicalBeforeBytes:Data?
+        var measuredSnapshotBytes=source.count
+        let stateEncoder=JSONEncoder();stateEncoder.outputFormatting = .sortedKeys
+        if physicalV2 {
+            let beforeActivation=try XCTUnwrap(journal().recover())
+            let password="FICTICIO-V2-PERFORMANCE-2026"
+            let archive=try N2InventoryBackupCodec.createVerified(snapshot:beforeActivation.snapshot,password:password,domain:.demo)
+            let backup=try N2InventoryBackupCodec.verify(archive:archive,password:password)
+            func physicalProduct(_ code:String,_ quantity:Double)throws->N2SimpleProduct {
+                let item=try XCTUnwrap(context.products.clinical.first{$0.code==code})
+                return N2SimpleProduct(code:item.code,name:item.name,unit:item.unit,
+                    mode:N2SimpleInventory.suggestedMode(unit:item.unit) ?? .units,
+                    quantity:quantity,expiry:"2027-02-10",expiryVerified:true)
+            }
+            revision=try store().activateSimpleInventory(backup:backup,
+                request:N2SimpleActivation(id:"3E380B51-8D4D-4A18-AD00-A4E28A4D5266",at:1_793_370_000_000,
+                    operatorName:"OPERADOR FICTICIO V2",confirmed:true,backupAvailable:true,
+                    initialProducts:[physicalProduct("16000182",70),physicalProduct("16000025",12)]),
+                catalog:context.products,expectedRevision:revision).revision
+            for (kind,quantity,id,time) in [(N2SimpleInventoryCommand.Operation.receipt,10.0,"V2-PERF-RECEIPT",Int64(1_793_370_000_010)),
+                                           (N2SimpleInventoryCommand.Operation.outflow,2.0,"V2-PERF-OUTFLOW",Int64(1_793_370_000_020))] {
+                revision=try store().applySimpleInventoryCommand(
+                    N2SimpleInventoryCommand(id:id,operation:kind,code:"16000182",quantity:quantity,
+                        at:time,operatorName:"OPERADOR FICTICIO V2",reason:"MOVIMIENTO FICTICIO DE RENDIMIENTO"),
+                    catalog:context.products,expectedRevision:revision).revision
+            }
+            let initialV2=try XCTUnwrap(journal().recover())
+            XCTAssertTrue(N2SimpleInventory.isActive(initialV2.snapshot))
+            XCTAssertEqual(try N2VersionedSnapshotAudit.inspect(initialV2.snapshot).workers,9_648)
+            let physical=try N2SimpleInventory.read(initialV2.snapshot)
+            XCTAssertEqual(physical.products.first{$0.code=="16000182"}?.quantity,78)
+            root=try XCTUnwrap(JSONSerialization.jsonObject(with:initialV2.snapshot) as? [String:Any])
+            physicalBeforeBytes=try stateEncoder.encode(physical)
+            measuredSnapshotBytes=initialV2.snapshot.count
+        }
         var results=[[String:Any]]()
         func measure(_ name:String,_ n:Int=7,_ work:()throws->Void)throws {
             var times=[Double]()
@@ -146,11 +182,13 @@ final class N2PerformanceAuditTests:XCTestCase {
                 start:"2026-10-09",end:"2026-11-08",responsible:"OPERADOR FICTICIO",mappings:mappings)
             XCTAssertFalse(x.xlsx.isEmpty)
         }
-        try measure("indicator_10_sheets_export",3) {
+        // V2 migration does not invent verification for historical indicator
+        // rows. Its official workbook assertions remain in the full test suite.
+        if !physicalV2 { try measure("indicator_10_sheets_export",3) {
             let x=try store().exportVerifiedIndicatorWorkbook(products:products,mappings:mappings,template:fixture("n1s-indicator-template-store.zip"),
                 start:"2026-10-09",end:"2026-11-08",subdivision:"LA VENTUROSA",ids:["fundo-unit","fundo-reuse"])
             XCTAssertEqual(x.visits,2);XCTAssertEqual(x.rows,2)
-        }
+        } }
         try measure("encrypted_backup_verified",3) {
             let x=try N2InventoryBackupCodec.createVerified(snapshot:try store().sourceForEncryptedBackup(),password:"FICTICIO-PERF-2026-ONLY",domain:.demo)
             XCTAssertFalse(x.isEmpty)
@@ -160,6 +198,9 @@ final class N2PerformanceAuditTests:XCTestCase {
         for field in ["workers","stockLots","stockMovements"] {
             XCTAssertEqual(try JSONSerialization.data(withJSONObject:root[field]!,options:.sortedKeys),
                            try JSONSerialization.data(withJSONObject:final[field]!,options:.sortedKeys))
+        }
+        if let physicalBeforeBytes {
+            XCTAssertEqual(try stateEncoder.encode(N2SimpleInventory.read(after.snapshot)),physicalBeforeBytes)
         }
         #if DANPER_PERF_OPTIMIZED
         let lifecycle="Session-owned journal/core; actual HMAC, AEAD, file reads and revision checks on every operation"
@@ -171,8 +212,10 @@ final class N2PerformanceAuditTests:XCTestCase {
         #else
         let indexMetric:Any=NSNull()
         #endif
-        let report:[String:Any]=["searchIndexBuild_ms":indexMetric,"storeLifecycle":lifecycle,"workers":9_648,"initialVisits":visits.count,"snapshotBytes":source.count,
-            "configuration":"SwiftPM Release; x86_64 Linux; fictitious v1 snapshot; same fabricated dataset; no UI/device latency claim",
+        let report:[String:Any]=["searchIndexBuild_ms":indexMetric,"storeLifecycle":lifecycle,"workers":9_648,"initialVisits":visits.count,"snapshotBytes":measuredSnapshotBytes,
+            "inventorySchemaVersion":physicalV2 ? 2:1,"physicalBalancePreserved":physicalBeforeBytes != nil,
+            "physicalQuantity":physicalV2 ? 78:0,"indicatorExportMeasured":!physicalV2,
+            "configuration":"SwiftPM Release; x86_64 Linux; fictitious v\(physicalV2 ? 2:1) snapshot; same fabricated dataset; no UI/device latency claim",
             "host":ProcessInfo.processInfo.operatingSystemVersionString,"actions":results]
         try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:URL(fileURLWithPath:out),options:.atomic)
     }
