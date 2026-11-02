@@ -1,0 +1,201 @@
+name: B15 - SAME-runner before-after active allergy Instruments (NOT release approval)
+'on':
+  push:
+    branches:
+    - audit/b15-active-comparison-59e6773-20261102
+    paths:
+    - .github/workflows/b15-active-comparison.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  active-comparison:
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 59e6773dafdc2e08d291bd7e33b5c6ffd685f1fd
+        fetch-depth: 0
+        path: current
+    - name: Require current-source binaries with all native cases passed
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        python3 - <<'PYWAIT'
+        import json,os,time,urllib.request
+        base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'
+        def get(path):
+         return json.load(urllib.request.urlopen(urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30))
+        for _ in range(40):
+         pr=get('pulls/10');assert pr['head']['sha']=='59e6773dafdc2e08d291bd7e33b5c6ffd685f1fd' and pr['draft'] and not pr['merged']
+         run=get('actions/runs/41528135555');assert run['head_sha']==pr['head']['sha']
+         artifacts=get('actions/runs/41528135555/artifacts')['artifacts']
+         if any(a['name']=='B15_COMPILED_SAME_HEAD' and not a['expired'] for a in artifacts):break
+         if run['status']=='completed':raise RuntimeError('Native build did not provide approved current-source binaries')
+         time.sleep(30)
+        else:raise RuntimeError('Current-source compiled artifact unavailable; no old binary accepted as current')
+        PYWAIT
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        run-id: 41366450170
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/profile-compiled-before
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        run-id: 41521115084
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/profile-compiled-after
+    - name: Restore compiled binaries; never use baseline as current certification
+      run: |
+        set -euo pipefail
+        for label in before after; do
+         mkdir -p "$RUNNER_TEMP/profile-derived-$label/Build"
+         tar -xzf "$RUNNER_TEMP/profile-compiled-$label/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/profile-derived-$label/Build"
+        done
+    - name: Apply IDENTICAL diagnostic harness, verify source manifests and x86_64
+      run: |
+        python3 - <<'PYPREP'
+        from pathlib import Path
+        import json,os,subprocess
+
+        current=Path(os.environ['GITHUB_WORKSPACE'])/'current'
+        before=Path(os.environ['RUNNER_TEMP'])/'profile-source-before'
+        subprocess.run(['git','worktree','add','--detach',str(before),'c274140aa631a7e9c262381dbff3f6a1f9a62582'],cwd=current,check=True)
+        # The workload and fabricated seeds must be identical; only app/Core differ.
+        subprocess.run(['git','diff','--exit-code','c274140aa631a7e9c262381dbff3f6a1f9a62582','HEAD','--',
+         'native-ios/InteractionTests/N2AllergySaveInteractionTests.swift',
+         'native-ios/NativeTests/N2PremiumDemoFixtureTests.swift',
+         'native-ios/NativeTests/N2SimpleInventoryNativeTests.swift'],cwd=current,check=True)
+        paths=['scripts/glass-audit/validate-macos.sh','scripts/glass-audit/check-xcresult.py',
+         'scripts/glass-audit/enroll-simulator.sh','scripts/glass-audit/prepare-auth-ui.sh',
+         'scripts/glass-audit/simulator-ready-bridge.py','scripts/performance/owned_process.py',
+         'scripts/performance/installer_failure.py','scripts/performance/test-products.py',
+         'scripts/performance/profile-simulator.py']
+        helpers={p:(current/p).read_bytes() for p in paths}
+        for label,root in [('before',before),('after',current)]:
+         for path,content in helpers.items():
+          p=root/path;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(content)
+         p=root/'scripts/performance/profile-simulator.py';s=p.read_text()
+         loop="for template,seconds in [('Time Profiler',60),('Allocations',45)]:"
+         assert s.count(loop)==1
+         s=s.replace(loop,loop+"\n    if template!=os.environ['DANPER_PROFILE_TEMPLATE']:continue")
+         s=s.replace("('Time Profiler',60),('Allocations',45)","('Time Profiler',600),('Allocations',600)")
+         s=s.replace('deadline=time.monotonic()+30','deadline=time.monotonic()+180')
+         s=s.replace("('time-profile','allocation','os-signpost')","('time-profile','time-sample','runloop-events','potential-hangs','allocation','os-signpost')")
+         s=s.replace('        pid=find_owned_app(p.stdout,sim)',"""        # Skip native fixture/automatic launches; attach only the UI journey.
+                listing='\\n'.join(row for row in p.stdout.splitlines()
+                    if '--danper-redesign-demo' in row.strip().split()[2:])
+                pid=find_owned_app(listing,sim)""")
+         s=s.replace('Separate synthetic Home process; not concurrent with functional UI tests; not physical iPhone latency',
+         'Active fictional allergy journey; two workers; profiler overhead included; comparative only; not physical iPhone latency')
+         s=s.replace("for template,seconds in", """# Inspect the selected Xcode's actual CLI; never assume newer flags.
+        extra_instruments=[]
+        try:
+            probe=subprocess.run(['xcrun','xctrace','list','instruments'],capture_output=True,text=True,timeout=20)
+            (out/'xctrace-instruments.txt').write_text(probe.stdout+probe.stderr)
+            help_text=(out/'xctrace-record-help.txt').read_text()
+            names={line.strip().strip('\"') for line in probe.stdout.splitlines()}
+            selected=next((n for n in ['os_signpost','Points of Interest'] if n in names),None)
+            if probe.returncode==0 and '--instrument' in help_text and selected:
+                extra_instruments=['--instrument',selected]
+            report['additionalSignpostInstrument']=selected if extra_instruments else None
+        except (OSError,subprocess.TimeoutExpired) as error:
+            report['instrumentProbeLimitation']=str(error)
+        save()
+        for template,seconds in""")
+         s=s.replace("['xcrun','xctrace','record','--template',template,", "['xcrun','xctrace','record','--template',template]+extra_instruments+[")
+         p.write_text(s)
+         p=root/'scripts/glass-audit/validate-macos.sh';s=p.read_text()
+         seed='  run_tests seed-profile 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests'
+         assert s.count(seed)==1;s=s.replace(seed,'  # Each template gets a fresh fabricated seed below.')
+         start=s.index('  xcrun simctl launch --terminate-running-process "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview --danper-redesign-demo > "$OUT/profile-owned-launch.log"')
+         end=s.index('  git rev-parse HEAD > "$OUT/PROFILE_SOURCE_SHA.txt"',start)
+         s=s[:start]+'''  for template in 'Time Profiler' 'Allocations'; do
+           label="active-${template// /-}"
+           # A seed preserves existing allergies; a NEW owned Simulator is required.
+           fresh "$label"
+           run_tests "availability-$label" 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
+           run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests
+           xcrun simctl terminate "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview >/dev/null 2>&1 || true
+           run_tests "$label" 1 -only-testing:DANPERInteractionTests/N2AllergySaveInteractionTests/testEmptyRosterSearchAndConfirmedAllergySaveSurviveDraftAndReopen &
+           workload_pid=$!
+           DANPER_PROFILE_TEMPLATE="$template" python3 scripts/performance/profile-simulator.py "$SIM_ID" "$OUT/Instruments/$label"
+           workload_status=0
+           wait "$workload_pid" || workload_status=$?
+           printf '%s %s\\n' "$label" "$workload_status" >> "$OUT/WORKLOAD_EXIT.txt"
+          done
+        '''+s[end:]
+         p.write_text(s)
+         out=Path(os.environ['RUNNER_TEMP'])/('active-profile-'+label);out.mkdir()
+         (out/'HARNESS.diff').write_bytes(subprocess.check_output(['git','diff','--','scripts'],cwd=root))
+         products=Path(os.environ['RUNNER_TEMP'])/('profile-derived-'+label)/'Build/Products'
+         proof=Path(os.environ['RUNNER_TEMP'])/('profile-compiled-'+label)/'TEST_PRODUCTS.json'
+         subprocess.run(['python3','scripts/performance/test-products.py','verify',str(products),str(proof)],cwd=root,check=True)
+         arch=subprocess.check_output(['lipo','-archs',str(products/'Debug-iphonesimulator/DANPERNative.app/DANPERNative')],text=True).strip()
+         assert arch=='x86_64',arch
+         info={'scope':'Before/after active synthetic journey on SAME runner; no release approval',
+          'sourceSHA':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
+          'workflowSHA':os.environ['GITHUB_SHA'],'runnerArchitecture':arch,'seedWorkers':2,
+          'appAndUITestBinariesUnmodified':True,'workloadAndSeedSourcesIdentical':True,
+          'requiredLaunchArgument':'--danper-redesign-demo','maxSecondsPerTemplate':600,
+          'profilerOverheadIncluded':True,'physicalDeviceValidated':False,'IPA':False}
+         (out/'ORCHESTRATION.json').write_text(json.dumps(info,indent=2))
+         subprocess.run(['bash','-n',str(p)],check=True)
+         compile((root/'scripts/performance/profile-simulator.py').read_text(),'generated-profiler','exec')
+
+        PYPREP
+    - name: Measure two identical fabricated allergy journeys sequentially on same
+        host
+      run: |
+        set -euo pipefail
+        for label in before after; do
+         if test "$label" = before; then task_root="$RUNNER_TEMP/profile-source-before"; else task_root="$GITHUB_WORKSPACE/current"; fi
+         export DANPER_AUDIT_OUT="$RUNNER_TEMP/active-profile-$label"
+         export DANPER_AUDIT_DERIVED_DATA="$RUNNER_TEMP/profile-derived-$label"
+         export DANPER_TEST_PROOF="$RUNNER_TEMP/profile-compiled-$label/TEST_PRODUCTS.json"
+         export DANPER_B15_UI_LABEL="Active-Allergy-$label"
+         (cd "$task_root" && bash scripts/glass-audit/validate-macos.sh b15-profile)
+        done
+    - name: Report actual captures and limitations, never infer an unavailable metric
+      if: always()
+      run: |
+        python3 - <<'PYSUMMARY'
+        import json,os,xml.etree.ElementTree as ET
+        from pathlib import Path
+        root=Path(os.environ['RUNNER_TEMP']);report={'scope':'Before/after same-runner synthetic UI profiling, two workers, NOT app approval','physicalDeviceValidated':False,'IPA':False,'variants':{}}
+        failed=[]
+        for label in ['before','after']:
+         folder=root/('active-profile-'+label);entry={};report['variants'][label]=entry
+         for name in ['ORCHESTRATION.json']:
+          p=folder/name
+          if p.exists():entry[name]=json.loads(p.read_text())
+         status=folder/'WORKLOAD_EXIT.txt'
+         entry['workloadExit']=status.read_text() if status.exists() else 'Not executed'
+         if not status.exists() or any(l.split()[-1]!='0' for l in status.read_text().splitlines()) or len(status.read_text().splitlines())!=2:failed.append(label+' incomplete/failed UI workload')
+         entry['captures']=[json.loads(p.read_text()) for p in folder.rglob('profiling-status.json')]
+         if len(entry['captures'])!=2 or any(not c.get('captures') or any(not t.get('captured') or not t.get('tocExported') for t in c['captures']) for c in entry['captures']):failed.append(label+' missing actual trace/TOC; no performance approval')
+         entry['tables']=[]
+         for p in folder.rglob('*.xml'):
+          if '-toc.' in p.name:continue
+          try:
+           tree=ET.parse(p);count=sum(1 for _ in tree.iter('row'))
+           entry['tables'].append({'file':str(p.relative_to(folder)),'rows':count,'bytes':p.stat().st_size})
+          except ET.ParseError:entry['tables'].append({'file':p.name,'parseable':False})
+         print('ACTUAL_PROFILE_RESULT',label,json.dumps(entry))
+        (root/'PROFILE_COMPARISON_STATUS.json').write_text(json.dumps(report,indent=2))
+        assert not failed,failed
+        PYSUMMARY
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_ACTIVE_BEFORE_AFTER_PROFILE_NOT_APPROVAL
+        path: |-
+          ${{ runner.temp }}/active-profile-*
+          ${{ runner.temp }}/PROFILE_COMPARISON_STATUS.json
+        retention-days: 7
