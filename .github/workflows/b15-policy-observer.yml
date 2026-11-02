@@ -1,0 +1,84 @@
+name: B15 - isolated policy observer on unchanged 9a4cad1 (DIAGNOSTIC ONLY)
+'on':
+  push:
+    branches:
+    - audit/b15-policy-observer-9a4cad1-20261102
+    paths:
+    - .github/workflows/b15-policy-observer.yml
+permissions:
+  contents: read
+jobs:
+  policy-diagnostic:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 9a4cad1d1463eee5b0ae118b3c14fe58b73a7710
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Prepare only distribution resources and unchanged native test sources
+      run: |
+        set -euo pipefail
+        npm ci --ignore-scripts --no-fund
+        if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+        node scripts/prepare-n1s-ios-demo-resources.cjs
+        (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+    - name: Record explicit single-case harness and read-only observer
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/policy-observer
+      run: |
+        python3 - <<'PYWRITE'
+        from pathlib import Path
+        import os
+        Path(os.environ['RUNNER_TEMP'],'policy-observer.py').write_text("import json,os,re,subprocess,sys,time\nfrom pathlib import Path\nsim,out=sys.argv[1],Path(sys.argv[2]);out.mkdir(exist_ok=True,parents=True)\nreport={'diagnosticOnly':True,'releaseApproval':False,'simulator':sim,'captures':[]}\ndef save():(out/'POLICY_OBSERVER.json').write_text(json.dumps(report,indent=2))\ndef run(args,name,timeout=12):\n try:\n  p=subprocess.run(args,capture_output=True,text=True,timeout=timeout)\n  (out/name).write_text(p.stdout+p.stderr);return p.returncode\n except subprocess.TimeoutExpired:\n  (out/name).write_text('Diagnostic command timeout; no metric inferred.\\n');return -1\nsave()\ntry:\n rows=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','-j'],timeout=15))\n own=[d for g in rows['devices'].values() for d in g if d['udid']==sim]\n assert len(own)==1 and own[0]['name'].startswith('DANPER-SYNTHETIC-') and own[0]['state']=='Booted'\n log=out/'native-policy-diagnostic-system.log';deadline=time.monotonic()+240\n while time.monotonic()<deadline:\n  text=log.read_text(errors='replace') if log.exists() else ''\n  lines=[l for l in text.splitlines() if '[com.apple.LocalAuthentication:Client,Interactive] evaluatePolicy:2' in l]\n  if lines:break\n  time.sleep(.25)\n else:raise RuntimeError('No genuine interactive policy request was observed')\n pid=int(re.search(r'DANPERNative\\[(\\d+):',lines[-1])[1])\n command=subprocess.check_output(['ps','-p',str(pid),'-o','command='],text=True,timeout=5)\n assert '/CoreSimulator/Devices/'+sim+'/data/Containers/Bundle/Application/' in command\n assert command.split()[0].endswith('/DANPERNative.app/DANPERNative')\n report['observedPID']=pid;start=time.monotonic();save()\n time.sleep(3)\n for name in ['policy-request-screen.png']:\n  status=run(['xcrun','simctl','io',sim,'screenshot',str(out/name)],name+'.log')\n  report['captures'].append({'file':name,'exit':status});save()\n while time.monotonic()-start<13:time.sleep(.1)\n status=run(['sample',str(pid),'3','1','-file',str(out/'policy-app-stack.txt')],'policy-sample-command.log',10)\n report['captures'].append({'file':'policy-app-stack.txt','exit':status});save()\n status=run(['xcrun','simctl','io',sim,'screenshot',str(out/'policy-cancel-screen.png')],'policy-cancel-screen.log')\n report['captures'].append({'file':'policy-cancel-screen.png','exit':status});save()\nexcept Exception as error:\n report['error']=type(error).__name__+': '+str(error);save()\n")
+        PYWRITE
+        python3 - <<'PYPATCH'
+        import hashlib,json,os,subprocess
+        from pathlib import Path
+        p=Path('scripts/glass-audit/validate-macos.sh');s=p.read_text()
+        old='  run_tests "native-$NATIVE_COUNT" "$NATIVE_COUNT" -only-testing:DANPERNativeTests'
+        assert s.count(old)==1
+        s=s.replace(old,'  run_tests native-policy-diagnostic 1 -only-testing:DANPERNativeTests/N2ColdAuthenticationPreflightTests/testRealDeviceOwnerPolicyCanBeCancelledAfterColdLaunch')
+        s=s.replace('CORE_NATIVE_SHA.txt','POLICY_DIAGNOSTIC_PASS_SHA.txt')
+        s=s.replace("stream='' bridge='' profiler=''", "stream='' bridge='' profiler='' observer=''")
+        needle=' local selection=(-project native-ios/DANPERNative.xcodeproj'
+        assert s.count(needle)==1
+        s=s.replace(needle,' if test "$label" = native-policy-diagnostic; then\n  python3 "$RUNNER_TEMP/policy-observer.py" "$SIM_ID" "$OUT" & observer=$!\n fi\n'+needle)
+        needle=' if test -n "$bridge"; then kill'
+        assert s.count(needle)==1
+        s=s.replace(needle,' if test -n "$observer"; then wait "$observer" || true; fi\n'+needle)
+        p.write_text(s)
+        p=Path('scripts/glass-audit/simulator-ready-bridge.py');s=p.read_text()
+        lines=s.splitlines()
+        for i,line in enumerate(lines):
+         if line.startswith(' predicate='):
+          lines[i]=" predicate='subsystem BEGINSWITH \"com.apple.LocalAuthentication\" OR process == \"tccd\" OR process == \"CoreAuthUI\" OR (process == \"SpringBoard\" AND (eventMessage CONTAINS[c] \"FaceID\" OR eventMessage CONTAINS[c] \"authentication\"))'"
+          break
+        else:raise RuntimeError('Log predicate not found')
+        p.write_text('\n'.join(lines)+'\n')
+        out=Path(os.environ['DANPER_AUDIT_OUT']);out.mkdir(parents=True,exist_ok=True)
+        (out/'HARNESS.diff').write_bytes(subprocess.check_output(['git','diff','--','scripts/glass-audit/validate-macos.sh','scripts/glass-audit/simulator-ready-bridge.py']))
+        proof={'sourceSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'workflowSHA':os.environ['GITHUB_SHA'],'nativeCasesSelected':1,'nativeCaseUnmodified':True,'diagnosticOnly':True,'releaseApproval':False,'physicalDeviceValidated':False,'IPA':False}
+        (out/'ORCHESTRATION.json').write_text(json.dumps(proof,indent=2))
+
+        PYPATCH
+        bash -n scripts/glass-audit/validate-macos.sh
+        python3 -m py_compile scripts/glass-audit/simulator-ready-bridge.py
+        git diff --exit-code HEAD -- '*.swift' native-ios/project.yml
+    - name: Run genuine unchanged cancellation case on own fresh iPhone 16
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/policy-observer
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/policy-derived
+      run: bash scripts/glass-audit/validate-macos.sh b15-native
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_POLICY_OBSERVER_DIAGNOSTIC_NOT_APPROVAL
+        path: ${{ runner.temp }}/policy-observer
+        retention-days: 14
+
