@@ -28,6 +28,27 @@ def passing(path,expected):
     assert data['failedTests']==data['skippedTests']==data.get('expectedFailures',0)==0,(path,data)
     assert not data.get('testFailures'),(path,data)
 
+def verify_inventory(path):
+    expected=counts()
+    rows=[line.split('\t') for line in path.read_text().splitlines()]
+    assert len(rows)==len(expected) and all(len(row)==4 for row in rows),(path,rows)
+    labels=[row[0] for row in rows]
+    assert len(set(labels))==len(labels) and set(labels)==set(expected),(path,labels)
+    for label,number,kind,selectors in rows:
+        assert int(number)==expected[label],(label,number,expected[label])
+        actual_kind=label.rsplit('-',1)[0] if label.startswith('N3ClinicalJourneyTests-') else label
+        assert kind==actual_kind,(label,kind,actual_kind)
+        prefix='-only-testing:DANPERInteractionTests/'+kind
+        if label.startswith('N3ClinicalJourneyTests-'):
+            source=Path(__file__).resolve().parents[2]/'native-ios/InteractionTests'/('N3ClinicalJourneyTests.swift')
+            methods=re.findall(r'func (test\w+)\(',source.read_text())
+            protected='testProtectedClinicalSourceCreationAndRelaunch'
+            selected=[protected] if label.endswith('-protected') else [m for m in methods if m!=protected]
+            required=[prefix+'/'+m for m in selected]
+        else:required=[prefix]
+        assert selectors.split()==required,(label,selectors,required)
+    return sum(expected.values())
+
 def verify(folder,label,head):
     verified=folder/'SHARD_VERIFIED_SHA.txt'
     verified.unlink(missing_ok=True)
@@ -46,6 +67,10 @@ def verify(folder,label,head):
     return expected
 
 if __name__=='__main__':
+    if len(sys.argv)==3 and sys.argv[1]=='--inventory':
+        number=verify_inventory(Path(sys.argv[2]))
+        print('PASS: source-discovered UI inventory and selectors:',number,'required cases; not execution evidence')
+        raise SystemExit(0)
     head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     number=verify(Path(sys.argv[1]),sys.argv[2],head)
     print('PASS:',sys.argv[2],number,'actual XCTest cases; no failures/skips, current HEAD')

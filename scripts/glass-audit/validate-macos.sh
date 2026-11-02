@@ -285,10 +285,7 @@ while IFS=$'\t' read -r label count cls selectors; do
  IFS=' ' read -r -a selection <<< "$selectors"
  if ! run_tests "$label" "$count" "${selection[@]}"; then overall=1; fi
 done < "$OUT/ui-classes.tsv"
-python3 - "$OUT/ui-classes.tsv" <<'PY'
-import sys
-assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==13,'Review UI test inventory'
-PY
+python3 scripts/performance/verify-ui-shard.py --inventory "$OUT/ui-classes.tsv"
 test "$overall" = 0
 if test "$MODE" = b15-shard; then
  grep -q "^$DANPER_B15_UI_LABEL" "$OUT/ui-classes.tsv"

@@ -23,3 +23,5 @@ El diagnóstico41509657892 confirmó mediante screenshot y AUTHREQ_PROMPTING que
 La preparación añade un caso UI (total14) y mantiene28nativas. Dos regresiones del verificador rechazan evidencia sin preparación de permiso o sin cancelación real; pasar ambas no sustituye un caso biométrico fallido. Python total33 (24anteriores+7presupuestos+2evidencia). Los resultados locales no sustituyen la ejecución completa del SHA publicado.
 
 Trazabilidad: presupuesto/testsbcbf7a0, UIpermiso267bfe4, checkoutdiagnóstico7841f58. El trial41516039780 aprobó permisoUI1/1 y cancelación nativa1/1, sin fallos/omisiones; appCancel-9 real en12,433s. Es validación acotada, no aprobación de28nativas/14UI del HEAD nuevo. No se modificó main ni la Build14 instalada, no se accedió al teléfono y no existe IPA aprobada.
+
+La corrección posterior del cierre del harness añade4regresiones de integración: Python pasa de33a37. El antiguo cierre fijo13se sustituye por verificación del inventario/selectores de las fuentes; se mantienen14UI y28nativas obligatorias. Véase UI_INVENTORY_GUARD.md. Estos resultados del harness no sustituyen Swift/Xcode/UI del HEAD final.
