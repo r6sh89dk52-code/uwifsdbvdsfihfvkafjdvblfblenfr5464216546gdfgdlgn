@@ -81,6 +81,7 @@ jobs:
             ${{ runner.temp }}/b15-native/*.json
             ${{ runner.temp }}/b15-native/*.txt
             ${{ runner.temp }}/b15-native/*.log
+            ${{ runner.temp }}/b15-native/*-failure-attachments.tgz
           retention-days: 14
   ui:
     needs: native-build

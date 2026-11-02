@@ -190,6 +190,12 @@ run_tests(){
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
  xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments" || status=1
+ # Preserve hang diagnostics alongside the summary/logs when XCTest fails.
+ # Artifact globs include this archive without uploading clinical data: all
+ # captures come from this script's isolated synthetic Simulator.
+ if test "$status" != 0 && test -d "$OUT/$label-attachments"; then
+  tar -czf "$OUT/$label-failure-attachments.tgz" -C "$OUT" "$label-attachments"
+ fi
  return "$status"
 }
 if test "$MODE" != ui; then
