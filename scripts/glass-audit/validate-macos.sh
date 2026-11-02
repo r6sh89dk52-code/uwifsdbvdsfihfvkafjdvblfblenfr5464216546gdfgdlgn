@@ -173,6 +173,9 @@ run_tests(){
  echo "PHASE: $label — $expected required tests; no skips"
  prepare_test_installation || return $?
  case "$label" in
+  native-*|system-auth-preflight)
+   # Observe only our synthetic device. No sensor event is injected here.
+   python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$OUT/$label-system.log" 2>&1 & stream=$! ;;
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
    python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$OUT/$label-system.log" 2>&1 & stream=$!
    python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;

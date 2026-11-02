@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 import LocalAuthentication
+import UIKit
 
 /// Simulator preparation only. No sensor match, fake success, private UI
 /// launch or production authentication change is permitted here.
@@ -16,38 +17,59 @@ final class N2ColdAuthenticationPreflightTests:XCTestCase {
             lock.lock();defer{lock.unlock()};return value
         }
     }
+    @MainActor
     func testRealDeviceOwnerPolicyCanBeCancelledAfterColdLaunch() async {
         #if targetEnvironment(simulator)
+        guard let scene=UIApplication.shared.connectedScenes.compactMap({$0 as? UIWindowScene})
+            .first(where:{$0.activationState == .foregroundActive}) else {
+            XCTFail("The isolated native test host needs a foreground scene");return
+        }
+        // Snapshot cases install temporary windows. Give this interactive test
+        // its own visible scene/window and restore the previous key window.
+        let previous=scene.windows.first(where:{$0.isKeyWindow})
+        let window=UIWindow(windowScene:scene)
+        window.rootViewController=UIViewController()
+        window.makeKeyAndVisible()
+        defer{window.isHidden=true;previous?.makeKey()}
+        await Task.yield()
+        XCTAssertTrue(window.isKeyWindow)
+        XCTAssertEqual(UIApplication.shared.applicationState,.active)
         for attempt in 1...2 {
             let context=LAContext()
             let result=Outcome(),finished=expectation(description:"Real policy cancellation")
-            // Neither synchronous LA IPC nor an XCTest wait may occupy the
-            // host's main thread: CoreAuthUI needs that thread to present.
-            // Schedule cancellation independently BEFORE making the request.
+            print("SYNTHETIC_POLICY_AVAILABILITY",attempt,Thread.isMainThread)
+            var availabilityError:NSError?
+            guard context.canEvaluatePolicy(.deviceOwnerAuthentication,error:&availabilityError) else {
+                XCTFail("Simulator device-owner policy unavailable: "+String(describing:availabilityError));return
+            }
+            // Cancellation is independent of the UI executor. The test awaits
+            // asynchronously; it must never block the host's main run loop.
             let cancel=DispatchWorkItem {
                 print("SYNTHETIC_POLICY_INVALIDATE",attempt)
                 context.invalidate()
+                print("SYNTHETIC_POLICY_INVALIDATE_RETURNED",attempt)
             }
             DispatchQueue.global(qos:.userInitiated).asyncAfter(deadline:.now()+12,execute:cancel)
-            DispatchQueue.global(qos:.userInitiated).async {
-                print("SYNTHETIC_POLICY_AVAILABILITY",attempt)
-                var availabilityError:NSError?
-                guard context.canEvaluatePolicy(.deviceOwnerAuthentication,error:&availabilityError) else {
-                    XCTFail("Simulator device-owner policy unavailable: "+String(describing:availabilityError))
-                    result.record(false,availabilityError);finished.fulfill();return
+            // Exercise the same async API/UI executor as the app, rather than
+            // initiating an interactive request on an unrelated global queue.
+            let request=Task { @MainActor in
+                print("SYNTHETIC_POLICY_EVALUATE",attempt,Thread.isMainThread)
+                do {
+                    let authenticated=try await context.evaluatePolicy(.deviceOwnerAuthentication,
+                        localizedReason:"Comprobación sintética de cancelación; no autoriza acceso clínico")
+                    result.record(authenticated,nil)
+                    print("SYNTHETIC_POLICY_CALLBACK",attempt,"none",0)
+                } catch {
+                    result.record(false,error)
+                    let issue=error as NSError
+                    print("SYNTHETIC_POLICY_CALLBACK",attempt,issue.domain,issue.code)
                 }
-                print("SYNTHETIC_POLICY_EVALUATE",attempt)
-                context.evaluatePolicy(.deviceOwnerAuthentication,
-                    localizedReason:"Comprobación sintética de cancelación; no autoriza acceso clínico") { authenticated,error in
-                    result.record(authenticated,error)
-                    let issue=error as NSError?
-                    print("SYNTHETIC_POLICY_CALLBACK",attempt,issue?.domain ?? "none",issue?.code ?? 0)
-                    finished.fulfill()
-                }
+                finished.fulfill()
             }
             await fulfillment(of:[finished],timeout:18)
-            cancel.cancel()
+            cancel.cancel();request.cancel()
             let outcome=result.read()
+            withExtendedLifetime(context){}
             guard outcome.received else{return} // fulfillment already failed
             XCTAssertFalse(outcome.authenticated,"Preflight must never authenticate the synthetic user")
             if outcome.cancelled {return}
