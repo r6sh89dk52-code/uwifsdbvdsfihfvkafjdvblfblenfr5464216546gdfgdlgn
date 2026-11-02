@@ -72,6 +72,18 @@ final class N3ClinicalJourneyTests:XCTestCase {
         if element.identifier=="inline-catalog-query" {
             XCTAssertEqual(element.value as? String,value,"La consulta debe escribirse en el buscador, nunca en la cantidad clínica")
         }
+        if element.identifier=="attention-worker-dni" {
+            // Selecting a known DNI dismisses focus asynchronously. The old
+            // exists→tap on its toolbar raced that real dismissal on the
+            // second R visit (run41528135555). Wait for selection to settle;
+            // never tap a button that the app is already removing.
+            let settled=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+                !app.keyboards.firstMatch.exists
+            },object:nil)
+            XCTAssertEqual(XCTWaiter.wait(for:[settled],timeout:10),.completed,
+                "La selección automática del trabajador debe cerrar su teclado antes de continuar")
+            return
+        }
         dismissKeyboard(in:app)
     }
     private func inventory(_ app:XCUIApplication) {

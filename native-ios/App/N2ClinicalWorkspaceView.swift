@@ -47,10 +47,10 @@ struct N2ClinicalWorkspaceGateView:View {
         }
         .background(DanperBackdrop())
         .task(id:sourceInspectionAllowed) {
-            if sourceInspectionAllowed && (!checked || invalidSource) {await refresh()}
-        }
-        .onChange(of:sessionUnlocked) {_,unlocked in
-            if unlocked && summary != nil {Task {await verifyRevision()}}
+            if sourceInspectionAllowed {
+                if !checked || invalidSource {await refresh()}
+                else if summary != nil {await verifyRevision()}
+            }
         }
         .onChange(of:scenePhase) {_,phase in
             if phase == .background {
@@ -120,6 +120,7 @@ struct N2ClinicalWorkspaceGateView:View {
         }
     }
     @MainActor private func verifyRevision() async {
+        let span=N2PerformanceSpan("Clinical revision verification");defer{span.end()}
         do {
             _=try await N2ProtectedClinicalIOSVault.shared.currentRevision()
         }catch {
