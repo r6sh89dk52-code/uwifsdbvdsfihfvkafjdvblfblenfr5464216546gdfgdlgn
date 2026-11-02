@@ -16,12 +16,13 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       STARTUP_MODE: ${{ matrix.startup }}
-      PROOF_ROOT: ${{ runner.temp }}/b15-cold-boot
     steps:
       - uses: actions/checkout@v4
         with:
           ref: 98c0dab7f7e8138b799062d5aefc894bcafefd9e
       - name: Time each cold startup phase on a new owned synthetic device
+        env:
+          PROOF_ROOT: ${{ runner.temp }}/b15-cold-boot
         run: |
           python3 - <<'PY'
           import json,os,subprocess,time,uuid
