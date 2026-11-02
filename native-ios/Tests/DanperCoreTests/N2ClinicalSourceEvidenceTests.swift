@@ -19,6 +19,14 @@ final class N2ClinicalSourceEvidenceTests:XCTestCase {
         try Data("FICTIONAL; not a clinical vault".utf8).write(to:marker)
         XCTAssertTrue(N2ClinicalSourceEvidence.hasFiles(at:root))
         XCTAssertTrue(N2ClinicalSourceEvidence.hasFiles(at:marker))
+        let empty=root.appendingPathComponent("empty-fictional-target")
+        try FileManager.default.createDirectory(at:empty,withIntermediateDirectories:true)
+        let link=root.appendingPathComponent("substituted-root")
+        try FileManager.default.createSymbolicLink(at:link,withDestinationURL:empty)
+        XCTAssertTrue(N2ClinicalSourceEvidence.hasFiles(at:link))
+        let dangling=root.appendingPathComponent("dangling-root")
+        try FileManager.default.createSymbolicLink(at:dangling,withDestinationURL:root.appendingPathComponent("missing-target"))
+        XCTAssertTrue(N2ClinicalSourceEvidence.hasFiles(at:dangling))
     }
 
     func testPermissionAndUnrecognizedErrorsAreNotAbsence() {

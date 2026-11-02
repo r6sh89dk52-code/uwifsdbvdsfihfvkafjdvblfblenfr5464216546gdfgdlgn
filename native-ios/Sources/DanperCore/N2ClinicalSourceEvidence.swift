@@ -5,6 +5,12 @@ import Foundation
 public enum N2ClinicalSourceEvidence {
     public static func hasFiles(at directory:URL)->Bool {
         do {
+            let attributes=try FileManager.default.attributesOfItem(atPath:directory.path)
+            guard attributes[.type] as? FileAttributeType == .typeDirectory else {
+                // A substituted symlink or non-directory root is not an
+                // empty vault, even if its target is empty or missing.
+                return true
+            }
             return !(try FileManager.default.contentsOfDirectory(atPath:directory.path)).isEmpty
         } catch {
             return !isConfirmedAbsence(error as NSError)
