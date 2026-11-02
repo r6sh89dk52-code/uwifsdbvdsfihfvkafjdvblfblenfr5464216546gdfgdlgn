@@ -102,6 +102,9 @@ jobs:
          end=s.index('  git rev-parse HEAD > "$OUT/PROFILE_SOURCE_SHA.txt"',start)
          s=s[:start]+'''  for template in 'Time Profiler' 'Allocations'; do
            label="active-${template// /-}"
+           # A seed preserves existing allergies; a NEW owned Simulator is required.
+           fresh "$label"
+           run_tests "availability-$label" 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
            run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests
            xcrun simctl terminate "$SIM_ID" pe.danper.saludmovil.native.iloaderpreview >/dev/null 2>&1 || true
            run_tests "$label" 1 -only-testing:DANPERInteractionTests/N2AllergySaveInteractionTests/testEmptyRosterSearchAndConfirmedAllergySaveSurviveDraftAndReopen &
