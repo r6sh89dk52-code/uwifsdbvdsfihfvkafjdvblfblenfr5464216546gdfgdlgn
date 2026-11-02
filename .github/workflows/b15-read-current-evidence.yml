@@ -17,10 +17,17 @@ jobs:
           run-id: 41360378278
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/b15-proof
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_UI_RESULT_N2AllergySaveInteractionTests
+          run-id: 41360378278
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b15-allergy-proof
       - name: Read actual capture outcomes; never certify an old app SHA
         env:
           GH_TOKEN: ${{ github.token }}
           EVIDENCE_DIR: ${{ runner.temp }}/b15-proof
+          UI_EVIDENCE_DIR: ${{ runner.temp }}/b15-allergy-proof
         run: |
           python3 - <<'PY'
           import json,os,urllib.request
@@ -39,4 +46,17 @@ jobs:
                   print(p.read_text(errors='replace')[-9000:])
           for p in root.rglob('*-toc.xml'):
               print('TRACE_TOC',p.name,p.read_text(errors='replace')[:5000])
+          ui=Path(os.environ['UI_EVIDENCE_DIR'])
+          for name in ['SOURCE_SHA.txt','SHARD_PASS_SHA.txt','SHARD_VERIFIED_SHA.txt']:
+              assert (ui/name).read_text().strip()==expected,name
+          for name,n in [('biometric-preflight',1),('seed-N2AllergySaveInteractionTests',2),('N2AllergySaveInteractionTests',2)]:
+              summary=json.loads((ui/(name+'.xcresult.summary.json')).read_text())
+              assert summary['totalTestCount']==summary['passedTests']==n
+              assert summary['failedTests']==summary['skippedTests']==0 and not summary.get('testFailures')
+              print('VERIFIED_XCTEST',name,n,'PASS, no failures/skips')
+          for line in (ui/'N2AllergySaveInteractionTests.log').read_text(errors='replace').splitlines():
+              if 'measured [' in line or "passed (" in line:print('UI_MEASUREMENT_OR_CASE',line)
+          request=urllib.request.Request('https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/jobs/125017394518',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          job=json.load(urllib.request.urlopen(request))
+          print('CI_JOB_RESULT_DISTINCT_FROM_TESTS',job['conclusion'],'START',job['started_at'],'END',job['completed_at'])
           PY
