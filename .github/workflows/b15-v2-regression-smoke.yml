@@ -1,0 +1,48 @@
+name: B15 - verify isolated v2 regression fixtures before promotion
+on:
+  push:
+    branches: [audit/b15-v2-regression-testpaths-20261101]
+    paths: [.github/workflows/b15-v2-regression-smoke.yml]
+permissions:
+  contents: read
+jobs:
+  v2-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: 6f74d66e8c327d96e7a9bcbae049eb67e706519d}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: swift-actions/setup-swift@v2
+        with: {swift-version: '6.0.3'}
+      - name: Generate entirely fictional fixtures
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-v2-smoke
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 6f74d66e8c327d96e7a9bcbae049eb67e706519d
+          bash scripts/glass-audit/prepare.sh
+          echo "DANPER_N1_FIXTURE_DIR=$DANPER_AUDIT_OUT/fixtures" >> "$GITHUB_ENV"
+          git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
+      - name: Run four actual v2 tests including both previously blocked fixtures
+        run: |
+          set -euo pipefail
+          swift test --package-path native-ios --jobs 2 --filter 'N2SimpleInventoryTests.testV2' > "$RUNNER_TEMP/b15-v2-smoke/v2-tests.log" 2>&1
+          python3 - "$RUNNER_TEMP/b15-v2-smoke" <<'PY'
+          import re,sys
+          from pathlib import Path
+          root=Path(sys.argv[1]);log=(root/'v2-tests.log').read_text()
+          assert re.search(r'Executed 4 tests, with 0 failures',log),log[-5000:]
+          assert not re.search(r'\d+ tests? skipped|\d+ tests? (?:were )?skipped',log)
+          (root/'V2_REGRESSION_PASS_SHA.txt').write_text((root/'SOURCE_SHA.txt').read_text())
+          print(log[-6000:])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_V2_REGRESSION_FIXTURE_PROOF
+          path: ${{ runner.temp }}/b15-v2-smoke
+          retention-days: 14
