@@ -11,8 +11,6 @@ jobs:
     timeout-minutes: 40
     env:
       DANPER_EXPECTED_BUILD: '15'
-      DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-incremental
-      DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/b15-incremental/fixtures
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,8 +21,12 @@ jobs:
       - uses: swift-actions/setup-swift@v2
         with: {swift-version: '6.0.3'}
       - name: Record source identities and prepare identical fictional inputs
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-incremental
+          DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/b15-incremental/fixtures
         run: |
           set -euo pipefail
+          printf 'DANPER_AUDIT_OUT=%s\nDANPER_N1_FIXTURE_DIR=%s\n' "$DANPER_AUDIT_OUT" "$DANPER_N1_FIXTURE_DIR" >> "$GITHUB_ENV"
           bash scripts/glass-audit/prepare.sh
           git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
           printf '%s\n' '90cb0aba7b553e536c9d3ad42d65eae9f7890fd5' > "$DANPER_AUDIT_OUT/BASELINE_SHA.txt"
