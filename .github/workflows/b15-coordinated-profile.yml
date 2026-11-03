@@ -1,0 +1,127 @@
+name: B15 - Single-current coordinated capture pilot (NOT comparison/app approval)
+'on':
+  push:
+    branches: [audit/b15-coordinated-pilot-4daba96-20261103]
+    paths: [.github/workflows/b15-coordinated-profile.yml, scripts/performance/coordinated_capture.py, scripts/performance/prepare_coordinated_profile.py, scripts/performance/make_coordinated_ui.py, scripts/performance/verify_diagnostic_products.py, scripts/performance/tests/test_coordinated_capture.py]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  coordinated-current-pilot:
+    runs-on: macos-15-intel
+    timeout-minutes: 50
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+      DANPER_SOURCE_SHA: 4daba9649824b58dedc57721d8cd1ad5af035963
+      DANPER_SOURCE_GATE_RUN: '41565545738'
+      DANPER_COORDINATED_PILOT: 'yes'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: profiling-harness
+      - name: Verify bounded ownership and actual recorder stop/ack protocol
+        run: python3 -m unittest discover -s profiling-harness/scripts/performance/tests -v
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DANPER_SOURCE_SHA }}
+          fetch-depth: 0
+          path: current
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Require genuine current-source native binary artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,os,time,urllib.request
+          base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'
+          def get(p):return json.load(urllib.request.urlopen(urllib.request.Request(base+p,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30))
+          for _ in range(40):
+           pr=get('pulls/10');assert pr['head']['sha']==os.environ['DANPER_SOURCE_SHA'] and pr['draft'] and not pr['merged']
+           run=get('actions/runs/'+os.environ['DANPER_SOURCE_GATE_RUN']);assert run['head_sha']==pr['head']['sha']
+           jobs=get('actions/runs/'+os.environ['DANPER_SOURCE_GATE_RUN']+'/jobs?per_page=100')['jobs']
+           artifacts=get('actions/runs/'+os.environ['DANPER_SOURCE_GATE_RUN']+'/artifacts')['artifacts']
+           native=[j for j in jobs if j['name']=='native-build']
+           if native and native[0]['conclusion']=='success' and any(a['name']=='B15_COMPILED_SAME_HEAD' and not a['expired'] for a in artifacts):break
+           if run['status']=='completed':raise RuntimeError('No approved current-source native artifact')
+           time.sleep(30)
+          else:raise RuntimeError('Current-source binary unavailable; never substitute an older source')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_SAME_HEAD
+          run-id: 41366450170
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/coordinated-compiled-before
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_SAME_HEAD
+          run-id: ${{ env.DANPER_SOURCE_GATE_RUN }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/coordinated-compiled-after
+      - name: Restore exact original app/native products for both variants
+        run: |
+          set -euo pipefail
+          for label in before after; do
+           mkdir -p "$RUNNER_TEMP/coordinated-derived-$label/Build"
+           tar -xzf "$RUNNER_TEMP/coordinated-compiled-$label/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/coordinated-derived-$label/Build"
+          done
+      - name: Compile identical diagnostic UI runner; never substitute a rebuilt app
+        run: |
+          set -euo pipefail
+          cd current
+          mkdir -p "$RUNNER_TEMP/diagnostic-build-proof"
+          npm ci --ignore-scripts --no-fund > "$RUNNER_TEMP/diagnostic-build-proof/npm.log" 2>&1
+          node scripts/prepare-n1s-ios-demo-resources.cjs > "$RUNNER_TEMP/diagnostic-build-proof/resources.log" 2>&1
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          python3 ../profiling-harness/scripts/performance/make_coordinated_ui.py
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          git diff --exit-code HEAD -- native-ios/App native-ios/Sources native-ios/NativeTests native-ios/project.yml
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/diagnostic-derived" ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES ASSETCATALOG_COMPILER_APPICON_NAME="" build-for-testing > "$RUNNER_TEMP/diagnostic-build-proof/build.log" 2>&1 || { tail -n 100 "$RUNNER_TEMP/diagnostic-build-proof/build.log"; exit 1; }
+      - name: Verify original app/native hashes and overlay only same diagnostic runner
+        run: python3 profiling-harness/scripts/performance/prepare_coordinated_profile.py
+      - name: Profile complete real assertions before app termination on same Mac
+        run: |
+          set -euo pipefail
+          overall=0
+          for label in after; do
+           if test "$label" = before; then task_root="$RUNNER_TEMP/coordinated-source-before"; else task_root="$GITHUB_WORKSPACE/current"; fi
+           export DANPER_AUDIT_OUT="$RUNNER_TEMP/coordinated-profile-$label"
+           export DANPER_AUDIT_DERIVED_DATA="$RUNNER_TEMP/coordinated-derived-$label"
+           export DANPER_TEST_PROOF="$RUNNER_TEMP/coordinated-proof-$label.json"
+           export DANPER_B15_UI_LABEL="Coordinated-Allergy-$label"
+           (cd "$task_root" && bash scripts/glass-audit/validate-macos.sh b15-profile) || overall=1
+          done
+          exit "$overall"
+      - name: Require current TimeProfiler span and real UI; comparison and Allocations remain unapproved
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP']);report={'scope':'Same-host two-worker diagnostic UI capture; unchanged sealed app/native binaries; NOT functional approval','physicalDeviceValidated':False,'IPA':False,'variants':{}}
+          failed=[]
+          for label in ['after']:
+           folder=root/('coordinated-profile-'+label);entry={};report['variants'][label]=entry
+           proof=folder/'ORCHESTRATION.json'
+           if proof.exists():entry['orchestration']=json.loads(proof.read_text())
+           rows=folder/'COORDINATED_EXIT.txt';entry['workloadExit']=rows.read_text() if rows.exists() else 'Not executed'
+           if not rows.exists() or len(rows.read_text().splitlines())!=1 or any(not row.endswith('ui=0 capture=0') for row in rows.read_text().splitlines()):failed.append(label+' missing/failed genuine UI/capture')
+           entry['captures']=[json.loads(p.read_text()) for p in folder.rglob('COORDINATED_CAPTURE.json')]
+           if len(entry['captures'])!=1 or any(not c.get('successful') for c in entry['captures']):failed.append(label+' incomplete capture; unavailable metrics remain unmeasured')
+           print('COORDINATED_ACTUAL_RESULT',label,json.dumps(entry))
+          assert report['variants'].get('after',{}).get('orchestration',{}).get('sourceSHA')==os.environ['DANPER_SOURCE_SHA']
+          report['pilotOnly']=True;report['fullComparisonApproved']=False
+          (root/'COORDINATED_COMPARISON.json').write_text(json.dumps(report,indent=2))
+          assert not failed,failed
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_COORDINATED_CURRENT_PILOT_NOT_COMPARISON
+          path: |
+            ${{ runner.temp }}/coordinated-profile-*
+            ${{ runner.temp }}/diagnostic-build-proof
+            ${{ runner.temp }}/COORDINATED_COMPARISON.json
+          retention-days: 14
