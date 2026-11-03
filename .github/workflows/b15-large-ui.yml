@@ -1,7 +1,7 @@
-name: B15 - 9648-worker real UI regression (NO release approval)
+name: B15 - Cold DEMO single recovery and 9648-worker UI (NO release approval)
 'on':
   push:
-    branches: [audit/b15-large-ui-4daba96-20261103]
+    branches: [audit/b15-cold-demo-4daba96-20261103]
     paths: [.github/workflows/b15-large-ui.yml, native-ios/NativeTests/N2LargeRosterProfileFixture.swift, scripts/performance/prepare_large_ui_harness.py, scripts/performance/verify_large_ui_products.py]
 permissions:
   contents: read
@@ -17,7 +17,7 @@ jobs:
         with: {path: load-harness}
       - uses: actions/checkout@v4
         with:
-          ref: 4daba9649824b58dedc57721d8cd1ad5af035963
+          ref: ${{ github.sha }}
           path: current
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
@@ -51,13 +51,14 @@ jobs:
           import json,math,os,re
           from pathlib import Path
           root=Path(os.environ['RUNNER_TEMP'])/'large-ui-results'
-          report={'sourceSHA':'4daba9649824b58dedc57721d8cd1ad5af035963','scope':'iPhone16/iOS18.5 Debug Simulator; 9648 fictional workers/1005 saved visits; diagnostic UI runner, production App/Core sources unchanged','fullAppApproved':False,'IPA':False,'physicalDeviceMeasured':False,'latencySamples':1,'p95':None,'limitation':'Save interval includes XCTest tap helper, scroll/query/idle overhead; search includes typing/automation. Not pure app latency, no matched baseline.'}
+          import subprocess
+          report={'sourceSHA':subprocess.check_output(['git','-C','current','rev-parse','HEAD'],text=True).strip(),'scope':'iPhone16/iOS18.5 Debug Simulator; 9648 fictional workers/1005 saved visits; candidate App/Core exactly match its committed HEAD; diagnostic UI runner overlay only','fullAppApproved':False,'IPA':False,'physicalDeviceMeasured':False,'latencySamples':1,'p95':None,'limitation':'Save interval includes XCTest tap helper, scroll/query/idle overhead; search includes typing/automation. Not pure app latency, no matched baseline.'}
           try:
            assert (root/'SOURCE_SHA.txt').read_text().strip()==report['sourceSHA']
-           for name,n in [('biometric-preflight',1),('large-seed',1),('original-fixtures',2),('large-invariants-before',1),('large-ui',3),('large-invariants-after',1)]:
+           for name,n in [('biometric-preflight',1),('empty-dashboard',1),('large-seed',1),('original-fixtures',2),('large-invariants-before',1),('large-ui',3),('large-invariants-after',1)]:
             d=json.loads((root/(name+'.xcresult.summary.json')).read_text());assert d['passedTests']==d['totalTestCount']==n and d['failedTests']==d['skippedTests']==0 and not d.get('testFailures'),name
            s=(root/'large-ui.log').read_text()
-           for key,marker in [('automatedSaveConfirmationMS','DANPER_LARGE_UI_SAVE_MS'),('automatedLastSearchMS','DANPER_LARGE_UI_LAST_SEARCH_MS')]:
+           for key,marker in [('automatedColdHomeReadyMS','DANPER_LARGE_UI_COLD_HOME_MS'),('automatedSaveConfirmationMS','DANPER_LARGE_UI_SAVE_MS'),('automatedLastSearchMS','DANPER_LARGE_UI_LAST_SEARCH_MS')]:
             values=re.findall(marker+r' ([0-9.]+)',s);assert len(values)==1,marker
             report[key]=float(values[0]);assert math.isfinite(report[key]) and report[key]>0
            report.update(uiPassed=3,uiFailed=0,uiSkipped=0,completeOriginalPhysicalWorkersHistoryDraftPreserved=True,successful=True)

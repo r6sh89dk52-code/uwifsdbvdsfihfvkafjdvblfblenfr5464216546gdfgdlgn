@@ -209,7 +209,13 @@ actor N2SyntheticTrialIOSVault {
         try protectedStore().dispensingStatus(visitID:visitID)
     }
     func dashboardSnapshot(today:String,weekStart:String)throws->N2DashboardSnapshot? {
-        try protectedStore().dashboardSnapshot(today:today,weekStart:weekStart)
+        do {
+            // Absence is allowed only with the same real deviceKey checks as
+            // inspect/readHistory. Existing encrypted files without a key
+            // still throw; never create a key, source or inventory here.
+            guard let secret=try deviceKey(create:false) else {sessionStore=nil;return nil}
+            return try sessionStore(for:secret).dashboardSnapshot(today:today,weekStart:weekStart)
+        } catch {sessionStore=nil;throw error}
     }
     func dashboardCounters(today:String,weekStart:String)throws
         ->(today:Int,week:Int,month:Int,drafts:Int)? {

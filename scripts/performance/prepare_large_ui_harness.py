@@ -29,7 +29,16 @@ EXTRA='''    func testLargeRosterSearchFindsLastWorkerWithoutRenderingWholeRoste
 
 def instrument(source):
     assert 'DANPER_LARGE_UI_SAVE_MS' not in source
-    trigger='        tap(save,in:app)';assert source.count(trigger)==1
+    launch='        app.launch()'
+    # Instrument only the save journey: the performance case is unchanged.
+    marker='    func testEmptyRosterSearchAndConfirmedAllergySaveSurviveDraftAndReopen() {'
+    prefix,body=source.split(marker);assert body.count(launch)==1
+    body=body.replace(launch,'        let coldHomeStart=ProcessInfo.processInfo.systemUptime\n'+launch)
+    ready='        XCTAssertTrue(new.waitForExistence(timeout:25),app.debugDescription)'
+    assert body.count(ready)==1
+    body=body.replace(ready,ready+'\n        print("DANPER_LARGE_UI_COLD_HOME_MS "+String((ProcessInfo.processInfo.systemUptime-coldHomeStart)*1000))')
+    source=prefix+marker+body
+    trigger='        tap(save,in:app)' ;assert source.count(trigger)==1
     confirmed='        XCTAssertTrue(app.staticTexts["Alergias revisadas y guardadas"].waitForExistence(timeout:20),app.debugDescription)'
     assert source.count(confirmed)==1
     source=source.replace(trigger,'        let largeSaveStart=ProcessInfo.processInfo.systemUptime\n'+trigger)
@@ -46,7 +55,8 @@ if __name__=='__main__':
     old='python3 scripts/performance/test-products.py verify "$DD/Build/Products" "$DANPER_TEST_PROOF"';assert s.count(old)==1
     s=s.replace(old,'python3 scripts/performance/verify_large_ui_products.py verify "$DD/Build/Products" "$DANPER_TEST_PROOF"')
     start=s.index('  run_tests seed-profile 2 ');end=s.index('  git rev-parse HEAD > "$OUT/PROFILE_SOURCE_SHA.txt"',start)
-    s=s[:start]+'''  run_tests large-seed 1 -only-testing:DANPERNativeTests/N2LargeRosterProfileFixture/testSeed9648WorkersAnd1005VisitsInEmptyDemo
+    s=s[:start]+'''  run_tests empty-dashboard 1 -only-testing:DANPERNativeTests/N2LargeRosterProfileFixture/testEmptyDashboardDoesNotCreateSyntheticSourceOrKey
+  run_tests large-seed 1 -only-testing:DANPERNativeTests/N2LargeRosterProfileFixture/testSeed9648WorkersAnd1005VisitsInEmptyDemo
   run_tests original-fixtures 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests
   run_tests large-invariants-before 1 -only-testing:DANPERNativeTests/N2LargeRosterProfileFixture/testCaptureCompletePhysicalWorkersAndHistoryBeforeReview
   run_tests large-ui 3 -only-testing:DANPERInteractionTests/N2AllergySaveInteractionTests

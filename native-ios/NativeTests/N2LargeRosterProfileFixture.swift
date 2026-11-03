@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import Security
 @testable import DanperCore
 @testable import DANPERNative
 
@@ -15,6 +16,19 @@ final class N2LargeRosterProfileFixture:XCTestCase {
         #if !targetEnvironment(simulator)
         throw Failure.simulatorRequired
         #endif
+    }
+    func testEmptyDashboardDoesNotCreateSyntheticSourceOrKey() async throws {
+        try requireSimulator();continueAfterFailure=false
+        let query:[String:Any]=[kSecClass as String:kSecClassGenericPassword,
+            kSecAttrService as String:"pe.danper.saludmovil.native.iloaderpreview.n2.synthetic",
+            kSecAttrAccount as String:"n2-synthetic-trial-key-v1"]
+        XCTAssertEqual(SecItemCopyMatching(query as CFDictionary,nil),errSecItemNotFound)
+        let vault=N2SyntheticTrialIOSVault.shared
+        let before=try await vault.inspect();XCTAssertNil(before)
+        let dashboard=try await vault.dashboardSnapshot(today:"2026-11-03",weekStart:"2026-11-02")
+        XCTAssertNil(dashboard)
+        let after=try await vault.inspect();XCTAssertNil(after)
+        XCTAssertEqual(SecItemCopyMatching(query as CFDictionary,nil),errSecItemNotFound)
     }
     func testSeed9648WorkersAnd1005VisitsInEmptyDemo() async throws {
         try requireSimulator();continueAfterFailure=false

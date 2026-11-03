@@ -19,7 +19,9 @@ struct NativeRootView:View {
     @State private var newlyRegisteredWorkerDNI:String?
     @State private var showNewAttention=false
     @State private var homeCounts:DanperHomeCounts?
-    @State private var summary:N2ProtectedStoreSummary?
+    @State private var sourceReady=false
+    @State private var refreshInFlight=false
+    @State private var refreshPending=false
     @State private var loading=true
     @State private var preparing=false
     @State private var problem=""
@@ -32,7 +34,7 @@ struct NativeRootView:View {
     @AppStorage("danper.visual.palette") private var visualPalette="danper"
     @AppStorage("danper.haptics.enabled") private var haptics=true
 
-    private var isReady:Bool { summary != nil || layoutOnly }
+    private var isReady:Bool { sourceReady || layoutOnly }
     var body:some View {
         VStack(spacing:0) {
             DanperBrandHeader {tab=3}
@@ -73,16 +75,16 @@ struct NativeRootView:View {
         .tint(DanperStyle.red)
         .environment(\.n2WorkspaceVault,.demo)
         .environment(\.locale,Locale(identifier:"es_PE"))
-        .task(id:tab) {if tab==0 {await refresh()}}
+        .task(id:tab) {if tab==0 {await refresh(forceFresh:true)}}
         .sheet(isPresented:$showNewAttention,onDismiss:{
             newlyRegisteredWorkerDNI=nil
-            Task {await refresh()}
+            Task {await refresh(forceFresh:true)}
         }) {
             DanperAttentionEditor(initialWorkerDNI:newlyRegisteredWorkerDNI)
 
         }
         .onChange(of:scenePhase) {_,phase in
-            if phase == .active {Task {await refresh()}}
+            if phase == .active {Task {await refresh(forceFresh:true)}}
         }
     }
 
@@ -253,11 +255,11 @@ struct NativeRootView:View {
                 NavigationLink {
                     N2DemoResetView(onDeleted:{
                         // The demo workspace is never silently re-initialized.
-                        summary=nil
+                        sourceReady=false
                         metrics=nil
                         newlyRegisteredWorkerDNI=nil
                         tab=0
-                        Task {await refresh()}
+                        Task {await refresh(forceFresh:true)}
                     })
                 } label: {
                     Label("Borrar TODOS los datos ficticios",
@@ -305,24 +307,35 @@ struct NativeRootView:View {
         .danperFormChrome()
     }
     @MainActor
-    private func refresh() async {
+    private func refresh(forceFresh:Bool=false) async {
         guard !layoutOnly else{return}
-        loading=true
-        defer{loading=false}
-        do {
-            summary=try await N2SyntheticTrialIOSVault.shared.inspect()
-            let period=N2HomeCalendarPeriod(now:Date())
-            let counters=try await N2SyntheticTrialIOSVault.shared.dashboardCounters(today:period.today,weekStart:period.weekStart)
-            homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
-            problem=""
-        }catch {
-            summary=nil
-            problem=trialFailureMessage(error)
+        if refreshInFlight {
+            // Initial .task and active-scene callbacks share one actual read.
+            // A later edit/return on a ready source must still request a fresh
+            // recovery; never drop a possible newer revision during a read.
+            if forceFresh && sourceReady {refreshPending=true}
+            return
         }
+        refreshInFlight=true;loading=true
+        defer{refreshInFlight=false;loading=false}
+        repeat {
+            refreshPending=false
+            do {
+                let period=N2HomeCalendarPeriod(now:Date())
+                let state=try await N2SyntheticTrialIOSVault.shared.dashboardSnapshot(
+                    today:period.today,weekStart:period.weekStart)
+                sourceReady=state != nil
+                homeCounts=state.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
+                problem=""
+            }catch {
+                sourceReady=false;homeCounts=nil
+                problem=trialFailureMessage(error)
+            }
+        } while refreshPending
     }
     @MainActor
     private func startPractice(withSample:Bool) async {
-        guard !preparing,summary==nil,problem.isEmpty else{return}
+        guard !preparing,!sourceReady,problem.isEmpty else{return}
         preparing=true
         defer{preparing=false}
         do {
@@ -336,13 +349,13 @@ struct NativeRootView:View {
                     throw N2SyntheticTrialIOSVault.Failure.blockedMigration
                 }
             }
-            summary=result
+            sourceReady=true
             let period=N2HomeCalendarPeriod(now:Date())
             let counters=try await N2SyntheticTrialIOSVault.shared.dashboardCounters(today:period.today,weekStart:period.weekStart)
             homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
             problem=""
         } catch {
-            summary=nil
+            sourceReady=false
             metrics=nil
             problem=trialFailureMessage(error)
         }
