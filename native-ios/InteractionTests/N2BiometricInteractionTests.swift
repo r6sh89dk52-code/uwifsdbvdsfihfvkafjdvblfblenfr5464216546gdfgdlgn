@@ -125,7 +125,21 @@ final class N2BiometricInteractionTests:XCTestCase {
             "La autenticación debe retirar la cobertura y permitir interacción real: "+app.debugDescription)
         capture(app,"Autenticacion-simulada-aceptada-seleccion-fuente")
         XCUIDevice.shared.press(.home)
-        XCTAssertTrue(app.wait(for:.runningBackground,timeout:10))
+        // iOS may suspend a backgrounded app before XCTest observes the
+        // transient runningBackground state. Both are actual background;
+        // foreground, unknown and termination must still fail this gate.
+        var observedBackgroundStates=[String]()
+        let backgrounded=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            let state=app.state
+            observedBackgroundStates.append(String(describing:state))
+            return state == .runningBackground || state == .runningBackgroundSuspended
+        },object:nil)
+        let backgroundResult=XCTWaiter.wait(for:[backgrounded],timeout:10)
+        let stateEvidence=XCTAttachment(string:observedBackgroundStates.joined(separator:"\n"))
+        stateEvidence.name="Actual-background-state-before-reauthentication"
+        stateEvidence.lifetime = .keepAlways;add(stateEvidence)
+        XCTAssertEqual(backgroundResult,.completed,
+            "La app debe estar realmente en segundo plano o suspendida; estados: "+observedBackgroundStates.joined(separator:", "))
         app.activate()
         XCTAssertTrue(checking.waitForExistence(timeout:10),app.debugDescription)
         Thread.sleep(forTimeInterval:2)
