@@ -45,7 +45,18 @@ final class N3ClinicalJourneyTests:XCTestCase {
                 if frame.minY>safeTop && frame.maxY<bottom && element.isHittable {
                     visible=true;break
                 }
-                scrollShort(in:app,up:frame.minY>=safeTop)
+                // Move only the distance required by this fresh target frame.
+                // The fixed0.20 drags produced31 gestures and many application
+                // queries in run41684106094. Do not scroll an already-in-bounds
+                // control merely because a presentation is still settling.
+                let height=launchViewport!.height
+                if frame.maxY>=bottom {
+                    let distance=min(0.32,max(0.10,(frame.maxY-bottom+32)/height))
+                    scrollShort(in:app,up:true,distance:distance)
+                } else if frame.minY<=safeTop {
+                    let distance=min(0.32,max(0.10,(safeTop-frame.minY+32)/height))
+                    scrollShort(in:app,up:false,distance:distance)
+                }
             }
             XCTAssertTrue(visible,"El control debe estar dentro del contenido visible, fuera del pie fijo: "+app.debugDescription)
             // visible already requires this exact target's current isHittable.
@@ -74,9 +85,10 @@ final class N3ClinicalJourneyTests:XCTestCase {
     /// Screen-wide inertial flicks can jump a short inline field past both
     /// viewport edges. Drag the empty outer gutter so date/menu controls never
     /// receive an accidental press; every target must still be hittable.
-    private func scrollShort(in app:XCUIApplication,up:Bool) {
-        let start=app.coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:up ? 0.65:0.40))
-        let end=app.coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:up ? 0.45:0.60))
+    private func scrollShort(in app:XCUIApplication,up:Bool,distance:CGFloat) {
+        let startY:CGFloat=up ? 0.65:0.40
+        let start=app.coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:startY))
+        let end=app.coordinate(withNormalizedOffset:CGVector(dx:0.02,dy:startY+(up ? -distance:distance)))
         start.press(forDuration:0.10,thenDragTo:end,withVelocity:.slow,thenHoldForDuration:0.10)
     }
     private func enter(_ element:XCUIElement,_ value:String,in app:XCUIApplication) {
@@ -87,11 +99,16 @@ final class N3ClinicalJourneyTests:XCTestCase {
         let keyboard=app.keyboards.firstMatch
         tap(element,in:app,field:true)
         XCTAssertTrue(keyboard.exists || keyboard.waitForExistence(timeout:5),app.debugDescription)
-        if let old=element.value as? String,old != element.placeholderValue,!old.isEmpty {
+        // Read related attributes in one fresh, public XCTest snapshot. This
+        // is discarded after this entry, never reused to assert a saved value.
+        guard let before=try? element.snapshot() else {
+            XCTFail("No se pudieron leer los atributos actuales del campo");return
+        }
+        if let old=before.value as? String,old != before.placeholderValue,!old.isEmpty {
             element.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:old.count))
         }
         element.typeText(value)
-        let identifier=element.identifier
+        let identifier=before.identifier
         if identifier=="inline-catalog-query" {
             XCTAssertEqual(element.value as? String,value,"La consulta debe escribirse en el buscador, nunca en la cantidad clínica")
         }
@@ -116,8 +133,9 @@ final class N3ClinicalJourneyTests:XCTestCase {
     }
     private func stock(_ app:XCUIApplication,_ code:String)->String {
         let field=app.staticTexts["simple-stock-"+code]
-        for _ in 0..<5 {if field.exists && field.isHittable {break};app.swipeUp()}
-        XCTAssertTrue(field.exists || field.waitForExistence(timeout:5),app.debugDescription)
+        var visible=false
+        for _ in 0..<5 {if field.exists && field.isHittable {visible=true;break};app.swipeUp()}
+        XCTAssertTrue(visible || field.waitForExistence(timeout:5),app.debugDescription)
         return field.label
     }
     private func saveVisit(_ app:XCUIApplication,r:String,units:Bool) {

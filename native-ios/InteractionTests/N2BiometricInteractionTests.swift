@@ -33,14 +33,16 @@ final class N2BiometricInteractionTests:XCTestCase {
         app.launchArguments=["-danper.native.onboarding.v1.finished","YES"]
         app.launch()
         let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
-        let alert=springboard.alerts.firstMatch
-        let ownFaceID=alert.staticTexts.matching(NSPredicate(format:
+        // Match the owned system alert directly. Reading a descendant text
+        // of alerts.firstMatch repeatedly asked AX for another subtree while
+        // the actual TCC alert was still being presented on cold Simulator.
+        let ownFaceID=springboard.alerts.matching(NSPredicate(format:
             "label CONTAINS[c] %@ AND label CONTAINS[c] %@ AND label CONTAINS[c] %@",
             "DANPER","Face","ID")).firstMatch
         var acceptedPermission=false
         var permissionDismissalSeconds:TimeInterval?
-        if ownFaceID.waitForExistence(timeout:15) {
-            let allow=alert.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
+        func acceptOwnedPermission() {
+            let allow=ownFaceID.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
             XCTAssertTrue(allow.waitForExistence(timeout:5))
             XCTAssertTrue(allow.isHittable)
             let permissionStarted=Date()
@@ -53,13 +55,32 @@ final class N2BiometricInteractionTests:XCTestCase {
             XCTAssertEqual(XCTWaiter.wait(for:[dismissed],timeout:30),.completed)
             permissionDismissalSeconds=Date().timeIntervalSince(permissionStarted)
         }
+        if ownFaceID.waitForExistence(timeout:15) {acceptOwnedPermission()}
         let checking=app.staticTexts["Verificando identidad…"]
         let retry=app.buttons["Reintentar Face ID"]
+        // The prompt can arrive after the first15s: run41684106094's
+        // SpringBoard snapshot at35.77s had no alert, but its later capture
+        // showed the real, unanswered permission covering the checking state.
+        // Observe it during the ORIGINAL15s gate window too. Consent handling
+        // keeps its original5s/30s budgets; discovery never gets a fresh15s.
+        var latePermission=false
+        let gateStarted=Date()
         let gated=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
-            checking.exists || retry.exists
+            if ownFaceID.exists {latePermission=true;return true}
+            return checking.exists || retry.exists
         },object:nil)
-        XCTAssertEqual(XCTWaiter.wait(for:[gated],timeout:15),.completed,
-            "The app must reach its genuine authentication gate")
+        let gateResult=XCTWaiter.wait(for:[gated],timeout:15)
+        XCTAssertEqual(gateResult,.completed,"The app must reach its genuine authentication gate or show its actual permission")
+        if latePermission {
+            let remaining=max(0,15-Date().timeIntervalSince(gateStarted))
+            acceptOwnedPermission()
+            let afterConsent=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+                checking.exists || retry.exists
+            },object:nil)
+            XCTAssertTrue(checking.exists || retry.exists ||
+                XCTWaiter.wait(for:[afterConsent],timeout:remaining) == .completed,
+                "Accepting permission must return to the genuine authentication gate")
+        }
         let source=app.buttons["clinical-first-run-import-personal"]
         let home=app.buttons["premium-tab-home"]
         let noAccess=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in

@@ -51,3 +51,42 @@ retries; its actual journey did not execute. Preserve that failure and run the
 unchanged real permission/authentication flow on a fresh isolated runner in
 the new source gate. Do not bypass consent, inject a success, extend deadlines,
 or automatically turn an assertion failure into success.
+
+
+## Closed gate41684106094 at8ca4b40 — blockers retained
+
+Actual result FAILURE, not release approval. Core439/native30/JS62/Python37,
+both official workbooks, v1/v2/9budgets, original14synthetic compatibility and
+idle Instruments jobs passed. Mandatory UI summaries:11PASS/2FAIL/0SKIP;
+protected journey1NOT EXECUTED due to separate permission preflight failure.
+Dedicated biometrics2/2, allergies2/2, Glass3/3, Menu1/1, Premium2/2 passed.
+Shell0/1 failed at a30s XCTest event synthesis timeout on Settings; source
+unchanged. Its failure remains visible and the case stays mandatory.
+
+R1/R0 still exceeded600s. R0 saved572.72s, physical balances read at582–584s,
+relaunch584.66s, final inventory/history assertions occurred after600s and do
+not certify the case. Previous helper change was insufficient; do not claim
+it solved the timeout. The case performed31 gutter drags and192 application
+queries before teardown. Next helper uses the fresh target frame to bound
+its drag distance0.10–0.32 of screen height, keeps the same slow gutter drag,
+8attempt limit, safe viewport and real hittability assertion. An in-bounds
+control that is not yet hittable is rechecked without scrolling it away.
+One fresh public XCTest element snapshot supplies existing text/placeholder/
+identifier for each entry; post-typing value and all saved-state assertions
+still query the live UI. No clinical or stock value is cached across actions.
+
+Protected permission-preflight snapshot35.77s had no TCC alert. The later
+system hierarchy and PNG show the actual owned Face ID permission still open,
+with Permitir/No permitir; app behind it remains Verificando identidad.
+The old test stopped looking for permission after its first15s and queried
+only the covered app during the next15s. The change matches the owned alert
+label directly and also checks for late consent during the ORIGINAL second
+15s window. Handling keeps original5s button/30s dismissal limits; after
+late consent only the unused gate interval remains. No match/nomatch event,
+TCC grant by command, authentication bypass or increased test allowance.
+
+Only these two XCTest helpers and this document change. App/Core, production
+optimizations, Face ID/device-code policies, storage/Keychain/bundle identity,
+stock, workers and clinical data are unchanged. All439/30/14/62/37 and other
+mandatory gates must run again for the newly published source. No IPA while
+any fails or remains pending. Distribution preparation stays inactive.
