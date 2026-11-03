@@ -1,0 +1,312 @@
+[
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-automatic-clinical-dispensing.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-logic.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-draft-logic.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-secure-store.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-ios-gesture.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-kardex.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-kardex-movements.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-attention-kardex.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-reconciliation.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-daily-kardex.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-kardex-98-export.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-ambulatory-rows.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-ambulatory-source-catalog.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-ambulatory-workbook.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-ambulatory-reconciliation.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-reviewed-associations.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-kardex-ux.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-kardex-embedded.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-kardex-embedded-export.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-kardex-entry-ux.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-shared-inventory-reports.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-private-worker-vault.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-personal-xml-dedupe.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-native-haptics.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-private-clinical-vault.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-portable-backup.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-portable-restore.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-verified-clinical-migration.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-native-access-lock.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-cross-device-encrypted-restore.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-official-roster-review.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-operational-roster.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-clean-install-reset.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-visual-refresh.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-guided-attention.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-stage-b.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-diagnosis-keyboard.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-cohesive-welcome.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-stage-c-ux.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-visual-polish.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-worker-report-clarity.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-worker-organization.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-organization-directory.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-shared-stock-closure.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-native-reminders.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-backup-restore-ux.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-release-upgrade-220.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-provisional-ambulatory-export.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-fefo-cross-report-audit.cjs",
+    "exit": 0
+  },
+  {
+    "group": "javascript-50",
+    "file": "scripts/test-upgrade-221-preservation.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/test-n2-build222-ui-parity.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/test-n2-premium-redesign.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/test-n2-simple-inventory-v2.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/test-n2-glass-clinical.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/audit-n2-workspace-routing.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/test-n2-workspace-routing.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/audit-n2-build222-backup-restore.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/audit-n2-swift-string-concatenations.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/audit-n2-personal-import.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/audit-n2-joint-indicator.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/test-n1s-one-click-container-consent.cjs",
+    "exit": 0
+  },
+  {
+    "group": "additional-12",
+    "file": "scripts/glass-audit/identity.cjs",
+    "exit": 0
+  }
+]

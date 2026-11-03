@@ -1,0 +1,35 @@
+{
+  "sourceSHA": "4daba9649824b58dedc57721d8cd1ad5af035963",
+  "swift": 437,
+  "native": 29,
+  "javascript": 62,
+  "skips": 0,
+  "coreBudgets": 9,
+  "build14Compatibility": {
+    "build14BackupRead": true,
+    "build14JournalRead": true,
+    "failures": 0,
+    "historicalRectificationPersisted": true,
+    "newBackupRoundTrip": true,
+    "physicalDeviceValidated": false,
+    "producerSHA": "9b1da6d4cdead4729bcade6843abcbcfc287e870",
+    "sourceSHA": "4daba9649824b58dedc57721d8cd1ad5af035963",
+    "stockUnchanged": true,
+    "tests": 1,
+    "workersAndOriginalVisitsUnchanged": true
+  },
+  "releaseFilesVerified": 22,
+  "arm64MachOVerified": true,
+  "debugHooksAbsent": true,
+  "uiStatus": "FAILURE",
+  "IPA": false,
+  "nonUIFailures": 0,
+  "ui": {
+    "passed": 12,
+    "failed": 2,
+    "skipped": 0,
+    "executed": 14
+  },
+  "overallGate": "FAILURE",
+  "completeJob": "SKIPPED"
+}

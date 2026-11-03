@@ -1,0 +1,45 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "x86_64",
+        "deviceId": "BAD5D2D5-14EF-4569-A07A-1CF1014DF6C9",
+        "deviceName": "DANPER-SYNTHETIC-native",
+        "modelName": "iPhone 16",
+        "osBuildNumber": "22F77",
+        "osVersion": "18.5",
+        "platform": "iOS Simulator"
+      },
+      "expectedFailures": 0,
+      "failedTests": 1,
+      "passedTests": 0,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "DANPERNative \u00b7 Built with macOS 15.7.9",
+  "expectedFailures": 0,
+  "failedTests": 1,
+  "finishTime": 1793676799.597,
+  "passedTests": 0,
+  "result": "Failed",
+  "skippedTests": 0,
+  "startTime": 1793676469.731,
+  "statistics": [],
+  "testFailures": [
+    {
+      "failureText": "XCTAssertTrue failed - Attributes: Application, 0x10cd5f260, pid: 25561, label: 'DANPER Salud M\u00f3vil'\nElement subtree:\n \u2192Application, 0x10cd5f260, pid: 25561, label: 'DANPER Salud M\u00f3vil'\n    Window (Main), 0x10cd5e7e0, {{0.0, 0.0}, {393.0, 852.0}}\n      Other, 0x10cd50d30, {{0.0, 0.0}, {393.0, 852.0}}\n        Other, 0x10cd5fdd0, {{0.0, 0.0}, {393.0, 852.0}}\n          Other, 0x10cd5eee0, {{0.0, 0.0}, {393.0, 852.0}}\n            Other, 0x10cd5eb70, {{0.0, 0.0}, {393.0, 852.0}}\n              ScrollView, 0x10cd60140, {{0.0, 0.0}, {393.0, 852.0}}\n                Other, 0x10cd604a0, {{0.0, 59.0}, {393.0, 787.3}}\n                  Image, 0x10cd607f0, {{27.0, 24.7}, {165.0, 165.0}}, label: 'Danper'\n                  StaticText, 0x10cd61300, {{27.0, 146.1}, {116.3, 14.3}}, label: 'SALUD M\u00d3VIL'\n                  StaticText, 0x10cd61be0, {{27.0, 280.2}, {134.0, 60.0}}, label: 'Cuidamos\nlo m\u00e1s importante,\nnuestra gente.'\n                  StaticText, 0x10cd61f70, {{87.0, 547.0}, {220.0, 15.7}}, identifier: 'premium-auth-error', label: 'No se pudo verificar tu identidad'\n                  Button, 0x10cd622f0, {{26.0, 575.7}, {341.0, 58.7}}, identifier: 'premium-face-id', label: 'Reintentar Face ID'\n                    Image, 0x10cd62670, {{46.7, 594.3}, {21.3, 21.3}}, identifier: 'faceid', label: 'Face Id'\n                    StaticText, 0x10cd629f0, {{82.7, 596.0}, {130.7, 18.0}}, label: 'Reintentar Face ID'\n                    Image, 0x10cd63520, {{342.0, 599.7}, {6.3, 10.7}}, identifier: 'chevron.right', label: 'Forward'\n                  StaticText, 0x10cd640b0, {{192.8, 647.4}, {7.3, 14.3}}, label: 'o'\n                  Button, 0x10cd64440, {{26.0, 674.7}, {341.0, 58.7}}, identifier: 'premium-device-code', label: 'Usar c\u00f3digo del dispositivo'\n                    Image, 0x10cd647c0, {{46.7, 693.3}, {22.3, 21.3}}, identifier: 'circle.grid.3x3.fill', label: 'circle.grid.3x3.fill'\n                    StaticText, 0x10cd64b30, {{83.7, 695.0}, {193.0, 18.0}}, label: 'Usar c\u00f3digo del dispositivo'\n                    Image, 0x10cd64ec0, {{342.0, 698.7}, {6.3, 10.7}}, identifier: 'chevron.right', label: 'Forward'\n                  StaticText, 0x10cd65250, {{114.3, 761.4}, {142.0, 14.3}}, label: 'Fuente cl\u00ednica protegida'\n                  StaticText, 0x10cd655d0, {{114.3, 780.7}, {206.0, 13.3}}, label: 'Tus datos est\u00e1n seguros y encriptados.'\n                  StaticText, 0x10cd65950, {{117.5, 813.0}, {158.0, 13.3}}, identifier: 'premium-access-version', label: 'Versi\u00f3n 0.4.2 \u00b7 Compilaci\u00f3n 15'\nPath to element:\n \u2192Application, 0x10cd5f260, pid: 25561, label: 'DANPER Salud M\u00f3vil'\nQuery chain:\n \u2192Find: Target Application 'pe.danper.saludmovil.native.iloaderpreview'\n  Output: {\n    Application, 0x10ce5fe50, pid: 25561, label: 'DANPER Salud M\u00f3vil'\n  }\n",
+      "targetName": "DANPERInteractionTests",
+      "testIdentifier": 1,
+      "testIdentifierString": "N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch()",
+      "testIdentifierURL": "test://com.apple.xcode/DANPERNative/DANPERInteractionTests/N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch",
+      "testName": "testProtectedClinicalSourceCreationAndRelaunch()"
+    }
+  ],
+  "title": "Test - DANPERNative",
+  "topInsights": [],
+  "totalTestCount": 1
+}
