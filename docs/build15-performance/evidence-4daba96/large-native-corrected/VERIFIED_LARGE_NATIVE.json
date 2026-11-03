@@ -1,0 +1,17 @@
+{
+  "run": 41630672533,
+  "workflowSHA": "3ed78cf9764de327ebddb5b81a10a75311aadbba",
+  "currentProductSourceSHA": "4daba9649824b58dedc57721d8cd1ad5af035963",
+  "artifact": 13229163757,
+  "artifactZIPHashVerified": true,
+  "actualNativeChecksPerVariant": 7,
+  "totalNativeChecks": 14,
+  "failures": 0,
+  "skips": 0,
+  "originalDraftFullObjectPreserved": true,
+  "completePhysicalStatePreserved": true,
+  "allWorkersAndOriginalSavedVisitsPreserved": true,
+  "sameFictionalInitialSource": true,
+  "physicalDeviceValidated": false,
+  "uiMeasured": false
+}

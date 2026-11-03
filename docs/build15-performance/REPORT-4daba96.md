@@ -74,7 +74,7 @@ Gate4daba captura Inicio ficticio separado (idle) con éxito, artifact1320109064
 
 Captura coordinada41568095067 terminó CANCELLED por plazo del job. Primera TimeProfiler tuvo continuidad del PID y completó aserciones clínicas pero rechazó escribir ACK en una ruta cuyo contenedor del runner había cambiado al reinstalar XCTest; el guardia de propiedad falló cerrado. Segunda Allocations no terminó de finalizar. No hay comparación aprobada.9801.37ms observado bajo automatización/profiler en baseline2trabajadores NO es tiempo del iPhone ni del HEAD4daba. La nueva prueba piloto reconsulta solo el contenedor del bundle de runner del mismo simulador tras su activación; conserva validaciones de propiedad/archivo exclusivo y no cambia app/nativas selladas.17 pruebas locales de protocolo aprobadas. Piloto solo TimeProfiler actual: no sustituye comparación antes/después/Allocations.
 
-Carga nativa grande41572032804 compiló ambas fuentes y sembró9648/1005, pero falló una aserción antes de medir: contó el borrador premium original dentro de attentions como si fuera una atención guardada (1006). La corrección3ed78cf distingue saved/draft y exige conservar todo el objeto del borrador además del estado físico/trabajadores/historia; no borra datos para aprobar. El mensaje adicional Differentfictionalclinicalsource provenía de pruebas de origen ausentes tras el fallo temprano, no demuestra bytes distintos. Nueva ejecución41630672533 en curso; no se publican latencias nativas todavía. Estas mediciones usarán API nativa cifrada/Keychain real, no botón SwiftUI ni teléfono físico.
+Carga nativa grande41572032804 compiló ambas fuentes y sembró9648/1005, pero falló una aserción antes de medir: contó el borrador premium original dentro de attentions como si fuera una atención guardada (1006). La corrección3ed78cf distingue saved/draft y exige conservar todo el objeto del borrador además del estado físico/trabajadores/historia; no borra datos para aprobar. El mensaje adicional Differentfictionalclinicalsource provenía de pruebas de origen ausentes tras el fallo temprano, no demuestra bytes distintos. La nueva ejecución41630672533 aprobó; se detallan muestras e integridad en la actualización nativa al final. Son APIs nativas DEMO cifradas/Keychain real, no botón SwiftUI ni teléfono físico.
 
 Capturas anteriores incompletas, incluidos fallos45/90s de exportación/finalización, permanecen documentadas. Exportación idle0cdc41557902626 sí obtuvo173Statistics/85496AllocationList,14,682,432bytes persistentes Heap+VM: otra fuente, otra operación, categorías superpuestas; no se reutiliza como mejora del guardado4daba.
 
@@ -89,7 +89,7 @@ ReleaseARM64 fuente4daba41565648700 SUCCESS (orquestación f07c287). Artifact132
 - ff94ee5: piloto coordinado actual, ejecución41631784691, pendiente. No comparación final.
 - c1ec68d: experimento menú A/B, ejecución41631982012, pendiente. Misma pruebaR completa, mismo600s, una modificación de producción; ninguna promoción al primario antes de evidencia.
 - 9b68b9b: un reintento real FaceID dentro del plazo existente, ejecución41632095913, pendiente. Pruebas biométricas dedicadas mantienen exigencia de entrada automática; no cambia código de seguridad.
-- 3ed78cf: corregir clasificación de borrador del fixture grande, ejecución41630672533, pendiente.
+- 3ed78cf: corregir clasificación de borrador del fixture grande, ejecución41630672533 SUCCESS;14controles realesPASS, ver actualización nativa.
 
 Los candidatos se basan en4daba y conservan trazabilidad; sus resultados no aprueban el HEAD principal. Debe evaluarse cada resultado, promover solo cambios demostrados y volver a ejecutar todos los gates obligatorios en el nuevo HEAD. Falta comparación activa completa de Instruments, medición real de UI a gran escala, cierre UI14/0 y comprobación final antes de IPA. Auditoría integral aún NO terminada.
 
@@ -139,3 +139,21 @@ c274140 ci(b15): budget cold simulator setup and scope Instruments to owned devi
 69e75ad ci(b15): isolate Instruments, prepare cold auth UI and reduce redundant XCTest queries
 4079122 perf(search): narrow roster substring candidates with session-owned posting lists
 ```
+
+## Actualización: carga API nativa real aprobada
+
+[41630672533 SUCCESS](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41630672533), orquestación3ed78cf, fuentes C274/4daba. [Artifact13229163757](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41630672533/artifacts/13229163757), ZIP SHA2568d5de66ec0388526a0c69a81a238d39ccd4947e44114de3f9a642c327e8d57fc verificado tras descarga. Se comprobaron los JSON originales de cada caso y se recalcularon medianas desde las muestras.
+
+Mismo Mac/Xcode16.4, iPhone16/iOS18.5 Simulator x86_64, compilación Debug con fixtures diagnósticos, App/Core/project sin modificar frente a cada fuente; dos Simuladores propios nuevos. Ambos parten de la misma fuente clínica ficticia plaintextSHA2566124699907f4d83ea483acc4747bd91f56870c54ad2ab25d832a25ee1449c39e. Los UUID/fechas/IV de las activaciones físicas son independientes por variante: no se afirma igualdad byte a byte entre dos contenedores cifrados. Dentro de cada variante sí se comprobó igualdad completa del estado físico, todos los trabajadores/1005 visitas guardadas originales y el objeto completo del borrador original antes/después de las siete revisiones.
+
+| API nativa DEMO | Antes p50ms | Después p50ms | n por variante | Estado |
+|---|---:|---:|---:|---|
+| Confirmar revisión cifrada de alergias | 10077.757 | 4723.935 | 7 | Reducción53.13%; p95 no calculado |
+| Buscar último trabajador, índice ya construido | 0.899374 | 0.677040 | 100 | Medido; p95antes5.618206/después0.773945ms |
+| Primera página25, búsqueda común | 0.144267 | 0.112751 | 100 | Medido; p95antes1.017523/después0.133154ms |
+| Cargar contexto inicial | 11421.428 | 6329.699 | 1 | Muestra única, no percentiles |
+| Construir índice | 529.448 | 509.370 | 1 | Muestra única, no mejora robusta inferida |
+
+Alergias actual mínimo3891.88/máximo5207.63ms: no se promete que todos los guardados sean inferiores a5s. Las APIs usan actor/bóveda/Keychain/cifrado/persistencia reales del namespace DEMO; no miden FaceID de la fuente clínica protegida ni latencia SwiftUI. **7 controles nativos por variante,14PASS/0FAIL/0SKIP**; no sustituye las29nativas o14UI del gate oficial. Conservación del borrador original verificada en las aserciones y el log final. Se mantiene FAILURE del intento anterior por clasificar mal ese borrador.
+
+La prueba UI grande adicional [41633526985](https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41633526985), commit31d9269, compiló con Xcode y está en ejecución funcional al publicar esta actualización. Conserva las dos pruebas originales de alergias (todas las aserciones) y añade búsqueda del último trabajador; exige preservar físico/historia/padrón/borrador original. Las marcas de tiempo son una muestra de automatización e incluyen consultas/scroll/typing/idle; no hay comparación equivalente ni p95 de botón. Ningún resultado pendiente se aprueba y no se habilita IPA.
