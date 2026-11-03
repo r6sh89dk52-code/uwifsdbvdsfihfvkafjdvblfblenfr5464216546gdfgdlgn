@@ -41,6 +41,15 @@ final class N2PremiumRedesignTests:XCTestCase {
         XCTAssertTrue(app.textFields["attention-worker-dni"].waitForExistence(timeout:10),app.debugDescription)
         app.textFields["attention-worker-dni"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5))
+        // XCTest can expose the 77-point accessory keyboard before the real
+        // numeric keyboard finishes opening (0cdc run41552268684). Require
+        // the same full software keyboard, after its actual geometry settles.
+        let softwareKeyboard=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            let keyboard=app.keyboards.firstMatch
+            return keyboard.exists && keyboard.frame.height>150
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[softwareKeyboard],timeout:5),.completed,
+            "El teclado de software debe estar desplegado antes de medir el editor")
         XCTAssertGreaterThan(app.keyboards.firstMatch.frame.height,150,"Validar con teclado en pantalla")
         let hiddenNew=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.buttons["Siguiente"])
         XCTAssertEqual(XCTWaiter.wait(for:[hiddenNew],timeout:5),.completed,"El teclado debe ocultar la barra de pasos")

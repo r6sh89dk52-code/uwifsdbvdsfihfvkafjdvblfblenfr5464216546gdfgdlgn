@@ -44,8 +44,14 @@ final class N3ClinicalJourneyTests:XCTestCase {
         let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
         if hide.exists {
             hide.tap()
-            let hidden=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.keyboards.firstMatch)
-            XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:5),.completed,
+            // Request a fresh query per poll. In run41552268684 the actual
+            // dismissal restored the footer, but the prior AX query consumed
+            // almost the whole five-second wait. Use the same bounded settling
+            // interval as automatic worker selection; still require absence.
+            let hidden=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+                !app.keyboards.firstMatch.exists
+            },object:nil)
+            XCTAssertEqual(XCTWaiter.wait(for:[hidden],timeout:10),.completed,
                 "El teclado debe cerrarse antes de buscar los controles de navegación")
         }
     }
@@ -193,7 +199,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
             enter(app.textFields["first-manual-worker-dni"],"00000031",in:app)
             enter(app.textFields["first-manual-worker-name"],"PERSONAL AUTORIZADO DE PRUEBA N3",in:app)
             tap(app.buttons["choice-Sede verificada"],in:app,content:true);tap(app.buttons["Fundo La Venturosa"],in:app)
-            tap(app.buttons["first-manual-worker-activate"],in:app)
+            tap(app.buttons["first-manual-worker-activate"],in:app,content:true)
             tap(app.buttons["Crear e ingresar primer trabajador"],in:app)
             Thread.sleep(forTimeInterval:2)
             SimulatorBiometricEvents.send("match")
