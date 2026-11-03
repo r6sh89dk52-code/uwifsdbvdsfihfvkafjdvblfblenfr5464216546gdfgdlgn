@@ -1,0 +1,61 @@
+{
+  "sourceSHA": "e58efd2a398b12ee196568295cb145821ed4639d",
+  "runID": 41707072055,
+  "conclusion": "FAILURE",
+  "swift": {
+    "passed": 439,
+    "failed": 0,
+    "skipped": 0
+  },
+  "native": {
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0
+  },
+  "javascript": {
+    "passed": 62,
+    "failed": 0
+  },
+  "python": {
+    "passed": 37,
+    "failed": 0
+  },
+  "uiXCTestReported": {
+    "passed": 11,
+    "failed": 3,
+    "skipped": 0
+  },
+  "menuCaseActuallyExecuted": false,
+  "menuRunnerDiagnosticFailures": 1,
+  "actualRequiredUICases": {
+    "passed": 11,
+    "failed": 2,
+    "notExecuted": 1
+  },
+  "R1R0AndRelaunch": "PASS",
+  "build14ForwardCompatibility": {
+    "tests": 1,
+    "failures": 0,
+    "producerSHA": "9b1da6d4cdead4729bcade6843abcbcfc287e870",
+    "stockUnchanged": true,
+    "workersAndOriginalVisitsUnchanged": true,
+    "physicalDeviceValidated": false
+  },
+  "distribution": {
+    "runID": 41708026547,
+    "conclusion": "FAILURE",
+    "arm64": "SKIPPED",
+    "package": "SKIPPED",
+    "IPA": false
+  },
+  "hostRecovery": {
+    "commit": "b16a212a20ccc42026a2c06fc2639cf4e650f401",
+    "runID": 41718693853,
+    "protocolTests": 11,
+    "protocolResult": "PASS",
+    "uiResult": "IN_PROGRESS_NOT_APPROVED",
+    "productionSourceUnchanged": true,
+    "doesNotSubstituteFullFinalHeadGate": true
+  },
+  "note": "Reconstructed status from verified GitHub job logs and artifact evidence; not original raw XCTest JSON."
+}
