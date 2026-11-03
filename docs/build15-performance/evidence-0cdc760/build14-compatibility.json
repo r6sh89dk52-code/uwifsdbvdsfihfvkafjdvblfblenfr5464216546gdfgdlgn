@@ -1,0 +1,13 @@
+{
+  "build14BackupRead" : true,
+  "build14JournalRead" : true,
+  "failures" : 0,
+  "historicalRectificationPersisted" : true,
+  "newBackupRoundTrip" : true,
+  "physicalDeviceValidated" : false,
+  "producerSHA" : "9b1da6d4cdead4729bcade6843abcbcfc287e870",
+  "sourceSHA" : "0cdc76048db778a6561a237fcb46d63d168a4f7c",
+  "stockUnchanged" : true,
+  "tests" : 1,
+  "workersAndOriginalVisitsUnchanged" : true
+}
