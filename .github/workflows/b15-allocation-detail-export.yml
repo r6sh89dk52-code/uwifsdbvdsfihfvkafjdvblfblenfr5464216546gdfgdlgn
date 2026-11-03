@@ -1,0 +1,52 @@
+name: B15 - Export current existing Allocations details (NOT app approval)
+'on':
+  push:
+    branches: [audit/b15-allocation-details-0cdc760-20261103]
+    paths: [.github/workflows/b15-allocation-detail-export.yml, scripts/performance/export-allocation-details.py, scripts/performance/tests/test_allocation_details.py]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  allocation-details:
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require exact current source and successful recording job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request
+          base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'
+          def get(p):return json.load(urllib.request.urlopen(urllib.request.Request(base+p,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30))
+          source='0cdc76048db778a6561a237fcb46d63d168a4f7c'
+          pr=get('pulls/10');assert pr['head']['sha']==source and pr['draft'] and not pr['merged']
+          run=get('actions/runs/41552268684');assert run['head_sha']==source
+          jobs=get('actions/runs/41552268684/jobs?per_page=100')['jobs']
+          recorded=[j for j in jobs if j['name']=='instruments'];assert len(recorded)==1 and recorded[0]['conclusion']=='success'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_INSTRUMENTS_RESULTS
+          run-id: 41552268684
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/current-trace
+      - name: Export actual Statistics and Allocations List view details
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/performance/tests -p test_allocation_details.py -v
+          test "$(cat "$RUNNER_TEMP/current-trace/SOURCE_SHA.txt")" = 0cdc76048db778a6561a237fcb46d63d168a4f7c
+          mkdir -p "$RUNNER_TEMP/allocation-details"
+          cp "$RUNNER_TEMP/current-trace/SOURCE_SHA.txt" "$RUNNER_TEMP/allocation-details/"
+          printf '%s\n' 'source0cdc; gate41552268684; recording artifact13194438610; existing idle trace, NOT UI or app approval' > "$RUNNER_TEMP/allocation-details/PROVENANCE.txt"
+          xcodebuild -version > "$RUNNER_TEMP/allocation-details/xcode-version.txt"
+          python3 scripts/performance/export-allocation-details.py --input "$RUNNER_TEMP/current-trace/Instruments/Allocations.trace" --output "$RUNNER_TEMP/allocation-details"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_CURRENT_ALLOCATION_EXPORT_NOT_APP_APPROVAL
+          path: ${{ runner.temp }}/allocation-details
+          retention-days: 14
