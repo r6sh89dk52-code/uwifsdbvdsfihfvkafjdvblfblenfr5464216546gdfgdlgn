@@ -171,10 +171,25 @@ final class N3ClinicalJourneyTests:XCTestCase {
         let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
         let permission=springboard.alerts.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
         if permission.waitForExistence(timeout:5) {permission.tap()}
-        XCTAssertTrue(app.staticTexts["Verificando identidad…"].waitForExistence(timeout:15),app.debugDescription)
+        let retry=app.buttons["Reintentar Face ID"]
+        let gate=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            app.staticTexts["Verificando identidad…"].exists || retry.exists
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[gate],timeout:15),.completed,app.debugDescription)
         XCTAssertFalse(app.buttons["premium-tab-home"].exists)
         Thread.sleep(forTimeInterval:2)
-        SimulatorBiometricEvents.send("match")
+        var retried=false
+        SimulatorBiometricEvents.send("match",onWaiting:{
+            // CoreAuthUI may fail to activate on a cold Simulator. Exercise
+            // the real user's one retry, within the existing 20-second
+            // sensor wait; dedicated biometric tests still require auto entry.
+            if !retried && retry.exists && retry.isHittable {
+                retried=true
+                XCTContext.runActivity(named:"Un reintento real tras fallo de activación Face ID") {_ in
+                    retry.tap()
+                }
+            }
+        })
         let usable=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
             let manual=app.buttons["clinical-first-run-manual-worker"]
             let home=app.buttons["premium-tab-home"]

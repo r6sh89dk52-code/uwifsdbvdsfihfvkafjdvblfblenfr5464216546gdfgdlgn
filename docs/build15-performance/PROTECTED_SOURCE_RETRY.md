@@ -1,0 +1,7 @@
+# Actual protected-source retry regression
+
+Baseline 4daba UI protected-source creation failed before sensor match. Its system log shows evaluatePolicy at 03:28:46.086 UTC, CoreAuthUI watchdog/activation timeout at 03:28:51.471 (Code -1000), and late CoreAuthUI at 03:29:04 with no pending UI mechanism. The screen correctly showed Reintentar Face ID. No authentication or acknowledgement had been faked.
+
+This diagnostic candidate allows the protected-source journey to exercise the actual user's retry once, only when the real retry button is visible and hittable, inside the existing 20-second sensor wait. The real request ID, increasing sensor generation, host readiness acknowledgement, permission handling and actual biometric event remain required. It cannot expose clinical content without actual LocalAuthentication success. The pre-authentication Home absence and post-authentication usability assertions remain. No application/security code or timeout is changed.
+
+The two dedicated biometric tests retain automatic-entry/cancellation/nomatch/retry/foreground checks with their existing default helper behavior. A pass in the protected journey would prove recovery through one real retry; it would not prove initial CoreAuthUI activation never fails. Run actual Xcode 29 native tests and both complete biometric tests plus protected source creation/relaunch. No primary promotion or release approval from static review.

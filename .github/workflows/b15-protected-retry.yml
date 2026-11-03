@@ -1,0 +1,154 @@
+name: B15 - Real protected-source retry regression (NO release approval)
+permissions:
+  contents: read
+  actions: read
+env:
+  DANPER_EXPECTED_BUILD: '15'
+concurrency:
+  group: b15-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-build:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Prepare production resources, never a patient dataset
+      run: 'set -euo pipefail
+
+        npm ci --ignore-scripts --no-fund
+
+        if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+
+        node scripts/prepare-n1s-ios-demo-resources.cjs
+
+        (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+
+        '
+    - name: Real signed SwiftUI typecheck, Face ID preflight and ALL native tests
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-native
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+      run: 'set -euo pipefail
+
+        mkdir -p "$DANPER_AUDIT_OUT"
+
+        uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
+
+        test "$(uname -m)" = x86_64
+
+        bash scripts/glass-audit/validate-macos.sh b15-native
+
+        python3 scripts/performance/test-products.py seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
+
+        tar -czf "$DANPER_AUDIT_OUT/TEST_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
+
+        '
+    - uses: actions/upload-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        path: '${{ runner.temp }}/b15-native/TEST_PRODUCTS.json
+
+          ${{ runner.temp }}/b15-native/TEST_PRODUCTS.tgz
+
+          '
+        retention-days: 7
+        compression-level: 0
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_NATIVE_RESULTS
+        path: '${{ runner.temp }}/b15-native/*.json
+
+          ${{ runner.temp }}/b15-native/*.txt
+
+          ${{ runner.temp }}/b15-native/*.log
+
+          ${{ runner.temp }}/b15-native/*-failure-attachments.tgz
+
+          '
+        retention-days: 14
+  ui:
+    needs: native-build
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        suite:
+        - N2BiometricInteractionTests
+        - N3ClinicalJourneyTests-protected
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        path: ${{ runner.temp }}/b15-compiled
+    - name: Restore executable permissions and verify exact current-HEAD binaries
+      run: 'set -euo pipefail
+
+        mkdir -p "$RUNNER_TEMP/b15-derived/Build"
+
+        tar -xzf "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+
+        python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.json"
+
+        '
+    - name: Real isolated iPhone 16 UI suite and Face ID preflight
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-ui
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+        DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/TEST_PRODUCTS.json
+        DANPER_B15_UI_LABEL: ${{ matrix.suite }}
+      run: 'set -euo pipefail
+
+        bash scripts/glass-audit/validate-macos.sh b15-shard
+
+        python3 scripts/performance/verify-ui-shard.py "$DANPER_AUDIT_OUT" "$DANPER_B15_UI_LABEL"
+
+        '
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_UI_RESULT_${{ matrix.suite }}
+        path: '${{ runner.temp }}/b15-ui/*.json
+
+          ${{ runner.temp }}/b15-ui/*.txt
+
+          ${{ runner.temp }}/b15-ui/*.log
+
+          ${{ runner.temp }}/b15-ui/Instruments/*.json
+
+          ${{ runner.temp }}/b15-ui/Instruments/*.log
+
+          ${{ runner.temp }}/b15-ui/Instruments/*.xml
+
+          '
+        retention-days: 14
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_UI_RAW_${{ matrix.suite }}
+        path: '${{ runner.temp }}/b15-ui/*.xcresult
+
+          ${{ runner.temp }}/b15-ui/*-attachments
+
+          ${{ runner.temp }}/b15-ui/Instruments
+
+          '
+        retention-days: 7
+'on':
+  push:
+    branches:
+    - audit/b15-protected-retry-4daba96-20261103
+    paths:
+    - native-ios/InteractionTests/**
+    - .github/workflows/b15-protected-retry.yml
