@@ -16,3 +16,10 @@ The measured case performs7genuine encrypted allergy updates, alternating substa
 The initial9648worker/1005visit plaintext source must have the same SHA across both variants. Native v2 activation IDs/times and encrypted archive nonces are generated normally per independent source; workload cardinality/history/physical quantities are the same, with full state preserved within each variant. Source App/Core/project edits are rejected; only diagnostic test source and generated test resources differ. Fresh binary proof is explicitly distinct from the original compiled artifact/native certification.
 
 The four new fixture methods have NOT passed until Xcode and the actual Simulator report it. Python/YAML and generated shell syntax/selectors were checked locally; these are not Swift type checking or runtime metrics. No packaging trigger or IPA.
+
+
+## Actual first execution41572032804: FAILURE, no timing approval
+
+Both source variants compiled in Xcode and seeded9648workers/1005saved visits. The original premium helper then correctly added its encrypted draft to the attentions storage array. The new baseline check incorrectly required the entire storage array to contain1005rows, but it contained1006:1005saved visits plus1draft. It failed before the measured save/search case, so no latency was approved. This is a diagnostic fixture count error, not a duplicated clinical attention in the app.
+
+The correction classifies stored draft rows explicitly, requires1005saved visits and the original premium draft with statusdraft, and compares that original draft's entire JSON alongside workers, visits and physical state. The measured report uses summary.saved for clinical visits and reports drafts separately, asserting totalRows=saved+drafts. Existing data is neither deleted nor rewritten to match the test. The old run staysFAILED. New Xcode/native results are mandatory.

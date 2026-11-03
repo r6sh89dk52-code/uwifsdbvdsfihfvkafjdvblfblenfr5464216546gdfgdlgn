@@ -58,10 +58,14 @@ final class N2LargeRosterProfileFixture:XCTestCase {
         XCTAssertEqual(checked.domain,.demo);XCTAssertEqual(checked.schemaVersion,2)
         let root=try XCTUnwrap(JSONSerialization.jsonObject(with:checked.snapshot) as? [String:Any])
         let workers=try XCTUnwrap(root["workers"] as? [[String:Any]])
-        let visits=try XCTUnwrap(root["attentions"] as? [[String:Any]])
+        let rows=try XCTUnwrap(root["attentions"] as? [[String:Any]])
+        let visits=rows.filter{$0["status"] as? String != "draft"}
+        let originalDraft=try XCTUnwrap(rows.first{$0["id"] as? String=="premium-ui-draft"})
+        XCTAssertEqual(originalDraft["status"] as? String,"draft")
         XCTAssertEqual(workers.count,9648);XCTAssertEqual(visits.count,1005)
+        XCTAssertTrue(visits.allSatisfy{$0["status"] as? String=="saved"})
         let physical=try XCTUnwrap(root["simpleInventory"])
-        return try JSONSerialization.data(withJSONObject:["workers":workers,"attentions":visits,"simpleInventory":physical],options:.sortedKeys)
+        return try JSONSerialization.data(withJSONObject:["workers":workers,"attentions":visits,"simpleInventory":physical,"originalDraft":originalDraft],options:.sortedKeys)
     }
     func testCaptureCompletePhysicalWorkersAndHistoryBeforeReview() async throws {
         try requireSimulator();continueAfterFailure=false
@@ -103,9 +107,11 @@ final class N2LargeRosterProfileFixture:XCTestCase {
         }
         let inspected=try await vault.inspect()
         let summary=try XCTUnwrap(inspected)
-        XCTAssertEqual(summary.workers,9648);XCTAssertEqual(summary.attentions,1005)
+        XCTAssertEqual(summary.workers,9648);XCTAssertEqual(summary.saved,1005)
+        XCTAssertGreaterThanOrEqual(summary.drafts,1)
+        XCTAssertEqual(summary.attentions,summary.saved+summary.drafts)
         let report:[String:Any]=["scope":"iPhone16 Simulator native DEMO API, not UI tap latency or physical iPhone",
-            "workers":summary.workers,"visits":summary.attentions,"confirmedAllergySaveMS":saves,
+            "workers":summary.workers,"visits":summary.saved,"drafts":summary.drafts,"confirmedAllergySaveMS":saves,
             "lastWorkerSearchMS":last,"commonFirstPageSearchMS":common,"contextLoadOneSampleMS":contextMS,
             "searchIndexBuildOneSampleMS":indexMS,"uiMeasured":false,"IPA":false]
         let json=try JSONSerialization.data(withJSONObject:report,options:.sortedKeys)
