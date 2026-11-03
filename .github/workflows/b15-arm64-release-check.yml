@@ -1,0 +1,257 @@
+name: B15 - final gates then ARM64 and gated unsigned iLoader IPA
+'on':
+  push:
+    branches:
+    - audit/b15-profile-device-9143997-20261101
+    paths:
+    - .github/workflows/b15-arm64-release-check.yml
+    - scripts/distribution/**
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: b15-gated-distribution-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  await-final-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Verify17 distribution guards with fictitious metadata; never create an IPA
+      run: python3 -m unittest discover -s scripts/distribution/tests -v
+    - name: Await exact-source mandatory result; fail immediately on failure or changed PR
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: "import json,os,time,urllib.request\nSOURCE='e58efd2a398b12ee196568295cb145821ed4639d';RUN=41707072055\nBASE='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\n\
+        def get(path):\n req=urllib.request.Request(BASE+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n\
+        \ return json.load(urllib.request.urlopen(req,timeout=30))\nstart=time.monotonic();deadline=start+90*60\nwhile True:\n pr=get('pulls/10');assert\
+        \ pr['head']['sha']==SOURCE and pr['draft'] and not pr['merged'] and pr['base']['sha']=='9b1da6d4cdead4729bcade6843abcbcfc287e870','PR\
+        \ source/identity changed; stop distribution'\n r=get('actions/runs/'+str(RUN));assert r['head_sha']==SOURCE and r['path']=='.github/workflows/b15-site-allergy-performance-gate.yml'\n\
+        \ print('Mandatory final-source gate:',RUN,r['status'],r['conclusion'],'elapsed seconds',round(time.monotonic()-start),flush=True)\n\
+        \ if r['status']=='completed':\n  assert r['conclusion']=='success','Mandatory gate failed; no ARM64 distribution/IPA'\n  jobs=get('actions/runs/'+str(RUN)+'/jobs?per_page=100')['jobs']\n\
+        \  suites=['N2MenuInteractionTests','N2Build222ShellTests','N2GlassClinicalTests','N3ClinicalJourneyTests-protected','N3ClinicalJourneyTests-demo','N2PremiumRedesignTests','N2BiometricInteractionTests','N2AllergySaveInteractionTests']\n\
+        \  expected={'javascript','native-build','performance','performance-v2','swift-core / swift-core','instruments','complete'}|{'ui\
+        \ ('+n+')' for n in suites}\n  assert len(jobs)==15 and {j['name'] for j in jobs}==expected\n  assert all(j['status']=='completed'\
+        \ and j['conclusion']=='success' for j in jobs)\n  print('PASS all15 real final-source mandatory jobs. Proceed to evidence verification.',flush=True);break\n\
+        \ assert r['status'] in ['queued','in_progress','waiting','pending','requested']\n assert time.monotonic()<deadline,'Distribution\
+        \ wait deadline; no tests/timeouts changed and no IPA'\n time.sleep(min(30,max(0,deadline-time.monotonic())))\n"
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_CURRENT_HEAD_AUDIT
+        run-id: 41707072055
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/b15-mandatory-gates
+    - name: Verify actual final439/30/14/62 counts, budgets and original14 invariants
+      run: 'python3 - <<''PYG''
+
+        import json,os,runpy
+
+        from pathlib import Path
+
+        m=runpy.run_path(''scripts/distribution/package-build15-gated.py'')
+
+        m[''checked_gate''](json.loads((Path(os.environ[''RUNNER_TEMP''])/''b15-mandatory-gates/FINAL_GATES.json'').read_text()))
+
+        print(''PASS actual final-source evidence; metadata unit tests alone never approve the app'')
+
+        PYG'
+  arm64-release:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: e58efd2a398b12ee196568295cb145821ed4639d
+        fetch-depth: 0
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_CURRENT_HEAD_AUDIT
+        run-id: 41707072055
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/b15-mandatory-gates
+    - name: Require every final-source mandatory gate and current draft PR before building distribution
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: "python3 - <<'PY'\nimport json,os,urllib.request\nfrom pathlib import Path\nsource='e58efd2a398b12ee196568295cb145821ed4639d';run=41707072055\n\
+        base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\ndef get(p):\n r=urllib.request.Request(base+p,headers={'Authorization':'Bearer\
+        \ '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n return json.load(urllib.request.urlopen(r,timeout=30))\n\
+        p=get('pulls/10');assert p['head']['sha']==source and p['draft'] and not p['merged'] and p['base']['sha']=='9b1da6d4cdead4729bcade6843abcbcfc287e870'\n\
+        r=get('actions/runs/'+str(run));assert r['head_sha']==source and r['status']=='completed' and r['conclusion']=='success'\nassert\
+        \ r['path']=='.github/workflows/b15-site-allergy-performance-gate.yml'\njobs=get('actions/runs/'+str(run)+'/jobs?per_page=100')['jobs'];assert\
+        \ jobs and all(j['status']=='completed' and j['conclusion']=='success' for j in jobs)\ng=json.loads((Path(os.environ['RUNNER_TEMP'])/'b15-mandatory-gates/FINAL_GATES.json').read_text())\n\
+        assert g['sourceSHA']==source and g['swift']==439 and g['native']==30 and g['javascript']==62\nassert sum(g['ui'].values())==14\
+        \ and len(g['ui'])==8 and g['failures']==g['skips']==0 and g['IPA'] is False\nassert g['corePerformanceBudgets']['failures']==0\
+        \ and len(g['corePerformanceBudgets']['checks'])==9\nc=g['build14ForwardCompatibility'];assert c['sourceSHA']==source and c['producerSHA']==p['base']['sha']\
+        \ and c['tests']==1 and c['failures']==0\nassert all(c[k] for k in ['build14JournalRead','build14BackupRead','historicalRectificationPersisted','newBackupRoundTrip','stockUnchanged','workersAndOriginalVisitsUnchanged'])\n\
+        print('PASS all final-source mandatory gates. ARM64 compile only; no IPA at this step.')\nPY"
+    - name: Prepare approved distribution resources and unchanged application identity
+      run: 'set -euo pipefail
+
+        test "$(git rev-parse HEAD)" = e58efd2a398b12ee196568295cb145821ed4639d
+
+        npm ci --ignore-scripts --no-fund
+
+        node scripts/glass-audit/identity.cjs
+
+        if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+
+        node scripts/prepare-n1s-ios-demo-resources.cjs
+
+        (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+
+        git diff --exit-code HEAD -- ''*.swift'' native-ios/project.yml
+
+        mkdir -p "$RUNNER_TEMP/b15-release-proof"
+
+        git rev-parse HEAD > "$RUNNER_TEMP/b15-release-proof/SOURCE_SHA.txt"
+
+        xcodebuild -version > "$RUNNER_TEMP/b15-release-proof/xcode-version.txt"
+
+        '
+    - name: Compile real Release iPhoneOS ARM64; do not package an IPA
+      run: "set -euo pipefail\nxcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Release   \
+        \          -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath \"$RUNNER_TEMP/b15-device-derived\"          \
+        \   ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO             build > \"$RUNNER_TEMP/b15-release-proof/release-iphoneos.log\"\
+        \ 2>&1 || {\n    tail -n 100 \"$RUNNER_TEMP/b15-release-proof/release-iphoneos.log\"\n    exit 1\n  }\n"
+    - name: Verify update identifier, architecture, resources and absence of clinical datasets
+      env:
+        APP_PATH: ${{ runner.temp }}/b15-device-derived/Build/Products/Release-iphoneos/DANPERNative.app
+        PROOF_ROOT: ${{ runner.temp }}/b15-release-proof
+      run: 'python3 - <<''PY''
+
+        import hashlib,json,os,plistlib,subprocess
+
+        from pathlib import Path
+
+        app=Path(os.environ[''APP_PATH'']);out=Path(os.environ[''PROOF_ROOT''])
+
+        source=subprocess.check_output([''git'',''rev-parse'',''HEAD''],text=True).strip()
+
+        assert source==''e58efd2a398b12ee196568295cb145821ed4639d''
+
+        p=plistlib.loads((app/''Info.plist'').read_bytes())
+
+        assert p[''CFBundleIdentifier'']==''pe.danper.saludmovil.native.iloaderpreview''
+
+        assert p[''CFBundleShortVersionString'']==''0.4.2'' and p[''CFBundleVersion'']==''15''
+
+        assert p[''CFBundleSupportedPlatforms'']==[''iPhoneOS'']
+
+        assert p[''MinimumOSVersion'']==''17.0''
+
+        assert p[''NSFaceIDUsageDescription''] and p[''UILaunchStoryboardName'']==''LaunchScreen''
+
+        assert list(app.rglob(''LaunchScreen.storyboardc''))
+
+        assert not (app/''embedded.mobileprovision'').exists() and not (app/''_CodeSignature'').exists()
+
+        assert not list(app.rglob(''*.xctest'')) and not list(app.rglob(''SyntheticFixtures''))
+
+        exe=app/p[''CFBundleExecutable'']
+
+        archs=subprocess.check_output([''lipo'',''-archs'',str(exe)],text=True).strip()
+
+        assert archs==''arm64''
+
+        assert subprocess.run([''codesign'',''--verify'',str(app)],capture_output=True).returncode != 0
+
+        assert b''DANPER_GREETING_TEST_LOCAL'' not in exe.read_bytes()
+
+        assert b''diagnosticKeychainReadCount'' not in exe.read_bytes()
+
+        expected={''n1s-indicator-plan.json'',''n1s-indicator-template-store.zip'',''n1s-nursing-plan.json'',''n1s-nursing-template-store.zip'',''n2-ambulatory-products.json'',''n2-nursing-catalog.json'',''n2-approved-mappings.json'',''n2-organization-areas.json''}
+
+        assert {x.name for x in (app/''N1sDemoResources'').iterdir()}==expected
+
+        baseline=subprocess.check_output([''git'',''show'',''9b1da6d4cdead4729bcade6843abcbcfc287e870:native-ios/project.yml''],text=True)
+
+        assert ''PRODUCT_BUNDLE_IDENTIFIER: ''+p[''CFBundleIdentifier''] in baseline
+
+        assert ''iOS: "17.0"'' in baseline
+
+        manifest={str(f.relative_to(app)):hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted(app.rglob(''*'')) if f.is_file()}
+
+        (out/''APP_SHA256.json'').write_text(json.dumps(manifest,indent=2))
+
+        report={''sourceSHA'':source,''workflowSHA'':os.environ[''GITHUB_SHA''],''bundleID'':p[''CFBundleIdentifier''],''sameBundleAsBuild14'':True,''version'':p[''CFBundleShortVersionString''],''build'':p[''CFBundleVersion''],''minimumOS'':p[''MinimumOSVersion''],''architecture'':archs,''signed'':False,''clinicalDatasetsBundled'':False,''testClockAbsent'':True,''physicalContainerValidated'':False,''IPA'':False,''packagingStillRequiresAllMandatoryGates'':True}
+
+        (out/''RELEASE_IDENTITY.json'').write_text(json.dumps(report,indent=2))
+
+        print(''RELEASE_VERIFIED'',json.dumps(report,indent=2))
+
+        PY
+
+        '
+    - name: Retain compiled app only for later same-source gated packaging
+      env:
+        APP_PARENT: ${{ runner.temp }}/b15-device-derived/Build/Products/Release-iphoneos
+      run: tar -czf "$RUNNER_TEMP/b15-release-proof/COMPILED_ARM64_APP.tgz" -C "$APP_PARENT" DANPERNative.app
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_ARM64_RELEASE_IDENTITY_NO_IPA
+        path: ${{ runner.temp }}/b15-release-proof
+        retention-days: 14
+    needs: await-final-gates
+  package:
+    needs:
+    - await-final-gates
+    - arm64-release
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DANPER_PACKAGE_ROOT: ${{ runner.temp }}/b15-package
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: e58efd2a398b12ee196568295cb145821ed4639d
+        fetch-depth: 0
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.sha }}
+        path: .b15-distribution
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_CURRENT_HEAD_AUDIT
+        run-id: 41707072055
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/b15-package/gates
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_ARM64_RELEASE_IDENTITY_NO_IPA
+        path: ${{ runner.temp }}/b15-package/release
+    - name: Recheck all gates, current PR, this successful ARM64 job, exact app hashes and unsigned identity; then package
+      run: python3 .b15-distribution/scripts/distribution/package-build15-gated.py
+    - name: Recheck current source immediately before publishing artifact
+      run: 'python3 - <<''PYG''
+
+        import runpy
+
+        m=runpy.run_path(''.b15-distribution/scripts/distribution/package-build15-gated.py'')
+
+        m[''current_runs'']()
+
+        print(''PASS current source and required jobs immediately before upload'')
+
+        PYG'
+    - uses: actions/upload-artifact@v4
+      with:
+        name: DANPER_BUILD15_ILOADER_UNSIGNED_e58efd2
+        path: ${{ runner.temp }}/b15-package/ipa
+        retention-days: 30
+        if-no-files-found: error
+        compression-level: 0
