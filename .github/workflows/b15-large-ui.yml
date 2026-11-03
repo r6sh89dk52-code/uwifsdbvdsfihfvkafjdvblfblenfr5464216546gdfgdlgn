@@ -2,7 +2,7 @@ name: B15 - Cold DEMO single recovery and 9648-worker UI (NO release approval)
 'on':
   push:
     branches: [audit/b15-cold-demo-4daba96-20261103]
-    paths: [.github/workflows/b15-large-ui.yml, native-ios/NativeTests/N2LargeRosterProfileFixture.swift, scripts/performance/prepare_large_ui_harness.py, scripts/performance/verify_large_ui_products.py]
+    paths: [native-ios/App/**, .github/workflows/b15-large-ui.yml, native-ios/NativeTests/N2LargeRosterProfileFixture.swift, scripts/performance/prepare_large_ui_harness.py, scripts/performance/verify_large_ui_products.py]
 permissions:
   contents: read
 jobs:

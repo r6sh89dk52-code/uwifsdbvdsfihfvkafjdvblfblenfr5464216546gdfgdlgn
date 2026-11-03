@@ -75,7 +75,7 @@ struct NativeRootView:View {
         .tint(DanperStyle.red)
         .environment(\.n2WorkspaceVault,.demo)
         .environment(\.locale,Locale(identifier:"es_PE"))
-        .task(id:tab) {if tab==0 {await refresh(forceFresh:true)}}
+        .task(id:tab) {if tab==0 {await refresh(forceFresh:sourceReady)}}
         .sheet(isPresented:$showNewAttention,onDismiss:{
             newlyRegisteredWorkerDNI=nil
             Task {await refresh(forceFresh:true)}
@@ -256,6 +256,7 @@ struct NativeRootView:View {
                     N2DemoResetView(onDeleted:{
                         // The demo workspace is never silently re-initialized.
                         sourceReady=false
+                        homeCounts=nil
                         metrics=nil
                         newlyRegisteredWorkerDNI=nil
                         tab=0
@@ -308,12 +309,12 @@ struct NativeRootView:View {
     }
     @MainActor
     private func refresh(forceFresh:Bool=false) async {
-        guard !layoutOnly else{return}
+        guard !layoutOnly,scenePhase == .active,!preparing else{return}
         if refreshInFlight {
             // Initial .task and active-scene callbacks share one actual read.
             // A later edit/return on a ready source must still request a fresh
             // recovery; never drop a possible newer revision during a read.
-            if forceFresh && sourceReady {refreshPending=true}
+            if forceFresh {refreshPending=true}
             return
         }
         refreshInFlight=true;loading=true
@@ -324,6 +325,7 @@ struct NativeRootView:View {
                 let period=N2HomeCalendarPeriod(now:Date())
                 let state=try await N2SyntheticTrialIOSVault.shared.dashboardSnapshot(
                     today:period.today,weekStart:period.weekStart)
+                guard scenePhase == .active else{return}
                 sourceReady=state != nil
                 homeCounts=state.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
                 problem=""
