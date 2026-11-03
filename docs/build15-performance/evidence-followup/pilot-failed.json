@@ -1,0 +1,13 @@
+{
+  "template": "Time Profiler",
+  "recorded": false,
+  "readyBeforeUI": true,
+  "uiRunnerModifiedForSynchronization": true,
+  "appBinaryUnmodified": true,
+  "physicalDeviceValidated": false,
+  "scope": "Already-running synthetic Home, then full allergy UI assertions; two workers; recorder overhead",
+  "pid": 24735,
+  "simulator": "275407CC-6DD2-46F6-A830-7FB6940AE311",
+  "successful": false,
+  "error": "TimeoutExpired: Command '['xcrun', 'simctl', 'get_app_container', '275407CC-6DD2-46F6-A830-7FB6940AE311', 'pe.danper.saludmovil.native.iloaderpreview.interactiontests.xctrunner', 'data']' timed out after 10 seconds"
+}

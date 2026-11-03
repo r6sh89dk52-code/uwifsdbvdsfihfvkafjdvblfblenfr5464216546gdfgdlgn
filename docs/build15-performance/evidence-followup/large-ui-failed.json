@@ -1,0 +1,12 @@
+{
+  "sourceSHA": "4daba9649824b58dedc57721d8cd1ad5af035963",
+  "scope": "iPhone16/iOS18.5 Debug Simulator; 9648 fictional workers/1005 saved visits; diagnostic UI runner, production App/Core sources unchanged",
+  "fullAppApproved": false,
+  "IPA": false,
+  "physicalDeviceMeasured": false,
+  "latencySamples": 1,
+  "p95": null,
+  "limitation": "Save interval includes XCTest tap helper, scroll/query/idle overhead; search includes typing/automation. Not pure app latency, no matched baseline.",
+  "successful": false,
+  "error": "large-ui"
+}

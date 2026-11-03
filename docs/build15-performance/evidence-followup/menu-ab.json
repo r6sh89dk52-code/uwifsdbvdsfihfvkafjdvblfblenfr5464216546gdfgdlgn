@@ -1,0 +1,99 @@
+{
+  "experimentOnly": true,
+  "fullAppApproved": false,
+  "oneSamplePerVariant": true,
+  "physicalDeviceMeasured": false,
+  "variants": {
+    "before": {
+      "sourceSHA": "4daba9649824b58dedc57721d8cd1ad5af035963",
+      "uiSummary": {
+        "devicesAndConfigurations": [
+          {
+            "device": {
+              "architecture": "x86_64",
+              "deviceId": "61B12449-73DB-4CCD-B17E-9F31EF127B85",
+              "deviceName": "DANPER-SYNTHETIC-native",
+              "modelName": "iPhone 16",
+              "osBuildNumber": "22F77",
+              "osVersion": "18.5",
+              "platform": "iOS Simulator"
+            },
+            "expectedFailures": 0,
+            "failedTests": 1,
+            "passedTests": 1,
+            "skippedTests": 0,
+            "testPlanConfiguration": {
+              "configurationId": "1",
+              "configurationName": "Test Scheme Action"
+            }
+          }
+        ],
+        "environmentDescription": "DANPERNative \u00b7 Built with macOS 15.7.9",
+        "expectedFailures": 0,
+        "failedTests": 1,
+        "finishTime": 1793710147.111,
+        "passedTests": 1,
+        "result": "Failed",
+        "skippedTests": 0,
+        "startTime": 1793709525.238,
+        "statistics": [],
+        "testFailures": [
+          {
+            "failureText": "XCTAssertTrue failed - Attributes: Application, 0x119d63aa0, pid: 81998, label: 'DANPER Salud M\u00f3vil'\nElement subtree:\n \u2192Application, 0x119d63aa0, pid: 81998, label: 'DANPER Salud M\u00f3vil'\n    Window (Main), 0x119d63e60, {{0.0, 0.0}, {393.0, 852.0}}\n      Other, 0x119d65000, {{0.0, 0.0}, {393.0, 852.0}}\n        Other, 0x119d65120, {{0.0, 0.0}, {393.0, 852.0}}\n          Other, 0x119d64eb0, {{0.0, 0.0}, {393.0, 852.0}}\n            Other, 0x119d63020, {{0.0, 0.0}, {393.0, 852.0}}\n              Other, 0x119d65240, {{0.0, 0.0}, {393.0, 852.0}}\n              Other, 0x119d65360, {{0.0, 0.0}, {393.0, 852.0}}\n              Other, 0x119d65480, {{14.0, 28.0}, {365.0, 120.0}}, identifier: 'danper-brand-header'\n                Image, 0x119d655a0, {{28.0, 28.0}, {120.0, 120.0}}, label: 'Danper'\n                StaticText, 0x119d656c0, {{156.0, 82.0}, {88.0, 12.0}}, label: 'SALUD M\u00d3VIL'\n                Image, 0x119d657e0, {{293.0, 78.3}, {18.0, 19.7}}, identifier: 'bell', label: 'Notificaciones'\n                Button, 0x119d65900, {{321.0, 66.0}, {44.0, 44.0}}, identifier: 'brand-header-settings', label: 'Ajustes'\n              Other, 0x119d65a20, {{0.0, 122.0}, {393.0, 607.0}}\n                Other, 0x119d65b40, {{0.0, 122.0}, {393.0, 607.0}}\n                  Other, 0x119d65c60, {{0.0, 122.0}, {393.0, 607.0}}\n                    Other, 0x119d65d80, {{0.0, 122.0}, {393.0, 607.0}}\n                      Other, 0x119d65ea0, {{0.0, 122.0}, {393.0, 607.0}}\n                        Other, 0x119d65fc0, {{0.0, 122.0}, {393.0, 607.0}}\n                          Other, 0x119d660e0, {{0.0, 122.0}, {393.0, 607.0}}\n                            NavigationBar, 0x119d66200, {{0.0, 122.0}, {393.0, 96.0}}, identifier: 'Historial de atenciones'\n                              StaticText, 0x119d66320, {{105.7, 133.7}, {181.7, 20.3}}, label: 'Historial de atenciones'\n                              Button, 0x119d66440, {{336.7, 122.0}, {48.3, 44.0}}, label: 'Nuevo trabajador'\n                              SearchField, 0x119d66560, {{16.0, 167.0}, {361.0, 36.0}}, label: 'Buscar trabajador, DNI, diagn\u00f3stico o fecha', placeholderValue: 'Buscar trabajador, DNI, diagn\u00f3stico o fecha'\n                                Image, 0x119d66680, {{22.0, 175.3}, {20.3, 18.7}}, identifier: 'magnifyingglass', label: 'Search'\n                            Other, 0x119d667a0, {{0.0, 122.0}, {393.0, 607.0}}\n                              Other, 0x119d668c0, {{0.0, 122.0}, {393.0, 607.0}}\n                                Other, 0x119d669e0, {{0.0, 122.0}, {393.0, 607.0}}\n                                  Other, 0x119d66b00, {{0.0, 122.0}, {393.0, 607.0}}\n                                    Other, 0x119d66c20, {{0.0, 122.0}, {393.0, 607.0}}\n                                    ScrollView, 0x119d66d40, {{0.0, 122.0}, {393.0, 607.0}}\n                                      Other, 0x119d66e60, {{0.0, 218.0}, {393.0, 266.0}}\n                                        StaticText, 0x119d66f80, {{34.0, 250.0}, {197.0, 20.3}}, label: 'Historial de atenciones'\n                                        StaticText, 0x119d670a0, {{32.0, 283.3}, {304.3, 15.7}}, label: 'Consulta los registros y sus consumos guardados.'\n                                        StaticText, 0x119d671c0, {{32.0, 347.0}, {183.3, 20.3}}, label: 'Atenciones registradas'\n                                        StaticText, 0x119d672e0, {{32.0, 394.3}, {156.3, 14.3}}, label: '0 atenciones \u00b7 P\u00e1gina 1 de 1'\n                                        StaticText, 0x119d67400, {{32.0, 421.7}, {289.3, 30.3}}, label: 'Toca una atenci\u00f3n para ver sus datos, tratamiento, consumos o solicitar una rectificaci\u00f3n.'\n                                      Other, 0x119d67520, {{360.0, 218.0}, {30.0, 511.0}}, label: 'Vertical scroll bar, 1 page', value: 0%\n                                        Other, 0x119d67640, {{387.0, 272.0}, {3.0, 454.0}}\n                                      Other, 0x119d67760, {{360.0, 218.0}, {30.0, 511.0}}, label: 'Vertical scroll bar, 1 page', value: 0%\n                                        Other, 0x119d67880, {{387.0, 272.0}, {3.0, 454.0}}\n              Other, 0x119d679a0, {{18.0, 738.0}, {357.0, 72.0}}, identifier: 'danper-floating-tabs'\n                Button, 0x119d67ac0, {{24.0, 744.0}, {84.7, 60.0}}, identifier: 'premium-tab-home', label: 'Inicio'\n                  Image, 0x119d67be0, {{53.7, 753.7}, {25.7, 22.3}}, identifier: 'house.fill', label: 'Casa'\n                  StaticText, 0x119d67d00, {{51.9, 782.7}, {29.0, 13.3}}, label: 'Inicio'\n                Button, 0x119d67e20, {{110.7, 744.0}, {85.0, 60.0}}, identifier: 'premium-tab-history', label: 'Historial', Selected\n                  Image, 0x119d67f40, {{144.0, 751.7}, {18.0, 26.7}}, identifier: 'list.clipboard.fill', label: 'list.clipboard.fill'\n                  StaticText, 0x119d68060, {{130.0, 784.8}, {46.3, 13.3}}, label: 'Historial'\n                Button, 0x119d68180, {{197.7, 744.0}, {84.7, 60.0}}, identifier: 'premium-tab-drafts', label: 'Borradores'\n                  Image, 0x119d682a0, {{231.0, 753.7}, {18.0, 22.7}}, identifier: 'doc.text.fill', label: 'Documento De Texto Sin Formato'\n                  StaticText, 0x119d683c0, {{209.9, 782.8}, {60.0, 13.3}}, label: 'Borradores'\n                Button, 0x119d684e0, {{284.3, 744.0}, {84.7, 60.0}}, identifier: 'premium-tab-settings', label: 'Ajustes'\n                  Image, 0x119d68600, {{315.3, 753.7}, {22.3, 22.3}}, identifier: 'gearshape.fill', label: 'gearshape.fill'\n                  StaticText, 0x119d68720, {{306.6, 782.7}, {40.0, 13.3}}, label: 'Ajustes'\nPath to element:\n \u2192Application, 0x119d63aa0, pid: 81998, label: 'DANPER Salud M\u00f3vil'\nQuery chain:\n \u2192Find: Target Application 'pe.danper.saludmovil.native.iloaderpreview'\n  Output: {\n    Application, 0x119e4ba00, pid: 81998, label: 'DANPER Salud M\u00f3vil'\n  }\n",
+            "targetName": "DANPERInteractionTests",
+            "testIdentifier": 1,
+            "testIdentifierString": "N3ClinicalJourneyTests/testConsolidatedClinicalUnitsAndManualRThenRelaunch()",
+            "testIdentifierURL": "test://com.apple.xcode/DANPERNative/DANPERInteractionTests/N3ClinicalJourneyTests/testConsolidatedClinicalUnitsAndManualRThenRelaunch",
+            "testName": "testConsolidatedClinicalUnitsAndManualRThenRelaunch()"
+          }
+        ],
+        "title": "Test - DANPERNative",
+        "topInsights": [],
+        "totalTestCount": 2
+      },
+      "automationSuiteSeconds": 621.8730001449585,
+      "missingAnimationNotifications": 0
+    },
+    "after": {
+      "sourceSHA": "c1ec68d7d95d0b8786bd871ad1c46adbfbff9901",
+      "uiSummary": {
+        "devicesAndConfigurations": [
+          {
+            "device": {
+              "architecture": "x86_64",
+              "deviceId": "0C9F4AD0-9EFE-4FBE-9E3F-343A69E2D142",
+              "deviceName": "DANPER-SYNTHETIC-native",
+              "modelName": "iPhone 16",
+              "osBuildNumber": "22F77",
+              "osVersion": "18.5",
+              "platform": "iOS Simulator"
+            },
+            "expectedFailures": 0,
+            "failedTests": 0,
+            "passedTests": 2,
+            "skippedTests": 0,
+            "testPlanConfiguration": {
+              "configurationId": "1",
+              "configurationName": "Test Scheme Action"
+            }
+          }
+        ],
+        "environmentDescription": "DANPERNative \u00b7 Built with macOS 15.7.9",
+        "expectedFailures": 0,
+        "failedTests": 0,
+        "finishTime": 1793712570.369,
+        "passedTests": 2,
+        "result": "Passed",
+        "skippedTests": 0,
+        "startTime": 1793711946.64,
+        "statistics": [],
+        "testFailures": [],
+        "title": "Test - DANPERNative",
+        "topInsights": [],
+        "totalTestCount": 2
+      },
+      "automationSuiteSeconds": 623.7289998531342,
+      "missingAnimationNotifications": 0
+    }
+  }
+}

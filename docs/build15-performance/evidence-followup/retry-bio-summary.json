@@ -1,0 +1,45 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "x86_64",
+        "deviceId": "8D36E51A-AC48-4690-948B-0C54640A69A7",
+        "deviceName": "DANPER-SYNTHETIC-native",
+        "modelName": "iPhone 16",
+        "osBuildNumber": "22F77",
+        "osVersion": "18.5",
+        "platform": "iOS Simulator"
+      },
+      "expectedFailures": 0,
+      "failedTests": 1,
+      "passedTests": 1,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "DANPERNative \u00b7 Built with macOS 15.7.9",
+  "expectedFailures": 0,
+  "failedTests": 1,
+  "finishTime": 1793710448.809,
+  "passedTests": 1,
+  "result": "Failed",
+  "skippedTests": 0,
+  "startTime": 1793709887.52,
+  "statistics": [],
+  "testFailures": [
+    {
+      "failureText": "Failed to get matching snapshots: Timed out while evaluating UI query.",
+      "targetName": "DANPERInteractionTests",
+      "testIdentifier": 1,
+      "testIdentifierString": "N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground()",
+      "testIdentifierURL": "test://com.apple.xcode/DANPERNative/DANPERInteractionTests/N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground",
+      "testName": "testAutomaticBiometryCancellationRetryAndForeground()"
+    }
+  ],
+  "title": "Test - DANPERNative",
+  "topInsights": [],
+  "totalTestCount": 2
+}
