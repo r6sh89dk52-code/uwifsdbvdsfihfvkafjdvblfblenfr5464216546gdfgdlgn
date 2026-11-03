@@ -1,0 +1,14 @@
+{
+  "source": "d49e55775dcbbddabe48bcfef3830537a99b0749",
+  "run": 41653553937,
+  "productCoreUnmodified": true,
+  "executedCases": 438,
+  "failedCases": 1,
+  "assertionFailures": 2,
+  "passedCases": 437,
+  "skipped": 0,
+  "failures": [
+    "2026-11-03T14:29:09.4192142Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2SearchIndexTests.swift:55: error: N2SearchIndexTests.testExplicitUnfilteredHistoryQueryPreservesSavedRowsAndBounds : XCTAssertEqual failed: (\"[]\") is not equal to (\"[\"ATENCION FICTICIA R1\", \"ATENCION FICTICIA R0\"]\") - ",
+    "2026-11-03T14:29:09.4195247Z /home/runner/work/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/native-ios/Tests/DanperCoreTests/N2SearchIndexTests.swift:56: error: N2SearchIndexTests.testExplicitUnfilteredHistoryQueryPreservesSavedRowsAndBounds : XCTAssertEqual failed: (\"[]\") is not equal to (\"[\"ATENCION FICTICIA R1\"]\") - "
+  ]
+}
