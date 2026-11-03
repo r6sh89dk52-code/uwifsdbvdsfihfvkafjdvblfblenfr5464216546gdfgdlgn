@@ -1,0 +1,117 @@
+name: B15 - same-source sensor and accessibility recovery (NO IPA)
+'on':
+  push:
+    branches:
+    - audit/b15-profile-device-9143997-20261101
+    paths:
+    - .github/workflows/b15-owned-sensor-replay.yml
+    - scripts/glass-audit/simulator-ready-bridge.py
+    - scripts/performance/tests/test_sensor_bridge.py
+permissions:
+  contents: read
+  actions: read
+jobs:
+  protocol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Eleven bridge regressions, including five current sensor/registration races
+      run: python3 -m unittest discover -s scripts/performance/tests -p test_sensor_bridge.py -v
+    - name: Require all native application/Core/test source bytes unchanged from exact approved compile source
+      run: git diff --exit-code e58efd2a398b12ee196568295cb145821ed4639d HEAD -- native-ios
+  replay:
+    needs: protocol
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        suite:
+        - N2BiometricInteractionTests
+        - N2MenuInteractionTests
+        - N3ClinicalJourneyTests-protected
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: e58efd2a398b12ee196568295cb145821ed4639d
+        fetch-depth: 0
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.sha }}
+        path: .b15-host-harness
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        run-id: 41707072055
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/compiled
+    - name: Verify sealed exact-e58 native/UI products and install only the new host observer
+      run: 'set -euo pipefail
+
+        mkdir -p "$RUNNER_TEMP/sensor-derived/Build" "$RUNNER_TEMP/sensor-replay"
+
+        tar -xzf "$RUNNER_TEMP/compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/sensor-derived/Build"
+
+        python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/sensor-derived/Build/Products" "$RUNNER_TEMP/compiled/TEST_PRODUCTS.json"
+
+        cp scripts/glass-audit/simulator-ready-bridge.py "$RUNNER_TEMP/sensor-replay/ORIGINAL_BRIDGE.py"
+
+        cp .b15-host-harness/scripts/glass-audit/simulator-ready-bridge.py scripts/glass-audit/simulator-ready-bridge.py
+
+        cmp .b15-host-harness/scripts/glass-audit/simulator-ready-bridge.py scripts/glass-audit/simulator-ready-bridge.py
+
+        git diff --exit-code HEAD -- native-ios
+
+        git diff HEAD -- scripts/glass-audit/simulator-ready-bridge.py > "$RUNNER_TEMP/sensor-replay/HOST_ONLY.diff"
+
+        printf ''%s\n'' "$GITHUB_SHA" > "$RUNNER_TEMP/sensor-replay/HOST_HARNESS_SHA.txt"
+
+        cp "$RUNNER_TEMP/compiled/TEST_PRODUCTS.json" "$RUNNER_TEMP/sensor-replay/SEALED_E58_PRODUCTS.json"
+
+        shasum -a256 scripts/glass-audit/simulator-ready-bridge.py > "$RUNNER_TEMP/sensor-replay/HOST_BRIDGE_SHA256.txt"
+
+        '
+    - name: Run original mandatory UI suite with actual sensor and unchanged600s/authentication deadlines
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/sensor-replay
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/sensor-derived
+        DANPER_TEST_PROOF: ${{ runner.temp }}/compiled/TEST_PRODUCTS.json
+        DANPER_B15_UI_LABEL: ${{ matrix.suite }}
+      run: 'set -euo pipefail
+
+        bash scripts/glass-audit/validate-macos.sh b15-shard
+
+        python3 scripts/performance/verify-ui-shard.py "$DANPER_AUDIT_OUT" "$DANPER_B15_UI_LABEL"
+
+        git diff --exit-code HEAD -- native-ios
+
+        '
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_SENSOR_REPLAY_RESULT_${{ matrix.suite }}
+        path: '${{ runner.temp }}/sensor-replay/*.json
+
+          ${{ runner.temp }}/sensor-replay/*.txt
+
+          ${{ runner.temp }}/sensor-replay/*.log
+
+          ${{ runner.temp }}/sensor-replay/*.diff
+
+          ${{ runner.temp }}/sensor-replay/*.py'
+        retention-days: 14
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_SENSOR_REPLAY_RAW_${{ matrix.suite }}
+        path: '${{ runner.temp }}/sensor-replay/*.xcresult
+
+          ${{ runner.temp }}/sensor-replay/*-attachments'
+        retention-days: 7
