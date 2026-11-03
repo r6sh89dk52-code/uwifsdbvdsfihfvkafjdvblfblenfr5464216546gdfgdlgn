@@ -1,35 +1,26 @@
 {
-  "capturedAtUTC": "2026-11-03T00:57:11.930Z",
+  "capturedAtUTC": "2026-11-03T02:30:06.973Z",
   "runs": [
     {
       "id": 41552268684,
       "head_sha": "0cdc76048db778a6561a237fcb46d63d168a4f7c",
-      "status": "queued",
-      "conclusion": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684",
-      "run_attempt": 1,
-      "created_at": "2026-11-03T00:21:29Z",
-      "updated_at": "2026-11-03T00:46:02Z"
-    },
-    {
-      "id": 41552987131,
-      "head_sha": "f73e2515bac4418ea3cc1b5684a87a682dd38d49",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552987131",
-      "run_attempt": 1,
-      "created_at": "2026-11-03T00:27:30Z",
-      "updated_at": "2026-11-03T00:36:26Z"
+      "conclusion": "failure",
+      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684"
     },
     {
       "id": 41555957508,
       "head_sha": "3adfff513c09decb33430e2d767af0c32477cd15",
-      "status": "queued",
-      "conclusion": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41555957508",
-      "run_attempt": 1,
-      "created_at": "2026-11-03T00:52:43Z",
-      "updated_at": "2026-11-03T00:52:43Z"
+      "status": "completed",
+      "conclusion": "failure",
+      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41555957508"
+    },
+    {
+      "id": 41557902626,
+      "head_sha": "504fe7c3aa28f41c26463df8b9c0b1979c16c0c2",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41557902626"
     }
   ],
   "jobs": [
@@ -37,127 +28,91 @@
       "id": 125642514629,
       "name": "performance",
       "status": "completed",
-      "conclusion": "success",
-      "started_at": "2026-11-03T00:21:33Z",
-      "completed_at": "2026-11-03T00:44:55Z",
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125642514629"
+      "conclusion": "success"
     },
     {
       "id": 125642514838,
       "name": "native-build",
       "status": "completed",
-      "conclusion": "success",
-      "started_at": "2026-11-03T00:21:34Z",
-      "completed_at": "2026-11-03T00:46:02Z",
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125642514838"
+      "conclusion": "success"
     },
     {
       "id": 125642514885,
       "name": "performance-v2",
       "status": "completed",
-      "conclusion": "success",
-      "started_at": "2026-11-03T00:21:32Z",
-      "completed_at": "2026-11-03T00:36:53Z",
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125642514885"
+      "conclusion": "success"
     },
     {
       "id": 125642515008,
       "name": "javascript",
       "status": "completed",
-      "conclusion": "success",
-      "started_at": "2026-11-03T00:21:32Z",
-      "completed_at": "2026-11-03T00:23:03Z",
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125642515008"
+      "conclusion": "success"
     },
     {
       "id": 125642515092,
       "name": "swift-core / swift-core",
       "status": "completed",
-      "conclusion": "success",
-      "started_at": "2026-11-03T00:21:32Z",
-      "completed_at": "2026-11-03T00:33:08Z",
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125642515092"
+      "conclusion": "success"
     },
     {
       "id": 125652186881,
       "name": "instruments",
-      "status": "in_progress",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:05Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652186881"
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "id": 125652187018,
       "name": "ui (N2BiometricInteractionTests)",
-      "status": "in_progress",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:06Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187018"
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "id": 125652187032,
       "name": "ui (N2MenuInteractionTests)",
-      "status": "queued",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:02Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187032"
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "id": 125652187055,
       "name": "ui (N2Build222ShellTests)",
-      "status": "in_progress",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:06Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187055"
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "id": 125652187073,
       "name": "ui (N3ClinicalJourneyTests-protected)",
-      "status": "queued",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:02Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187073"
+      "status": "completed",
+      "conclusion": "failure"
     },
     {
       "id": 125652187081,
       "name": "ui (N2PremiumRedesignTests)",
-      "status": "queued",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:02Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187081"
+      "status": "completed",
+      "conclusion": "failure"
     },
     {
       "id": 125652187086,
       "name": "ui (N3ClinicalJourneyTests-demo)",
-      "status": "queued",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:02Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187086"
+      "status": "completed",
+      "conclusion": "failure"
     },
     {
       "id": 125652187189,
       "name": "ui (N2GlassClinicalTests)",
-      "status": "in_progress",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:05Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187189"
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "id": 125652187216,
       "name": "ui (N2AllergySaveInteractionTests)",
-      "status": "in_progress",
-      "conclusion": null,
-      "started_at": "2026-11-03T00:46:06Z",
-      "completed_at": null,
-      "html_url": "https://github.com/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/actions/runs/41552268684/job/125652187216"
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 125670652014,
+      "name": "complete",
+      "status": "completed",
+      "conclusion": "skipped"
     }
   ]
 }

@@ -1,0 +1,45 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "x86_64",
+        "deviceId": "FB80245A-BE6C-4C98-97C5-62C1989AF72B",
+        "deviceName": "DANPER-SYNTHETIC-native",
+        "modelName": "iPhone 16",
+        "osBuildNumber": "22F77",
+        "osVersion": "18.5",
+        "platform": "iOS Simulator"
+      },
+      "expectedFailures": 0,
+      "failedTests": 1,
+      "passedTests": 0,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "DANPERNative \u00b7 Built with macOS 15.7.9",
+  "expectedFailures": 0,
+  "failedTests": 1,
+  "finishTime": 1793669278.002,
+  "passedTests": 0,
+  "result": "Failed",
+  "skippedTests": 0,
+  "startTime": 1793669137.586,
+  "statistics": [],
+  "testFailures": [
+    {
+      "failureText": "XCTAssertTrue failed - Attributes: Application, 0x10f778660, pid: 19534, label: 'DANPER Salud M\u00f3vil'\nElement subtree:\n \u2192Application, 0x10f778660, pid: 19534, label: 'DANPER Salud M\u00f3vil'\n    Window (Main), 0x10f77a490, {{0.0, 0.0}, {393.0, 852.0}}\n      Other, 0x10f77a850, {{0.0, 0.0}, {393.0, 852.0}}\n        Other, 0x10f77a970, {{0.0, 0.0}, {393.0, 852.0}}\n          Other, 0x10f77a5b0, {{0.0, 0.0}, {393.0, 852.0}}\n            Other, 0x10f77a6d0, {{0.0, 0.0}, {393.0, 852.0}}\n              Other, 0x10f77aa90, {{0.0, 0.0}, {393.0, 852.0}}\n              Other, 0x10f77abb0, {{0.0, 0.0}, {393.0, 852.0}}\n                NavigationBar, 0x10f77acd0, {{0.0, 53.7}, {393.0, 44.0}}, identifier: 'Crear fuente cl\u00ednica'\n                  Button, 0x10f77adf0, {{0.0, 53.7}, {108.7, 44.0}}, label: 'Comenzar'\n                  StaticText, 0x10f77af10, {{119.3, 65.3}, {154.7, 20.3}}, label: 'Crear fuente cl\u00ednica'\n                Other, 0x10f77b030, {{0.0, 0.0}, {393.0, 852.0}}\n                  Other, 0x10f77b150, {{0.0, 0.0}, {393.0, 852.0}}\n                    Other, 0x10f77b270, {{0.0, 0.0}, {393.0, 852.0}}\n                      Other, 0x10f77b390, {{0.0, 0.0}, {393.0, 852.0}}\n                        Other, 0x10f77b4b0, {{0.0, 0.0}, {393.0, 852.0}}\n                        ScrollView, 0x10f77b5d0, {{0.0, 0.0}, {393.0, 852.0}}\n                          Other, 0x10f77b6f0, {{0.0, -98.3}, {393.0, 1082.7}}\n                            StaticText, 0x10f77b810, {{32.0, -66.3}, {246.7, 20.3}}, label: 'Comenzar sin Excel ni respaldo'\n                            StaticText, 0x10f77b930, {{34.0, -33.0}, {302.0, 22.0}}, label: 'Primer trabajador \u00b7 registro manual'\n                            StaticText, 0x10f77ba50, {{32.0, 3.3}, {308.0, 69.7}}, label: 'No se cargar\u00e1n registros de prueba. Se crear\u00e1 una fuente cifrada \u00fanicamente con los datos que introduzcas y apruebes aqu\u00ed. Inicialmente habr\u00e1 0 atenciones y ning\u00fan inventario iniciado.'\n                            StaticText, 0x10f77bd00, {{32.0, 86.0}, {329.0, 69.7}}, label: 'Para pruebas con empleados ficticios, regresa a Inicio \u2192 Empezar con una base vac\u00eda (DEMO). Este formulario crea una fuente CL\u00cdNICA independiente y requiere Face ID o el c\u00f3digo del dispositivo.'\n                            StaticText, 0x10f77bfc0, {{32.0, 168.7}, {318.7, 87.7}}, label: 'Si tienes historial anterior, conserva su respaldo cifrado. Despu\u00e9s de iniciar el inventario nuevo podr\u00e1s restaurar el historial cl\u00ednico sin reemplazar existencias. La recuperaci\u00f3n completa se reserva para una fuente vac\u00eda.'\n                            StaticText, 0x10f77c2c0, {{32.0, 304.3}, {108.0, 20.3}}, label: 'Identificaci\u00f3n'\n                            StaticText, 0x10f77c3e0, {{32.0, 337.7}, {26.3, 18.0}}, label: 'DNI'\n                            TextField, 0x10f77c500, {{44.0, 375.7}, {305.0, 22.0}}, identifier: 'first-manual-worker-dni', placeholderValue: '8 d\u00edgitos', value: 00000031\n                            StaticText, 0x10f77c620, {{32.0, 422.7}, {145.3, 18.0}}, label: 'Apellidos y nombres'\n                            TextField, 0x10f77c740, {{44.0, 460.7}, {305.0, 22.0}}, identifier: 'first-manual-worker-name', placeholderValue: 'Apellidos y nombres', value: PERSONAL AUTORIZAD...\n                            Button, 0x10f77c860, {{32.0, 507.7}, {329.0, 74.0}}, identifier: 'choice-Sede verificada', label: 'Sede verificada, Fundo La Venturosa'\n                              Button, 0x10f77c980, {{32.0, 507.7}, {329.0, 74.0}}\n                                Other, 0x10f77caa0, {{32.0, 507.7}, {329.0, 74.0}}\n                                  StaticText, 0x10f77cbc0, {{32.0, 507.7}, {110.7, 18.0}}, label: 'Sede verificada'\n                                  StaticText, 0x10f77cce0, {{44.0, 547.5}, {152.0, 20.3}}, label: 'Fundo La Venturosa'\n                                  Image, 0x10f77ce00, {{338.7, 551.3}, {9.0, 12.7}}, identifier: 'chevron.up.chevron.down', label: 'Chevr\u00f3n Hacia Arriba Y Abajo'\n                            StaticText, 0x10f77cf20, {{32.0, 594.7}, {109.7, 18.0}}, label: '\u00c1rea (opcional)'\n                            TextField, 0x10f77d040, {{44.0, 632.7}, {305.0, 22.0}}, placeholderValue: '\u00c1rea de trabajo'\n                            StaticText, 0x10f77d160, {{32.0, 679.7}, {117.7, 18.0}}, label: 'Labor (opcional)'\n                            TextField, 0x10f77d280, {{44.0, 717.7}, {305.0, 22.0}}, placeholderValue: 'Labor'\n                            StaticText, 0x10f77d3a0, {{32.0, 764.7}, {204.0, 18.0}}, label: 'Ubigeo / localidad (opcional)'\n                            TextField, 0x10f77d4c0, {{44.0, 802.7}, {305.0, 22.0}}, identifier: 'first-manual-worker-ubigeo', placeholderValue: 'Ej.: CHEP\u00c9N, TRUJILLO, PACASMAYO'\n                            Button, 0x10f77d5e0, {{16.0, 868.7}, {361.0, 50.0}}, identifier: 'first-manual-worker-activate', label: 'Revisar y crear base nueva'\n                              Image, 0x10f77d700, {{90.0, 886.3}, {12.7, 15.0}}, identifier: 'lock.shield.fill', label: 'lock.shield.fill'\n                              StaticText, 0x10f77d820, {{16.0, 868.7}, {361.0, 50.0}}, label: 'Revisar y crear base nueva'\n                            StaticText, 0x10f77d940, {{16.0, 934.7}, {331.7, 33.7}}, identifier: 'first-manual-worker-status', label: 'Ingresa los datos del primer trabajador para comenzar sin Excel.'\n                          Other, 0x10f77da60, {{360.0, 97.7}, {30.0, 705.0}}, label: 'Vertical scroll bar, 2 pages', value: 54%\n                            Other, 0x10f64c260, {{387.0, 213.7}, {3.0, 490.3}}\n                          Other, 0x10f6513c0, {{360.0, 97.7}, {30.0, 705.0}}, label: 'Vertical scroll bar, 2 pages', value: 54%\n                            Other, 0x10f651040, {{387.0, 213.7}, {3.0, 490.3}}\n    Window, 0x10f650240, {{0.0, 0.0}, {393.0, 852.0}}\n      Other, 0x10f651730, {{0.0, 0.0}, {393.0, 852.0}}\n        Other, 0x10f651ad0, {{0.0, 0.0}, {393.0, 852.0}}\n        Other, 0x10f652500, {{0.0, 852.0}, {393.0, 233.0}}\nPath to element:\n \u2192Application, 0x10f778660, pid: 19534, label: 'DANPER Salud M\u00f3vil'\nQuery chain:\n \u2192Find: Target Application 'pe.danper.saludmovil.native.iloaderpreview'\n  Output: {\n    Application, 0x10f650cc0, pid: 19534, label: 'DANPER Salud M\u00f3vil'\n  }\n",
+      "targetName": "DANPERInteractionTests",
+      "testIdentifier": 1,
+      "testIdentifierString": "N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch()",
+      "testIdentifierURL": "test://com.apple.xcode/DANPERNative/DANPERInteractionTests/N3ClinicalJourneyTests/testProtectedClinicalSourceCreationAndRelaunch",
+      "testName": "testProtectedClinicalSourceCreationAndRelaunch()"
+    }
+  ],
+  "title": "Test - DANPERNative",
+  "topInsights": [],
+  "totalTestCount": 1
+}

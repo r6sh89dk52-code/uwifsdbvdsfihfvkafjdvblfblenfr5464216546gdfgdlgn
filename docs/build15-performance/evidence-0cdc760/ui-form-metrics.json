@@ -1,0 +1,120 @@
+{
+  "sourceSHA": "0cdc76048db778a6561a237fcb46d63d168a4f7c",
+  "run": 41552268684,
+  "artifact": 13194278531,
+  "scope": "Xcode16.4 iPhone16 iOS18.5 x86_64 Simulator, 2 fake workers; not physical iPhone",
+  "metrics": [
+    {
+      "metric": "Absolute Memory Physical (iloaderpreview), kB",
+      "id": "com.apple.dt.XCTMetric_Memory-pe.danper.saludmovil.native.iloaderpreview.physical_absolute",
+      "mean": 54157.312,
+      "samples": [
+        53751.808,
+        54112.256,
+        54259.712,
+        54312.96,
+        54349.824
+      ],
+      "p50": 54259.712,
+      "p95": null,
+      "available": true,
+      "interpretation": "5 cycles open AND close form, includes XCTest automation; 2 fictitious workers; no matched baseline"
+    },
+    {
+      "metric": "Memory Peak Physical (iloaderpreview), kB",
+      "id": "com.apple.dt.XCTMetric_Memory-pe.danper.saludmovil.native.iloaderpreview.physical_peak",
+      "mean": 56041.472,
+      "samples": [
+        55693.312,
+        55914.496,
+        56127.488,
+        56209.408,
+        56262.656
+      ],
+      "p50": 56127.488,
+      "p95": null,
+      "available": true,
+      "interpretation": "5 cycles open AND close form, includes XCTest automation; 2 fictitious workers; no matched baseline"
+    },
+    {
+      "metric": "CPU Cycles (iloaderpreview), kC",
+      "id": "com.apple.dt.XCTMetric_CPU-pe.danper.saludmovil.native.iloaderpreview.cycles",
+      "mean": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "p50": 0.0,
+      "p95": null,
+      "available": false,
+      "interpretation": "Unavailable Simulator hardware counter, not zero CPU"
+    },
+    {
+      "metric": "Memory Physical (iloaderpreview), kB",
+      "id": "com.apple.dt.XCTMetric_Memory-pe.danper.saludmovil.native.iloaderpreview.physical",
+      "mean": 194.15,
+      "samples": [
+        372.736,
+        360.448,
+        147.456,
+        53.248,
+        36.864
+      ],
+      "p50": 147.456,
+      "p95": null,
+      "available": true,
+      "interpretation": "5 cycles open AND close form, includes XCTest automation; 2 fictitious workers; no matched baseline"
+    },
+    {
+      "metric": "Clock Monotonic Time, s",
+      "id": "com.apple.dt.XCTMetric_Clock.time.monotonic",
+      "mean": 5.487,
+      "samples": [
+        6.632455,
+        5.58143,
+        5.004314,
+        5.200295,
+        5.015954
+      ],
+      "p50": 5.200295,
+      "p95": null,
+      "available": true,
+      "interpretation": "5 cycles open AND close form, includes XCTest automation; 2 fictitious workers; no matched baseline"
+    },
+    {
+      "metric": "CPU Time (iloaderpreview), s",
+      "id": "com.apple.dt.XCTMetric_CPU-pe.danper.saludmovil.native.iloaderpreview.time",
+      "mean": 2.231,
+      "samples": [
+        2.822658,
+        2.02223,
+        2.066906,
+        1.876873,
+        2.367171
+      ],
+      "p50": 2.066906,
+      "p95": null,
+      "available": true,
+      "interpretation": "5 cycles open AND close form, includes XCTest automation; 2 fictitious workers; no matched baseline"
+    },
+    {
+      "metric": "CPU Instructions Retired (iloaderpreview), kI",
+      "id": "com.apple.dt.XCTMetric_CPU-pe.danper.saludmovil.native.iloaderpreview.instructions_retired",
+      "mean": 0.0,
+      "samples": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "p50": 0.0,
+      "p95": null,
+      "available": false,
+      "interpretation": "Unavailable Simulator hardware counter, not zero CPU"
+    }
+  ]
+}

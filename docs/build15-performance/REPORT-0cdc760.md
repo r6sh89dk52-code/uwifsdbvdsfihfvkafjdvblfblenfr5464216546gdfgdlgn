@@ -1,6 +1,10 @@
-# Build 15 — evidencia del HEAD 0cdc760, validación aún abierta
+# Build 15 — evidencia del HEAD 0cdc760, cierre FAILURE conservado
 
-**No es aprobación de distribución. No hay IPA nueva.** Corte técnico: 3 de noviembre de 2026 UTC (2 de noviembre, Lima). El estado exacto de los jobs al corte está en [workflows-snapshot.json](evidence-0cdc760/workflows-snapshot.json); puede avanzar después de este documento.
+**Cierre definitivo de0cdc: FAILURE, UI11PASS/3FAIL/0SKIP. No hay IPA nueva.**
+
+El HEAD de aplicación avanzó posteriormente a4daba9649824b58dedc57721d8cd1ad5af035963 con tres ajustes de interacción UI; su gate41565545738 y Release41565648700 deben validar ese SHA. Este informe certifica únicamente las cifras explícitas de0cdc, cuyo cierre falló. No aprueba4daba.
+
+Los tres fallos actuales son: geometría de teclado leída antes de desplegarse completamente, consulta AX de teclado agotada aunque captura posterior ya lo muestra oculto, y botón de activación fuera del viewport. Biometría(cancel/no-match/retry/foreground) y alergias completas aprobaron. La fuente clínica vacía ya pasa acceso/desbloqueo; no se atribuye retroactivamente toda la demora antigua a Keychain. Corte técnico: 3 de noviembre de 2026 UTC (2 de noviembre, Lima). El estado exacto de los jobs al corte está en [workflows-snapshot.json](evidence-0cdc760/workflows-snapshot.json); puede avanzar después de este documento.
 
 ## 1. Fuente y continuidad
 
@@ -24,9 +28,9 @@
 | Regresiones Python del workflow | 37 | 0 | 0 | PASS, log 0.364s |
 | Compatibilidad cifrada con productor Build 14 original | 1 | 0 | 0 | PASS |
 | Presupuestos de rendimiento Core v2 | 9 | 0 | 0 | PASS; son presupuestos, no nueve casos XCTest |
-| UI funcional obligatoria | Pendiente de cierre | No consolidado | No consolidado | 14 casos esperados en ocho shards |
+| UI funcional obligatoria | 11 | 3 | 0 | FAILURE;14casos realmente ejecutados |
 | Release iPhoneOS ARM64 | Compilada | 0 | — | PASS identidad, sin IPA |
-| Instruments activo antes/después | No medido todavía | No consolidado | — | Ejecución nueva pendiente |
+| Instruments activo antes/después | 4recorridosUI;2TimeProfilertraces | 2Allocations finalización y1exportCPU | — | FAILURE; ambos perfiles empezaron DESPUÉS del guardado objetivo |
 | Guardas auxiliares de empaquetado | 10 | 0 | 0 | PASS local sobre metadatos ficticios; no aprobación de app |
 
 Las 29 nativas finalizaron con 0 fallos/omisiones: 239.262s agregados de XCTest. La cancelación genuina de LocalAuthentication devolvió appCancel -9, caso12.244s; no se envió match para hacerlo pasar. El nuevo caso de fuente vacía pasó en0.012s y comprobó cero consultas Keychain y ausencia de creación de datos. Es duración del caso, no una medición de arranque completo ni del iPhone real.
@@ -59,7 +63,7 @@ El artifact actual contiene `action-inventory.json`: **55 archivos Swift de App 
 1. **787b3ad +1419703:** descubrimiento UI ya tenía14 casos, pero cierre shell exigía13. Rechazaba un inventario completo y podía aceptar el anterior incompleto. Nuevo verificador coteja suites, clases, selectores y cuentas con fuente actual. Cuatro regresiones ejecutan descubrimiento/cierre shell reales: antes2PASS/2FAIL; después37PythonPASS. Se conserva modo100644 del script.
 2. **9a28363 +bae26cf +0cdc760:** inspección de fuente vacía hacía lectura Keychain innecesaria y podía comenzar fuera de escena activa; se difiere inspección/revisión y se omite Keychain solo ante ausencia/raíz real vacía confirmada. Errores, permisos, archivo no directorio, enlaces simbólicos y enlaces rotos mantienen el recorrido protegido. No cambia claves, formatos, archivo, stock ni servicios Keychain. Cuatro regresiones Core y una nativa nueva pasan. Nuevos signposts técnicos fijos sin datos personales. El antiguo caso UI mostró loading después de autenticar, pero no existía una traza para atribuir todo ese tiempo a Keychain: corrección de trabajo redundante verificada, resolución del spinner pendiente de UI.
 3. **bae26cf, arnés R:** la selección automática de trabajador cerraba el teclado entre el exists y el tap del botón de ocultarlo durante la segunda atención. Ahora se espera la desaparición real después de escribir DNI. Se conservan R1/R0, saldos, relanzamiento, no duplicación y límite600s; no se relaja la función clínica.
-4. **3adfff5, auxiliar:** el perfilado anterior aprobó sus4 recorridos UI, pero las4 capturas fallaron consultando `ps` con timeout5s. No produjo métricas utilizables. Nuevo selector observa el lanzamiento de la app en el log del simulador propio y valida PID/ruta con libproc;8 regresiones locales y probe macOS obligatorio. Conserva binarios y escenarios idénticos en ambos lados; captura actual todavía no aprobada.
+4. **3adfff5, auxiliar:** el perfilado anterior aprobó sus4 recorridos UI, pero las4 capturas fallaron consultando `ps` con timeout5s. No produjo métricas utilizables. Nuevo selector observa el lanzamiento de la app en el log del simulador propio y valida PID/ruta con libproc;8 regresiones locales y probe macOS obligatorio. Conserva binarios y escenarios idénticos en ambos lados; captura activa terminóFAILURE; selecciónPIDfuncionó, pero hubo finalización/exportación incompleta y se perdió el guardado inicial.
 5. **48cc3d6, auxiliar:** preparación de empaquetado fijada a0cdc,437Swift/29Native/14UI, Release actual y perfil41555957508. Rechaza fuentes, cuentas, UI, skips, compatibilidad física y presupuestos incorrectos;10 pruebas locales aprobadas. No tiene workflow de IPA habilitado.
 
 ## 5. Mediciones antes/después
@@ -111,8 +115,8 @@ Recursos completos v1: CPUusuario523.78→122.85s; sistema2.52→1.29s; pared525
 
 ### Interfaz, Instruments y dispositivo
 
-- Medición UI actual0cdc: pendiente, **No medido** aún. La app funcional usa binarios sellados del mismo HEAD; no se inyectan resultados.
-- Comparación activa41555957508: misma máquina Mac, antesC274/después0cdc, dos trabajadores ficticios por escenario, una instancia de Simulator nueva por template para que la revisión realmente se escriba. TimeProfiler yAllocations deben producir trazas/tablas reales; sin captura, métrica No medido.
+- Medición UI actual0cdc:2alergiasPASS;5ciclos abrir/cerrar, media5.487s/reloj y2.231s/CPU, memoria absoluta54157.312kB y pico56041.472kB. n5,2trabajadores, automatización incluida; sin baseline comparable no hay mejora UI demostrada. La app funcional usa binarios sellados del mismo HEAD; no se inyectan resultados.
+- Comparación activa41555957508 terminóFAILURE: misma máquina Mac, antesC274/después0cdc, dos trabajadores ficticios por escenario, una instancia de Simulator nueva por template para que la revisión realmente se escriba. TimeProfiler yAllocations deben producir trazas/tablas reales; sin captura, métrica No medido.
 - Antecedente59e, no certifica0cdc: XCTest de5 ciclos abrir/cerrar formulario,2 trabajadores, media reloj4.993s/CPU2.339s y pico memoria medio55729.357kB. Incluye automatización y cierre; no es tiempo exacto hasta formulario ni guardado. Contadores ciclos/instrucciones0 del simulador no son evidencia de CPUcero. Sin antes comparable no se declara mejora UI.
 - iPhone físico: latencia de alergias, inicio/pantallas, CPU, asignaciones y contenedor **No medido**. No se accedió a datos reales.
 
@@ -129,7 +133,7 @@ Bundle ID permanece **pe.danper.saludmovil.native.iloaderpreview**; Release0.4.2
 - **59e, run41528135555: FAILURE definitivo.** Swift433/Native28/JS62/Py33/Excel/compat/benchmarks aprobaron. UI14ejecutados:11PASS/3FAIL/0SKIP; además el cierre obsoleto13 falló en todos los shards. No se ocultan los tres fallos reales: loading tras autenticar, carrera del teclado en segunda atención y activación de CoreAuthUI -1000 con consulta AXagotada antes de match. La invalidación LA registrada volvió en milisegundos; no se declara bloqueo de147s en invalidate. El tercer problema sigue sin causa completamente demostrada hasta repetir UI.
 - **41535822144: FAILURE.** Cuatro recorridos UI aprobados, cuatro capturas sin PID/trace; noCPU/alloc antes/después disponible. Se conserva el fallo, nuevo selector no se declara aprobado solo por sus tests.
 - Los antiguos errores SwiftPM139 ocurrieron en planificación antes de casos; causa exacta no establecida para todos. No se borran ni se renombran como PASS. Los resultados nuevos de437pruebas no reescriben esos logs.
-- UI14, Instruments actual, cierre final y perfil activo comparativo siguen pendientes al corte. No hay aprobación integral mientras falte alguno.
+- UI14 terminó11PASS/3FAIL; cierre finalSKIPPED por dependencia fallida; perfil activoFAILURE. No hay aprobación integral niIPA.
 - No se afirma haber medido cada botón/selector/render del mapa estático. Los escenarios de UI perfilada tienen2trabajadores; la carga9648 se mide en Core. Reproducir ese volumen con Instruments de UI sigue siendo una limitación.
 - Ningún cambio requiere reiniciar bóveda, reimportar historia, generar stock, repetir consumos o eliminar Trabajadores. Si la validación actual detecta regresión se conserva su fallo y se corrige antes de IPA.
 
@@ -191,3 +195,25 @@ Auxiliares nuevos, sin fusionar ni cambiar main:
 - `48cc3d6accf5e567a45edae9311df65660496d5c` — preparación de guardas de distribución0cdc, sin trigger niIPA.
 
 Los JSON adjuntos son evidencia cruda del HEAD indicado. La fixture de empaquetado es ficticia y está en otra rama: no forma parte de esta evidencia medida.
+
+
+## Cierre de interfaz y mediciones complementarias
+
+| Suite0cdc | PASS | FAIL | SKIP |
+|---|---:|---:|---:|
+| Build222Shell |1|0|0|
+| AllergySave |2|0|0|
+| GlassClinical |3|0|0|
+| Biometric |2|0|0|
+| Menu |1|0|0|
+| PremiumRedesign |1|1|0|
+| N3demo |1|1|0|
+| N3protected |0|1|0|
+
+Los campos previos de diagnóstico/contexto de este informe reflejan el estado de evaluación inicial; esta tabla y workflows-snapshot.json cierran el resultado real, sin ocultar fallos. Los cambios posteriores están en4daba/docs/build15-performance/UI_TRANSITION_EVIDENCE.md.
+
+La exportación auxiliar41557902626 SUCCESS recuperó173filasStatistics y85496filasAllocationList del Inicio ficticio0cdc. Heap+VM:14682432bytes persistentes,15078480bytes asignados totales,85496asignaciones persistentes. No son fugas demostradas, RSS ni costo de alergias; categorías solapadas no se suman. Artifact13196690048.
+
+El análisis parcial del perfil41555957508 encontró31marcadores de posible bloqueo antes y44después (no se afirma mejora):256.773–11801.324ms y255.193–2806.671ms. Requieren correlación con stacks de automatización/AX/UI. Los intervalos completos del journal no representan el botón: el caso guardó a01:20:34UTCantes de que TimeProfiler iniciara01:20:44; después guardó01:44:22UTCantes de que iniciara01:44:25. Falta por diseño una sincronización entre recorder y recorrido. La latencia de guardado SwiftUI en esas trazas es **No medido**, no cero. Los4recorridos UI sí aprobaron; dosTimeProfilertraces existen, baselineexportCPUagotado y ambasAllocationsdetenidas por timeout tras Target app exited/Stopping recording. Artifact13198113880 conserva evidencia parcial; no se cambia suFAILURE.
+
+Los nuevos JSON incluyen resúmenes UI actuales, métricasXCTest y datos de ambas trazas parciales. No reemplazan la obligación de probar4daba. La preparación de empaquetado48cc3d6, fijada a0cdc, ahora falla deliberadamente si se intenta usar con4daba; no se habilitó distribución.

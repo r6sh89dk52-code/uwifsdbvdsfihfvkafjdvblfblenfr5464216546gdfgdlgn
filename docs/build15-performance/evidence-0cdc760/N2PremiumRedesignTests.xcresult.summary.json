@@ -1,0 +1,45 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "x86_64",
+        "deviceId": "D138F8E9-834A-4BC4-8810-E3C25F0CE55C",
+        "deviceName": "DANPER-SYNTHETIC-native",
+        "modelName": "iPhone 16",
+        "osBuildNumber": "22F77",
+        "osVersion": "18.5",
+        "platform": "iOS Simulator"
+      },
+      "expectedFailures": 0,
+      "failedTests": 1,
+      "passedTests": 1,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "DANPERNative \u00b7 Built with macOS 15.7.9",
+  "expectedFailures": 0,
+  "failedTests": 1,
+  "finishTime": 1793669299.589,
+  "passedTests": 1,
+  "result": "Failed",
+  "skippedTests": 0,
+  "startTime": 1793668962.407,
+  "statistics": [],
+  "testFailures": [
+    {
+      "failureText": "XCTAssertGreaterThan failed: (\"77.66666666666669\") is not greater than (\"150.0\") - Validar con teclado en pantalla",
+      "targetName": "DANPERInteractionTests",
+      "testIdentifier": 2,
+      "testIdentifierString": "N2PremiumRedesignTests/testDemoNavigationAttentionAndVersion()",
+      "testIdentifierURL": "test://com.apple.xcode/DANPERNative/DANPERInteractionTests/N2PremiumRedesignTests/testDemoNavigationAttentionAndVersion",
+      "testName": "testDemoNavigationAttentionAndVersion()"
+    }
+  ],
+  "title": "Test - DANPERNative",
+  "topInsights": [],
+  "totalTestCount": 2
+}

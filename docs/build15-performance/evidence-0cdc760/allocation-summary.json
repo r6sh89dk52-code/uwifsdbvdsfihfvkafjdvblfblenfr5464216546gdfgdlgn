@@ -1,0 +1,43 @@
+{
+  "sourceSHA": "0cdc76048db778a6561a237fcb46d63d168a4f7c",
+  "recordingRun": 41552268684,
+  "exportRun": 41557902626,
+  "recordingArtifact": 13194438610,
+  "exportArtifact": 13196690048,
+  "scope": "Existing idle fictional Home trace; no before/after allergy allocation or physical iPhone claim",
+  "statisticsRowCount": 173,
+  "allocationListRows": 85496,
+  "aggregateCategories": [
+    {
+      "category": "All Heap & Anonymous VM",
+      "persistent-bytes": "14682432",
+      "count-persistent": "85496",
+      "total-bytes": "15078480",
+      "transient-bytes": "396048",
+      "count-events": "85538",
+      "count-transient": "21",
+      "count-total": "85517"
+    },
+    {
+      "category": "All Heap Allocations",
+      "persistent-bytes": "14682432",
+      "count-persistent": "85496",
+      "total-bytes": "14685264",
+      "transient-bytes": "2832",
+      "count-events": "85530",
+      "count-transient": "17",
+      "count-total": "85513"
+    },
+    {
+      "category": "All Anonymous VM",
+      "persistent-bytes": "0",
+      "count-persistent": "0",
+      "total-bytes": "393216",
+      "transient-bytes": "393216",
+      "count-events": "8",
+      "count-transient": "4",
+      "count-total": "4"
+    }
+  ],
+  "warning": "Categories overlap; never sum Heap and its combined Heap+VM category. Persistent allocation counts are not leaks or physical RSS."
+}

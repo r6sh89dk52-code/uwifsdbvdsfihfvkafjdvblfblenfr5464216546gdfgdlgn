@@ -1,0 +1,127 @@
+{
+  "sourceSHA": "0cdc76048db778a6561a237fcb46d63d168a4f7c",
+  "run": 41552268684,
+  "artifact": 13194438610,
+  "scope": "Separate synthetic Home process; not concurrent with functional UI tests; not physical iPhone latency",
+  "captures": [
+    {
+      "template": "Time Profiler",
+      "captured": true,
+      "phase": "exporting",
+      "observedPID": 20364,
+      "attachTarget": 20364,
+      "deviceUDID": "F27E32F5-0D62-47CF-9C85-8D650C87AA4C",
+      "noPrompt": true,
+      "exit": 0,
+      "tocExported": true,
+      "availableSchemas": [
+        "device-thermal-state-intervals",
+        "gcd-perf-event",
+        "global-poi-layout",
+        "global-roi-layout",
+        "hang-risks",
+        "kdebug",
+        "kdebug-signpost",
+        "kdebug-strings",
+        "life-cycle-period",
+        "os-log",
+        "os-log-arg",
+        "os-signpost",
+        "os-signpost-arg",
+        "potential-hangs",
+        "process-info",
+        "region-of-interest",
+        "roi-metadata",
+        "runloop-events",
+        "thread-info",
+        "tick",
+        "time-profile",
+        "time-sample"
+      ],
+      "dataExports": [
+        {
+          "schema": "os-signpost",
+          "exported": true,
+          "file": "Time-Profiler-os-signpost.xml"
+        },
+        {
+          "schema": "os-signpost-arg",
+          "exported": true,
+          "file": "Time-Profiler-os-signpost-arg.xml"
+        },
+        {
+          "schema": "time-profile",
+          "exported": true,
+          "file": "Time-Profiler-time-profile.xml"
+        }
+      ]
+    },
+    {
+      "template": "Allocations",
+      "captured": true,
+      "phase": "exporting",
+      "observedPID": 20364,
+      "attachTarget": 20364,
+      "deviceUDID": "F27E32F5-0D62-47CF-9C85-8D650C87AA4C",
+      "noPrompt": true,
+      "exit": 0,
+      "tocExported": true,
+      "availableSchemas": [
+        "gcd-perf-event",
+        "global-poi-layout",
+        "global-roi-layout",
+        "kdebug",
+        "kdebug-signpost",
+        "os-log",
+        "os-log-arg",
+        "os-signpost",
+        "os-signpost-arg",
+        "process-info",
+        "region-of-interest",
+        "roi-metadata",
+        "thread-info"
+      ],
+      "dataExports": [
+        {
+          "schema": "os-signpost",
+          "exported": true,
+          "file": "Allocations-os-signpost.xml"
+        },
+        {
+          "schema": "os-signpost-arg",
+          "exported": true,
+          "file": "Allocations-os-signpost-arg.xml"
+        }
+      ]
+    }
+  ],
+  "exportedTables": [
+    {
+      "file": "Allocations-os-signpost-arg.xml",
+      "rows": 0,
+      "bytes": 1151
+    },
+    {
+      "file": "Allocations-os-signpost.xml",
+      "rows": 0,
+      "bytes": 1477
+    },
+    {
+      "file": "Time-Profiler-os-signpost-arg.xml",
+      "rows": 0,
+      "bytes": 1152
+    },
+    {
+      "file": "Time-Profiler-os-signpost.xml",
+      "rows": 0,
+      "bytes": 1536
+    },
+    {
+      "file": "Time-Profiler-time-profile.xml",
+      "rows": 2,
+      "bytes": 3522
+    }
+  ],
+  "quantifiedAllocationStatistics": false,
+  "limitation": "Allocations trace exists and has GUI Statistics/Allocations List tracks, but its xctrace TOC exposes no allocation data schema. Exported signpost tables contain zero rows. Allocation counts/bytes remain No medido. Idle TimeProfiler has two sample rows; no clinical transaction latency or CPU improvement can be inferred."
+}

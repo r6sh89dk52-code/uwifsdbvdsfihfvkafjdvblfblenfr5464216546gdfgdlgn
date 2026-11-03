@@ -1,0 +1,368 @@
+{
+  "sourceSHA": "0cdc76048db778a6561a237fcb46d63d168a4f7c",
+  "run": 41555957508,
+  "workflowResult": "failure",
+  "scope": "Actual partial TimeProfiler traces, same Mac, 2 fake workers, profiler overhead; not current4daba approval, not physical iPhone",
+  "variants": {
+    "before": {
+      "intervals": [
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 34306362638,
+          "duration_ms": 4.429717,
+          "startThread": "DANPERNative 0x172f4 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x172f4 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Dashboard counters",
+          "start_ns": 34576546776,
+          "duration_ms": 2.997454,
+          "startThread": "DANPERNative 0x19020 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19020 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 34577029334,
+          "duration_ms": 1.610552,
+          "startThread": "DANPERNative 0x19020 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19020 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 35621075649,
+          "duration_ms": 0.934446,
+          "startThread": "DANPERNative 0x172f4 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x172f4 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 45323211005,
+          "duration_ms": 0.993267,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal atomic commit",
+          "start_ns": 45357135606,
+          "duration_ms": 34.52494,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal semantic validation",
+          "start_ns": 45357216429,
+          "duration_ms": 23.134598,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 45380445757,
+          "duration_ms": 0.904829,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 45391719606,
+          "duration_ms": 0.8255,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 57064802074,
+          "duration_ms": 1.162392,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal atomic commit",
+          "start_ns": 57119517570,
+          "duration_ms": 44.457699,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal semantic validation",
+          "start_ns": 57119650447,
+          "duration_ms": 38.011045,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 57157721006,
+          "duration_ms": 0.823308,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 57164034577,
+          "duration_ms": 0.819999,
+          "startThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)",
+          "endThread": "DANPERNative 0x19473 (DANPERNative, pid: 31603)"
+        }
+      ],
+      "operationSummary": {
+        "Journal authenticated recovery": {
+          "samples": [
+            4.429717,
+            1.610552,
+            0.934446,
+            0.993267,
+            0.904829,
+            0.8255,
+            1.162392,
+            0.823308,
+            0.819999
+          ],
+          "n": 9,
+          "p50_ms": 0.934446,
+          "p95_ms": null
+        },
+        "Dashboard counters": {
+          "samples": [
+            2.997454
+          ],
+          "n": 1,
+          "p50_ms": 2.997454,
+          "p95_ms": null
+        },
+        "Journal atomic commit": {
+          "samples": [
+            34.52494,
+            44.457699
+          ],
+          "n": 2,
+          "p50_ms": 39.4913195,
+          "p95_ms": null
+        },
+        "Journal semantic validation": {
+          "samples": [
+            23.134598,
+            38.011045
+          ],
+          "n": 2,
+          "p50_ms": 30.572821500000003,
+          "p95_ms": null
+        }
+      },
+      "potentialHangMarkers": {
+        "count": 31,
+        "durations_ms": [
+          578.138292,
+          870.152034,
+          528.179033,
+          435.974653,
+          11801.32446,
+          819.179058,
+          372.636265,
+          703.051778,
+          436.563581,
+          264.120745,
+          256.772629,
+          336.690223,
+          569.845963,
+          603.710611,
+          625.867726,
+          1575.229614,
+          320.801236,
+          932.03492,
+          945.965088,
+          632.399491,
+          398.614903,
+          2186.168659,
+          2848.088347,
+          267.78066,
+          469.533499,
+          457.799545,
+          589.491317,
+          473.308993,
+          456.509783,
+          638.749604,
+          602.567522
+        ],
+        "min_ms": 256.772629,
+        "max_ms": 11801.32446,
+        "interpretation": "Tool potential-hang markers during automated/profiled full journey; require stack correlation, not all proven production hangs"
+      }
+    },
+    "after": {
+      "intervals": [
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 85375477994,
+          "duration_ms": 2.369421,
+          "startThread": "DANPERNative 0x35e85 (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35e85 (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Dashboard counters",
+          "start_ns": 85430671928,
+          "duration_ms": 5.36351,
+          "startThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 85431063587,
+          "duration_ms": 2.079226,
+          "startThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 86615689390,
+          "duration_ms": 1.885421,
+          "startThread": "DANPERNative 0x35e85 (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35e85 (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 96676267061,
+          "duration_ms": 1.323331,
+          "startThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal atomic commit",
+          "start_ns": 96694413575,
+          "duration_ms": 11.592734,
+          "startThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 96694473760,
+          "duration_ms": 0.909038,
+          "startThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 96706136861,
+          "duration_ms": 1.265995,
+          "startThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x361a0 (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 108245734248,
+          "duration_ms": 1.070813,
+          "startThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal atomic commit",
+          "start_ns": 108280935820,
+          "duration_ms": 14.694057,
+          "startThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 108281108081,
+          "duration_ms": 1.537262,
+          "startThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)"
+        },
+        {
+          "name": "Journal authenticated recovery",
+          "start_ns": 108295690684,
+          "duration_ms": 2.160642,
+          "startThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)",
+          "endThread": "DANPERNative 0x35b8c (DANPERNative, pid: 74720)"
+        }
+      ],
+      "operationSummary": {
+        "Journal authenticated recovery": {
+          "samples": [
+            2.369421,
+            2.079226,
+            1.885421,
+            1.323331,
+            0.909038,
+            1.265995,
+            1.070813,
+            1.537262,
+            2.160642
+          ],
+          "n": 9,
+          "p50_ms": 1.537262,
+          "p95_ms": null
+        },
+        "Dashboard counters": {
+          "samples": [
+            5.36351
+          ],
+          "n": 1,
+          "p50_ms": 5.36351,
+          "p95_ms": null
+        },
+        "Journal atomic commit": {
+          "samples": [
+            11.592734,
+            14.694057
+          ],
+          "n": 2,
+          "p50_ms": 13.1433955,
+          "p95_ms": null
+        }
+      },
+      "potentialHangMarkers": {
+        "count": 44,
+        "durations_ms": [
+          497.195664,
+          793.136422,
+          579.499477,
+          404.592229,
+          479.959681,
+          535.021042,
+          502.999172,
+          255.193407,
+          493.505745,
+          264.823646,
+          628.271972,
+          267.099652,
+          2806.670616,
+          493.943878,
+          628.283545,
+          574.188021,
+          512.886919,
+          700.684194,
+          336.50673,
+          629.109974,
+          317.860652,
+          753.792019,
+          552.009483,
+          302.325555,
+          367.832664,
+          337.317855,
+          683.615467,
+          477.175622,
+          1792.958648,
+          258.275894,
+          1028.358211,
+          258.468714,
+          1086.405779,
+          525.769392,
+          2181.903899,
+          2005.528793,
+          749.492055,
+          684.565813,
+          514.29312,
+          579.822812,
+          584.78053,
+          500.346204,
+          532.9241,
+          605.587292
+        ],
+        "min_ms": 255.193407,
+        "max_ms": 2806.670616,
+        "interpretation": "Tool potential-hang markers during automated/profiled full journey; require stack correlation, not all proven production hangs"
+      }
+    }
+  }
+}
