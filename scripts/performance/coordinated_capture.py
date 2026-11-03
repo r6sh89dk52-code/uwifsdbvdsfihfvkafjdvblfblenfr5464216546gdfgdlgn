@@ -86,10 +86,16 @@ def capture(a):
                 pid=activated_pid(ui)
                 if pid is not None:
                     assert pid==a.pid,'XCTest launched a replacement process'
-                    if not runner_revalidated:
-                        a.runner_data=current_runner_data(a.sim,kernel_path(a.pid))
-                        result['uiRunnerContainerRevalidated']=str(a.runner_data)
-                        runner_revalidated=True;save()
+                # simctl container lookup during active AX interaction timed
+                # out in41631784691. Defer that same bounded, scoped ownership
+                # check until all clinical assertions finish and the runner
+                # waits only on a file, before parsing/writing any ACK.
+                if 'DANPER_PROFILE_COMPLETED_ACK ' in ui and not runner_revalidated:
+                    assert pid==a.pid and result['readyBeforeUI']
+                    a.runner_data=current_runner_data(a.sim,kernel_path(a.pid))
+                    result['uiRunnerContainerRevalidated']=str(a.runner_data)
+                    result['containerLookupDeferredUntilClinicalCompletion']=True
+                    runner_revalidated=True;save()
                 candidate=completion_path(ui,a.runner_data)
                 if candidate is not None and ack is None:
                     assert result['readyBeforeUI'] and pid==a.pid

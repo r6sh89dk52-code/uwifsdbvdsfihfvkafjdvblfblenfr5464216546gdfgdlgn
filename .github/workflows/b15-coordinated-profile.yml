@@ -1,7 +1,7 @@
 name: B15 - Single-current coordinated capture pilot (NOT comparison/app approval)
 'on':
   push:
-    branches: [audit/b15-coordinated-pilot-4daba96-20261103]
+    branches: [audit/b15-coordinated-deferred-4daba96-20261103]
     paths: [.github/workflows/b15-coordinated-profile.yml, scripts/performance/coordinated_capture.py, scripts/performance/prepare_coordinated_profile.py, scripts/performance/make_coordinated_ui.py, scripts/performance/verify_diagnostic_products.py, scripts/performance/tests/test_coordinated_capture.py]
 permissions:
   contents: read

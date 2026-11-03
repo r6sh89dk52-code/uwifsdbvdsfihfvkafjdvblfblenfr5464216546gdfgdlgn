@@ -78,10 +78,12 @@ class CoordinatedProtocolTests(unittest.TestCase):
    def workload():
     until=time.monotonic()+12
     while not ready.exists() and time.monotonic()<until:time.sleep(.02)
+    ui.write_text('DANPER_PROFILE_ACTIVATED_APPLICATION Attributes: Application, pid: 123\n')
+    time.sleep(.6) # active AX phase: never query the container service here
     ui.write_text('DANPER_PROFILE_ACTIVATED_APPLICATION Attributes: Application, pid: 123\nDANPER_PROFILE_SAVE_INTERVAL_MS 25.5\nDANPER_PROFILE_COMPLETED_ACK '+str(ack)+'\n')
    t=threading.Thread(target=workload);t.start()
    devices={'devices':{'iOS':[{'udid':SIM,'name':'DANPER-SYNTHETIC-test','state':'Booted'}]}}
-   with patch.object(m,'current_runner_data',return_value=root),patch.object(m,'kernel_path',return_value=OWN),patch.object(m,'command',side_effect=tool),patch.object(m.subprocess,'check_output',return_value=json.dumps(devices)),patch.object(m.subprocess,'Popen',side_effect=recorder):result=m.capture(a)
+   with patch.object(m,'current_runner_data',side_effect=lambda *_:(self.assertIn('DANPER_PROFILE_COMPLETED_ACK ',ui.read_text()),root)[1]),patch.object(m,'kernel_path',return_value=OWN),patch.object(m,'command',side_effect=tool),patch.object(m.subprocess,'check_output',return_value=json.dumps(devices)),patch.object(m.subprocess,'Popen',side_effect=recorder):result=m.capture(a)
    t.join();response=json.loads(ack.read_text())
    self.assertEqual(response['recorderExit'],exit_code)
    self.assertEqual(result['successful'],exit_code==0)
