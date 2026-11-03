@@ -1,0 +1,87 @@
+name: B15 - Controlled menu A-B experiment (NO release approval)
+'on':
+  push:
+    branches: [audit/b15-menu-ab-4daba96-20261103]
+    paths: ['native-ios/App/DanperUITheme.swift', '.github/workflows/b15-menu-ab.yml']
+permissions:
+  contents: read
+jobs:
+  same-host-menu-comparison:
+    runs-on: macos-15-intel
+    timeout-minutes: 100
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 4daba9649824b58dedc57721d8cd1ad5af035963
+          path: before
+      - uses: actions/checkout@v4
+        with:
+          path: after
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify one production factor and unchanged complete clinical tests
+        run: |
+          set -euo pipefail
+          cd after
+          python3 - <<'PY'
+          import subprocess
+          old='4daba9649824b58dedc57721d8cd1ad5af035963'
+          paths=subprocess.check_output(['git','diff','--name-only',old,'HEAD','--','native-ios'],text=True).splitlines()
+          assert paths==['native-ios/App/DanperUITheme.swift'],paths
+          for p in ['native-ios/InteractionTests/N3ClinicalJourneyTests.swift','native-ios/NativeTests/N2PremiumDemoFixtureTests.swift','native-ios/NativeTests/N2SimpleInventoryNativeTests.swift']:
+           assert subprocess.check_output(['git','show',old+':'+p])==open(p,'rb').read(),p
+          PY
+      - name: Compile and execute each actual source with same Xcode and fresh owned Simulators
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          overall=0
+          for label in before after; do
+           cd "$GITHUB_WORKSPACE/$label"
+           export DANPER_AUDIT_OUT="$RUNNER_TEMP/menu-$label/native"
+           export DANPER_AUDIT_DERIVED_DATA="$RUNNER_TEMP/menu-derived-$label"
+           mkdir -p "$DANPER_AUDIT_OUT"
+           npm ci --ignore-scripts --no-fund > "$DANPER_AUDIT_OUT/npm.log" 2>&1
+           node scripts/prepare-n1s-ios-demo-resources.cjs > "$DANPER_AUDIT_OUT/resources.log" 2>&1
+           (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+           if ! bash scripts/glass-audit/validate-macos.sh b15-native; then overall=1; continue; fi
+           python3 scripts/performance/test-products.py seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
+           export DANPER_TEST_PROOF="$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
+           export DANPER_AUDIT_OUT="$RUNNER_TEMP/menu-$label/ui"
+           export DANPER_B15_UI_LABEL=N3ClinicalJourneyTests-demo
+           if ! bash scripts/glass-audit/validate-macos.sh b15-shard; then overall=1; fi
+          done
+          exit "$overall"
+      - name: Preserve actual failures and measured automation duration
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP']);result={'experimentOnly':True,'fullAppApproved':False,'oneSamplePerVariant':True,'physicalDeviceMeasured':False,'variants':{}}
+          for label in ['before','after']:
+           root=out/('menu-'+label);p=root/'ui/N3ClinicalJourneyTests-demo.xcresult.summary.json';log=root/'ui/N3ClinicalJourneyTests-demo.log'
+           d=json.loads(p.read_text()) if p.exists() else {}
+           result['variants'][label]={'sourceSHA':(root/'native/SOURCE_SHA.txt').read_text().strip() if (root/'native/SOURCE_SHA.txt').exists() else None,'uiSummary':d,'automationSuiteSeconds':d.get('finishTime',0)-d.get('startTime',0) if d else None,'missingAnimationNotifications':log.read_text().count('App animations complete notification not received') if log.exists() else None}
+          (out/'MENU_AB.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_MENU_AB_EXPERIMENT_NOT_RELEASE
+          path: |
+            ${{ runner.temp }}/MENU_AB.json
+            ${{ runner.temp }}/menu-before/**/*.json
+            ${{ runner.temp }}/menu-before/**/*.txt
+            ${{ runner.temp }}/menu-before/**/*.log
+            ${{ runner.temp }}/menu-before/**/*-failure-attachments.tgz
+            ${{ runner.temp }}/menu-after/**/*.json
+            ${{ runner.temp }}/menu-after/**/*.txt
+            ${{ runner.temp }}/menu-after/**/*.log
+            ${{ runner.temp }}/menu-after/**/*-failure-attachments.tgz
+          retention-days: 14

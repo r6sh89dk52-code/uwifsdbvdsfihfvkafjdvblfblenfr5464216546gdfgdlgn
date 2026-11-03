@@ -278,9 +278,17 @@ struct DanperChoiceField:View {
     private func label(_ value:String)->String {labels[value] ?? value.capitalized(with:Locale(identifier:"es_PE"))}
     var body:some View {
         Menu {
-            Picker(title,selection:$selection) {
-                if !options.contains("") {Text("Seleccionar").tag("")}
-                ForEach(options,id:\.self) {value in Text(label(value)).tag(value)}
+            if !options.contains("") {
+                Button("Seleccionar") {selection=""}
+            }
+            ForEach(options,id:\.self) {value in
+                Button {selection=value} label: {
+                    if selection == value {
+                        Label(label(value),systemImage:"checkmark")
+                    } else {
+                        Text(label(value))
+                    }
+                }
             }
         } label: {
             DanperField(title:title,highlighted:highlighted) {

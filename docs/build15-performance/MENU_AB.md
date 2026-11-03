@@ -1,0 +1,7 @@
+# Controlled menu experiment — not a release
+
+Source baseline 4daba9649824b58dedc57721d8cd1ad5af035963 completed UI with 12 passes and 2 failures. The original R1/R0 journey exceeded its unchanged 600-second limit. Its log contains three missing-animation-notification stalls of approximately 60 seconds, two during Tipo/Sistema native menu selection. This establishes XCTest waiting, not a proven iPhone application latency or a proven Picker defect.
+
+The candidate changes one production factor: DanperChoiceField uses native Menu Buttons instead of a Picker nested inside Menu. It preserves the binding, option order, empty selection, displayed labels, selected checkmark, field identity and existing requested-options confirmation dialog. No clinical rules, persisted data, vault, stock, tests, helpers or timeout changes.
+
+Run both actual sources on the same Mac/Xcode 16.4, separate fresh owned iPhone 16/iOS18.5 Simulators, complete 29 native tests and both original demo clinical journeys. Preserve actual failures. Compare raw automation duration and animation-notification stalls with one sample each; no p50/p95 or device latency claim. A candidate improvement requires actual complete R1/R0/physical-stock/relaunch assertions, not only a shorter failed run. Any baseline failure remains visible in workflow and summaries. No primary branch promotion before measurement and no release approval from this experiment alone.
