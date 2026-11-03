@@ -1,0 +1,84 @@
+name: B15 - Reproduce empty-history query on unmodified Core (expected red on Darwin)
+permissions:
+  contents: read
+  actions: read
+env:
+  DANPER_EXPECTED_BUILD: '15'
+concurrency:
+  group: b15-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  swift-core:
+    uses: ./.github/workflows/native-swift-linux.yml
+  native-build:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Prepare production resources, never a patient dataset
+      run: 'set -euo pipefail
+
+        npm ci --ignore-scripts --no-fund
+
+        if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+
+        node scripts/prepare-n1s-ios-demo-resources.cjs
+
+        (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+
+        '
+    - name: Real signed SwiftUI typecheck, Face ID preflight and ALL native tests
+      env:
+        DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-native
+        DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+      run: 'set -euo pipefail
+
+        mkdir -p "$DANPER_AUDIT_OUT"
+
+        uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
+
+        test "$(uname -m)" = x86_64
+
+        bash scripts/glass-audit/validate-macos.sh b15-native
+
+        python3 scripts/performance/test-products.py seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
+
+        tar -czf "$DANPER_AUDIT_OUT/TEST_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
+
+        '
+    - uses: actions/upload-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        path: '${{ runner.temp }}/b15-native/TEST_PRODUCTS.json
+
+          ${{ runner.temp }}/b15-native/TEST_PRODUCTS.tgz
+
+          '
+        retention-days: 7
+        compression-level: 0
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_NATIVE_RESULTS
+        path: '${{ runner.temp }}/b15-native/*.json
+
+          ${{ runner.temp }}/b15-native/*.txt
+
+          ${{ runner.temp }}/b15-native/*.log
+
+          ${{ runner.temp }}/b15-native/*-failure-attachments.tgz
+
+          '
+        retention-days: 14
+'on':
+  push:
+    branches:
+    - audit/b15-history-red-4daba96-20261103
+    paths:
+    - native-ios/**
+    - .github/workflows/b15-history-red.yml
