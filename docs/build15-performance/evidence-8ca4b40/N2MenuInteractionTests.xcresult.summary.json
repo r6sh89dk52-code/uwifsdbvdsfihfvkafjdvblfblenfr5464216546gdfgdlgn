@@ -1,0 +1,36 @@
+{
+  "devicesAndConfigurations": [
+    {
+      "device": {
+        "architecture": "x86_64",
+        "deviceId": "B0C796F4-611A-4F2E-91E8-434AEBBDB7A8",
+        "deviceName": "DANPER-SYNTHETIC-native",
+        "modelName": "iPhone 16",
+        "osBuildNumber": "22F77",
+        "osVersion": "18.5",
+        "platform": "iOS Simulator"
+      },
+      "expectedFailures": 0,
+      "failedTests": 0,
+      "passedTests": 1,
+      "skippedTests": 0,
+      "testPlanConfiguration": {
+        "configurationId": "1",
+        "configurationName": "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription": "DANPERNative \u00b7 Built with macOS 15.7.9",
+  "expectedFailures": 0,
+  "failedTests": 0,
+  "finishTime": 1793729451.528,
+  "passedTests": 1,
+  "result": "Passed",
+  "skippedTests": 0,
+  "startTime": 1793729373.359,
+  "statistics": [],
+  "testFailures": [],
+  "title": "Test - DANPERNative",
+  "topInsights": [],
+  "totalTestCount": 1
+}

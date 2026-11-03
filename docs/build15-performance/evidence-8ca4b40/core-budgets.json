@@ -1,0 +1,62 @@
+{
+  "scope": "Fixed fictitious Core v2 workload; not SwiftUI/device latency",
+  "checks": [
+    {
+      "action": "allergy_confirmed_encrypted_save",
+      "actual": 0.6514080338137844,
+      "limit": 0.85,
+      "unit": "after/before"
+    },
+    {
+      "action": "draft_confirmed_encrypted_save",
+      "actual": 0.3804102959015209,
+      "limit": 0.65,
+      "unit": "after/before"
+    },
+    {
+      "action": "dispensing_readonly_refresh",
+      "actual": 0.07461107585231834,
+      "limit": 0.25,
+      "unit": "after/before"
+    },
+    {
+      "action": "nursing_98_export",
+      "actual": 0.7783954473751983,
+      "limit": 0.9,
+      "unit": "after/before"
+    },
+    {
+      "action": "encrypted_backup_verified",
+      "actual": 0.8142971679250909,
+      "limit": 0.95,
+      "unit": "after/before"
+    },
+    {
+      "action": "worker_search_last",
+      "actual": 0.22736500000064552,
+      "limit": 5.0,
+      "unit": "core p95 ms"
+    },
+    {
+      "action": "worker_search_common",
+      "actual": 9.43552399996861,
+      "limit": 25.0,
+      "unit": "core p95 ms"
+    },
+    {
+      "action": "whole_core_workload_cpu",
+      "actual": 0.6764133817427386,
+      "limit": 0.9,
+      "unit": "after/before CPU"
+    },
+    {
+      "action": "whole_core_workload_rss",
+      "actual": 1.0056279461581201,
+      "limit": 1.1,
+      "unit": "after/before RSS"
+    }
+  ],
+  "failures": 0,
+  "physicalDeviceValidated": false,
+  "IPA": false
+}

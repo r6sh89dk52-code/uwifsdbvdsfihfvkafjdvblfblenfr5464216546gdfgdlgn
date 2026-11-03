@@ -1,0 +1,104 @@
+{
+  "sourceSHA": "8ca4b400c3d12eb43953ed148c5c3241e0fc7b23",
+  "runID": 41684106094,
+  "conclusion": "FAILURE",
+  "swift": {
+    "passed": 439,
+    "failed": 0,
+    "skipped": 0
+  },
+  "native": {
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0
+  },
+  "javascript": {
+    "passed": 62,
+    "failed": 0
+  },
+  "python": {
+    "passed": 37,
+    "failed": 0
+  },
+  "mandatoryUI": {
+    "passed": 11,
+    "failed": 2,
+    "notExecuted": 1,
+    "skipped": 0,
+    "suites": [
+      {
+        "suite": "N2BiometricInteractionTests",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "N2AllergySaveInteractionTests",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "N2Build222ShellTests",
+        "passed": 0,
+        "failed": 1,
+        "skipped": 0
+      },
+      {
+        "suite": "N2PremiumRedesignTests",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "N2GlassClinicalTests",
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "N2MenuInteractionTests",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "N3ClinicalJourneyTests-demo",
+        "passed": 1,
+        "failed": 1,
+        "skipped": 0
+      }
+    ]
+  },
+  "separateProtectedPermissionPreflight": {
+    "passed": 0,
+    "failed": 1,
+    "cause": "Late real TCC FaceID consent; still open in captured screenshot"
+  },
+  "newCandidateSHA": "e58efd2a398b12ee196568295cb145821ed4639d",
+  "newCandidateRun": 41707072055,
+  "newCandidateStatus": "IN_PROGRESS_NOT_APPROVED",
+  "distributionWorkflowSHA": "2cf841b57a4376709ed16bccd7dd2a2417f93be8",
+  "distributionRun": 41708026547,
+  "distributionStatus": "AWAITING_ALL_FINAL_GATES",
+  "distributionGuardMetadataTests": 17,
+  "IPA": false,
+  "physicalDeviceValidated": false,
+  "evidenceFileSHA256": {
+    "javascript-results.json": "6237926ff7a99d92aa08dd844feb42ef07d811869b288c285082f28250e5a750",
+    "N2PremiumRedesignTests.xcresult.summary.json": "d684a41c82ccf3075a6ca4ccb08bf9ea840a9b760a48e1f019afec551979af42",
+    "N2MenuInteractionTests.xcresult.summary.json": "2a5cab7f8f5c24dbced06ff932c02afe26630467b06305c529852e0f4269198d",
+    "native-30.xcresult.summary.json": "ec04f7f5b750f0e7bcb311a9b4282198b73ea19d424526d6e88aa3a47d81836f",
+    "N2BiometricInteractionTests.xcresult.summary.json": "4dd5a6f679951ae1c8a559207a910ac1c8417f2f88fa7d32a5e76ba8ece5166c",
+    "protected-permission-preflight.xcresult.summary.json": "8749f980e2e038ce725191aa13321b1eeba56e674dc14466630aa4be77b236ed",
+    "N3ClinicalJourneyTests-demo.xcresult.summary.json": "d33a1460e025bc37fac40824b514f43dca71dca8c387e1ed96efadf5029aa482",
+    "N2GlassClinicalTests.xcresult.summary.json": "ddee04e71570827051de312fcfe976c6d5d406a8483147928c294cca44b702ef",
+    "N2Build222ShellTests.xcresult.summary.json": "cffd53a53766ea40625c757f67d95947da739b33bda9cc8d8675ed64f204f170",
+    "v1-comparison.json": "8e2dfe0bfa6844ef42b45a7460be8ab8eb8e203e123890006780f02e6537d6ca",
+    "v2-comparison.json": "d4f9a117fb76992b92519cc349a3f072b7311357131f8e8b7a948ffd98bf5897",
+    "core-budgets.json": "d7248c248e4e0a6ed36b00ae4c71ec745989fed2aae58dd516121caaaa58139c",
+    "N2AllergySaveInteractionTests.xcresult.summary.json": "e576dd2ddb2922ffdf555b2b478b22b1f9fe403940954f852899778c6ed2cf43",
+    "swift-results.json": "4f478ae3e56cc93c71f721064f5b18cf465a3400326c4e3fbaddc9c873d79cff",
+    "build14-forward-compatibility.json": "2136d4e41628c73f9fcaf902ccdc9e75fb9a594d06caf7580f9a01585e37b769"
+  }
+}
