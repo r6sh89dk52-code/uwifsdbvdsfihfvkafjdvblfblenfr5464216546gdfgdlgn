@@ -43,6 +43,7 @@ final class N2LargeRosterProfileFixture:XCTestCase {
         let source=try JSONSerialization.data(withJSONObject:root,options:.sortedKeys)
         let report=try N2VersionedSnapshotAudit.inspect(source)
         XCTAssertEqual(report.workers,9648);XCTAssertEqual(report.attentions,1005)
+        print("DANPER_LARGE_SOURCE_SHA256 "+report.sourceSHA256)
         let archive=try N2InventoryBackupCodec.createVerified(snapshot:source,password:password,domain:.demo)
         let restored=try await vault.recoverPortableSource(archive:archive,password:password,confirmed:true)
         XCTAssertEqual(restored.workers,9648);XCTAssertEqual(restored.attentions,1005)
@@ -62,12 +63,55 @@ final class N2LargeRosterProfileFixture:XCTestCase {
         let physical=try XCTUnwrap(root["simpleInventory"])
         return try JSONSerialization.data(withJSONObject:["workers":workers,"attentions":visits,"simpleInventory":physical],options:.sortedKeys)
     }
-    func testCaptureCompletePhysicalWorkersAndHistoryBeforeUI() async throws {
+    func testCaptureCompletePhysicalWorkersAndHistoryBeforeReview() async throws {
         try requireSimulator();continueAfterFailure=false
         XCTAssertFalse(FileManager.default.fileExists(atPath:baseline.path),"Refuse to replace a prior baseline")
-        try await invariantData().write(to:baseline,options:.atomic)
+        let data=try await invariantData()
+        try data.write(to:baseline,options:.atomic)
     }
-    func testVerifyLargeUIReviewPreservedPhysicalWorkersHistoryAndDraft() async throws {
+    func testMeasureNativeAllergyAndSearchOnLargeDemo() async throws {
+        try requireSimulator();continueAfterFailure=false
+        let vault=N2SyntheticTrialIOSVault.shared
+        let contextStart=ProcessInfo.processInfo.systemUptime
+        let context=try await vault.clinicalFormContext()
+        let contextMS=(ProcessInfo.processInfo.systemUptime-contextStart)*1000
+        XCTAssertEqual(context.workers.count,9648)
+        var revision=context.revision
+        var saves=[Double]()
+        let at=Int64(Date().timeIntervalSince1970*1000)
+        for i in 0..<7 {
+            let start=ProcessInfo.processInfo.systemUptime
+            revision=try await vault.reviewAllergiesRevision(dni:"00000031",
+                status:i%2==0 ? "none":"known",substances:i%2==0 ? "":"SUSTANCIA FICTICIA PERF",
+                at:at+Int64(i),expectedRevision:revision)
+            saves.append((ProcessInfo.processInfo.systemUptime-start)*1000)
+        }
+        let indexStart=ProcessInfo.processInfo.systemUptime
+        let index=N2SearchIndex(rows:context.workers,fields:{$0.dni+"\u{1f}"+$0.name})
+        let indexMS=(ProcessInfo.processInfo.systemUptime-indexStart)*1000
+        XCTAssertTrue(index.matches("").isEmpty)
+        var last=[Double](),common=[Double]()
+        for _ in 0..<100 {
+            var start=ProcessInfo.processInfo.systemUptime
+            let end=index.matches("PERF 09648",limit:25)
+            last.append((ProcessInfo.processInfo.systemUptime-start)*1000)
+            XCTAssertEqual(end.last?.dni,"00009648")
+            start=ProcessInfo.processInfo.systemUptime
+            let page=index.matches("PERSONA FICTICIA PERF",limit:25)
+            common.append((ProcessInfo.processInfo.systemUptime-start)*1000)
+            XCTAssertEqual(page.count,25)
+        }
+        let inspected=try await vault.inspect()
+        let summary=try XCTUnwrap(inspected)
+        XCTAssertEqual(summary.workers,9648);XCTAssertEqual(summary.attentions,1005)
+        let report:[String:Any]=["scope":"iPhone16 Simulator native DEMO API, not UI tap latency or physical iPhone",
+            "workers":summary.workers,"visits":summary.attentions,"confirmedAllergySaveMS":saves,
+            "lastWorkerSearchMS":last,"commonFirstPageSearchMS":common,"contextLoadOneSampleMS":contextMS,
+            "searchIndexBuildOneSampleMS":indexMS,"uiMeasured":false,"IPA":false]
+        let json=try JSONSerialization.data(withJSONObject:report,options:.sortedKeys)
+        print("DANPER_LARGE_NATIVE_BENCHMARK "+String(decoding:json,as:UTF8.self))
+    }
+    func testVerifyLargeReviewPreservedPhysicalWorkersHistoryAndDraft() async throws {
         try requireSimulator();continueAfterFailure=false
         let expected=try Data(contentsOf:baseline)
         let actual=try await invariantData()

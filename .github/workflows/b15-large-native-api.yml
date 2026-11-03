@@ -1,0 +1,108 @@
+name: B15 - 9648-worker iPhone16 native API before-after (NOT UI/app approval)
+'on':
+  push:
+    branches: [audit/b15-large-native-run-4daba96-20261103]
+    paths: [.github/workflows/b15-large-native-api.yml, native-ios/NativeTests/N2LargeRosterProfileFixture.swift, scripts/performance/prepare_large_native_harness.py, scripts/performance/verify_large_native_products.py]
+permissions:
+  contents: read
+jobs:
+  large-native-comparison:
+    runs-on: macos-15-intel
+    timeout-minutes: 100
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+    steps:
+      - uses: actions/checkout@v4
+        with: {path: load-harness}
+      - uses: actions/checkout@v4
+        with:
+          ref: 4daba9649824b58dedc57721d8cd1ad5af035963
+          fetch-depth: 0
+          path: current
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Require current draft source; prepare same fictitious input
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,urllib.request
+          url='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/pulls/10'
+          p=json.load(urllib.request.urlopen(urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30))
+          assert p['head']['sha']=='4daba9649824b58dedc57721d8cd1ad5af035963' and p['draft'] and not p['merged']
+          PY
+          git -C current worktree add --detach "$RUNNER_TEMP/large-source-before" c274140aa631a7e9c262381dbff3f6a1f9a62582
+          mkdir -p "$RUNNER_TEMP/large-native-build-proof"
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          for task_root in "$GITHUB_WORKSPACE/current" "$RUNNER_TEMP/large-source-before"; do
+           (cd "$task_root" && npm ci --ignore-scripts --no-fund && node scripts/prepare-n1s-ios-demo-resources.cjs) >> "$RUNNER_TEMP/large-native-build-proof/resources.log" 2>&1
+          done
+          cp current/native-ios/NativeTests/SyntheticFixtures/n2-synthetic-clinical.json "$RUNNER_TEMP/large-source-before/native-ios/NativeTests/SyntheticFixtures/n2-synthetic-clinical.json"
+          python3 load-harness/scripts/performance/prepare_large_native_harness.py
+      - name: Compile both exact product sources with identical diagnostic fixture
+        run: |
+          set -euo pipefail
+          for label in before after; do
+           if test "$label" = before; then task_root="$RUNNER_TEMP/large-source-before"; else task_root="$GITHUB_WORKSPACE/current"; fi
+           (cd "$task_root" && {
+            git diff --exit-code HEAD -- native-ios/App native-ios/Sources native-ios/project.yml
+            (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+            xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/large-native-derived-$label" ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES ENABLE_TESTABILITY=YES ASSETCATALOG_COMPILER_APPICON_NAME="" build-for-testing > "$RUNNER_TEMP/large-native-build-proof/build-$label.log" 2>&1 || { tail -n 100 "$RUNNER_TEMP/large-native-build-proof/build-$label.log"; exit 1; }
+            python3 scripts/performance/verify_large_native_products.py seal "$RUNNER_TEMP/large-native-derived-$label/Build/Products" "$RUNNER_TEMP/large-native-proof-$label.json"
+           })
+          done
+      - name: Measure actual encrypted native API and preserve complete physical/history invariants
+        run: |
+          set -euo pipefail
+          overall=0
+          for label in before after; do
+           if test "$label" = before; then task_root="$RUNNER_TEMP/large-source-before"; else task_root="$GITHUB_WORKSPACE/current"; fi
+           export DANPER_AUDIT_OUT="$RUNNER_TEMP/large-native-results-$label"
+           export DANPER_AUDIT_DERIVED_DATA="$RUNNER_TEMP/large-native-derived-$label"
+           export DANPER_TEST_PROOF="$RUNNER_TEMP/large-native-proof-$label.json"
+           export DANPER_B15_UI_LABEL="Native-API-NOT-UI-$label"
+           (cd "$task_root" && bash scripts/glass-audit/validate-macos.sh b15-profile) || overall=1
+          done
+          exit "$overall"
+      - name: Validate raw measured samples and actual native results, never infer UI latency
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json,math,os,re,statistics
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP']);report={'scope':'Same-Mac iPhone16 iOS18.5 Debug native API; not SwiftUI tap latency or physical iPhone','workers':9648,'visits':1005,'uiMeasured':False,'IPA':False,'variants':{}};failed=[];sources=[]
+          required={'biometric-preflight':1,'large-seed':1,'original-fixtures':2,'large-invariants-before':1,'large-measured-api':1,'large-invariants-after':1}
+          for label,sha in [('before','c274140aa631a7e9c262381dbff3f6a1f9a62582'),('after','4daba9649824b58dedc57721d8cd1ad5af035963')]:
+           folder=root/('large-native-results-'+label);entry={'sourceSHA':sha};report['variants'][label]=entry
+           try:
+            assert (folder/'SOURCE_SHA.txt').read_text().strip()==sha
+            for name,n in required.items():
+             data=json.loads((folder/(name+'.xcresult.summary.json')).read_text());assert data['passedTests']==data['totalTestCount']==n and data['failedTests']==data['skippedTests']==0 and not data.get('testFailures')
+            text=(folder/'large-measured-api.log').read_text();matches=re.findall(r'DANPER_LARGE_NATIVE_BENCHMARK (\{[^\n]+\})',text);assert len(matches)==1
+            data=json.loads(matches[0]);assert data['workers']==9648 and data['visits']==1005 and data['uiMeasured'] is False
+            entry['raw']=data;entry['summary']={}
+            for name,n in [('confirmedAllergySaveMS',7),('lastWorkerSearchMS',100),('commonFirstPageSearchMS',100)]:
+             samples=data[name];assert len(samples)==n and all(math.isfinite(v) and v>=0 for v in samples) and any(v>0 for v in samples)
+             entry['summary'][name]={'n':n,'p50_ms':statistics.median(samples),'p95_ms':sorted(samples)[math.ceil(.95*n)-1] if n>=100 else None}
+            seeds=re.findall(r'DANPER_LARGE_SOURCE_SHA256 ([0-9a-f]{64})',(folder/'large-seed.log').read_text());assert len(seeds)==1;sources.append(seeds[0]);entry['initialClinicalSourceSHA256']=seeds[0]
+            entry['nativeChecks']=sum(required.values());entry['completePhysicalWorkersVisitsPreserved']=True
+           except Exception as e:entry['error']=str(e);failed.append(label)
+          if len(sources)!=2 or sources[0]!=sources[1]:failed.append('Different fictional clinical source')
+          (root/'LARGE_NATIVE_COMPARISON.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2));assert not failed,failed
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_9648_NATIVE_API_NOT_UI_APPROVAL
+          path: |
+            ${{ runner.temp }}/large-native-build-proof
+            ${{ runner.temp }}/large-native-proof-*.json
+            ${{ runner.temp }}/large-native-results-*/*.log
+            ${{ runner.temp }}/large-native-results-*/*.json
+            ${{ runner.temp }}/large-native-results-*/*.txt
+            ${{ runner.temp }}/large-native-results-*/*-failure-attachments.tgz
+            ${{ runner.temp }}/LARGE_NATIVE_COMPARISON.json
+          retention-days: 14
