@@ -26,11 +26,12 @@ jobs:
     - name: Await exact-source mandatory result; fail immediately on failure or changed PR
       env:
         GH_TOKEN: ${{ github.token }}
-      run: "import json,os,time,urllib.request\nSOURCE='e58efd2a398b12ee196568295cb145821ed4639d';RUN=41707072055\nBASE='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\n\
-        def get(path):\n req=urllib.request.Request(BASE+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n\
-        \ return json.load(urllib.request.urlopen(req,timeout=30))\nstart=time.monotonic();deadline=start+90*60\nwhile True:\n pr=get('pulls/10');assert\
-        \ pr['head']['sha']==SOURCE and pr['draft'] and not pr['merged'] and pr['base']['sha']=='9b1da6d4cdead4729bcade6843abcbcfc287e870','PR\
-        \ source/identity changed; stop distribution'\n r=get('actions/runs/'+str(RUN));assert r['head_sha']==SOURCE and r['path']=='.github/workflows/b15-site-allergy-performance-gate.yml'\n\
+      run: "python3 - <<'PY'\nimport json,os,time,urllib.request\nSOURCE='e58efd2a398b12ee196568295cb145821ed4639d';RUN=41707072055\n\
+        BASE='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\ndef get(path):\n req=urllib.request.Request(BASE+path,headers={'Authorization':'Bearer\
+        \ '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n return json.load(urllib.request.urlopen(req,timeout=30))\n\
+        start=time.monotonic();deadline=start+90*60\nwhile True:\n pr=get('pulls/10');assert pr['head']['sha']==SOURCE and pr['draft']\
+        \ and not pr['merged'] and pr['base']['sha']=='9b1da6d4cdead4729bcade6843abcbcfc287e870','PR source/identity changed; stop distribution'\n\
+        \ r=get('actions/runs/'+str(RUN));assert r['head_sha']==SOURCE and r['path']=='.github/workflows/b15-site-allergy-performance-gate.yml'\n\
         \ print('Mandatory final-source gate:',RUN,r['status'],r['conclusion'],'elapsed seconds',round(time.monotonic()-start),flush=True)\n\
         \ if r['status']=='completed':\n  assert r['conclusion']=='success','Mandatory gate failed; no ARM64 distribution/IPA'\n  jobs=get('actions/runs/'+str(RUN)+'/jobs?per_page=100')['jobs']\n\
         \  suites=['N2MenuInteractionTests','N2Build222ShellTests','N2GlassClinicalTests','N3ClinicalJourneyTests-protected','N3ClinicalJourneyTests-demo','N2PremiumRedesignTests','N2BiometricInteractionTests','N2AllergySaveInteractionTests']\n\
@@ -38,7 +39,7 @@ jobs:
         \ ('+n+')' for n in suites}\n  assert len(jobs)==15 and {j['name'] for j in jobs}==expected\n  assert all(j['status']=='completed'\
         \ and j['conclusion']=='success' for j in jobs)\n  print('PASS all15 real final-source mandatory jobs. Proceed to evidence verification.',flush=True);break\n\
         \ assert r['status'] in ['queued','in_progress','waiting','pending','requested']\n assert time.monotonic()<deadline,'Distribution\
-        \ wait deadline; no tests/timeouts changed and no IPA'\n time.sleep(min(30,max(0,deadline-time.monotonic())))\n"
+        \ wait deadline; no tests/timeouts changed and no IPA'\n time.sleep(min(30,max(0,deadline-time.monotonic())))\nPY\n"
     - uses: actions/download-artifact@v4
       with:
         name: B15_CURRENT_HEAD_AUDIT
@@ -211,7 +212,6 @@ jobs:
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
-      DANPER_PACKAGE_ROOT: ${{ runner.temp }}/b15-package
     steps:
     - uses: actions/checkout@v4
       with:
@@ -236,6 +236,8 @@ jobs:
         path: ${{ runner.temp }}/b15-package/release
     - name: Recheck all gates, current PR, this successful ARM64 job, exact app hashes and unsigned identity; then package
       run: python3 .b15-distribution/scripts/distribution/package-build15-gated.py
+      env:
+        DANPER_PACKAGE_ROOT: ${{ runner.temp }}/b15-package
     - name: Recheck current source immediately before publishing artifact
       run: 'python3 - <<''PYG''
 
