@@ -1,0 +1,11 @@
+# Active profiling: source0cdc760, no release approval
+
+Run41535822144 executed all four unchanged synthetic allergy UI journeys successfully (baselineC274 and source59e, two templates per variant). All four recordings failed while observing the process; no trace or CPU/allocation/signpost interval is claimed. The only bounded subprocess in that observer was the host-wide ps command, with a5s timeout. The previous source59 full gate separately had11/14 UI cases passing and remains FAILURE.
+
+This diagnostic waits for the real selected XCTest case's explicit app launch to reach its idle-wait marker. It then selects a PID from UIKit lifecycle events on the owned Simulator and checks that PID's actual executable path using macOS libproc. It never enumerates host command lines. Foreign devices, fixture launches preceding the test, dead processes and test runners are rejected. The exact app/test binary manifest and Xcode version remain required for both sources.
+
+Eight regressions cover PID ownership, launch ordering, midnight rollover, transient/dead processes, a forged command string and recorder lifecycle. Actual macOS must also prove libproc can query its own executable before any capture. A successful fixture/UI test never substitutes for a successful trace.
+
+There is a fresh fictional Simulator and two-worker seed for each template. The redundant unused initial device is removed. Capture still has a600s bound, while the unchanged UI workload keeps its own600s test deadline; the owned recorder receives SIGINT only after that real workload has finished, so it need not record idle time afterward. Only an actual recorder exit0 and successful TOC are accepted as captured. UI failure/uncaptured trace makes the diagnostic fail; existing failures are retained.
+
+Before/after run sequentially on the SAME Intel macOS runner/Xcode16.4. Source0cdc and its exact gate run are shared variables across checkout, prerequisite checks and download. BaselineC274 is comparison-only. The app and test Swift sources are not patched. Diagnostic script diffs and input/generated helper hashes are retained. This does not measure the physical iPhone or UI performance with9648 workers; the large Core benchmarks supply a separate scope. No IPA is generated.

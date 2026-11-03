@@ -1,0 +1,138 @@
+name: B15 - SAME-runner before-after active allergy Instruments (NOT release approval)
+'on':
+  push:
+    branches:
+    - audit/b15-active-comparison-0cdc760-20261102
+    paths:
+    - .github/workflows/b15-active-comparison.yml
+    - scripts/performance/profile_target_pid.py
+    - scripts/performance/prepare_active_profile.py
+    - scripts/performance/tests/test_profile_target_pid.py
+permissions:
+  contents: read
+  actions: read
+jobs:
+  active-comparison:
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_EXPECTED_BUILD: '15'
+      DANPER_SOURCE_SHA: 0cdc76048db778a6561a237fcb46d63d168a4f7c
+      DANPER_SOURCE_GATE_RUN: '41552268684'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: profiling-harness
+        sparse-checkout: |-
+          scripts/performance/profile_target_pid.py
+          scripts/performance/prepare_active_profile.py
+          scripts/performance/tests/test_profile_target_pid.py
+        sparse-checkout-cone-mode: false
+    - name: Verify owned-process selector and recorder supervision before recording
+      run: |
+        python3 -m unittest discover -s profiling-harness/scripts/performance/tests -p test_profile_target_pid.py -v
+        python3 - <<'PYPROBE'
+        import os,sys
+        sys.path.insert(0,"profiling-harness/scripts/performance")
+        from profile_target_pid import kernel_path
+        assert kernel_path(os.getpid()), "libproc cannot read the owned process executable"
+        print("PASS: actual macOS libproc executable-path probe; no process enumeration")
+        PYPROBE
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ env.DANPER_SOURCE_SHA }}
+        fetch-depth: 0
+        path: current
+    - name: Require current-source binaries with all native cases passed
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        python3 - <<'PYWAIT'
+        import json,os,time,urllib.request
+        base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'
+        def get(path):
+         return json.load(urllib.request.urlopen(urllib.request.Request(base+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}),timeout=30))
+        for _ in range(40):
+         pr=get('pulls/10');assert pr['head']['sha']==os.environ['DANPER_SOURCE_SHA'] and pr['draft'] and not pr['merged']
+         run=get('actions/runs/'+os.environ['DANPER_SOURCE_GATE_RUN']);assert run['head_sha']==pr['head']['sha']
+         artifacts=get('actions/runs/'+os.environ['DANPER_SOURCE_GATE_RUN']+'/artifacts')['artifacts']
+         if any(a['name']=='B15_COMPILED_SAME_HEAD' and not a['expired'] for a in artifacts):break
+         if run['status']=='completed':raise RuntimeError('Native build did not provide approved current-source binaries')
+         time.sleep(30)
+        else:raise RuntimeError('Current-source compiled artifact unavailable; no old binary accepted as current')
+        PYWAIT
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        run-id: 41366450170
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/profile-compiled-before
+    - uses: actions/download-artifact@v4
+      with:
+        name: B15_COMPILED_SAME_HEAD
+        run-id: ${{ env.DANPER_SOURCE_GATE_RUN }}
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/profile-compiled-after
+    - name: Restore compiled binaries; never use baseline as current certification
+      run: |
+        set -euo pipefail
+        for label in before after; do
+         mkdir -p "$RUNNER_TEMP/profile-derived-$label/Build"
+         tar -xzf "$RUNNER_TEMP/profile-compiled-$label/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/profile-derived-$label/Build"
+        done
+    - name: Apply IDENTICAL diagnostic harness, verify source manifests and x86_64
+      run: |
+        python3 profiling-harness/scripts/performance/prepare_active_profile.py
+    - name: Measure two identical fabricated allergy journeys sequentially on same
+        host
+      run: |
+        set -euo pipefail
+        overall=0
+        for label in before after; do
+         if test "$label" = before; then task_root="$RUNNER_TEMP/profile-source-before"; else task_root="$GITHUB_WORKSPACE/current"; fi
+         export DANPER_AUDIT_OUT="$RUNNER_TEMP/active-profile-$label"
+         export DANPER_AUDIT_DERIVED_DATA="$RUNNER_TEMP/profile-derived-$label"
+         export DANPER_TEST_PROOF="$RUNNER_TEMP/profile-compiled-$label/TEST_PRODUCTS.json"
+         export DANPER_B15_UI_LABEL="Active-Allergy-$label"
+         (cd "$task_root" && bash scripts/glass-audit/validate-macos.sh b15-profile) || overall=1
+        done
+
+        exit "$overall"
+    - name: Report actual captures and limitations, never infer an unavailable metric
+      if: always()
+      run: |
+        python3 - <<'PYSUMMARY'
+        import json,os,xml.etree.ElementTree as ET
+        from pathlib import Path
+        root=Path(os.environ['RUNNER_TEMP']);report={'scope':'Before/after same-runner synthetic UI profiling, two workers, NOT app approval','physicalDeviceValidated':False,'IPA':False,'variants':{}}
+        failed=[]
+        for label in ['before','after']:
+         folder=root/('active-profile-'+label);entry={};report['variants'][label]=entry
+         for name in ['ORCHESTRATION.json']:
+          p=folder/name
+          if p.exists():entry[name]=json.loads(p.read_text())
+         status=folder/'WORKLOAD_EXIT.txt'
+         entry['workloadExit']=status.read_text() if status.exists() else 'Not executed'
+         if not status.exists() or any(l.split()[-1]!='0' for l in status.read_text().splitlines()) or len(status.read_text().splitlines())!=2:failed.append(label+' incomplete/failed UI workload')
+         entry['captures']=[json.loads(p.read_text()) for p in folder.rglob('profiling-status.json')]
+         if len(entry['captures'])!=2 or any(not c.get('captures') or any(not t.get('captured') or not t.get('tocExported') for t in c['captures']) for c in entry['captures']):failed.append(label+' missing actual trace/TOC; no performance approval')
+         entry['tables']=[]
+         for p in folder.rglob('*.xml'):
+          if '-toc.' in p.name:continue
+          try:
+           tree=ET.parse(p);count=sum(1 for _ in tree.iter('row'))
+           entry['tables'].append({'file':str(p.relative_to(folder)),'rows':count,'bytes':p.stat().st_size})
+          except ET.ParseError:entry['tables'].append({'file':p.name,'parseable':False})
+         print('ACTUAL_PROFILE_RESULT',label,json.dumps(entry))
+        (root/'PROFILE_COMPARISON_STATUS.json').write_text(json.dumps(report,indent=2))
+        assert not failed,failed
+        PYSUMMARY
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: B15_ACTIVE_BEFORE_AFTER_PROFILE_NOT_APPROVAL
+        path: |-
+          ${{ runner.temp }}/active-profile-*
+          ${{ runner.temp }}/PROFILE_COMPARISON_STATUS.json
+        retention-days: 7
