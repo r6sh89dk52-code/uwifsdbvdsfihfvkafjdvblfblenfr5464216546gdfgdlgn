@@ -20,14 +20,14 @@ final class N3ClinicalJourneyTests:XCTestCase {
     private func capture(_ app:XCUIApplication,_ name:String) {
         let image=XCTAttachment(screenshot:app.screenshot());image.name="KardexV2-"+name;image.lifetime = .keepAlways;add(image)
     }
-    private func tap(_ element:XCUIElement,in app:XCUIApplication,field:Bool=false,content:Bool=false) {
+    private func tap(_ element:XCUIElement,in app:XCUIApplication,field:Bool=false,content:Bool=false,bottomInset:CGFloat=110) {
         XCTAssertTrue(element.exists || element.waitForExistence(timeout:10),app.debugDescription)
         // Only scroll actual form content. Native menu options and the fixed
         // footer have their own hit regions; do not query the entire keyboard
         // hierarchy or drag the form behind an already open native menu.
         if field || content {
             let safeTop:CGFloat=field ? 170:130
-            let bottom=app.frame.maxY-110
+            let bottom=app.frame.maxY-bottomInset
             var visible=false
             for _ in 0..<8 {
                 let frame=element.frame
@@ -143,6 +143,8 @@ final class N3ClinicalJourneyTests:XCTestCase {
     func testConsolidatedClinicalUnitsAndManualRThenRelaunch() {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["--danper-redesign-demo","-danper.appearance","dark"];app.launch()
+        tap(app.buttons["premium-tab-history"],in:app)
+        XCTAssertTrue(app.staticTexts["Atenciones registradas"].waitForExistence(timeout:10))
         inventory(app)
         let unitsBefore=stock(app,"16000182"),packagesBefore=stock(app,"16000025")
         XCTAssertTrue(unitsBefore.hasPrefix("70 "));XCTAssertTrue(packagesBefore.hasPrefix("12 "))
@@ -171,10 +173,25 @@ final class N3ClinicalJourneyTests:XCTestCase {
         let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
         let permission=springboard.alerts.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
         if permission.waitForExistence(timeout:5) {permission.tap()}
-        XCTAssertTrue(app.staticTexts["Verificando identidad…"].waitForExistence(timeout:15),app.debugDescription)
+        let retry=app.buttons["Reintentar Face ID"]
+        let gate=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            app.staticTexts["Verificando identidad…"].exists || retry.exists
+        },object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[gate],timeout:15),.completed,app.debugDescription)
         XCTAssertFalse(app.buttons["premium-tab-home"].exists)
         Thread.sleep(forTimeInterval:2)
-        SimulatorBiometricEvents.send("match")
+        var retried=false
+        SimulatorBiometricEvents.send("match",onWaiting:{
+            // CoreAuthUI may fail to activate on a cold Simulator. Exercise
+            // the real user's one retry, within the existing 20-second
+            // sensor wait; dedicated biometric tests still require auto entry.
+            if !retried && retry.exists && retry.isHittable {
+                retried=true
+                XCTContext.runActivity(named:"Un reintento real tras fallo de activación Face ID") {_ in
+                    retry.tap()
+                }
+            }
+        })
         let usable=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
             let manual=app.buttons["clinical-first-run-manual-worker"]
             let home=app.buttons["premium-tab-home"]
@@ -199,7 +216,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
             enter(app.textFields["first-manual-worker-dni"],"00000031",in:app)
             enter(app.textFields["first-manual-worker-name"],"PERSONAL AUTORIZADO DE PRUEBA N3",in:app)
             tap(app.buttons["choice-Sede verificada"],in:app,content:true);tap(app.buttons["Fundo La Venturosa"],in:app)
-            tap(app.buttons["first-manual-worker-activate"],in:app,content:true)
+            tap(app.buttons["first-manual-worker-activate"],in:app,content:true,bottomInset:50)
             tap(app.buttons["Crear e ingresar primer trabajador"],in:app)
             Thread.sleep(forTimeInterval:2)
             SimulatorBiometricEvents.send("match")

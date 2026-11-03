@@ -21,6 +21,7 @@ struct N2NativeHistoryView: View {
     var useProtectedVault = false
     private var showWorkers=false
     @State private var projection:N2NativeReadModel?
+    @State private var loadedRevision:Int?
     @State private var query=""
     @State private var committedQuery=""
     @State private var workerSearchIndex:N2SearchIndex<N2WorkerIndexRow>?
@@ -258,13 +259,26 @@ struct N2NativeHistoryView: View {
     @MainActor
     private func load(force:Bool=false) async {
         guard !layoutOnly else{return}
-        guard force || projection==nil else {return}
+        // A retained tab may have loaded before a new visit was saved.
+        // Authenticate its revision on appearance, reusing the model only
+        // while it still describes that same revision. No roster rebuild
+        // merely because SwiftUI reevaluates body.
+        if !force,projection != nil {
+            if !useProtectedVault {return}
+            do {
+                if try await vault.currentRevision()==loadedRevision {return}
+            } catch {
+                projection=nil;loadedRevision=nil;hasError=true;return
+            }
+        }
         do {
             if useProtectedVault {
-                guard let records=try await vault.readHistory() else {
-                    hasError=true;return
+                guard let latest=try await vault.readHistoryWithRevision() else {
+                    projection=nil;loadedRevision=nil;hasError=true;return
                 }
-                await installProjection(records)
+                await installProjection(latest.model)
+                guard !Task.isCancelled else{return}
+                loadedRevision=latest.revision;hasError=false
                 return
             }
             guard let file=Bundle.main.url(forResource:"n2-synthetic-clinical",
@@ -276,7 +290,7 @@ struct N2NativeHistoryView: View {
             }.value
             await installProjection(records)
         } catch {
-            hasError=true
+            projection=nil;loadedRevision=nil;hasError=true
         }
     }
 }

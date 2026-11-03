@@ -78,7 +78,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swift-evidence"
           (cd native-ios && swift test --jobs 2) 2>&1 | tee "$RUNNER_TEMP/swift-evidence/swift.log"
-          if test "${{ github.ref }}" = refs/heads/fix/indicator-historical-visit-site-build15-20261030; then
+          if test "${{ github.ref }}" = refs/heads/fix/indicator-historical-visit-site-build15-20261030 || test "${{ github.ref }}" = refs/heads/audit/b15-history-fix-4daba96-20261103; then
             python3 scripts/performance/summarize-swift.py "$RUNNER_TEMP/swift-evidence/swift.log" "$RUNNER_TEMP/swift-evidence/swift-results.json"
           fi
       - name: Cross-verify native Swift XLSX against TypeScript A–AD
@@ -93,7 +93,7 @@ jobs:
 
 
       - uses: actions/upload-artifact@v4
-        if: always() && github.ref == 'refs/heads/fix/indicator-historical-visit-site-build15-20261030'
+        if: always() && (github.ref == 'refs/heads/fix/indicator-historical-visit-site-build15-20261030' || github.ref == 'refs/heads/audit/b15-history-fix-4daba96-20261103')
         with:
           name: B15_SWIFT_RESULTS
           path: ${{ runner.temp }}/swift-evidence

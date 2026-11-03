@@ -73,6 +73,12 @@ struct N2WorkspaceVault:Sendable {
         }
         return try await N2SyntheticTrialIOSVault.shared.readDashboard()
     }
+    func readHistoryWithRevision() async throws ->(revision:Int,model:N2NativeReadModel)? {
+        if isClinical {
+            return try await N2ProtectedClinicalIOSVault.shared.readHistoryWithRevision()
+        }
+        return try await N2SyntheticTrialIOSVault.shared.readHistoryWithRevision()
+    }
     func readHistory() async throws -> N2NativeReadModel? {
         if isClinical {
             return try await N2ProtectedClinicalIOSVault.shared.readHistory()

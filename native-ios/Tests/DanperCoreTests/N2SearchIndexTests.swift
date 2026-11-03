@@ -48,4 +48,14 @@ final class N2SearchIndexTests:XCTestCase {
         XCTAssertEqual(index.matches("PERSONA").count,rows.count)
     }
 
+    func testExplicitUnfilteredHistoryQueryPreservesSavedRowsAndBounds() {
+        let rows=["ATENCION FICTICIA R1","ATENCION FICTICIA R0"]
+        let index=N2SearchIndex(rows:rows,fields:{$0})
+        XCTAssertTrue(index.matches("").isEmpty,"Roster must still start empty")
+        XCTAssertEqual(index.matches("",minimumLength:0),rows)
+        XCTAssertEqual(index.matches("  ",minimumLength:0,limit:1),Array(rows.prefix(1)))
+        XCTAssertTrue(index.matches("",minimumLength:0,limit:0).isEmpty)
+        XCTAssertEqual(index.matches("R0",minimumLength:0),[rows[1]])
+    }
+
 }

@@ -29,6 +29,11 @@ public struct N2SearchIndex<Row:Sendable>:Sendable {
     public func matches(_ text:String,minimumLength:Int=2,limit:Int?=nil)->[Row] {
         let q=Self.fold(text.trimmingCharacters(in:.whitespacesAndNewlines))
         guard q.count>=minimumLength,limit.map({$0>0}) ?? true else{return []}
+        // History explicitly permits an empty query; Foundation's
+        // String.contains("") is false on Darwin. Never let that platform
+        // detail erase the unfiltered visits. Default roster queries still
+        // fail the minimumLength guard above and reveal no directory.
+        if q.isEmpty {return Array(rows.prefix(limit ?? rows.count))}
         // A full substring must contain each adjacent pair. Start with the
         // rarest posting list, retain source order and verify the entire query.
         // No patient/query cache or index is persisted outside this value.

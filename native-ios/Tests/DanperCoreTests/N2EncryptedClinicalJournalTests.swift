@@ -179,4 +179,29 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath:target.path))
     }
+    func testHistoryProjectionCarriesItsOwnAuthenticatedRevision()throws {
+        let folder=try path(),key=Data(repeating:0x6a,count:32)
+        let journal=try start(folder,key)
+        let core=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        XCTAssertNil(try core.readIndexWithRevision())
+        let original=try input()
+        XCTAssertEqual(try journal.commit(original,expectedRevision:0),1)
+        let first=try XCTUnwrap(core.readIndexWithRevision())
+        XCTAssertEqual(first.revision,1)
+        XCTAssertEqual(first.model.visits.count,5)
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        var rows=try XCTUnwrap(root["attentions"] as? [[String:Any]])
+        let index=try XCTUnwrap(rows.firstIndex{$0["id"] as? String=="fundo-unit"})
+        rows[index]["diagnosis"]="DIAGNOSTICO FICTICIO ACTUALIZADO"
+        root["attentions"]=rows
+        let changed=try JSONSerialization.data(withJSONObject:root,options:.sortedKeys)
+        XCTAssertEqual(try journal.commit(changed,expectedRevision:1),2)
+        let second=try XCTUnwrap(core.readIndexWithRevision())
+        XCTAssertEqual(second.revision,2)
+        XCTAssertEqual(second.model.visits.first{$0.id=="fundo-unit"}?.diagnosis,"DIAGNOSTICO FICTICIO ACTUALIZADO")
+        XCTAssertNotEqual(first.model.visits.first{$0.id=="fundo-unit"}?.diagnosis,second.model.visits.first{$0.id=="fundo-unit"}?.diagnosis)
+        XCTAssertEqual(second.model.roster,first.model.roster)
+        XCTAssertEqual(try core.readIndex()?.visits,second.model.visits)
+    }
+
 }

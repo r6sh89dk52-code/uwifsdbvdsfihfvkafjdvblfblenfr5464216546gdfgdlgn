@@ -162,9 +162,12 @@ actor N2ProtectedClinicalIOSVault {
         try protectedStore().readDashboard()
     }
     func readHistory()throws->N2NativeReadModel? {
+        try readHistoryWithRevision()?.model
+    }
+    func readHistoryWithRevision()throws->(revision:Int,model:N2NativeReadModel)? {
         do {
             guard let secret=try deviceKey(create:false) else {sessionStore=nil;return nil}
-            return try sessionStore(for:secret).readIndex()
+            return try sessionStore(for:secret).readIndexWithRevision()
         } catch {sessionStore=nil;throw error}
     }
     private func protectedStore()throws->N2ProtectedClinicalVaultCore {

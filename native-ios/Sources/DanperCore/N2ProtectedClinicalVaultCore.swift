@@ -255,8 +255,13 @@ public final class N2ProtectedClinicalVaultCore {
         )
     }
     public func readIndex()throws->N2NativeReadModel? {
+        try readIndexWithRevision()?.model
+    }
+    /// The displayed rows and their revision belong to one authenticated
+    /// recovery; never label old history with a separately read newer revision.
+    public func readIndexWithRevision()throws->(revision:Int,model:N2NativeReadModel)? {
         guard let active=try journal.recover() else{return nil}
-        return try N2NativeSnapshotReader.readAuthenticated(active)
+        return (active.revision,try N2NativeSnapshotReader.readAuthenticated(active))
     }
     public func clinicalFormContext(products:Data,nursing:Data,mappings:Data)
         throws->N2FormContext {
