@@ -5,6 +5,16 @@ import CoreFoundation
 /// UI test. Uses the existing fictional DEMO harness; authentication is tested
 /// separately against the genuine device-owner policy, without bypassing it.
 final class N3ClinicalJourneyTests:XCTestCase {
+    // Every journey remains portrait. Cache only the window geometry during
+    // one launch, never an element, clinical value, stock or authentication.
+    // Repeated app.frame queries were visible before every content tap in
+    // run41664865130, in addition to the fresh target-frame/hit-test queries.
+    private var launchViewport:CGRect?
+    private func launch(_ app:XCUIApplication) {
+        launchViewport=nil
+        app.launch()
+    }
+
     override func tearDownWithError() throws {
         for (name, app) in [("DANPER", XCUIApplication()),
                             ("SpringBoard", XCUIApplication(bundleIdentifier:"com.apple.springboard")),
@@ -27,7 +37,8 @@ final class N3ClinicalJourneyTests:XCTestCase {
         // hierarchy or drag the form behind an already open native menu.
         if field || content {
             let safeTop:CGFloat=field ? 170:130
-            let bottom=app.frame.maxY-bottomInset
+            if launchViewport == nil {launchViewport=app.frame}
+            let bottom=launchViewport!.maxY-bottomInset
             var visible=false
             for _ in 0..<8 {
                 let frame=element.frame
@@ -37,8 +48,13 @@ final class N3ClinicalJourneyTests:XCTestCase {
                 scrollShort(in:app,up:frame.minY>=safeTop)
             }
             XCTAssertTrue(visible,"El control debe estar dentro del contenido visible, fuera del pie fijo: "+app.debugDescription)
+            // visible already requires this exact target's current isHittable.
+            // tap still performs XCTest's own fresh hit test and interruption
+            // checks. Do not issue a second identical AX query in between.
+        } else {
+            XCTAssertTrue(element.isHittable,app.debugDescription)
         }
-        XCTAssertTrue(element.isHittable,app.debugDescription);element.tap()
+        element.tap()
     }
     private func dismissKeyboard(in app:XCUIApplication) {
         let hide=app.buttons["danper-dismiss-keyboard"].firstMatch
@@ -70,15 +86,16 @@ final class N3ClinicalJourneyTests:XCTestCase {
         dismissKeyboard(in:app)
         let keyboard=app.keyboards.firstMatch
         tap(element,in:app,field:true)
-        XCTAssertTrue(keyboard.waitForExistence(timeout:5),app.debugDescription)
+        XCTAssertTrue(keyboard.exists || keyboard.waitForExistence(timeout:5),app.debugDescription)
         if let old=element.value as? String,old != element.placeholderValue,!old.isEmpty {
             element.typeText(String(repeating:XCUIKeyboardKey.delete.rawValue,count:old.count))
         }
         element.typeText(value)
-        if element.identifier=="inline-catalog-query" {
+        let identifier=element.identifier
+        if identifier=="inline-catalog-query" {
             XCTAssertEqual(element.value as? String,value,"La consulta debe escribirse en el buscador, nunca en la cantidad clínica")
         }
-        if element.identifier=="attention-worker-dni" {
+        if identifier=="attention-worker-dni" {
             // Selecting a known DNI dismisses focus asynchronously. The old
             // exists→tap on its toolbar raced that real dismissal on the
             // second R visit (run41528135555). Wait for selection to settle;
@@ -95,12 +112,12 @@ final class N3ClinicalJourneyTests:XCTestCase {
     private func inventory(_ app:XCUIApplication) {
         tap(app.buttons["premium-tab-home"],in:app)
         tap(app.buttons.matching(NSPredicate(format:"label BEGINSWITH %@","Kardex:")).firstMatch,in:app,content:true)
-        XCTAssertTrue(app.textFields["simple-inventory-search"].waitForExistence(timeout:10),"Ejecuta primero la fixture DEMO v2 en este dispositivo: "+app.debugDescription)
+        XCTAssertTrue(app.textFields["simple-inventory-search"].exists || app.textFields["simple-inventory-search"].waitForExistence(timeout:10),"Ejecuta primero la fixture DEMO v2 en este dispositivo: "+app.debugDescription)
     }
     private func stock(_ app:XCUIApplication,_ code:String)->String {
         let field=app.staticTexts["simple-stock-"+code]
         for _ in 0..<5 {if field.exists && field.isHittable {break};app.swipeUp()}
-        XCTAssertTrue(field.waitForExistence(timeout:5),app.debugDescription)
+        XCTAssertTrue(field.exists || field.waitForExistence(timeout:5),app.debugDescription)
         return field.label
     }
     private func saveVisit(_ app:XCUIApplication,r:String,units:Bool) {
@@ -142,7 +159,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
     }
     func testConsolidatedClinicalUnitsAndManualRThenRelaunch() {
         continueAfterFailure=false
-        let app=XCUIApplication();app.launchArguments=["--danper-redesign-demo","-danper.appearance","dark"];app.launch()
+        let app=XCUIApplication();app.launchArguments=["--danper-redesign-demo","-danper.appearance","dark"];launch(app)
         tap(app.buttons["premium-tab-history"],in:app)
         XCTAssertTrue(app.staticTexts["Atenciones registradas"].waitForExistence(timeout:10))
         inventory(app)
@@ -153,7 +170,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         inventory(app);XCTAssertTrue(stock(app,"16000182").hasPrefix("68 "));XCTAssertTrue(stock(app,"16000025").hasPrefix("11 "))
         saveVisit(app,r:"0",units:false)
         inventory(app);XCTAssertTrue(stock(app,"16000182").hasPrefix("68 "));XCTAssertTrue(stock(app,"16000025").hasPrefix("11 "))
-        app.terminate();app.launchArguments=["--danper-redesign-demo","-danper.appearance","light"];app.launch()
+        app.terminate();app.launchArguments=["--danper-redesign-demo","-danper.appearance","light"];launch(app)
         inventory(app);XCTAssertTrue(stock(app,"16000182").hasPrefix("68 "));XCTAssertTrue(stock(app,"16000025").hasPrefix("11 "))
         capture(app,"Inventario-claro-persistido")
         tap(app.buttons["premium-tab-history"],in:app)
@@ -161,11 +178,11 @@ final class N3ClinicalJourneyTests:XCTestCase {
     }
     func testIndependentRelaunchShowsConsolidatedSourceWithoutReactivation() {
         continueAfterFailure=false
-        let app=XCUIApplication();app.launchArguments=["--danper-redesign-demo","-danper.appearance","light"];app.launch()
+        let app=XCUIApplication();app.launchArguments=["--danper-redesign-demo","-danper.appearance","light"];launch(app)
         inventory(app);XCTAssertFalse(app.buttons["simple-migration-activate"].exists)
         XCTAssertTrue(app.buttons["simple-register-product"].exists)
         XCTAssertTrue(app.buttons["simple-product-16000182"].exists)
-        app.terminate();app.launch();inventory(app)
+        app.terminate();launch(app);inventory(app)
         XCTAssertFalse(app.buttons["simple-migration-activate"].exists)
         capture(app,"Relanzamiento-independiente")
     }
@@ -209,7 +226,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         #endif
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["-danper.native.onboarding.v1.finished","YES"]
-        app.launch();authenticateProtectedSource(app)
+        launch(app);authenticateProtectedSource(app)
         let manual=app.buttons["clinical-first-run-manual-worker"]
         if manual.waitForExistence(timeout:5) {
             tap(manual,in:app)
@@ -227,7 +244,7 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertFalse(app.staticTexts["clinical-empty-setup"].exists)
         capture(app,"Fuente-clinica-protegida-ficticia")
         app.terminate();app.launchArguments=["-danper.native.onboarding.v1.finished","NO"]
-        app.launch();authenticateProtectedSource(app)
+        launch(app);authenticateProtectedSource(app)
         XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
         XCTAssertFalse(app.buttons["clinical-first-run-manual-worker"].exists)
         capture(app,"Fuente-protegida-tras-relanzar")

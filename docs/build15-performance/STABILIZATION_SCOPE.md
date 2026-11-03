@@ -21,3 +21,33 @@ Stable14 is the verified backup producer9b1da6d and preserved installation ident
 ## Final mandatory source
 
 Run the existing primary gate at the closing HEAD:439Swift,30native,14UI,62JS,37Python, official10-sheet/98-row Excel, current v1/v2 budgets and originalBuild14forwardcompatibility. All failures and skips remain blocking; no time allowance is increased. No main merge. After approval build ARM64 Release from that SAME HEAD, verify exact BundleID and app contents, then generate unsigned iLoader IPA/artifact. Never touch installed phone data or use the old hardcoded Build14packager.
+
+
+## Closing gate 41664865130 at5e570b4 — preserved failure, next correction
+
+The actual5e gate completed FAILURE. Core439, native30, JS62, Python37,
+official Excel, v1/v2,9budgets and original14synthetic compatibility passed.
+Dedicated biometric UI2/2 passed, including genuine cancellation/retry and
+fresh foreground authentication; no production authentication change is needed
+based on that evidence. Other completed mandatory UI cases:12PASS/1FAIL;
+the protected journey itself was NOT RUN because its independent permission
+preflight failed. Do not count that missing journey as a passed or executed case.
+
+DEMO R1/R0 failed the unchanged600s allowance. The log shows R0 persisted at
+616.98s but remaining stock/relaunch/history assertions could not complete.
+It also records a60s XCTest animation notification stall. Remove redundant
+AX queries in this journey only: same-target hittability queried twice per
+content tap, full app frame queried per content tap, existence polling after
+already-present inventory/keyboard controls, repeated stable field identifier.
+Cache only actual window geometry per portrait launch, invalidated on each
+launch; continue querying current target frame/hittability before taps.
+Keep all clinical/stock/history assertions, all actual taps and all original
+600s/authentication/wait limits. Benefit and full pass remain UNPROVEN until
+the new same-HEAD run completes. No production App/Core file changed here.
+
+Protected-source job126047917742 failed during permission-preflight before
+any simulated biometric event, at a SpringBoard text query with AX snapshot
+retries; its actual journey did not execute. Preserve that failure and run the
+unchanged real permission/authentication flow on a fresh isolated runner in
+the new source gate. Do not bypass consent, inject a success, extend deadlines,
+or automatically turn an assertion failure into success.
