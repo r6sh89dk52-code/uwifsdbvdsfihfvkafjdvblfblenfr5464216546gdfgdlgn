@@ -1,0 +1,91 @@
+{
+  "sourceSHA": "5e570b449c56a8716e405aba51baeb093d8043a8",
+  "runID": 41664865130,
+  "conclusion": "FAILURE",
+  "swift": {
+    "passed": 439,
+    "failed": 0,
+    "skipped": 0
+  },
+  "native": {
+    "passed": 30,
+    "failed": 0,
+    "skipped": 0
+  },
+  "javascript": {
+    "passed": 62,
+    "failed": 0
+  },
+  "python": {
+    "passed": 37,
+    "failed": 0
+  },
+  "mandatoryUI": {
+    "passed": 12,
+    "failed": 1,
+    "skipped": 0,
+    "notExecuted": 1,
+    "reasonNotExecuted": "protected journey not launched after failed permission preflight",
+    "suites": [
+      {
+        "suite": "N2GlassClinicalTests",
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "total": 3
+      },
+      {
+        "suite": "N2AllergySaveInteractionTests",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "total": 2
+      },
+      {
+        "suite": "N2MenuInteractionTests",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "total": 1
+      },
+      {
+        "suite": "N2Build222ShellTests",
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "total": 1
+      },
+      {
+        "suite": "N2BiometricInteractionTests",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "total": 2
+      },
+      {
+        "suite": "N2PremiumRedesignTests",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "total": 2
+      },
+      {
+        "suite": "N3ClinicalJourneyTests-demo",
+        "passed": 1,
+        "failed": 1,
+        "skipped": 0,
+        "total": 2
+      }
+    ]
+  },
+  "separateProtectedPermissionPreflight": {
+    "passed": 0,
+    "failed": 1,
+    "failure": "SpringBoard AX query snapshot timeout before biometric event"
+  },
+  "dedicatedBiometryUI": "2/2 PASS; fresh authentication after background retained",
+  "IPA": false,
+  "newCandidateSHA": "8ca4b400c3d12eb43953ed148c5c3241e0fc7b23",
+  "newCandidateRun": 41684106094,
+  "newCandidateStatus": "IN_PROGRESS_NOT_APPROVED"
+}

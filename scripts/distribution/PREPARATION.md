@@ -1,6 +1,6 @@
-# Packaging preparation for final Build15 source5e570b4 — NO IPA yet
+# Packaging preparation for final Build15 source8ca4b40 — NO IPA yet
 
-Source5e570b449c56a8716e405aba51baeb093d8043a8; mandatory full gate41664865130. Release run/workflow constants are intentionallyUNBOUND and cannot package until a real successful same-source Release has been built and verified. No executable packaging workflow is enabled by this preparation.
+Source8ca4b400c3d12eb43953ed148c5c3241e0fc7b23; mandatory full gate41684106094. Release run/workflow constants are intentionallyUNBOUND and cannot package until a real successful same-source Release has been built and verified. No executable packaging workflow is enabled by this preparation.
 
 Closing scope follows the user's explicit request to stop indefinite experiments. All current mandatory tests remain required:439Swift/30native/14UI/62JS/37Python, both official Excel, Kardex/physical invariants, originalBuild14backup/journal/roundtrip and9Core budgets. Current workflow must completeSUCCESSwith all15expected logical jobs, including current Instruments, not merely a subset. The historical active profiler4daba remains evidence, not mandatory certification for another SHA and not a substitute for any current-source gate. No critical security/clinical/physical check is relaxed.
 
@@ -8,6 +8,6 @@ The guard validates current PR10 draft/unmerged, exact current source and stable
 
 Ten local negative metadata guard testsPASS: fabricated complete envelope only, not app approval. Reject oldSHA, previous437Swift/29native, missing/wrongUI, skips, alteredphysicalcompatibility, hidden real budget failure or modified saved budgets. Source/Release/gate identifiers cannot be substituted by environment overrides. No executable IPA is created by tests. Run tests from repository root:python3 -m unittest discover -s scripts/distribution/tests -v.
 
-Only after every required gate passes, reuse the existing distribution branch/procedure to build actual ReleaseARM64from5e and bind its exactrun/workflow. Download exact gate+Release artifacts, then package/upload an unsigned iLoaderIPA. No new audit branch, no installed phone access, no main merge. Any failure keeps IPA unavailable.
+Only after every required gate passes, reuse the existing distribution branch/procedure to build actual ReleaseARM64from8ca and bind its exactrun/workflow. Download exact gate+Release artifacts, then package/upload an unsigned iLoaderIPA. No new audit branch, no installed phone access, no main merge. Any failure keeps IPA unavailable.
 
 Safe update after approval: verify a recent encrypted14backup and keep its password offphone; use the sameAppleID/signingteam/BundleID; install over the existing app. Never uninstall/erase/importoldhistory merely to update. Stop on a new identity/app or empty source. Confirm workers/history/allergies/drafts and shared physicalbalances afterward. The package preserves identifiers and formats; physical container and downgrade are not certified by Simulator tests.
