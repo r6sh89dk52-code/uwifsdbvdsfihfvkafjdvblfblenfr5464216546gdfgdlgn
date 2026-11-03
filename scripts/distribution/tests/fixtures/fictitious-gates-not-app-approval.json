@@ -1,0 +1,239 @@
+{
+  "sourceSHA": "5e570b449c56a8716e405aba51baeb093d8043a8",
+  "swift": 439,
+  "native": 30,
+  "javascript": 62,
+  "ui": {
+    "N2MenuInteractionTests": 1,
+    "N2Build222ShellTests": 1,
+    "N2GlassClinicalTests": 3,
+    "N3ClinicalJourneyTests-protected": 1,
+    "N3ClinicalJourneyTests-demo": 2,
+    "N2PremiumRedesignTests": 2,
+    "N2BiometricInteractionTests": 2,
+    "N2AllergySaveInteractionTests": 2
+  },
+  "failures": 0,
+  "skips": 0,
+  "IPA": false,
+  "corePerformanceBudgets": {
+    "scope": "Fixed fictitious Core v2 workload; not SwiftUI/device latency",
+    "checks": [
+      {
+        "action": "allergy_confirmed_encrypted_save",
+        "actual": 0.6857755779117977,
+        "limit": 0.85,
+        "unit": "after/before"
+      },
+      {
+        "action": "draft_confirmed_encrypted_save",
+        "actual": 0.4086319650227723,
+        "limit": 0.65,
+        "unit": "after/before"
+      },
+      {
+        "action": "dispensing_readonly_refresh",
+        "actual": 0.09474922922668283,
+        "limit": 0.25,
+        "unit": "after/before"
+      },
+      {
+        "action": "nursing_98_export",
+        "actual": 0.8034297122476649,
+        "limit": 0.9,
+        "unit": "after/before"
+      },
+      {
+        "action": "encrypted_backup_verified",
+        "actual": 0.8095140031199142,
+        "limit": 0.95,
+        "unit": "after/before"
+      },
+      {
+        "action": "worker_search_last",
+        "actual": 0.12531899994883133,
+        "limit": 5.0,
+        "unit": "core p95 ms"
+      },
+      {
+        "action": "worker_search_common",
+        "actual": 5.739031000075556,
+        "limit": 25.0,
+        "unit": "core p95 ms"
+      },
+      {
+        "action": "whole_core_workload_cpu",
+        "actual": 0.7057707938228122,
+        "limit": 0.9,
+        "unit": "after/before CPU"
+      },
+      {
+        "action": "whole_core_workload_rss",
+        "actual": 0.9967882583029802,
+        "limit": 1.1,
+        "unit": "after/before RSS"
+      }
+    ],
+    "failures": 0,
+    "physicalDeviceValidated": false,
+    "IPA": false
+  },
+  "physicalV2Performance": {
+    "resourceScope": "Whole prepared Core/XCTest workload, compiler excluded; not physical iPhone memory",
+    "resources": {
+      "before": {
+        "user_cpu_s": 184.55,
+        "system_cpu_s": 1.44,
+        "peak_rss_kib": 222932,
+        "wall_s": 185.87
+      },
+      "after": {
+        "user_cpu_s": 130.25,
+        "system_cpu_s": 0.97,
+        "peak_rss_kib": 222216,
+        "wall_s": 131.11
+      }
+    },
+    "workers": 9648,
+    "initialVisits": 1005,
+    "conditions": "SwiftPM Release; x86_64 Linux; fictitious v2 snapshot; same fabricated dataset; no UI/device latency claim",
+    "beforeStoreLifecycle": "Session-owned journal/core; actual HMAC, AEAD, file reads and revision checks on every operation",
+    "afterStoreLifecycle": "Session-owned journal/core; actual HMAC, AEAD, file reads and revision checks on every operation",
+    "operations": [
+      {
+        "action": "allergy_confirmed_encrypted_save",
+        "before_p50_ms": 3408.1294410000282,
+        "after_p50_ms": 2337.2119370000064,
+        "change_percent": 31.42244220882023,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 7,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "draft_confirmed_encrypted_save",
+        "before_p50_ms": 5915.521791999992,
+        "after_p50_ms": 2417.2712939999883,
+        "change_percent": 59.13680349772277,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 7,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "form_prepare_9648",
+        "before_p50_ms": 164.8608219999801,
+        "after_p50_ms": 199.19907600001352,
+        "change_percent": -20.82863204457247,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 7,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "history_read_1005",
+        "before_p50_ms": 99.36362199999849,
+        "after_p50_ms": 115.92882399997961,
+        "change_percent": -16.67129445017753,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 7,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "dashboard_refresh",
+        "before_p50_ms": 64.22797100003663,
+        "after_p50_ms": 80.2965640000366,
+        "change_percent": -25.01806105628154,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 7,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "correction_editor_load",
+        "before_p50_ms": 36.59877500001585,
+        "after_p50_ms": 44.36425899996266,
+        "change_percent": -21.217879560022013,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 3,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "dispensing_readonly_refresh",
+        "before_p50_ms": 2962.7137370000014,
+        "after_p50_ms": 280.7148430000552,
+        "change_percent": 90.52507707733172,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 3,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "inventory_catalog_only",
+        "before_p50_ms": 0.9848690000353599,
+        "after_p50_ms": 1.0660130000132995,
+        "change_percent": -8.239065294473296,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 3,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "worker_search_last",
+        "before_p50_ms": 0.11968600000500373,
+        "after_p50_ms": 0.11993099997198442,
+        "change_percent": -0.20470227676624078,
+        "before_p95_ms": 0.12529000002814428,
+        "after_p95_ms": 0.12531899994883133,
+        "samples": 100,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "worker_search_common",
+        "before_p50_ms": 5.373618500016164,
+        "after_p50_ms": 5.458321499986596,
+        "change_percent": -1.5762749061954633,
+        "before_p95_ms": 5.6971590000216565,
+        "after_p95_ms": 5.739031000075556,
+        "samples": 100,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "nursing_98_export",
+        "before_p50_ms": 6316.710567999962,
+        "after_p50_ms": 5075.032953999994,
+        "change_percent": 19.657028775233503,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 3,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      },
+      {
+        "action": "encrypted_backup_verified",
+        "before_p50_ms": 12725.71731100004,
+        "after_p50_ms": 10301.646363000033,
+        "change_percent": 19.048599688008583,
+        "before_p95_ms": null,
+        "after_p95_ms": null,
+        "samples": 3,
+        "interpretation": "measured core-only synthetic benchmark; not physical iPhone latency"
+      }
+    ]
+  },
+  "build14ForwardCompatibility": {
+    "build14BackupRead": true,
+    "build14JournalRead": true,
+    "failures": 0,
+    "historicalRectificationPersisted": true,
+    "newBackupRoundTrip": true,
+    "physicalDeviceValidated": false,
+    "producerSHA": "9b1da6d4cdead4729bcade6843abcbcfc287e870",
+    "sourceSHA": "5e570b449c56a8716e405aba51baeb093d8043a8",
+    "stockUnchanged": true,
+    "tests": 1,
+    "workersAndOriginalVisitsUnchanged": true
+  },
+  "fixturePurpose": "FICTITIOUS ENVELOPE for packaging guard unit tests, never application certification"
+}
