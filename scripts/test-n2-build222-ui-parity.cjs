@@ -405,7 +405,9 @@ for(const phrase of ['rosterPage','matches.dropFirst(safePage*pageSize)',
   'Button("Siguiente")'])
   must(history,phrase,'paginación del Personal');
 
-must(clinicalHome,'N2FirstManualWorkerView()','registro inicial sin archivo');
+must(clinicalHome,'N2FirstManualWorkerView(onContinue:{','registro inicial sin archivo');
+must(clinicalHome,'Task {await refresh()}','verificar la fuente al continuar tras crearla');
+must(firstWorker,'if let onContinue {onContinue()} else {dismiss()}','propagar continuación explícita a la puerta clínica');
 for(const phrase of ['N2EmptyDemoSnapshot.make()','N2SnapshotEditor.addWorker(',
   'activateOnlyWithConsent(source,approvedByUser:true)',
   'first-manual-worker-activate','.deviceOwnerAuthentication',
