@@ -26,7 +26,7 @@ jobs:
     - name: Await exact-source mandatory result; fail immediately on failure or changed PR
       env:
         GH_TOKEN: ${{ github.token }}
-      run: "python3 - <<'PY'\nimport json,os,time,urllib.request\nSOURCE='b9e6b57137e6d54f4b9bfb0933d66d2a76033638';RUN=41864751013\n\
+      run: "python3 - <<'PY'\nimport json,os,time,urllib.request\nSOURCE='3e4484663c9373c0138abec0288d617dc137f632';RUN=41885631401\n\
         BASE='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\ndef get(path):\n req=urllib.request.Request(BASE+path,headers={'Authorization':'Bearer\
         \ '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n return json.load(urllib.request.urlopen(req,timeout=30))\n\
         start=time.monotonic();deadline=start+90*60\nwhile True:\n pr=get('pulls/10');assert pr['head']['sha']==SOURCE and pr['draft']\
@@ -43,7 +43,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: B15_CURRENT_HEAD_AUDIT
-        run-id: 41864751013
+        run-id: 41885631401
         github-token: ${{ github.token }}
         path: ${{ runner.temp }}/b15-mandatory-gates
     - name: Verify actual final439/30/14/62 counts, budgets and original14 invariants
@@ -61,7 +61,7 @@ jobs:
 
         PYG'
   arm64-release:
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
@@ -69,7 +69,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: b9e6b57137e6d54f4b9bfb0933d66d2a76033638
+        ref: 3e4484663c9373c0138abec0288d617dc137f632
         fetch-depth: 0
     - uses: actions/setup-node@v4
       with:
@@ -77,13 +77,13 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: B15_CURRENT_HEAD_AUDIT
-        run-id: 41864751013
+        run-id: 41885631401
         github-token: ${{ github.token }}
         path: ${{ runner.temp }}/b15-mandatory-gates
     - name: Require every final-source mandatory gate and current draft PR before building distribution
       env:
         GH_TOKEN: ${{ github.token }}
-      run: "python3 - <<'PY'\nimport json,os,urllib.request\nfrom pathlib import Path\nsource='b9e6b57137e6d54f4b9bfb0933d66d2a76033638';run=41864751013\n\
+      run: "python3 - <<'PY'\nimport json,os,urllib.request\nfrom pathlib import Path\nsource='3e4484663c9373c0138abec0288d617dc137f632';run=41885631401\n\
         base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\ndef get(p):\n r=urllib.request.Request(base+p,headers={'Authorization':'Bearer\
         \ '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n return json.load(urllib.request.urlopen(r,timeout=30))\n\
         p=get('pulls/10');assert p['head']['sha']==source and p['draft'] and not p['merged'] and p['base']['sha']=='9b1da6d4cdead4729bcade6843abcbcfc287e870'\n\
@@ -98,7 +98,7 @@ jobs:
     - name: Prepare approved distribution resources and unchanged application identity
       run: 'set -euo pipefail
 
-        test "$(git rev-parse HEAD)" = b9e6b57137e6d54f4b9bfb0933d66d2a76033638
+        test "$(git rev-parse HEAD)" = 3e4484663c9373c0138abec0288d617dc137f632
 
         npm ci --ignore-scripts --no-fund
 
@@ -138,7 +138,7 @@ jobs:
 
         source=subprocess.check_output([''git'',''rev-parse'',''HEAD''],text=True).strip()
 
-        assert source==''b9e6b57137e6d54f4b9bfb0933d66d2a76033638''
+        assert source==''3e4484663c9373c0138abec0288d617dc137f632''
 
         p=plistlib.loads((app/''Info.plist'').read_bytes())
 
@@ -208,14 +208,14 @@ jobs:
     needs:
     - await-final-gates
     - arm64-release
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: b9e6b57137e6d54f4b9bfb0933d66d2a76033638
+        ref: 3e4484663c9373c0138abec0288d617dc137f632
         fetch-depth: 0
     - uses: actions/checkout@v4
       with:
@@ -227,7 +227,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: B15_CURRENT_HEAD_AUDIT
-        run-id: 41864751013
+        run-id: 41885631401
         github-token: ${{ github.token }}
         path: ${{ runner.temp }}/b15-package/gates
     - uses: actions/download-artifact@v4
@@ -252,7 +252,7 @@ jobs:
         PYG'
     - uses: actions/upload-artifact@v4
       with:
-        name: DANPER_BUILD15_ILOADER_UNSIGNED_b9e6b57
+        name: DANPER_BUILD15_ILOADER_UNSIGNED_3e44846
         path: ${{ runner.temp }}/b15-package/ipa
         retention-days: 30
         if-no-files-found: error
