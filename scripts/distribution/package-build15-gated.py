@@ -3,10 +3,10 @@
 import hashlib,json,os,plistlib,runpy,subprocess,sys,tarfile,urllib.request,zipfile
 from pathlib import Path,PurePosixPath
 
-SOURCE='e58efd2a398b12ee196568295cb145821ed4639d'
+SOURCE='b9e6b57137e6d54f4b9bfb0933d66d2a76033638'
 REPO='r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn'
 BUNDLE='pe.danper.saludmovil.native.iloaderpreview'
-GATE_RUN=41707072055
+GATE_RUN=41864751013
 # Same immutable Actions run: package only after the real compile job passed.
 # SOURCE/GATE_RUN are literal, never overridden by the caller/environment.
 RELEASE_RUN=int(os.environ.get('GITHUB_RUN_ID','0'))

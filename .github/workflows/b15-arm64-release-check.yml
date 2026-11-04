@@ -26,7 +26,7 @@ jobs:
     - name: Await exact-source mandatory result; fail immediately on failure or changed PR
       env:
         GH_TOKEN: ${{ github.token }}
-      run: "python3 - <<'PY'\nimport json,os,time,urllib.request\nSOURCE='e58efd2a398b12ee196568295cb145821ed4639d';RUN=41707072055\n\
+      run: "python3 - <<'PY'\nimport json,os,time,urllib.request\nSOURCE='b9e6b57137e6d54f4b9bfb0933d66d2a76033638';RUN=41864751013\n\
         BASE='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\ndef get(path):\n req=urllib.request.Request(BASE+path,headers={'Authorization':'Bearer\
         \ '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n return json.load(urllib.request.urlopen(req,timeout=30))\n\
         start=time.monotonic();deadline=start+90*60\nwhile True:\n pr=get('pulls/10');assert pr['head']['sha']==SOURCE and pr['draft']\
@@ -43,7 +43,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: B15_CURRENT_HEAD_AUDIT
-        run-id: 41707072055
+        run-id: 41864751013
         github-token: ${{ github.token }}
         path: ${{ runner.temp }}/b15-mandatory-gates
     - name: Verify actual final439/30/14/62 counts, budgets and original14 invariants
@@ -69,7 +69,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: e58efd2a398b12ee196568295cb145821ed4639d
+        ref: b9e6b57137e6d54f4b9bfb0933d66d2a76033638
         fetch-depth: 0
     - uses: actions/setup-node@v4
       with:
@@ -77,13 +77,13 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: B15_CURRENT_HEAD_AUDIT
-        run-id: 41707072055
+        run-id: 41864751013
         github-token: ${{ github.token }}
         path: ${{ runner.temp }}/b15-mandatory-gates
     - name: Require every final-source mandatory gate and current draft PR before building distribution
       env:
         GH_TOKEN: ${{ github.token }}
-      run: "python3 - <<'PY'\nimport json,os,urllib.request\nfrom pathlib import Path\nsource='e58efd2a398b12ee196568295cb145821ed4639d';run=41707072055\n\
+      run: "python3 - <<'PY'\nimport json,os,urllib.request\nfrom pathlib import Path\nsource='b9e6b57137e6d54f4b9bfb0933d66d2a76033638';run=41864751013\n\
         base='https://api.github.com/repos/r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn/'\ndef get(p):\n r=urllib.request.Request(base+p,headers={'Authorization':'Bearer\
         \ '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})\n return json.load(urllib.request.urlopen(r,timeout=30))\n\
         p=get('pulls/10');assert p['head']['sha']==source and p['draft'] and not p['merged'] and p['base']['sha']=='9b1da6d4cdead4729bcade6843abcbcfc287e870'\n\
@@ -98,7 +98,7 @@ jobs:
     - name: Prepare approved distribution resources and unchanged application identity
       run: 'set -euo pipefail
 
-        test "$(git rev-parse HEAD)" = e58efd2a398b12ee196568295cb145821ed4639d
+        test "$(git rev-parse HEAD)" = b9e6b57137e6d54f4b9bfb0933d66d2a76033638
 
         npm ci --ignore-scripts --no-fund
 
@@ -138,7 +138,7 @@ jobs:
 
         source=subprocess.check_output([''git'',''rev-parse'',''HEAD''],text=True).strip()
 
-        assert source==''e58efd2a398b12ee196568295cb145821ed4639d''
+        assert source==''b9e6b57137e6d54f4b9bfb0933d66d2a76033638''
 
         p=plistlib.loads((app/''Info.plist'').read_bytes())
 
@@ -215,7 +215,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: e58efd2a398b12ee196568295cb145821ed4639d
+        ref: b9e6b57137e6d54f4b9bfb0933d66d2a76033638
         fetch-depth: 0
     - uses: actions/checkout@v4
       with:
@@ -227,7 +227,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: B15_CURRENT_HEAD_AUDIT
-        run-id: 41707072055
+        run-id: 41864751013
         github-token: ${{ github.token }}
         path: ${{ runner.temp }}/b15-package/gates
     - uses: actions/download-artifact@v4
@@ -252,7 +252,7 @@ jobs:
         PYG'
     - uses: actions/upload-artifact@v4
       with:
-        name: DANPER_BUILD15_ILOADER_UNSIGNED_e58efd2
+        name: DANPER_BUILD15_ILOADER_UNSIGNED_b9e6b57
         path: ${{ runner.temp }}/b15-package/ipa
         retention-days: 30
         if-no-files-found: error

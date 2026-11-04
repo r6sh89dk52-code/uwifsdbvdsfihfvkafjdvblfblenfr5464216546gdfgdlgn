@@ -1,7 +1,7 @@
 # Build15 — conditional exact-source distribution
 
-Source:e58efd2a398b12ee196568295cb145821ed4639d.
-Mandatory run:41707072055. PR10 remains draft/unmerged; main/stable14 unchanged.
+Source:b9e6b57137e6d54f4b9bfb0933d66d2a76033638.
+Mandatory run:41864751013. PR10 remains draft/unmerged; main/stable14 unchanged.
 This workflow reuses audit/b15-profile-device-9143997-20261101. No new branch.
 It does not claim the app is approved while the mandatory run remains pending.
 
@@ -24,7 +24,7 @@ The guard validates exact app22file hashes, assets, unsigned ARM64 identity,
 adds two provenance files, uses the existing ditto Payload procedure and
 checks all24IPAfile hashes and SHA256. Rechecks PR/main gate/prerequisite
 jobs immediately before upload. All token permissions are read-only.
-Artifact name:DANPER_BUILD15_ILOADER_UNSIGNED_e58efd2, retention30days.
+Artifact name:DANPER_BUILD15_ILOADER_UNSIGNED_b9e6b57, retention30days.
 No installed phone access, no main merge, no signing/install operation.
 
 17local metadata tests PASS: fictitious positive envelopes do not generate
