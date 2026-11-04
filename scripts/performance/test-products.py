@@ -14,7 +14,10 @@ def manifest():
             files[str(f.relative_to(root))]=hashlib.sha256(f.read_bytes()).hexdigest()
     assert files and any(x.endswith('.xctestrun') for x in files)
     return files
-if mode=='seal':
+if mode=='compile-seal':
+    path.write_text(json.dumps({'kind':'compiled-untested','sourceSHA':head,'sourceTree':tree,
+        'xcode':subprocess.check_output(['xcodebuild','-version'],text=True).strip(),'files':manifest()},indent=2))
+elif mode=='seal':
     summaries=list(path.parent.glob('native-*.xcresult.summary.json'))
     assert len(summaries)==1
     data=json.loads(summaries[0].read_text())
@@ -25,10 +28,12 @@ if mode=='seal':
         'xcode':subprocess.check_output(['xcodebuild','-version'],text=True).strip(),
         'nativeSummarySHA256':hashlib.sha256(summaries[0].read_bytes()).hexdigest(),
         'files':manifest()},indent=2))
-elif mode=='verify':
+elif mode in ('verify','compile-verify'):
     data=json.loads(path.read_text())
+    if mode=='compile-verify': assert data.get('kind')=='compiled-untested'
+    else: assert data.get('nativeCount',0)>0 and data.get('nativeSummarySHA256') and 'kind' not in data
     assert data['sourceSHA']==head and data['sourceTree']==tree, 'Compiled tests belong to another HEAD'
     assert data['xcode']==subprocess.check_output(['xcodebuild','-version'],text=True).strip()
     assert data['files']==manifest(), 'Compiled products changed'
 else:raise ValueError(mode)
-print('PASS: same-HEAD compiled products, exact file hashes and native results verified')
+print('PASS: same-HEAD product identity and exact hashes verified; proof mode: '+mode)

@@ -37,7 +37,7 @@ jobs:
           name: B15_JAVASCRIPT
           path: ${{ runner.temp }}/b15-js
           retention-days: 14
-  native-build:
+  native-compile:
     runs-on: macos-26-intel
     timeout-minutes: 45
     env:
@@ -53,8 +53,57 @@ jobs:
           if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
           node scripts/prepare-n1s-ios-demo-resources.cjs
           (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
-      - name: Real signed SwiftUI typecheck, Face ID preflight and ALL native tests
+      - name: Compile the exact signed simulator products; approval requires the next job
         env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-compile
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+        run: |
+          set -euo pipefail
+          mkdir -p "$DANPER_AUDIT_OUT"
+          uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
+          test "$(uname -m)" = x86_64
+          bash scripts/glass-audit/validate-macos.sh b15-compile
+          python3 scripts/performance/test-products.py compile-seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/COMPILE_PRODUCTS.json"
+          tar -czf "$DANPER_AUDIT_OUT/COMPILE_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
+      - uses: actions/upload-artifact@v4
+        with:
+          name: B15_COMPILED_UNTESTED_SAME_HEAD
+          path: |
+            ${{ runner.temp }}/b15-compile/COMPILE_PRODUCTS.json
+            ${{ runner.temp }}/b15-compile/COMPILE_PRODUCTS.tgz
+          retention-days: 7
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_COMPILE_RESULTS
+          path: |
+            ${{ runner.temp }}/b15-compile/*.json
+            ${{ runner.temp }}/b15-compile/*.txt
+            ${{ runner.temp }}/b15-compile/*.log
+            ${{ runner.temp }}/b15-compile/*-failure-attachments.tgz
+          retention-days: 14
+  native-build:
+    needs: native-compile
+    runs-on: macos-26-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_UNTESTED_SAME_HEAD
+          path: ${{ runner.temp }}/b15-compiled
+      - name: Restore the exact current-HEAD untested products
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b15-derived/Build"
+          tar -xzf "$RUNNER_TEMP/b15-compiled/COMPILE_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+          python3 scripts/performance/test-products.py compile-verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/COMPILE_PRODUCTS.json"
+      - name: Face ID preflight and ALL native tests on the verified compiled products
+        env:
+          DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/COMPILE_PRODUCTS.json
           DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-native
           DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
         run: |
@@ -62,7 +111,7 @@ jobs:
           mkdir -p "$DANPER_AUDIT_OUT"
           uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
           test "$(uname -m)" = x86_64
-          bash scripts/glass-audit/validate-macos.sh b15-native
+          bash scripts/glass-audit/validate-macos.sh b15-native-prebuilt
           python3 scripts/performance/test-products.py seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
           tar -czf "$DANPER_AUDIT_OUT/TEST_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
       - uses: actions/upload-artifact@v4

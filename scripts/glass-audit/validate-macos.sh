@@ -14,7 +14,7 @@ if test "$MODE" = replay; then
  printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
 fi
 DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay && test "$MODE" != b15-native && test "$MODE" != b15-shard && test "$MODE" != b15-profile; then
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay && test "$MODE" != b15-native && test "$MODE" != b15-compile && test "$MODE" != b15-native-prebuilt && test "$MODE" != b15-shard && test "$MODE" != b15-profile; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -50,7 +50,7 @@ if test "$MODE" = resume-native; then
 fi
 # Current-branch CI: run every simulator suite from this checkout, without
 # reusing earlier evidence or packaging. Swift/Excel gates run independently.
-if test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native || test "$MODE" = b15-shard || test "$MODE" = b15-profile; then
+if test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native || test "$MODE" = b15-compile || test "$MODE" = b15-native-prebuilt || test "$MODE" = b15-shard || test "$MODE" = b15-profile; then
  git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
  git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
  xcodebuild -version > "$OUT/xcode-version.txt"
@@ -70,10 +70,16 @@ print(r[0]['identifier'])
 PY
 )
 TEST_RUN=''
-if test "$MODE" = b15-shard || test "$MODE" = b15-profile; then
+if test "$MODE" = b15-native-prebuilt; then
+ : "${DANPER_TEST_PROOF:?Set same-HEAD untested product proof}"
+ python3 scripts/performance/test-products.py compile-verify "$DD/Build/Products" "$DANPER_TEST_PROOF"
+fi
+if test "$MODE" = b15-shard || test "$MODE" = b15-profile || test "$MODE" = b15-native-prebuilt; then
+ if test "$MODE" != b15-native-prebuilt; then
  : "${DANPER_B15_UI_LABEL:?Set one discovered UI suite}"
  : "${DANPER_TEST_PROOF:?Set same-HEAD compiled product proof}"
  python3 scripts/performance/test-products.py verify "$DD/Build/Products" "$DANPER_TEST_PROOF"
+ fi
  TEST_RUN=$(python3 - "$DD/Build/Products" <<'PYRUN'
 from pathlib import Path
 import sys
@@ -82,7 +88,7 @@ assert len(paths)==1,paths
 print(paths[0])
 PYRUN
 )
- printf '%s\n' "$DANPER_B15_UI_LABEL" > "$OUT/SHARD_LABEL.txt"
+ if test "$MODE" != b15-native-prebuilt; then printf '%s\n' "$DANPER_B15_UI_LABEL" > "$OUT/SHARD_LABEL.txt"; fi
 fi
 SIM_ID=''
 INSTALL_RECOVERY_SIM=''
@@ -95,8 +101,11 @@ finish(){
  if test "$MODE" = b15-shard && ! test -f "$OUT/SHARD_PASS_SHA.txt"; then
   echo 'FAIL: UI shard did not produce its completion marker' >&2; result=1
  fi
- if test "$MODE" = b15-native && ! test -f "$OUT/CORE_NATIVE_SHA.txt"; then
+ if { test "$MODE" = b15-native || test "$MODE" = b15-native-prebuilt; } && ! test -f "$OUT/CORE_NATIVE_SHA.txt"; then
   echo 'FAIL: native suite did not produce its completion marker' >&2; result=1
+ fi
+ if test "$MODE" = b15-compile && ! test -f "$OUT/COMPILED_SOURCE_SHA.txt"; then
+  echo "FAIL: compilation did not complete" >&2; result=1
  fi
  cleanup
  exit "$result"
@@ -203,11 +212,15 @@ run_tests(){
 }
 if test "$MODE" != ui; then
  fresh native
- if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native; then
+ if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = replay || test "$MODE" = b15-native || test "$MODE" = b15-compile; then
   # Compile for this actual Simulator architecture, not two unused slices.
   xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
    ONLY_ACTIVE_ARCH=YES ASSETCATALOG_COMPILER_APPICON_NAME="" build-for-testing > "$OUT/build-for-testing.log" 2>&1
+ fi
+ if test "$MODE" = b15-compile; then
+  git rev-parse HEAD > "$OUT/COMPILED_SOURCE_SHA.txt"
+  exit 0
  fi
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
@@ -249,7 +262,7 @@ PYCOUNT
   run_tests "native-$NATIVE_COUNT" "$NATIVE_COUNT" -only-testing:DANPERNativeTests
   git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
  fi
- if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native || test "$MODE" = b15-native; then exit 0; fi
+ if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native || test "$MODE" = b15-native || test "$MODE" = b15-native-prebuilt; then exit 0; fi
 fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
 python3 - <<'PY' > "$OUT/ui-classes.tsv"
