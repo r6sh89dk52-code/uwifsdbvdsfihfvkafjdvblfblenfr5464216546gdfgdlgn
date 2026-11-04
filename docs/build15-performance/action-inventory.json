@@ -1,0 +1,4076 @@
+{
+  "kind": "static source inventory; not an execution trace",
+  "files": [
+    {
+      "path": "native-ios/App/BackupPreviewView.swift",
+      "views": [
+        "BackupPreviewView"
+      ],
+      "actions": [
+        {
+          "line": 24,
+          "owner": "body",
+          "kind": "fileImporter",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 67,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 127,
+          "owner": "warningSection",
+          "kind": "Button",
+          "label": "Cerrar resultados",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/DANPERNativeApp.swift",
+      "views": [
+        "DanperAccessView"
+      ],
+      "actions": [
+        {
+          "line": 227,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 243,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/DanperGreeting.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/DanperPremiumPresentation.swift",
+      "views": [
+        "DanperFloatingNavigation",
+        "DanperGlassSurface",
+        "DanperAttentionEditor",
+        "DanperAttentionLauncher",
+        "DanperBackdrop"
+      ],
+      "actions": [
+        {
+          "line": 85,
+          "owner": "body",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 93,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 117,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/DanperPremiumUI.swift",
+      "views": [
+        "DanperWordmark",
+        "DanperFloatingTabs",
+        "DanperHomeWelcome",
+        "DanperNewAttentionCard",
+        "DanperHomeMetricRow",
+        "DanperToolCard",
+        "DanperVersionPanel",
+        "DanperStatisticsView",
+        "DanperExportsView",
+        "DanperDemoInspection",
+        "DanperEmptyState",
+        "DanperLoadingState",
+        "DanperErrorState",
+        "DanperDisplayNamePreference"
+      ],
+      "actions": [
+        {
+          "line": 44,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 150,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 293,
+          "owner": "body",
+          "kind": "DanperToolLink",
+          "label": "Indicador ambulatorio · Excel",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 294,
+          "owner": "body",
+          "kind": "DanperToolLink",
+          "label": "Kardex de enfermería",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 295,
+          "owner": "body",
+          "kind": "DanperToolLink",
+          "label": "Vigilancia ocupacional · Excel",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 342,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Reintentar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/DanperUITheme.swift",
+      "views": [
+        "DanperBrandHeader",
+        "DanperFormChrome",
+        "DanperStepProgress",
+        "DanperStatusBanner",
+        "DanperChoiceField",
+        "DanperInlineSearch",
+        "DanperDateField"
+      ],
+      "actions": [
+        {
+          "line": 77,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 141,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Ocultar teclado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 270,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 304,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 306,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 363,
+          "owner": "body",
+          "kind": "DanperInlineSearch",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 394,
+          "owner": "body",
+          "kind": "Button",
+          "label": "xmark",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 410,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 440,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 462,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 472,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Listo",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 480,
+          "owner": "body",
+          "kind": "DanperToolLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 485,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 2,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N1gClinicalWorkspace.swift",
+      "views": [
+        "N1gSafetyHeader",
+        "N1gRosterScreen",
+        "N1gAttentionScreen",
+        "N1gHistoryScreen"
+      ],
+      "actions": [
+        {
+          "line": 49,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 70,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 340,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 357,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Anterior",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 361,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Siguiente",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 365,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 379,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 411,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Continuar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 416,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Eliminar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 438,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Crear borrador de corrección",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N1iDemoDraftIOSVault.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N1mRealClinicalStagingIOSVault.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N1nInactivePreparationView.swift",
+      "views": [
+        "N1nInactivePreparationView"
+      ],
+      "actions": [
+        {
+          "line": 48,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 67,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Seleccionar respaldo",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 68,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 72,
+          "owner": "body",
+          "kind": "fileImporter",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N1sDemoExportView.swift",
+      "views": [
+        "N1sDemoExportView"
+      ],
+      "actions": [
+        {
+          "line": 64,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2AuxiliaryInventoryView.swift",
+      "views": [
+        "N2AuxiliaryInventoryView"
+      ],
+      "actions": [
+        {
+          "line": 38,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Registrar lote auxiliar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 52,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 54,
+          "owner": "body",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "auxiliaryAccounting"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 76,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "registerAuxiliaryLot"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2Build222ExportStages.swift",
+      "views": [
+        "N2Build222ExportProgress",
+        "N2Build222StageHeading"
+      ],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2Build222KardexHub.swift",
+      "views": [
+        "N2Build222KardexHub"
+      ],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2ClinicalCorrectionView.swift",
+      "views": [
+        "N2ClinicalCorrectionView"
+      ],
+      "actions": [
+        {
+          "line": 93,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Lugar donde se atendió",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 128,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Situación al finalizar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 163,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 189,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 200,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Guardar rectificación",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 203,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 207,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 218,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Descartar borrador",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 221,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 340,
+          "owner": "queueDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "currentRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 367,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "prepareClinicalCorrection"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 447,
+          "owner": "discardDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "currentRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 471,
+          "owner": "confirm",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "currentRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 483,
+          "owner": "confirm",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readCorrectionDetail"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 4,
+      "mainActorAnnotations": 4
+    },
+    {
+      "path": "native-ios/App/N2ClinicalWorkspaceView.swift",
+      "views": [
+        "N2ClinicalWorkspaceGateView",
+        "N2ClinicalWorkspaceRootView"
+      ],
+      "actions": [
+        {
+          "line": 70,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 78,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 86,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 177,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 234,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": "Herramientas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 258,
+          "owner": "refreshHomeCounts",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "dashboardSnapshot"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 269,
+          "owner": "homeTile",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 281,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Trabajadores",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 282,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Kardex",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 283,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Estadísticas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 284,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Indicadores",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 300,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Trabajadores",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 301,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Borradores",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 303,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Importar / conciliar PERSONAL",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 306,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Inventario y existencias",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 307,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Corte del día 9 · inventario único",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 308,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Kardex de enfermería",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 309,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Indicador ambulatorio · Excel",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 310,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Vigilancia ocupacional · Excel",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 311,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Estadísticas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 314,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Respaldo cifrado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 315,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Restaurar historial sin reemplazar inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 316,
+          "owner": "toolsPage",
+          "kind": "Button",
+          "label": "Bloquear aplicación",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 8,
+      "mainActorAnnotations": 4
+    },
+    {
+      "path": "native-ios/App/N2ContainerStateView.swift",
+      "views": [
+        "N2ContainerStateView"
+      ],
+      "actions": [
+        {
+          "line": 32,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Registrar declaración",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 38,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 45,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "closeContainers"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2DemoResetView.swift",
+      "views": [
+        "N2DemoResetView"
+      ],
+      "actions": [
+        {
+          "line": 57,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Volver a Inicio",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 72,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 100,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Sí, borrar todo lo ficticio",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 103,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2DraftReminder.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2ExpiryTextField.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2FirstManualWorkerView.swift",
+      "views": [
+        "N2FirstManualWorkerView"
+      ],
+      "actions": [
+        {
+          "line": 60,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Sede verificada",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 78,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 95,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Volver para entrar a DANPER",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 109,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Crear e ingresar primer trabajador",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 112,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2GeneratedOfficialAreas.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2HealthMascot.swift",
+      "views": [
+        "N2HealthMascot"
+      ],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2InteractionProbe.swift",
+      "views": [
+        "N2InteractionProbe"
+      ],
+      "actions": [
+        {
+          "line": 25,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Tipo de atención",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 26,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Sistema afectado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 27,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Situación al finalizar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 30,
+          "owner": "body",
+          "kind": "DanperInlineSearch",
+          "label": "Medicamentos e insumos",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2InventoryPresentation.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2KardexCutPreviewView.swift",
+      "views": [
+        "N2KardexCutPreviewView"
+      ],
+      "actions": [
+        {
+          "line": 55,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Producto",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 80,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Actualizar desde el inventario y las atenciones",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 122,
+          "owner": "reload",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "automaticCutAccounting"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2MedicationRowView.swift",
+      "views": [
+        "N2MedicationRowView"
+      ],
+      "actions": [
+        {
+          "line": 68,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 122,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 137,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "¿Abriste una presentación nueva?",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 158,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 169,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 183,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Procedimiento",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 188,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 207,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Existencia física",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2NativeActivationView.swift",
+      "views": [
+        "N2NativeActivationView"
+      ],
+      "actions": [
+        {
+          "line": 71,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 109,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 137,
+          "owner": "body",
+          "kind": "fileImporter",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 150,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Sí, restaurar respaldo completo",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 153,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 2,
+      "mainActorAnnotations": 3
+    },
+    {
+      "path": "native-ios/App/N2NativeBackupExportView.swift",
+      "views": [
+        "N2NativeBackupExportView"
+      ],
+      "actions": [
+        {
+          "line": 44,
+          "owner": "body",
+          "kind": "vault call",
+          "label": "Datos protegidos de la bóveda CLÍNICA",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 73,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 94,
+          "owner": "body",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "inspect"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 136,
+          "owner": "exportProtected",
+          "kind": "vault call",
+          "label": "danper-n2-clinical-encrypted-share-",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 146,
+          "owner": "exportProtected",
+          "kind": "vault call",
+          "label": "DANPER_N2_CLINICA_CIFRADO_",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2NativeClinicalFormView.swift",
+      "views": [
+        "N2NativeClinicalFormView"
+      ],
+      "actions": [
+        {
+          "line": 6,
+          "owner": "declaration",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "Nothing"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 227,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 248,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Agregar y conservar advertencia",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 254,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 261,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Sí, abrí uno nuevo · Kardex 1",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 264,
+          "owner": "body",
+          "kind": "Button",
+          "label": "No, usé el abierto · Kardex 0",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 267,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Volver",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 275,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Registrar trabajador",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 278,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 320,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 332,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 343,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 355,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 362,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Eliminar borrador",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 368,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 381,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 398,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Ir al campo",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 399,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 455,
+          "owner": "formContents",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 474,
+          "owner": "formContents",
+          "kind": "Button",
+          "label": "Resolver en Inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 479,
+          "owner": "formContents",
+          "kind": "Button",
+          "label": "Nueva atención",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 481,
+          "owner": "formContents",
+          "kind": "NavigationLink",
+          "label": "Ver historial y consumos",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 491,
+          "owner": "formContents",
+          "kind": "Button",
+          "label": "Guardar borrador",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 515,
+          "owner": "formChanged",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 549,
+          "owner": "formChanged",
+          "kind": "Button",
+          "label": "Editar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 561,
+          "owner": "workerSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 574,
+          "owner": "workerSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 629,
+          "owner": "workerSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 659,
+          "owner": "workerSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 693,
+          "owner": "workerSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 722,
+          "owner": "clinicalSection",
+          "kind": "DanperChoiceField",
+          "label": "Revisión de alergias",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 745,
+          "owner": "clinicalSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 762,
+          "owner": "clinicalSection",
+          "kind": "DanperChoiceField",
+          "label": "Tipo de atención",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 767,
+          "owner": "clinicalSection",
+          "kind": "DanperChoiceField",
+          "label": "Sistema afectado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 772,
+          "owner": "clinicalSection",
+          "kind": "DanperChoiceField",
+          "label": "Segmento osteomuscular",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 799,
+          "owner": "clinicalSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 829,
+          "owner": "procedureOption",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 881,
+          "owner": "independentProceduresSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 918,
+          "owner": "independentProceduresSection",
+          "kind": "DanperChoiceField",
+          "label": "¿Se envió la foto?",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 941,
+          "owner": "medicationPickerSection",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 947,
+          "owner": "medicationPickerSection",
+          "kind": "DanperInlineSearch",
+          "label": "Buscar medicamento o insumo",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1012,
+          "owner": "medicationGroup",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1054,
+          "owner": "medicationGroup",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1177,
+          "owner": "reviewSection",
+          "kind": "Button",
+          "label": "Editar evaluación",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1180,
+          "owner": "reviewSection",
+          "kind": "DanperChoiceField",
+          "label": "Situación al finalizar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1208,
+          "owner": "actions",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1215,
+          "owner": "actions",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1256,
+          "owner": "refreshDispensing",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1257,
+          "owner": "refreshDispensing",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "retryDispensing"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1258,
+          "owner": "refreshDispensing",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1261,
+          "owner": "refreshDispensing",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "dispensingStatus"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1262,
+          "owner": "refreshDispensing",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "dispensingLines"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1272,
+          "owner": "blankForm",
+          "kind": "vault call",
+          "label": "OPERADOR FICTICIO",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1277,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "prepareClinicalForm"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1294,
+          "owner": "load",
+          "kind": "vault call",
+          "label": "OPERADOR FICTICIO",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1336,
+          "owner": "recordAllergy",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "reviewAllergiesRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1343,
+          "owner": "recordAllergy",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "currentRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1344,
+          "owner": "recordAllergy",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "reviewAllergiesRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1356,
+          "owner": "recordAllergy",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1382,
+          "owner": "didRegisterWorker",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1426,
+          "owner": "scheduleDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "saveDraft"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1433,
+          "owner": "scheduleDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1435,
+          "owner": "scheduleDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "saveDraft"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1450,
+          "owner": "scheduleDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "mode"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1593,
+          "owner": "confirm",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1595,
+          "owner": "confirm",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "saveAttention"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1600,
+          "owner": "confirm",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "mode"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1605,
+          "owner": "confirm",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "dispensingLines"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1636,
+          "owner": "deleteRecoveredDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "currentRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1637,
+          "owner": "deleteRecoveredDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "deleteDraft"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1639,
+          "owner": "deleteRecoveredDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "mode"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1641,
+          "owner": "deleteRecoveredDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "prepareClinicalForm"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 1649,
+          "owner": "deleteRecoveredDraft",
+          "kind": "vault call",
+          "label": "OPERADOR FICTICIO",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 13,
+      "mainActorAnnotations": 12
+    },
+    {
+      "path": "native-ios/App/N2NativeDraftsDashboard.swift",
+      "views": [
+        "N2NativeDraftsDashboard"
+      ],
+      "actions": [
+        {
+          "line": 32,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 48,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 63,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 83,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Eliminar borrador",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 88,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 116,
+          "owner": "deleteDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "currentRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 120,
+          "owner": "deleteDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "deleteDraft"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 123,
+          "owner": "deleteDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "mode"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 134,
+          "owner": "deleteDraft",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readDraftsWithRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 148,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "currentRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 157,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readDraftsWithRevision"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 2,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2NativeHistoryView.swift",
+      "views": [
+        "N2NativeHistoryView",
+        "N2RecordedVisitDetailView",
+        "N2WorkerHistoryDetail",
+        "N2VisitDispensingView"
+      ],
+      "actions": [
+        {
+          "line": 72,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 93,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Anterior",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 103,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Siguiente",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 121,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 152,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Anterior",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 160,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Siguiente",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 264,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readHistory"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 343,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 349,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 374,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Sí, editar atención",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 375,
+          "owner": "body",
+          "kind": "Button",
+          "label": "No, solo consultar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 391,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readCorrectionDetail"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 416,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 438,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 441,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 589,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": "Resolver incidencia en Inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 615,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 633,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 666,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 698,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "dispensingLines"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 706,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 714,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readCorrectionDetail"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 725,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "automaticCutAccounting"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 744,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readCorrectionDetail"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 758,
+          "owner": "retryPending",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 759,
+          "owner": "retryPending",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "retryDispensing"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 5,
+      "mainActorAnnotations": 6
+    },
+    {
+      "path": "native-ios/App/N2NativeInventoryView.swift",
+      "views": [
+        "N2NativeInventoryView",
+        "N2LotMetadataEditor"
+      ],
+      "actions": [
+        {
+          "line": 215,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Stock inicial del día 9",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 218,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Stock físico que tengo hoy",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 221,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 266,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 292,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 313,
+          "owner": "action",
+          "kind": "DanperChoiceField",
+          "label": "Presentación por verificar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 338,
+          "owner": "action",
+          "kind": "DanperChoiceField",
+          "label": "Medicamento y lote",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 375,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 408,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 446,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 481,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 568,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 574,
+          "owner": "action",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 585,
+          "owner": "action",
+          "kind": "Button",
+          "label": "Declarar agotado, cerrado o descartado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 614,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 642,
+          "owner": "commit",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "automaticCutAccounting"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 691,
+          "owner": "commit",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "addLot"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 697,
+          "owner": "commit",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "receiveStock"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 705,
+          "owner": "commit",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "reconcileCount"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 714,
+          "owner": "commit",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 803,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Guardar corrección del lote",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 807,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Sí, guardar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 808,
+          "owner": "body",
+          "kind": "Button",
+          "label": "No",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 820,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 830,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 831,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "correctUnusedLot"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 9,
+      "mainActorAnnotations": 4
+    },
+    {
+      "path": "native-ios/App/N2NativePersonalImportView.swift",
+      "views": [
+        "N2NativePersonalImportView"
+      ],
+      "actions": [
+        {
+          "line": 55,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 81,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 144,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 167,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 188,
+          "owner": "body",
+          "kind": "fileImporter",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 201,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Sí, importar PERSONAL",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 202,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 4,
+      "mainActorAnnotations": 4
+    },
+    {
+      "path": "native-ios/App/N2NativePortableBackupMaker.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2NativeWorkerEditorView.swift",
+      "views": [
+        "N2NativeWorkerEditorView"
+      ],
+      "actions": [
+        {
+          "line": 158,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Sede",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 192,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 235,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Sexo registrado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 312,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 322,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 327,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 334,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 351,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Entendido",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 438,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "inspect"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 440,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 448,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readHistory"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 570,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "correctWorker"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 575,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "registerWorker"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 583,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 589,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "correctWorker"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 594,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "registerWorker"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 601,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 4,
+      "mainActorAnnotations": 6
+    },
+    {
+      "path": "native-ios/App/N2OccupationalVigilanceExportView.swift",
+      "views": [
+        "N2OccupationalVigilanceExportView"
+      ],
+      "actions": [
+        {
+          "line": 71,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Período",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 95,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 125,
+          "owner": "export",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "exportOccupationalVigilance"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 129,
+          "owner": "export",
+          "kind": "vault call",
+          "label": "danper-n2-clinical-vigilance-",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2OperationalMappingView.swift",
+      "views": [
+        "N2OperationalMappingView"
+      ],
+      "actions": [
+        {
+          "line": 48,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Registrar producto fuera del Kardex de 98",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 51,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Guardar correspondencia operativa",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 58,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 78,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "confirmOperationalMapping"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2PendingDispensingView.swift",
+      "views": [
+        "N2PendingDispensingView"
+      ],
+      "actions": [
+        {
+          "line": 107,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Guardar declaración histórica (R=1/0)",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 119,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 152,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "confirmPendingDispensing"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2ProtectedClinicalIOSVault.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 1,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2ReconciliationView.swift",
+      "views": [
+        "N2ReconciliationView"
+      ],
+      "actions": [
+        {
+          "line": 65,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Sede",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 66,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Evento",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 76,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Registro que se anula",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 79,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 86,
+          "owner": "body",
+          "kind": "DanperInlineSearch",
+          "label": "Buscar material oficial",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 110,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 141,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 142,
+          "owner": "load",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "reconciliationEvents"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 173,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "clinicalFormContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 174,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "reconciliationEvents"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2SimpleCutView.swift",
+      "views": [
+        "N2SimpleCutView"
+      ],
+      "actions": [
+        {
+          "line": 27,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Producto",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 32,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": "Registrar inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 35,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Consultar saldo",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 42,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Elegir respaldo histórico",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 49,
+          "owner": "body",
+          "kind": "vault call",
+          "label": "",
+          "vaultCalls": [
+            "simpleInventoryContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 52,
+          "owner": "body",
+          "kind": "fileImporter",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 93,
+          "owner": "calculate",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "simpleInventoryCut"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2SimpleInventoryView.swift",
+      "views": [
+        "N2SimpleInventoryView",
+        "N2SimpleProductDetail",
+        "N2GlassInventoryRow"
+      ],
+      "actions": [
+        {
+          "line": 85,
+          "owner": "inventory",
+          "kind": "Button",
+          "label": "Registrar inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 90,
+          "owner": "inventory",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 104,
+          "owner": "inventory",
+          "kind": "NavigationLink",
+          "label": "Corte mensual · del 9 al 8",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 105,
+          "owner": "inventory",
+          "kind": "NavigationLink",
+          "label": "Vigilancia ocupacional",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 106,
+          "owner": "inventory",
+          "kind": "NavigationLink",
+          "label": "Kardex · Excel oficial",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 107,
+          "owner": "inventory",
+          "kind": "NavigationLink",
+          "label": "Excel ambulatorio",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 108,
+          "owner": "inventory",
+          "kind": "NavigationLink",
+          "label": "Restaurar historial clínico sin reemplazar inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 124,
+          "owner": "inventoryControls",
+          "kind": "Button",
+          "label": "",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 141,
+          "owner": "incidents",
+          "kind": "Button",
+          "label": "Revisar declaración",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 144,
+          "owner": "incidents",
+          "kind": "NavigationLink",
+          "label": "Ver atención",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 152,
+          "owner": "load",
+          "kind": "vault call",
+          "label": "",
+          "vaultCalls": [
+            "simpleInventoryContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 183,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": "Ver atención",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 216,
+          "owner": "actions",
+          "kind": "Button",
+          "label": "Registrar ingreso",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 217,
+          "owner": "actions",
+          "kind": "Button",
+          "label": "Registrar salida",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 218,
+          "owner": "actions",
+          "kind": "Button",
+          "label": "Actualizar conteo físico",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 219,
+          "owner": "actions",
+          "kind": "Button",
+          "label": "Actualizar vencimiento",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 223,
+          "owner": "load",
+          "kind": "vault call",
+          "label": "",
+          "vaultCalls": [
+            "simpleInventoryContext"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 5,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2SimpleMigrationViews.swift",
+      "views": [
+        "N2SimpleMigrationSetup",
+        "N2SimpleRestoreView"
+      ],
+      "actions": [
+        {
+          "line": 52,
+          "owner": "body",
+          "kind": "vault call",
+          "label": "OPERADOR FICTICIO",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 58,
+          "owner": "body",
+          "kind": "fileExporter",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 66,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Respaldé mis datos y autorizo el reinicio",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 67,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 93,
+          "owner": "body",
+          "kind": "Button",
+          "label": "trash",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 97,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Agregar medicamento o insumo al conteo",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 114,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Verificando…",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 124,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Activar con estos conteos",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 135,
+          "owner": "createBackup",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "exportPortableEncryptedBackup"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 147,
+          "owner": "verifySaved",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "inspectSimpleBackup"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 166,
+          "owner": "activateNow",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "activateSimpleInventory"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 214,
+          "owner": "body",
+          "kind": "fileImporter",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 222,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Restaurar solo historia clínica",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 223,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 226,
+          "owner": "body",
+          "kind": "vault call",
+          "label": "OPERADOR FICTICIO",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 229,
+          "owner": "body",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "simpleInventoryContext"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 241,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Elegir respaldo cifrado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 246,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Verificando…",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 254,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Restaurar historial sin reemplazar inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 263,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Continuar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 269,
+          "owner": "inspect",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "inspectSimpleBackup"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 286,
+          "owner": "restore",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "restoreSimpleClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 289,
+          "owner": "restore",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "recoverPortableSource"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 7,
+      "mainActorAnnotations": 5
+    },
+    {
+      "path": "native-ios/App/N2SimpleProductEditor.swift",
+      "views": [
+        "N2SimpleProductEditor"
+      ],
+      "actions": [
+        {
+          "line": 62,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 68,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 71,
+          "owner": "body",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 72,
+          "owner": "body",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 74,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Confirmar conteo físico",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 75,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 90,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 101,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Cómo se cuenta físicamente",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 115,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "¿Abriste una presentación nueva?",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 140,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Próximo vencimiento",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 173,
+          "owner": "prepare",
+          "kind": "vault call",
+          "label": "OPERADOR FICTICIO",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 196,
+          "owner": "save",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "applySimpleInventoryCommand"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 1
+    },
+    {
+      "path": "native-ios/App/N2SyntheticTrialIOSVault.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 1,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2VerifiedIndicatorExportView.swift",
+      "views": [
+        "N2VerifiedIndicatorExportView"
+      ],
+      "actions": [
+        {
+          "line": 118,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Usar período oficial 9 → 8",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 139,
+          "owner": "body",
+          "kind": "DanperToolLink",
+          "label": "Revisar inventario único y corte 9–8",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 159,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Solo confirmadas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 160,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Todas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 197,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 223,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 245,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Generar provisional",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 246,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cancelar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 299,
+          "owner": "refreshVerifiedVisits",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "readHistory"
+          ],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 333,
+          "owner": "export",
+          "kind": "vault call",
+          "label": "danper-n2-clinical-indicator-",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 3,
+      "mainActorAnnotations": 4
+    },
+    {
+      "path": "native-ios/App/N2VerifiedNursingExportView.swift",
+      "views": [
+        "N2VerifiedNursingExportView"
+      ],
+      "actions": [
+        {
+          "line": 87,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Modalidad",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 93,
+          "owner": "body",
+          "kind": "DanperChoiceField",
+          "label": "Turno",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 125,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 132,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 143,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 192,
+          "owner": "export",
+          "kind": "vault call",
+          "label": "danper-n2-clinical-kardex-",
+          "vaultCalls": [
+            "isClinical"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/N2WorkerSearchSheet.swift",
+      "views": [
+        "N2WorkerSearchSheet"
+      ],
+      "actions": [
+        {
+          "line": 61,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 84,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Anterior",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 90,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Siguiente",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 95,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 131,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Cerrar",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2WorkspaceFileIO.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/N2WorkspaceVault.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/NativeEncryptedLabVault.swift",
+      "views": [],
+      "actions": [],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/NativeFirstRunOnboarding.swift",
+      "views": [
+        "NativeFirstRunOnboarding"
+      ],
+      "actions": [
+        {
+          "line": 74,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 80,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Ahora no",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 84,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 91,
+          "owner": "body",
+          "kind": "Button",
+          "label": "Continuar con código",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 94,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 2,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/NativeRootView.swift",
+      "views": [
+        "NativeRootView"
+      ],
+      "actions": [
+        {
+          "line": 49,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 109,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 121,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 134,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 146,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 162,
+          "owner": "body",
+          "kind": "NavigationLink",
+          "label": "Herramientas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 180,
+          "owner": "shortcut",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 191,
+          "owner": "lockedTab",
+          "kind": "Button",
+          "label": "Ir a Inicio",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 203,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Trabajadores",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 204,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Kardex",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 205,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Estadísticas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 206,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Indicadores",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 219,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Trabajadores",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 221,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Estadísticas",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 224,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Inventario y existencias",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 225,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Corte del día 9 · inventario único",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 226,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Kardex de enfermería",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 227,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Indicador ambulatorio · Excel",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 228,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Vigilancia ocupacional · Excel",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 229,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Respaldo cifrado",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 230,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Restaurar historial sin reemplazar inventario",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 234,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Importar trabajadores desde Excel PERSONAL",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 240,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Acceso al espacio clínico independiente",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 245,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Comprobar respaldo original (solo lectura)",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 247,
+          "owner": "toolsPage",
+          "kind": "DanperToolLink",
+          "label": "Importación protegida en bóveda independiente",
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        },
+        {
+          "line": 253,
+          "owner": "toolsPage",
+          "kind": "NavigationLink",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 5,
+      "mainActorAnnotations": 2
+    },
+    {
+      "path": "native-ios/App/NativeStorageLabView.swift",
+      "views": [
+        "NativeStorageLabView"
+      ],
+      "actions": [
+        {
+          "line": 21,
+          "owner": "body",
+          "kind": "Button",
+          "label": null,
+          "vaultCalls": [],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 1,
+      "mainActorAnnotations": 0
+    },
+    {
+      "path": "native-ios/App/PortableBackupInspector.swift",
+      "views": [],
+      "actions": [
+        {
+          "line": 83,
+          "owner": "prepareInactive",
+          "kind": "vault call",
+          "label": null,
+          "vaultCalls": [
+            "Does"
+          ],
+          "measurement": "not implied by static inventory"
+        }
+      ],
+      "tasks": 0,
+      "mainActorAnnotations": 0
+    }
+  ]
+}

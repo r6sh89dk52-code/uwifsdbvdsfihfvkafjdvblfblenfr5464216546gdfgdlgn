@@ -32,6 +32,24 @@ public struct N2NativeReadModel: Sendable {
     public let visits:[N2VisitIndexRow]
     public let pendingClinicalLines:Int
 
+    /// Corrections may change diagnosis/site but cannot change original item
+    /// identities or physical quantities. Refresh this one displayed row from
+    /// a verified detail, retaining roster and physical projections unchanged.
+    public func applyingClinicalDetail(_ detail:N2CorrectionDetail)->N2NativeReadModel {
+        let updated=visits.map {row in
+            guard row.id==detail.id else{return row}
+            var next=N2VisitIndexRow(id:row.id,workerDNI:row.workerDNI,workerName:row.workerName,
+                date:row.date,time:row.time,diagnosis:detail.diagnosis,status:row.status,
+                frequency:row.frequency,clinicalLines:row.clinicalLines,
+                confirmedPhysicalLines:row.confirmedPhysicalLines,pendingPhysicalLines:row.pendingPhysicalLines,
+                consumptionR:row.consumptionR)
+            next.workerSite=detail.workerSite
+            return next
+        }
+        return N2NativeReadModel(roster:roster,searchableRoster:searchableRoster,
+            visits:updated,pendingClinicalLines:pendingClinicalLines)
+    }
+
     public func findWorkers(_ needle:String)->[N2WorkerIndexRow] {
         let q=needle.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !q.isEmpty else {return searchableRoster}
@@ -63,12 +81,32 @@ public enum N2NativeSnapshotReader {
         let site:String
     }
     public static func read(_ data:Data)throws->N2NativeReadModel {
+        try project(data,authenticated:nil)
+    }
+    /// Internal proof type can only come from the journal's authenticated path.
+    static func readAuthenticated(_ record:N2EncryptedClinicalJournal.Recovered)throws->N2NativeReadModel {
+        try project(record.snapshot,authenticated:record)
+    }
+    private static func project(_ data:Data,authenticated:N2EncryptedClinicalJournal.Recovered?)throws->N2NativeReadModel {
+        let span=N2PerformanceSpan("History projection");defer{span.end()}
         // Never mutate source visits. Apply the validated append-only clinical
         // correction ledger to the displayed history only.
-        let clinical=try N2ClinicalCorrections.effectiveSnapshot(data)
-        guard let parity=try? N2VersionedSnapshotAudit.inspect(N2SimpleInventory.isActive(data) ? data:clinical,allowEmptySynthetic:true),
-              (try? N1fLosslessFieldGate.inspect(clinical)) != nil,
-              let root=try? JSONSerialization.jsonObject(with:clinical) as? [String:Any],
+        let clinical:Data
+        if let authenticated {clinical=try N2ClinicalCorrections.authenticatedProjection(authenticated).snapshot}
+        else {clinical=try N2ClinicalCorrections.effectiveSnapshot(data)}
+        let parity:N1eClinicalParityReport
+        if let authenticated,clinical==data {
+            parity=authenticated.parity
+        } else {
+            // A correction creates different effective bytes. Audit those;
+            // raw-snapshot proof must never certify an altered projection.
+            guard let checked=try? N2VersionedSnapshotAudit.inspect(N2SimpleInventory.isActive(data) ? data:clinical,allowEmptySynthetic:true),
+                  (try? N1fLosslessFieldGate.inspect(clinical)) != nil else {
+                throw N2NativeReadError.invalidSnapshot
+            }
+            parity=checked
+        }
+        guard let root=try? JSONSerialization.jsonObject(with:clinical) as? [String:Any],
               let workers=root["workers"] as? [[String:Any]],
               let visits=root["attentions"] as? [[String:Any]] else {
             throw N2NativeReadError.invalidSnapshot
@@ -86,7 +124,14 @@ public enum N2NativeSnapshotReader {
         let searchable=roster.filter{
             !official || $0.rosterStatus=="official" || $0.rosterStatus=="verified"
         }
-        let simple=N2SimpleInventory.isActive(data) ? try N2SimpleInventory.read(data) : nil
+        // Either public read or the authenticated path has fully audited it.
+        let simple=root["inventorySchemaVersion"] as? Int == 2 ? try N2SimpleInventory.state(root) : nil
+        var pendingByVisit=[String:Int]()
+        if let simple {
+            for incident in simple.incidents where incident.resolutionEventID==nil {
+                pendingByVisit[incident.visitID,default:0]+=1
+            }
+        }
         var pointer=0,lines:[Item]=[]
         for visit in visits {
             let status=visit["status"] as? String ?? ""
@@ -133,7 +178,7 @@ public enum N2NativeSnapshotReader {
                 status:row.status,frequency:label,
                 clinicalLines:row.physical.count,
                 confirmedPhysicalLines:row.physical.compactMap{$0}.count,
-                pendingPhysicalLines:simple.map{state in state.incidents.filter{$0.visitID==row.id && $0.resolutionEventID==nil}.count} ?? row.physical.filter{$0==nil}.count,
+                pendingPhysicalLines:simple != nil ? (pendingByVisit[row.id] ?? 0) : row.physical.filter{$0==nil}.count,
                 consumptionR:row.physical)
             record.workerSite=row.site
             indexed.append(record)

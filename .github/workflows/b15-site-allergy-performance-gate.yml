@@ -1,0 +1,345 @@
+name: B15 - Integral performance and fresh clinical gates (NO IPA)
+on:
+  push:
+    branches: [fix/indicator-historical-visit-site-build15-20261030]
+    paths: ['native-ios/**', 'scripts/**', '.github/workflows/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  DANPER_EXPECTED_BUILD: '15'
+concurrency:
+  group: b15-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  swift-core:
+    uses: ./.github/workflows/native-swift-linux.yml
+  javascript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Run all 50 logic regressions and 12 clinical guards
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-js
+        run: |
+          node scripts/glass-audit/javascript.cjs
+          git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
+          python3 scripts/performance/inventory.py "$DANPER_AUDIT_OUT/action-inventory.json"
+          python3 -m unittest discover -s scripts/performance/tests -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_JAVASCRIPT
+          path: ${{ runner.temp }}/b15-js
+          retention-days: 14
+  native-compile:
+    runs-on: macos-26-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Prepare production resources, never a patient dataset
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+      - name: Compile the exact signed simulator products; approval requires the next job
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-compile
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+        run: |
+          set -euo pipefail
+          mkdir -p "$DANPER_AUDIT_OUT"
+          uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
+          test "$(uname -m)" = x86_64
+          bash scripts/glass-audit/validate-macos.sh b15-compile
+          python3 scripts/performance/test-products.py compile-seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/COMPILE_PRODUCTS.json"
+          tar -czf "$DANPER_AUDIT_OUT/COMPILE_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
+      - uses: actions/upload-artifact@v4
+        with:
+          name: B15_COMPILED_UNTESTED_SAME_HEAD
+          path: |
+            ${{ runner.temp }}/b15-compile/COMPILE_PRODUCTS.json
+            ${{ runner.temp }}/b15-compile/COMPILE_PRODUCTS.tgz
+          retention-days: 7
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_COMPILE_RESULTS
+          path: |
+            ${{ runner.temp }}/b15-compile/*.json
+            ${{ runner.temp }}/b15-compile/*.txt
+            ${{ runner.temp }}/b15-compile/*.log
+            ${{ runner.temp }}/b15-compile/*-failure-attachments.tgz
+          retention-days: 14
+  native-build:
+    needs: native-compile
+    runs-on: macos-26-intel
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_UNTESTED_SAME_HEAD
+          path: ${{ runner.temp }}/b15-compiled
+      - name: Restore the exact current-HEAD untested products
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b15-derived/Build"
+          tar -xzf "$RUNNER_TEMP/b15-compiled/COMPILE_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+          python3 scripts/performance/test-products.py compile-verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/COMPILE_PRODUCTS.json"
+      - name: Face ID preflight and ALL native tests on the verified compiled products
+        env:
+          DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/COMPILE_PRODUCTS.json
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-native
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+        run: |
+          set -euo pipefail
+          mkdir -p "$DANPER_AUDIT_OUT"
+          uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
+          test "$(uname -m)" = x86_64
+          bash scripts/glass-audit/validate-macos.sh b15-native-prebuilt
+          python3 scripts/performance/test-products.py seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
+          tar -czf "$DANPER_AUDIT_OUT/TEST_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
+      - uses: actions/upload-artifact@v4
+        with:
+          name: B15_COMPILED_SAME_HEAD
+          path: |
+            ${{ runner.temp }}/b15-native/TEST_PRODUCTS.json
+            ${{ runner.temp }}/b15-native/TEST_PRODUCTS.tgz
+          retention-days: 7
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_NATIVE_RESULTS
+          path: |
+            ${{ runner.temp }}/b15-native/*.json
+            ${{ runner.temp }}/b15-native/*.txt
+            ${{ runner.temp }}/b15-native/*.log
+            ${{ runner.temp }}/b15-native/*-failure-attachments.tgz
+          retention-days: 14
+  ui:
+    needs: native-build
+    runs-on: macos-26-intel
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        suite: [N2AllergySaveInteractionTests, N2BiometricInteractionTests, N2Build222ShellTests, N2GlassClinicalTests, N2MenuInteractionTests, N2PremiumRedesignTests, N3ClinicalJourneyTests-demo, N3ClinicalJourneyTests-protected]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_SAME_HEAD
+          path: ${{ runner.temp }}/b15-compiled
+      - name: Restore executable permissions and verify exact current-HEAD binaries
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b15-derived/Build"
+          tar -xzf "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+          python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.json"
+      - name: Real isolated iPhone 16 UI suite and Face ID preflight
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-ui
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+          DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/TEST_PRODUCTS.json
+          DANPER_B15_UI_LABEL: ${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/validate-macos.sh b15-shard
+          python3 scripts/performance/verify-ui-shard.py "$DANPER_AUDIT_OUT" "$DANPER_B15_UI_LABEL"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_UI_RESULT_${{ matrix.suite }}
+          path: |
+            ${{ runner.temp }}/b15-ui/*.json
+            ${{ runner.temp }}/b15-ui/*.txt
+            ${{ runner.temp }}/b15-ui/*.log
+            ${{ runner.temp }}/b15-ui/Instruments/*.json
+            ${{ runner.temp }}/b15-ui/Instruments/*.log
+            ${{ runner.temp }}/b15-ui/Instruments/*.xml
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_UI_RAW_${{ matrix.suite }}
+          path: |
+            ${{ runner.temp }}/b15-ui/*.xcresult
+            ${{ runner.temp }}/b15-ui/*-attachments
+            ${{ runner.temp }}/b15-ui/Instruments
+          retention-days: 7
+  instruments:
+    needs: native-build
+    runs-on: macos-26-intel
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_COMPILED_SAME_HEAD
+          path: ${{ runner.temp }}/b15-compiled
+      - name: Restore and verify current-HEAD binary only
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b15-derived/Build"
+          tar -xzf "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.tgz" -C "$RUNNER_TEMP/b15-derived/Build"
+          python3 scripts/performance/test-products.py verify "$RUNNER_TEMP/b15-derived/Build/Products" "$RUNNER_TEMP/b15-compiled/TEST_PRODUCTS.json"
+      - name: Profile a separate synthetic app process without disrupting functional UI tests
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-instruments
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b15-derived
+          DANPER_TEST_PROOF: ${{ runner.temp }}/b15-compiled/TEST_PRODUCTS.json
+          DANPER_B15_UI_LABEL: Instruments-Home
+        run: bash scripts/glass-audit/validate-macos.sh b15-profile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_INSTRUMENTS_RESULTS
+          path: ${{ runner.temp }}/b15-instruments
+          retention-days: 14
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0.3'
+      - name: Generate the same fabricated workload for both implementations
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-perf
+        run: |
+          bash scripts/glass-audit/prepare.sh
+          swift --version > "$DANPER_AUDIT_OUT/swift-version.txt"
+          git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
+          git worktree add --detach "$RUNNER_TEMP/b15-initial" cc45aa27013922a68301be01eaa1f1a16ad9e910
+      - name: Measure initial HEAD (comparison only, NOT current-HEAD certification)
+        env:
+          DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/b15-perf/fixtures
+        run: bash scripts/performance/run-core.sh "$RUNNER_TEMP/b15-initial" "$RUNNER_TEMP/b15-perf/before.json" baseline > "$RUNNER_TEMP/b15-perf/before.log" 2>&1
+      - name: Measure current HEAD and compare raw samples
+        env:
+          DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/b15-perf/fixtures
+        run: |
+          set -euo pipefail
+          bash scripts/performance/run-core.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/b15-perf/after.json" optimized > "$RUNNER_TEMP/b15-perf/after.log" 2>&1
+          python3 scripts/performance/compare.py "$RUNNER_TEMP/b15-perf/before.json" "$RUNNER_TEMP/b15-perf/after.json" "$RUNNER_TEMP/b15-perf/comparison.json"
+      - name: Verify forward compatibility using encrypted files from actual Build 14 code
+        env:
+          DANPER_N1_FIXTURE_DIR: ${{ runner.temp }}/b15-perf/fixtures
+          DANPER_BUILD14_FIXTURE_OUT: ${{ runner.temp }}/b15-perf/compatibility
+        run: bash scripts/performance/compatibility.sh "$RUNNER_TEMP/b15-build14" > "$RUNNER_TEMP/b15-perf/compatibility.log" 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_PERFORMANCE_COMPARISON
+          path: |
+            ${{ runner.temp }}/b15-perf/*.json
+            ${{ runner.temp }}/b15-perf/*.log
+            ${{ runner.temp }}/b15-perf/*.txt
+          retention-days: 14
+  performance-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DANPER_PERF_V2: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: swift-actions/setup-swift@v2
+        with: {swift-version: '6.0.3'}
+      - name: Prepare identical v2 physical stock workload for current candidate and c274140
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b15-v2-perf
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/prepare.sh
+          git rev-parse HEAD > "$DANPER_AUDIT_OUT/SOURCE_SHA.txt"
+          printf '%s\n' c274140aa631a7e9c262381dbff3f6a1f9a62582 > "$DANPER_AUDIT_OUT/BASELINE_SHA.txt"
+          git worktree add --detach "$RUNNER_TEMP/b15-v2-before" c274140aa631a7e9c262381dbff3f6a1f9a62582
+          echo "DANPER_N1_FIXTURE_DIR=$DANPER_AUDIT_OUT/fixtures" >> "$GITHUB_ENV"
+      - name: Measure previous v2 implementation with its existing session lifecycle
+        run: bash scripts/performance/run-core.sh "$RUNNER_TEMP/b15-v2-before" "$RUNNER_TEMP/b15-v2-perf/before.json" optimized > "$RUNNER_TEMP/b15-v2-perf/before.log" 2>&1
+      - name: Measure current v2 encrypted saves, physical invariants and twelve operations
+        run: |
+          set -euo pipefail
+          bash scripts/performance/run-core.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/b15-v2-perf/after.json" optimized > "$RUNNER_TEMP/b15-v2-perf/after.log" 2>&1
+          python3 scripts/performance/compare.py "$RUNNER_TEMP/b15-v2-perf/before.json" "$RUNNER_TEMP/b15-v2-perf/after.json" "$RUNNER_TEMP/b15-v2-perf/comparison.json"
+          python3 scripts/performance/core-budgets.py "$RUNNER_TEMP/b15-v2-perf/comparison.json" "$RUNNER_TEMP/b15-v2-perf/core-budgets.json"
+          python3 - "$RUNNER_TEMP/b15-v2-perf" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path(sys.argv[1])
+          for name in ['before','after']:
+              x=json.loads((root/(name+'.json')).read_text())
+              assert x['inventorySchemaVersion']==2 and x['physicalBalancePreserved'] and x['physicalQuantity']==78
+              assert x['workers']==9648 and x['initialVisits']==1005 and len(x['actions'])==12
+              assert not x['indicatorExportMeasured']
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_V2_PERFORMANCE_COMPARISON
+          path: |
+            ${{ runner.temp }}/b15-v2-perf/*.json
+            ${{ runner.temp }}/b15-v2-perf/*.txt
+            ${{ runner.temp }}/b15-v2-perf/*.log
+          retention-days: 14
+  complete:
+    needs: [swift-core, javascript, native-build, ui, performance, performance-v2, instruments]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: B15_*RESULT*
+          path: ${{ runner.temp }}/b15-final
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_SWIFT_RESULTS
+          path: ${{ runner.temp }}/b15-final/swift
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_JAVASCRIPT
+          path: ${{ runner.temp }}/b15-final/javascript
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_PERFORMANCE_COMPARISON
+          path: ${{ runner.temp }}/b15-final/performance
+      - uses: actions/download-artifact@v4
+        with:
+          name: B15_V2_PERFORMANCE_COMPARISON
+          path: ${{ runner.temp }}/b15-final/performance-v2
+      - name: Require all fresh source markers, zero failures and complete counts
+        run: python3 scripts/performance/final-gate.py "$RUNNER_TEMP/b15-final"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: B15_CURRENT_HEAD_AUDIT
+          path: ${{ runner.temp }}/b15-final/FINAL_GATES.json
+          retention-days: 14

@@ -1,0 +1,39 @@
+name: B15 - UI inventory guard regressions (NOT app approval)
+on:
+  push:
+    branches: [audit/b15-ui-inventory-fix-59e6773-20261102]
+    paths: ['scripts/glass-audit/validate-macos.sh', 'scripts/performance/**', '.github/workflows/b15-ui-inventory-regressions.yml']
+permissions:
+  contents: read
+jobs:
+  inventory-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Verify unchanged app sources and exercise actual discovery and shell guard
+        run: |
+          set -euo pipefail
+          git diff --exit-code 59e6773dafdc2e08d291bd7e33b5c6ffd685f1fd HEAD -- native-ios
+          bash -n scripts/glass-audit/validate-macos.sh
+          mkdir -p "$RUNNER_TEMP/ui-inventory-guard"
+          python3 -m unittest discover -s scripts/performance/tests -v 2>&1 | tee "$RUNNER_TEMP/ui-inventory-guard/python.log"
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'ui-inventory-guard'
+          text=(out/'python.log').read_text()
+          match=re.search(r'Ran (\d+) tests',text)
+          assert match and int(match[1])>=37 and '\nOK\n' in text and 'skipped=' not in text
+          report={'sourceSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+            'tests':int(match[1]),'failures':0,'scope':'Python guards, including actual UI-discovery/final-shell integration; NOT application certification',
+            'applicationApproval':False,'IPA':False}
+          (out/'REGRESSION_RESULTS.json').write_text(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B15_UI_INVENTORY_GUARD_NOT_APP_APPROVAL
+          path: ${{ runner.temp }}/ui-inventory-guard
+          retention-days: 14

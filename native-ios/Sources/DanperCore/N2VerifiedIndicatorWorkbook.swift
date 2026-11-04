@@ -141,6 +141,19 @@ public enum N2VerifiedIndicatorWorkbook {
     public static func export(snapshot:Data,products:Data,mappings:Data,
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
+        try build(snapshot:snapshot,products:products,mappings:mappings,template:template,
+            start:start,end:end,subdivision:subdivision,selectedVisitIDs:selectedVisitIDs,allowPending:allowPending)
+    }
+    static func exportAuthenticated(_ record:N2EncryptedClinicalJournal.Recovered,products:Data,mappings:Data,
+        template:Data,start:String,end:String,subdivision:String,
+        selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
+        try build(snapshot:record.snapshot,products:products,mappings:mappings,template:template,
+            start:start,end:end,subdivision:subdivision,selectedVisitIDs:selectedVisitIDs,
+            allowPending:allowPending,authenticated:record)
+    }
+    private static func build(snapshot:Data,products:Data,mappings:Data,
+        template:Data,start:String,end:String,subdivision:String,
+        selectedVisitIDs:Set<String>,allowPending:Bool,authenticated:N2EncryptedClinicalJournal.Recovered?=nil)throws->Result {
         try period(start,end)
         guard ["LA VENTUROSA","PLVENTUROSA","AMBAS"].contains(subdivision) else{
             throw Failure.ambiguousSite
@@ -148,15 +161,18 @@ public enum N2VerifiedIndicatorWorkbook {
         guard !selectedVisitIDs.isEmpty else{throw Failure.missingSelection}
         // Source quantities remain tied to the original FEFO movements.
         // Any disputed medication/dose is barred from the official workbook.
-        let pending=try N2ClinicalCorrections.pendingDiscrepancies(snapshot)
-        guard pending.isDisjoint(with:selectedVisitIDs) else{
+        let projection=try authenticated.map{try N2ClinicalCorrections.authenticatedProjection($0)}
+            ?? N2ClinicalCorrections.effectiveProjection(snapshot)
+        guard projection.pending.isDisjoint(with:selectedVisitIDs) else{
             throw Failure.unverifiedDelivery
         }
-        let clinical=try N2ClinicalCorrections.effectiveSnapshot(snapshot)
-        let parity=try N2VersionedSnapshotAudit.inspect(N2SimpleInventory.isActive(snapshot) ? snapshot:clinical)
+        let clinical=projection.snapshot
+        let parity:N1eClinicalParityReport
+        if let authenticated,clinical==snapshot {parity=authenticated.parity}
+        else {parity=try N2VersionedSnapshotAudit.inspect(N2SimpleInventory.isActive(snapshot) ? snapshot:clinical)}
         let historicalOverrides=try N2SimpleInventory.isActive(snapshot)
             ? N2SimpleInventory.historicalOpeningOverrides(snapshot) : [:]
-        _=try N1fLosslessFieldGate.inspect(clinical)
+        if authenticated==nil || clinical != snapshot {_=try N1fLosslessFieldGate.inspect(clinical)}
         guard let source=try? JSONSerialization.jsonObject(with:clinical)
                     as? [String:Any],
               let visits=source["attentions"] as? [[String:Any]],
@@ -296,9 +312,10 @@ public enum N2VerifiedIndicatorWorkbook {
                   !string(visit["diagnosis"]).isEmpty,
                   let items=visit["items"] as? [[String:Any]],
                   items.count<=1000,
-                  (subdivision=="AMBAS" ?
-                    ["LA VENTUROSA","PLVENTUROSA"].contains(string(worker["site"])) :
-                    ["",subdivision].contains(string(worker["site"]))) else{
+                  // A report filter is not evidence of an encounter's site.
+                  // Never turn an unknown historical site into a verified one.
+                  ["LA VENTUROSA","PLVENTUROSA"].contains(string(worker["site"])),
+                  (subdivision=="AMBAS" || string(worker["site"])==subdivision) else{
                 throw Failure.invalidVisit
             }
             let sourceSite=subdivision=="AMBAS" ? string(worker["site"]) : subdivision

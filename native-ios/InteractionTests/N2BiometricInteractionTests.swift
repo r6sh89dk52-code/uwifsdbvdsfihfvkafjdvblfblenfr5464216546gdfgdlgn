@@ -21,6 +21,83 @@ final class N2BiometricInteractionTests:XCTestCase {
         let attachment=XCTAttachment(screenshot:app.screenshot())
         attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)
     }
+    /// Consent to using Face ID is not identity authentication. This public
+    /// UI setup handles the real first-use alert on an owned fresh Simulator.
+    func testFaceIDPermissionDoesNotAuthenticateOrExposeClinicalData() {
+        #if !targetEnvironment(simulator)
+        XCTFail("Synthetic permission preparation requires an isolated Simulator")
+        return
+        #endif
+        continueAfterFailure=false
+        let app=XCUIApplication()
+        app.launchArguments=["-danper.native.onboarding.v1.finished","YES"]
+        app.launch()
+        let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+        // Match the owned system alert directly. Reading a descendant text
+        // of alerts.firstMatch repeatedly asked AX for another subtree while
+        // the actual TCC alert was still being presented on cold Simulator.
+        let ownFaceID=springboard.alerts.matching(NSPredicate(format:
+            "label CONTAINS[c] %@ AND label CONTAINS[c] %@ AND label CONTAINS[c] %@",
+            "DANPER","Face","ID")).firstMatch
+        var acceptedPermission=false
+        var permissionDismissalSeconds:TimeInterval?
+        func acceptOwnedPermission() {
+            let allow=ownFaceID.buttons.matching(NSPredicate(format:"label IN %@",["OK","Allow","Permitir"])).firstMatch
+            XCTAssertTrue(allow.waitForExistence(timeout:5))
+            XCTAssertTrue(allow.isHittable)
+            let permissionStarted=Date()
+            allow.tap();acceptedPermission=true
+            let dismissed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:ownFaceID)
+            // Run 41521115084's recording shows the genuine TCC alert still
+            // present 15 seconds after the tap and gone by 23 seconds. This
+            // bounds only system consent acknowledgement, never identity or
+            // the independent native cancellation case's 12s/18s deadlines.
+            XCTAssertEqual(XCTWaiter.wait(for:[dismissed],timeout:30),.completed)
+            permissionDismissalSeconds=Date().timeIntervalSince(permissionStarted)
+        }
+        if ownFaceID.waitForExistence(timeout:15) {acceptOwnedPermission()}
+        let checking=app.staticTexts["Verificando identidad…"]
+        let retry=app.buttons["Reintentar Face ID"]
+        // The prompt can arrive after the first15s: run41684106094's
+        // SpringBoard snapshot at35.77s had no alert, but its later capture
+        // showed the real, unanswered permission covering the checking state.
+        // Observe it during the ORIGINAL15s gate window too. Consent handling
+        // keeps its original5s/30s budgets; discovery never gets a fresh15s.
+        var latePermission=false
+        let gateStarted=Date()
+        let gated=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            if ownFaceID.exists {latePermission=true;return true}
+            return checking.exists || retry.exists
+        },object:nil)
+        let gateResult=XCTWaiter.wait(for:[gated],timeout:15)
+        XCTAssertEqual(gateResult,.completed,"The app must reach its genuine authentication gate or show its actual permission")
+        if latePermission {
+            let remaining=max(0,15-Date().timeIntervalSince(gateStarted))
+            acceptOwnedPermission()
+            let afterConsent=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+                checking.exists || retry.exists
+            },object:nil)
+            XCTAssertTrue(checking.exists || retry.exists ||
+                XCTWaiter.wait(for:[afterConsent],timeout:remaining) == .completed,
+                "Accepting permission must return to the genuine authentication gate")
+        }
+        let source=app.buttons["clinical-first-run-import-personal"]
+        let home=app.buttons["premium-tab-home"]
+        let noAccess=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            (source.exists && source.isHittable) || (home.exists && home.isHittable)
+        },object:nil)
+        noAccess.isInverted=true
+        XCTAssertEqual(XCTWaiter.wait(for:[noAccess],timeout:2),.completed,
+            "Accepting Face ID permission must not authenticate or expose clinical controls")
+        let dismissalTiming=permissionDismissalSeconds.map{String($0)} ?? "not required"
+        let proof=XCTAttachment(string:"permissionPromptAccepted=\(acceptedPermission); permissionDismissalObservedSeconds=\(dismissalTiming); biometricEventsSent=0; clinicalAccessGranted=false; SimulatorOnly=true")
+        proof.name="FaceID-permission-is-not-authentication";proof.lifetime = .keepAlways;add(proof)
+        // No match/nomatch event is sent. Termination releases this setup
+        // context; the independent native case must still prove appCancel.
+        app.terminate()
+        XCTAssertTrue(app.wait(for:.notRunning,timeout:10))
+    }
+
     func testAutomaticBiometryCancellationRetryAndForeground() {
         #if !targetEnvironment(simulator)
         XCTFail("Esta prueba usa exclusivamente biometría simulada; no valida Face ID físico")
@@ -69,7 +146,21 @@ final class N2BiometricInteractionTests:XCTestCase {
             "La autenticación debe retirar la cobertura y permitir interacción real: "+app.debugDescription)
         capture(app,"Autenticacion-simulada-aceptada-seleccion-fuente")
         XCUIDevice.shared.press(.home)
-        XCTAssertTrue(app.wait(for:.runningBackground,timeout:10))
+        // iOS may suspend a backgrounded app before XCTest observes the
+        // transient runningBackground state. Both are actual background;
+        // foreground, unknown and termination must still fail this gate.
+        var observedBackgroundStates=[String]()
+        let backgrounded=XCTNSPredicateExpectation(predicate:NSPredicate {_,_ in
+            let state=app.state
+            observedBackgroundStates.append(String(describing:state))
+            return state == .runningBackground || state == .runningBackgroundSuspended
+        },object:nil)
+        let backgroundResult=XCTWaiter.wait(for:[backgrounded],timeout:10)
+        let stateEvidence=XCTAttachment(string:observedBackgroundStates.joined(separator:"\n"))
+        stateEvidence.name="Actual-background-state-before-reauthentication"
+        stateEvidence.lifetime = .keepAlways;add(stateEvidence)
+        XCTAssertEqual(backgroundResult,.completed,
+            "La app debe estar realmente en segundo plano o suspendida; estados: "+observedBackgroundStates.joined(separator:", "))
         app.activate()
         XCTAssertTrue(checking.waitForExistence(timeout:10),app.debugDescription)
         Thread.sleep(forTimeInterval:2)

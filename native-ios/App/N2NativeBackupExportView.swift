@@ -147,7 +147,7 @@ struct N2NativeBackupExportView:View {
                                           "DANPER_N2_DEMO_CIFRADO_"
             let backupFilename="\(prefix)\(fmt.string(from:Date())).danperbackup"
             let destination=folder.appendingPathComponent(backupFilename)
-            try bytes.write(to:destination,options:[.atomic,.completeFileProtection])
+            try await N2WorkspaceFileIO.shared.writeProtectedExport(bytes,to:destination)
             status="Respaldo cifrado verificado. Abriendo Compartir…"
             share=N2SecureBackupShare(url:destination)
         }catch {

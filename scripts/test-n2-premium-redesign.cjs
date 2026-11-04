@@ -13,7 +13,8 @@ for(const file of ['NativeRootView.swift','N2ClinicalWorkspaceView.swift']) {
  assert(source.includes('.toolbar(.hidden,for:.tabBar)'));
  assert(source.includes('DanperAttentionEditor(initialWorkerDNI:'));
  assert(source.includes('DanperStatisticsView()'));
- assert(source.includes('dashboardCounters('));
+ const counter=file==='N2ClinicalWorkspaceView.swift' ? 'dashboardSnapshot(' : 'dashboardCounters(';
+ assert(source.includes(counter),'Home must use direct authenticated counters');
  assert(!source.includes('.shared.readHistory()'),'Home must not rebuild the worker index');
 }
 for(const marker of ['CFBundleShortVersionString','CFBundleVersion','premium-app-version',

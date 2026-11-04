@@ -5,7 +5,7 @@ import CoreFoundation
 /// only the existing test step posts its intended simulator event.
 enum SimulatorBiometricEvents {
     private static var lastGeneration=0
-    static func send(_ event:String,file:StaticString = #filePath,line:UInt = #line) {
+    static func send(_ event:String,file:StaticString = #filePath,line:UInt = #line,onWaiting:@escaping ()->Void = {}) {
         guard ["match","nomatch"].contains(event) else {XCTFail("Evento no permitido",file:file,line:line);return}
         let base=FileManager.default.urls(for:.documentDirectory,in:.userDomainMask)[0]
             .appendingPathComponent("DANPER_BIOMETRIC_READY",isDirectory:true)
@@ -23,6 +23,9 @@ enum SimulatorBiometricEvents {
                    let generation=value["generation"] as? Int,generation>lastGeneration {
                     acknowledgement=value;return true
                 }
+                // Optional test interaction with the actual retry gate. Never
+                // synthesizes sensor readiness or an authenticated result.
+                onWaiting()
                 // Cold TCC can show Face ID permission after the old 5-second
                 // poll. Handle that actual permission while awaiting the sensor.
                 let alert=springboard.alerts.firstMatch

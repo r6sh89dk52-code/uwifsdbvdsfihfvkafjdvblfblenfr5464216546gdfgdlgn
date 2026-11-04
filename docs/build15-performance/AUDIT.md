@@ -1,0 +1,162 @@
+# Auditoría integral Build 15 — alcance, controles y evidencias
+
+Inicio: `cc45aa27013922a68301be01eaa1f1a16ad9e910`, PR #10. Base estable Build 14: `9b1da6d4cdead4729bcade6843abcbcfc287e870`. Trabajo exclusivo en `fix/indicator-historical-visit-site-build15-20261030`.
+
+## Estado de validación
+
+Este documento describe cambios y cómo se comprueban; **no certifica una ejecución pendiente**. El workflow B15 genera `FINAL_GATES.json` únicamente cuando las pruebas del SHA actual terminan sin fallos. Los resultados antiguos se usan solo para diagnóstico, comparación de rendimiento y producción de entradas cifradas de compatibilidad; no certifican el nuevo HEAD.
+
+La entrega incluye un inventario estático de los 56 archivos Swift de App y de sus botones, selectores, rutas y llamadas detectadas: `action-inventory.json`. Un inventario estático no equivale a pulsar cada combinación posible ni a medirla. Las rutas diagnósticas/laboratorio se identifican aparte del trabajo clínico cotidiano; se conservan.
+
+## Recorridos y hallazgos
+
+| Módulo | Acciones revisadas | Coste o defecto encontrado | Cambio y control |
+|---|---|---|---|
+| Inicio, sesión y navegación | Abrir, desbloquear, pestañas, contadores, segundo plano | Dos recuperaciones para revisión y contadores; tareas simultáneas de refresco | Revisión/contadores desde un mismo registro autenticado; refresco excluyente; ocultación clínica y Face ID conservados |
+| Atención y alergias | Abrir formulario, seleccionar persona, revisar, guardar, pasar pasos | Auditorías repetidas de exactamente los mismos bytes; carrera con autosave; construir padrón después de una escritura | Prueba inmutable interna tras ambas auditorías; confirmación de persistencia real; actualización COW de una alergia; errores de guardado separados del refresco visual |
+| Borradores | Debounce, cambio de paso, cerrar, recuperar, confirmar | Consulta completa de revisión antes de cada escritura; guardados idénticos; cancelación de alergias podía dejar el borrador pendiente | Escritura optimista con un reintento solo ante conflicto real; etapa capturada junto al formulario; no reescribir estado idéntico; reprogramación tras fallo de alergias |
+| Personal | DNI, nombre, directorio, alta y ficha laboral | Filtrado con comparación de locale durante cada render/paginación | Índices normalizados en memoria; búsqueda diferida fuera del hilo principal; lista vacía sin consulta; 25 filas por página y cinco sugerencias; DNI exacto por diccionario |
+| Historial | Buscar, paginar, detalle, rectificar, volver | Auditorías completas ya disponibles; recorrido de incidencias por cada visita; reconstruir padrón al abrir la edición | Proyección autenticada interna con firmas de rectificación verificadas; incidencias indexadas por visita; edición preparada desde una sola revisión; actualización de una fila de historial conservando consumos físicos |
+| Kardex e inventario | Consolidado, 98 productos, filtros, ingresos/conteos, R 1/0, cortes 9–8, movimientos | Validaciones duplicadas en operaciones del diario y sumarios; trabajo de incidencias cuadrático en historial v2 | Pruebas semánticas ligadas a bytes exactos; sumarios reutilizan resultados autenticados; sin cambios al cálculo físico, redondeos, movimientos, cierres ni secuencia de consumos |
+| Indicador de diez hojas | Período, ambas sedes, selección, sede pendiente, generar/compartir | Un filtro Fundo aceptaba sede vacía; verificar dos veces la misma cadena; escritura del archivo en MainActor | Sede histórica explícita; nunca copiar automáticamente la ficha laboral; proyección compartida; ruta interna autenticada; archivo protegido escrito por actor separado |
+| Excel enfermeras y vigilancia | Rangos, filtros, generar, compartir | Escrituras de XLSX en el hilo de interfaz; coste compartido de la bóveda | Escrituras protegidas fuera de MainActor; fórmulas, 98 productos, saldos desconocidos y formatos conservados; comparaciones oficiales TS/Swift |
+| Respaldos, importación y restauración | Autenticar, leer, verificar, cifrar, compartir, restaurar | Lecturas/escrituras grandes en MainActor; validaciones repetidas en fuente ya autenticada | I/O en actor dedicado, acceso security-scoped durante toda la lectura, límite 42 MB, archivos regulares sin symlinks, protección completa y escritura atómica conservados |
+| Catálogos, diagnósticos, procedimientos y vencimientos | Elegir, buscar, validar, agregar tratamientos | Riesgo de trabajo dentro de `body`; reglas clínicas y validaciones no deben reducirse | Se conservan los catálogos revisados, búsqueda de productos y alertas clínicas. Los cambios comunes de bóveda no alteran su contabilidad; regresiones funcionales existentes siguen obligatorias |
+
+La importación inicial, la admisión de un respaldo externo y la verificación de una generación distinta continúan realizando auditorías completas. No se sustituyen por una comprobación de tamaño, fecha de archivo o número de revisión.
+
+## Límite de confianza de las optimizaciones
+
+- `N2AuditedSnapshot` es interno e inmutable: construirlo exige las dos auditorías completas. No existe un inicializador que acepte informes arbitrarios.
+- El diario lee el archivo y comprueba recibo HMAC, AES-GCM/AAD y SHA en **cada** recuperación. Solo reutiliza auditorías semánticas si los bytes descifrados son exactamente iguales a bytes ya auditados.
+- Dos entradas como máximo, de hasta 8 MiB cada una, por diario; ninguna se escribe en texto plano. Las fuentes mayores mantienen el recorrido completo.
+- Cada actor mantiene su propia sesión clínica o ficticia, comprueba Keychain en cada llamada y descarta la sesión al bloquearse, ir a segundo plano o fallar Keychain. Un cambio de clave crea otra sesión.
+- Las firmas y la secuencia de la cadena de rectificaciones se verifican también en los recorridos autenticados. Una modificación efectiva de datos no recibe automáticamente la prueba de los bytes originales.
+- Escrituras y revisiones permanecen serializadas por sus actores; se prueban 16 solicitudes concurrentes con la misma revisión, una aceptada y quince rechazadas como obsoletas.
+- No se cambia Bundle ID, grupos compartidos, claves/servicios Keychain, formato del diario, esquema v2 ni codec del respaldo. Solo el número de compilación candidato avanza a 15. No se instala en el iPhone real.
+
+## Mediciones reproducibles
+
+`scripts/performance/run-core.sh` ejecuta un mismo harness sobre el HEAD inicial y el actual. Datos fabricados: 9.648 trabajadores, 1.005 atenciones iniciales, stock/lotes/movimientos originales ficticios y borrador. Compilación SwiftPM Release en Linux x86_64; no son tiempos de iPhone ni de SwiftUI.
+
+Se conservan todas las muestras. Operaciones lentas: siete muestras (o tres en Excel, edición y respaldo), mediana y máximo; no se inventa p95 con tres/siete muestras. Búsquedas: cien muestras y p50/p95. Se declara el ciclo de vida de cada implementación: el adaptador inicial creaba un diario por llamada; el optimizado mantiene el diario autenticado durante la sesión. La preparación inicial en frío no se representa como reapertura caliente.
+
+La tabla final procede del artefacto `B15_PERFORMANCE_COMPARISON/comparison.json`. CPU/memoria de la navegación se miden además con XCTest en Simulator; `profile-simulator.py` intenta registrar Time Profiler y Allocations y guarda el resultado real de cada herramienta. Si no puede capturar una métrica, se informa **No medido**, nunca cero ni aprobado por inferencia. No se afirma una mejora en el iPhone físico sin medirlo.
+
+## Pruebas y compatibilidad
+
+1. Todas las pruebas Swift actuales, sin filtro, y comparaciones Excel oficiales.
+2. 50 regresiones JavaScript y 12 controles adicionales.
+3. Xcode real sobre el candidato y todas las pruebas nativas, incluyendo concurrencia; Face ID real inscrito en simuladores propios.
+4. Todas las suites UI descubiertas, incluyendo guardar alergias/reabrir, búsqueda vacía, paginación y métricas del formulario. Los binarios se comparten solo dentro de la ejecución del **mismo HEAD**, con hashes de cada archivo y permisos preservados en tar. No se reutiliza un binario de otro SHA.
+5. Archivos cifrados producidos por el código original Build 14 se abren y editan en el candidato; stock, trabajadores y atenciones originales deben permanecer iguales. Se verifica respaldo Build 14 y nuevo round trip. Es compatibilidad hacia delante; no una promesa de que Build 14 entienda campos nuevos de rectificación de Build 15.
+6. Los fallos reales y las cancelaciones anteriores quedan en GitHub y en `previous-linux-failures.json`.
+
+## Pendientes y distribución
+
+No hay IPA de Build 15 autorizada por este documento. La versión instalada Build 14 permanece intacta. Se debe revisar el resultado completo de la ejecución actual, las métricas y cualquier limitación de Instruments antes de evaluar distribución.
+
+La firma iLoader y la conservación del contenedor en una actualización física no pueden certificarse con Simulator. Conservar el respaldo original de Build 14 y la misma identidad de firma; no desinstalar la app que contiene los datos reales. No se ha accedido a datos del iPhone durante estas pruebas.
+
+
+## Continuación desde el HEAD real 90cb0ab — 1 de noviembre
+
+La solicitud volvió a citar cc45aa2, pero la rama ya contenía toda la auditoría anterior. Se conservan los cambios. El workflow 41173716294 terminó FAILURE: 428 Swift, 27 nativas, ambos Excel, 62 controles JS, 15 Python, benchmark de once operaciones y compatibilidad Build 14 pasaron; UI 9 PASS y 4 FAIL. Ninguna cifra anterior certifica un candidato nuevo.
+
+Diagnóstico de los fallos actuales:
+- Los dos casos de autenticación no observaron el sensor porque CoreAuthUI terminó su arranque después del watchdog de 5 s de coreauthd: código -1000 y `UI activation timed out`. No fue un ACK falso ni una autenticación exitosa. Se prepara el ejecutable del servicio antes de solicitar la política, se observa su arranque real y se retira su escena independiente. La espera real del sensor y todos los eventos/aserciones de los casos permanecen obligatorios.
+- El caso de alergias seguía en Inicio después de tocar Nueva atención. Se elimina la captura de Instruments concurrente con esa prueba funcional y se exige que el formulario esté presente antes de buscar sus controles. Se conserva la regresión de persistencia y de alergia modificada sin confirmar.
+- El recorrido R1/R0 consumió diez minutos con consultas XCTest redundantes. Los botones ya visibles usan su hit point real sin múltiples lecturas de geometría y pie de página. La entrada de texto conserva el control de posición/foco. Se mantienen stock, R1/R0, relanzamiento, historial y el límite de 600 s.
+- Instruments no había llegado a obtener PID: la consulta `simctl spawn launchctl list` agotaba su propio timeout. Se selecciona el proceso host por ruta del simulador propio (con cuatro regresiones de aislamiento), se adjunta por PID y se ejecuta en un job separado. El alcance de esa captura es Inicio ficticio, no todas las acciones ni el iPhone físico. Si falla, queda No medido.
+
+Optimización productiva adicional: `N2SearchIndex` pasa de recorrer todas las filas normalizadas a elegir la lista de candidatos del fragmento de dos caracteres menos frecuente y verificar la subcadena completa. Conserva orden, acentos/anchura, límites y búsqueda por DNI/nombre. El índice sigue siendo un valor de sesión en memoria. Dos regresiones Swift comprueban equivalencia, Unicode, falsos candidatos, paginación y el último registro de 9.648. El benchmark repite el harness original e informa además el coste inicial de construcción; ese coste no se confunde con latencia de consulta. No se declara una mejora hasta leer la medición nueva. CPU y RSS del workload se vuelven a medir para mostrar el coste de memoria del índice.
+
+El job de UI se serializa para reducir contención de CI. Esto no cambia la aplicación, los tiempos límite, las pruebas ni su verificador de evidencia. El job de Instruments conserva su SHA y binarios del mismo HEAD. La versión instalada y el PR en borrador permanecen intactos; no se genera IPA mientras falten controles.
+
+
+Se hallaron además dos rutas secundarias de producción no cubiertas por la optimización previa: revisar consumos sin reintento reconstruía dos veces el contexto completo; registrar lote auxiliar y confirmar asociación operativa obtenían el catálogo estático reconstruyendo también trabajadores, alergias y lotes. La revisión usa una sola carga de contexto; al reintentar usa la revisión autenticada, y las dos transacciones auxiliares cargan el mismo catálogo revisado directamente. Sus validaciones y commits cifrados permanecen en el núcleo existente. El harness incorpora `dispensing_readonly_refresh` e `inventory_catalog_only` (tres muestras cada una); el gate final exige ahora trece operaciones comparadas. No se afirma una mejora cuantitativa antes de revisar sus muestras. El tiempo de construir el índice se conserva además en el JSON bruto, separado de la búsqueda caliente.
+
+
+## Presupuesto de CI y selección de Instruments
+
+En `9143997`, Xcode/27 nativas, 430 Swift, JS62/Python19, los dos Excel y las trece operaciones medidas pasaron. Las dos pruebas de alergias y su verificador pasaron, pero GitHub concluyó su job CANCELLED al llegar a 30 minutos globales; no se presenta como un job verde. La preparación/preflight del simulador consumió la mayor parte de ese presupuesto. Se amplía exclusivamente el job UI a 45 minutos y se restauran cuatro runners independientes; el timeout XCTest de 600 s y las esperas del sensor no cambian. Instruments recibe 35 minutos globales de preparación/captura.
+
+El proceso de Inicio ficticio fue observado, pero xctrace sin selección de dispositivo no encontró el PID (salida 21). El arnés vuelve a especificar el UDID del simulador propio al adjuntarse por PID. La nueva ejecución debe confirmar si permite capturar: el cambio de parámetros por sí solo no demuestra una captura ni mide acciones clínicas.
+
+El benchmark previo compara de forma acumulada cc45aa2 frente a 9143997, no aísla las mejoras nuevas frente al HEAD real de entrada 90cb0ab. En el artefacto de 9143997, guardar alergias cifradas pasó de p50 9831,402 a 2349,057 ms (7 muestras Linux Release), búsqueda del último trabajador de 12,192 a 0,126 ms (100), formulario Core de 1616,834 a 209,665 ms (7). Son cifras del núcleo con datos ficticios, no latencia física de iPhone. La medición XCTest UI de cinco ciclos abrir/cerrar formulario tuvo media 5,803 s y CPU 3,011 s, memoria física máxima media 55.810,458 kB; incluye automatización y solo dos trabajadores sintéticos. No tiene línea base UI ni equivale al tiempo del botón Guardar alergias. Los contadores de ciclos/instrucciones cero del simulador se consideran No medido.
+
+Este commit de infraestructura cambia el HEAD: las evidencias de 9143997 quedan como antecedentes y se requieren comprobaciones frescas para el candidato siguiente. PR en borrador, sin IPA y sin cambios a Build 14 instalada.
+
+## Hallazgo adicional medido: inventario físico v2 con padrón completo
+
+La carga adicional de c274140 (`41369582547`, artefacto `13108563610`) usa 9.648 trabajadores, 1.005 atenciones ficticias e inventario v2: conteo 70, ingreso 10 y salida 2, saldo 78. Conservó el estado físico completo tras todas las escrituras, pero midió p50 de 3.491,715 ms en alergias, 6.136,331 ms en borradores, 3.033,512 ms al revisar consumos y 6.416,381 ms en Excel enfermeras. Son cifras Linux Release, no iPhone. El indicador no se mide en ese arnés v2 porque no se inventa validación histórica para forzar su exportación; su corrección sigue siendo obligatoria en la suite completa.
+
+Se encontraron duplicaciones verificables en código: la auditoría de paridad v2 ya ejecutaba N1fLosslessFieldGate, pero N2AuditedSnapshot y el codec de respaldo la repetían; el borrador devolvía bytes tras auditar y perdía su prueba antes del commit; dispensingLines volvía a auditar dos veces la generación autenticada; Kardex/corte releían la misma instantánea para extraer sus rectificaciones.
+
+La corrección comparte los dos informes completos generados dentro de una misma llamada que solo acepta bytes. No se permite inyectar informes de confianza. El borrador entrega su prueba inmutable al diario y confirma revisión y bytes después de escribir. Las líneas de consumo usan los informes de esa recuperación autenticada, y la lectura de stock/rectificaciones valida una sola vez conservando la verificación de la cadena de correcciones. No cambia formato, cifrado, HMAC, lecturas de archivo, clave, control de revisión, movimientos ni valores del Excel.
+
+Se agregan tres regresiones: equivalencia de informes/rechazo de campos, balances y esquemas inválidos; borrador cifrado reabierto con etapa y stock/atenciones originales conservados, rechazo de revisión obsoleta; líneas v2 equivalentes a la auditoría completa sin modificar generación. El caso de rectificación R añade rechazo de una cadena falsificada. El workflow final incorpora una comparación v2 obligatoria c274140→candidato con igual ciclo de sesión, doce operaciones, ingreso/salida y saldo 78 inalterado en ambos lados. Los beneficios nuevos no se cuantifican antes de leer esa ejecución.
+
+La ejecución c274140 `41366450170` terminó FAILURE: 430 Swift, 27 nativas, JS62/Python19, ambos Excel y compatibilidad Build14 pasaron; UI 7 PASS, 3 FAIL y 3 no ejecutadas por cancelación del shard Glass. CoreAuthUI volvió a exceder su watchdog de 5 s incluso en el reintento posterior a una cancelación real. El toque de Tipo de atención del recorrido R apuntó a y=838 detrás del pie fijo: ser hittable no probó visibilidad útil. Se exige geometría de contenido también en botones, manteniendo los controles fijos identificados y todas las aserciones clínicas. El nuevo CI utiliza `macos-15` ARM64 (documentado por GitHub), registra y exige su arquitectura, conserva Xcode16.4, iPhone16 y los plazos XCTest/sensor. Esto es una corrección del entorno y del arnés; no se declara Face ID aprobado hasta obtener el nuevo resultado.
+
+La compilación Release ARM64 de c274140 `41370048064` pasó las comprobaciones de Bundle ID, Build15, iOS17, recursos sin datasets clínicos y ausencia de firma; no generó IPA y no certifica el código posterior. El diagnóstico activo `41368239478` aprobó el recorrido ficticio bajo ambas plantillas, pero sus capturas agotaron el plazo: métricas Instruments No medido. Se distingue ahora explícitamente el timeout de observación de proceso, grabación y exportación. Ninguna de estas evidencias anteriores sustituye las pruebas del nuevo HEAD.
+
+
+La ejecución e909ca6 registró 433 pruebas Swift: 431 PASS y dos fixtures nuevas bloqueadas por unsafeLocation al usar un prefijo temporal no permitido. Se corrigen únicamente sus rutas al espacio danper-n2-synthetic-; la protección no se relaja. Las cuatro pruebas v2 del candidato 6f74d66 pasaron en 41388149441. Xcode/27 nativas y Release ARM64 de e909ca6 pasaron. La comparación v2 en el mismo runner midió alergias4506,975→2927,991ms (35,0%), borrador7634,421→3008,924ms (60,6%), consumos3739,349→329,005ms (91,2%), Excel enfermeras8018,742→6377,904ms (20,5%) y respaldo15905,101→13143,116ms (17,4%), con saldo78 y estado físico completo idénticos. Son antecedentes medidos; se repetirán sobre el HEAD posterior.
+
+### Resultado de 67c4ec8 y continuación desde sus fallos
+
+La ejecución41389072346 terminó FAILURE. Pasaron433 Swift/27 nativas/62 JavaScript/19 Python, ambas comparaciones Excel oficiales, compatibilidad cifrada real Build14 y benchmarks v1/v2. UI:11 casos PASS,1 FAIL y1 no ejecutado. El grupo biométrico no llegó a XCTest: simctl install falló con NSCocoaErrorDomain4097, «Couldn’t communicate with a helper application». Se amplía la recuperación de instalación ya existente a esta firma exacta; mantiene un único reinicio del simulador sintético propio, los logs originales y el fallo obligatorio si la reinstalación falla. Tres pruebas comprueban las dos firmas conocidas y el rechazo de errores distintos/incompletos. No se reintenta ninguna aserción XCTest.
+
+El recorrido clínico R llegó ahora hasta escribir el diagnóstico; después buscó Siguiente mientras el teclado seguía abierto. El formulario oculta deliberadamente sus acciones en ese estado. El helper de botones cierra y comprueba el teclado antes de buscar el control, igual que hace el helper de alergias. Permanecen todas las comprobaciones de R1/R0, cantidades70→68/12→11, persistencia, ausencia de reactivación y relanzamiento. El nuevo SHA necesita sus pruebas completas; no se certifica con los resultados de67c4ec8.
+
+La medición v2 c274140→67c4ec8, mismo runner Linux Release con9.648 trabajadores/1.005 atenciones, conservó el estado físico completo y saldo78. p50: alergias5673,730→3774,202ms; borrador9773,356→3891,450; consumos4793,535→400,386; Excel enfermeras10362,002→8238,958; respaldo20742,313→16693,385. Las lecturas de formulario/historial/panel/editor y búsqueda común fueron aproximadamente7–9% más lentas en esa pasada; no se presentan como mejoras ni se atribuye su causa al host sin prueba. CPU de todo el workload304,84→210,94s; RSS222952→223296KiB. No son tiempos de iPhone.
+
+El perfilado activo41390330778 usó binarios67c4ec8 intactos y dos trabajadores ficticios. Ambos recorridos de alergias pasaron. Time Profiler produjo6907 filas ponderadas y6923 muestras,8618 eventos de runloop y4 marcadores de posible bloqueo294,768–511,092ms; no se declara ausencia de bloqueos. La captura terminó cuando salió el proceso. Allocations grabó pero agotó el plazo al exportar: cuantificación de asignaciones No medido. Sus resultados no sustituyen UI ni establecen una comparación antes/después. La Release ARM6441389127133 aprobó identidad/recursos del mismo67c4ec8 sin IPA; la instalación física y conservación del contenedor iLoader siguen sin validar.
+
+### Fallos definitivos de98c0dab y corrección del arnés
+
+41461695918 terminó FAILURE por infraestructura: las anotaciones públicas confirman capacidad limitada macOS ARM64 y error interno al adquirir runner; native-build se canceló sin ejecutar pasos. Sus433Swift/62JS/22Python, Excel oficiales, compatibilidad Build14 y benchmarks v1/v2 pasaron. El fallback41465269363, fuente98c0dab explícita, aprobó Xcode/27nativas/ReleaseARM64 y terminó FAILURE con UI10PASS/3FAIL. Los dos casos biométricos registraron watchdog de CoreAuthUI: la escena terminó de arrancar después del límite interno de5s. El recorrido R llegó hasta la selección de foto de la primera atención y agotó600s. Las consultas globales del teclado en opciones modales llegaron a bloquearse más de30s; además se recorrían identificador/etiqueta/frame/hittable para cada botón y se intentaba desplazar el contenido detrás de menús nativos.
+
+La nueva corrección del arnés distingue explícitamente contenido desplazable, navegación fija y opciones modales. Verifica geometría solo para contenido y campos; cierra/comprueba el teclado al terminar de escribir, no recorriendo todo el árbol de teclado antes de cada opción de menú. Se conserva y refuerza la comprobación de visibilidad fuera del pie fijo. No se modifica ningún assert de R, saldos, atenciones, persistencia o relanzamiento;600s permanece igual.
+
+Se agrega una prueba nativa exclusiva de Simulator: solicita la política real deviceOwnerAuthentication y la invalida sin enviar ningún sensor match. Debe observar cancelación appCancel sin autenticar; admite como máximo dos solicitudes acotadas, conservando los callbacks técnicos de un arranque frío. Si no logra una cancelación real, falla. Esa preparación ocurre antes de los dos casos UI biométricos, que siguen exigiendo sensor/ACK/nomatch/cancel/retry/foreground reales. Los verificadores exigen su xcresult y rechazan que una preparación aprobada sustituya un caso sensor fallido. Es código del target NativeTests, excluido de Release y bloqueado fuera de Simulator; no cambia la autenticación del producto. La suite nativa pasa a28 casos y Python a24; UI conserva13 y Swift433.
+
+La validación principal pasa a runners macos-15-intel disponibles, con el mismo Xcode16.4/SDK18.5/iPhone16 y registro explícito de arquitectura. La distribución sigue compilándose para iPhoneOS ARM64. Ni resultados de98c0dab ni de otros SHA certifican el candidato posterior. IPA permanece bloqueada. El diagnóstico auxiliar41470753089 falló antes de ejecutar jobs por runner.temp en job-env; corregido en48be5391.41471227122 registró timeouts de comandos CoreSimulator incluso después de bootstatus: no se presentan como pruebas clínicas fallidas ni como arranque aprobado.
+
+El shard biométrico ARM64 no llegó a XCTest: la preparación externa de CoreAuthUI esperaba un stream vacío y terminó con Authentication diagnostic stream did not start. Se retira el lanzamiento/terminación manual de esa escena privada; LocalAuthentication administra su ciclo de vida. Se mantienen la inscripción real del simulador, el log del sensor durante los tests, los ACK por generación y todas las aserciones/plazos. El diagnóstico separado 41388727286 usa binarios e909ca6 con el diff del arnés explícito; no certifica el nuevo HEAD. La aprobación exige otra ejecución completa del SHA definitivo. No IPA.
+
+
+### Resultado deeeea540 y espera asíncrona de autenticación sintética
+
+41482409677 terminó FAILURE:433 Swift,62 JavaScript y24 Python pasaron; ambos Excel oficiales, compatibilidad cifrada Build14 y comparaciones v1/v2 pasaron. Xcode compiló, pero native-28 registró12 casos PASS, un caso de cancelación bloqueado y un error adicional del runner; el resto no terminó. El resumen xcresult informa «Stall on main thread» y el log muestra que la nueva prueba de política real agotó600s. No se contabilizan esas pruebas pendientes como aprobadas. UI13 e Instruments se omitieron por la dependencia fallida.
+
+La espera síncrona XCTWaiter y su temporizador en main no proporcionaron la preparación acotada prevista. Se reemplazan por XCTest async fulfillment; disponibilidad/evaluación de LocalAuthentication se invocan fuera del hilo principal y la invalidación se agenda previamente en una cola independiente. Los18s de espera y12s de cancelación no cambian;600s del caso permanece igual. Se registran únicamente fases, intento y códigos técnicos. Si no llega el callback real o no es appCancel, la prueba falla; nunca se envía match ni se acepta autenticación exitosa. El arnés conserva ahora las capturas de hang fallido en un archivo tar dentro del artifact nativo. Esta corrección necesita nueva compilación y ejecución Xcode: no se declara validada por inspección local. No cambian App, Sources, formatos ni identidad de instalación.
+
+La Release41482696816 compiló iPhoneOS ARM64 y verificó identidad deeeea540; el primer intento falló al subir el artifact por timeout del servicio CreateArtifact. El segundo intento completó SUCCESS y produjo B15_ARM64_RELEASE_IDENTITY_NO_IPA13161293805. No es IPA ni aprueba las pruebas nativas fallidas.
+
+Benchmark v2 deeeea540, Linux Release,9.648 trabajadores/1.005 atenciones ficticias, comparación con c274140 en el mismo runner y ciclo de sesión: p50 alergias4698,598→3050,150ms; borrador8042,747→3051,489; consumos3810,756→289,382; Excel98productos8203,280→6719,023; respaldo16335,221→13313,471. Estado físico completo y saldo78 conservados en ambos lados. Búsqueda al final0,173→0,175ms y común7,814→7,886ms: no mejoraron en esa pasada. CPUuser245,54→167,27s; RSS223764→224712KiB del workload Core, no del iPhone. Las muestras7/3 no permiten atribuir un p95 sólido a operaciones lentas. Ningún resultado deeeea540 certifica un HEAD posterior.
+
+
+### Resultado de799dc5f y aislamiento del contexto interactivo
+
+41490125275 terminó FAILURE:433Swift/62JS/24Python, ambos Excel, compatibilidad Build14 y benchmarks v1/v2 PASS. Xcode compiló y ejecutó los28casos:27PASS/1FAIL/0SKIP. La cancelación real no respondió dentro de18s; se registraron AVAILABILITY, EVALUATE e INVALIDATE, sin CALLBACK. La espera asíncrona evitó el stall anterior y el resto de casos terminó. UI13 e Instruments se omitieron por dependencia fallida; no están aprobados. La Release ARM6441490193045 terminó SUCCESS en el segundo intento; el primero fue CANCELLED sin pasos. Ninguno generó IPA. Las mediciones definitivas están en REPORT-799dc5f.md de la rama audit/b15-validation-799dc5f-20261102.
+
+Se aísla el preflight interactivo con una UIWindow pública de prueba ligada a una escena foreground activa, restaurando la ventana anterior. Usa MainActor y la misma API async de LocalAuthentication que el producto; la espera sigue siendo async fulfillment y la invalidación independiente. Se mantiene12s/18s, dos solicitudes máximas y appCancel real sin autenticar. Se agregan marcas de retorno de invalidación y captura del log de autenticación solo del Simulator sintético propio. No se lanza CoreAuthUI manualmente, no se envía match, no se altera la política ni se cambia App/Sources. Es una corrección de aislamiento del arnés pendiente de validación real, no una causa de plataforma declarada como demostrada.
+
+Referencias primarias: https://developer.apple.com/documentation/localauthentication/lacontext/evaluatepolicy(_:localizedreason:reply:) (API async y callback privado); https://developer.apple.com/documentation/localauthentication/lacontext/invalidate() (cancelación appCancel); https://developer.apple.com/documentation/xctest/asynchronous-tests-and-expectations (async/MainActor/fulfillment). Ninguna documentación sustituye el resultado Xcode del nuevo SHA.
+
+
+### Causa observada del bloqueo FaceID y preparación validada
+
+El diagnóstico41509657892, aplicación/caso nativo9a4cad1 sin modificaciones, terminó FAILURE1caso. La captura inicial válida muestra el aviso real «¿Quieres permitir que DANPER Salud Móvil utilice FaceID?» sin responder. TCC registró AUTHREQ_PROMPTING/kTCCServiceFaceID y autorización desconocida. El muestreo de pila y segunda captura agotaron su plazo: no se presentan como métricas. La UI de consentimiento pendiente explica el bloqueo observado; se mantiene el fallo original y no se amplía18s ni se cambia la política.
+
+Se añade un testUI exclusivo de Simulator que acepta solo el permiso FaceID de DANPER mediante el botón real del sistema. No envía match/nomatch, exige la puerta de autenticación y ausencia de controles clínicos utilizables, y termina la app de preparación. El caso nativo original permanece intacto y después debe obtener appCancel real. No se preautoriza TCC por base de datos ni se lanza CoreAuthUI manualmente. Es preparación del simulador de prueba; no cambia pantallas ni pasos clínicos del producto.
+
+El trial41515353400 falló antes de ejecutar pruebas porque checkout superficial no incluía9a4cad1 para comprobar el diff. Se corrigió fetch-depth0 en7841f58. El trial41516039780 terminó SUCCESS: preflight de disponibilidad1/1, permisoUI1/1 y caso nativo original1/1; sin fallos/omisiones. El log registra INVALIDATE_RETURNED y CALLBACK com.apple.LocalAuthentication-9; duración del caso12,433s. La prueba de permiso no concedió acceso clínico. App/Sources/NativeTests/project.yml se verificaron idénticos a9a4cad1. Este resultado acotado no sustituye la suite completa del HEAD posterior.
+
+La integración mantiene28nativas y añade1UI (14totales), incluyendo el caso biométrico original sin cambios. Los verificadores exigen ambas preparaciones y rechazan fallos del sensor aunque las preparaciones pasen. Python33 (24previos+7presupuestos+2controles de evidencia) aprobados localmente. Se elimina además el mensaje legado que afirmaba26nativas/11UI; los conteos verificables salen de código/xcresult.
+
+Los nueve presupuestos Core, derivados de mediciones v2 repetidas, protegen ratios de alergias/borrador/consumos/Excel/backup, consultas p95, CPU y RSS. Se calculan durante el benchmark y de nuevo en el cierre, exigiendo el mismo artifact.31Python y9presupuestos sobre datos9a4cad1 pasaron en41513994635, rama auxiliarbcbf7a0. No son límites físicos del iPhone ni una sustitución de las garantías criptográficas o clínicas.
+
+El nuevo HEAD necesita la ejecución completa Swift433/Xcode28/UI14/JS62/Python33, Excel, compatibilidad Build14, benchmarks e Instruments. La IPA continúa bloqueada hasta completarla. No se cambian App/Sources/formatos/clave/stock/BundleID ni main; el iPhone permanece en Build14 y no se accede a sus datos.

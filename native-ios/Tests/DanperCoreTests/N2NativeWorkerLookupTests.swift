@@ -36,6 +36,23 @@ final class N2NativeWorkerLookupTests:XCTestCase {
         XCTAssertEqual(N2NativeWorkerLookup.nameMatches("a",in:roster,limit:5).count,0)
         XCTAssertEqual(N2NativeWorkerLookup.nameMatches("ar",in:roster,limit:1).count,1)
     }
+    func testLargeRosterInlineLookupReturnsOnlyFiveAndFindsLateDNI() {
+        let workers=(0..<9_648).map { index in
+            N2FormWorker(dni:String(format:"%08d",index+1),
+                         name:"Persona Ficticia \(index)",
+                         area:"Área",labor:"Labor",sex:"F",
+                         age:"30",ubigeo:"",site:"LA VENTUROSA")
+        }
+        XCTAssertEqual(workers.count,9_648)
+        let first=N2NativeWorkerLookup.nameMatches("Persona",in:workers,limit:5)
+        XCTAssertEqual(first.count,5)
+        XCTAssertEqual(first.map(\.dni),["00000001","00000002","00000003","00000004","00000005"])
+        XCTAssertEqual(N2NativeWorkerLookup.exactDNI("00009648",in:workers)?.dni,"00009648")
+        XCTAssertEqual(N2NativeWorkerLookup.nameMatches("Ficticia 9647",in:workers,limit:5).map(\.dni),["00009648"])
+        XCTAssertTrue(N2NativeWorkerLookup.nameMatches("",in:workers).isEmpty)
+        XCTAssertTrue(N2NativeWorkerLookup.nameMatches("x",in:workers).isEmpty)
+    }
+
     func testPersistenceOfOrdinaryDNIWithoutDemoPrefix() throws {
         let dir=try XCTUnwrap(ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"])
         let data=try Data(contentsOf:URL(fileURLWithPath:dir)

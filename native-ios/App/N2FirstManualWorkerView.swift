@@ -7,6 +7,7 @@ import DanperCore
 /// No employee, visit, lot or medication is ever invented or preloaded.
 /// Only the manually entered and reviewed FIRST worker becomes the source.
 struct N2FirstManualWorkerView:View {
+    var onContinue:(()->Void)?
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @State private var dni=""
@@ -92,7 +93,9 @@ struct N2FirstManualWorkerView:View {
                         LabeledContent("Trabajadores", value:"1")
                         LabeledContent("Atenciones", value:"0")
                         LabeledContent("Inventario", value:"Pendiente de activar")
-                        Button("Volver para entrar a DANPER") {dismiss()}
+                        Button("Volver para entrar a DANPER") {
+                            if let onContinue {onContinue()} else {dismiss()}
+                        }
                             .buttonStyle(DanperPrimaryButton())
                     }
                 }
