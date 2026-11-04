@@ -1,5 +1,5 @@
 {
-  "sourceSHA": "3e4484663c9373c0138abec0288d617dc137f632",
+  "sourceSHA": "f19533fa17a2de80d76331ab0b90f225740875f6",
   "swift": 439,
   "native": 30,
   "javascript": 62,
@@ -230,7 +230,7 @@
     "newBackupRoundTrip": true,
     "physicalDeviceValidated": false,
     "producerSHA": "9b1da6d4cdead4729bcade6843abcbcfc287e870",
-    "sourceSHA": "3e4484663c9373c0138abec0288d617dc137f632",
+    "sourceSHA": "f19533fa17a2de80d76331ab0b90f225740875f6",
     "stockUnchanged": true,
     "tests": 1,
     "workersAndOriginalVisitsUnchanged": true
