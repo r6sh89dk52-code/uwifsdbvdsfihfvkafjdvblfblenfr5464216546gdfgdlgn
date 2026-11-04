@@ -406,7 +406,8 @@ for(const phrase of ['rosterPage','matches.dropFirst(safePage*pageSize)',
   must(history,phrase,'paginación del Personal');
 
 must(clinicalHome,'N2FirstManualWorkerView(onContinue:{','registro inicial sin archivo');
-must(clinicalHome,'Task {await refresh()}','verificar la fuente al continuar tras crearla');
+must(clinicalHome,'sourceInspectionRevision+=1','solicitar verificación sin retener escena ni sesión');
+must(clinicalHome,'.task(id:"\\(sourceInspectionAllowed)-\\(sourceInspectionRevision)")','verificar la fuente con la escena y sesión actuales');
 must(firstWorker,'if let onContinue {onContinue()} else {dismiss()}','propagar continuación explícita a la puerta clínica');
 for(const phrase of ['N2EmptyDemoSnapshot.make()','N2SnapshotEditor.addWorker(',
   'activateOnlyWithConsent(source,approvedByUser:true)',

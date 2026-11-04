@@ -13,6 +13,8 @@ struct N2ClinicalWorkspaceGateView:View {
     @Environment(\.danperAuthenticatedSession) private var inheritedAuthentication
     @State private var summary:N2ProtectedStoreSummary?
     @State private var checked=false
+    @State private var sourceInspectionRevision=0
+    @State private var inspectedSourceRevision=0
     @State private var busy=false
     @State private var invalidSource=false
     @State private var authorized=false
@@ -46,10 +48,12 @@ struct N2ClinicalWorkspaceGateView:View {
             }
         }
         .background(DanperBackdrop())
-        .task(id:sourceInspectionAllowed) {
+        .task(id:"\(sourceInspectionAllowed)-\(sourceInspectionRevision)") {
             if sourceInspectionAllowed {
-                if !checked || invalidSource {await refresh()}
-                else if summary != nil {await verifyRevision()}
+                if sourceInspectionRevision != inspectedSourceRevision || !checked || invalidSource {
+                    await refresh()
+                    inspectedSourceRevision=sourceInspectionRevision
+                } else if summary != nil {await verifyRevision()}
             }
         }
         .onChange(of:scenePhase) {_,phase in
@@ -90,10 +94,10 @@ struct N2ClinicalWorkspaceGateView:View {
                         .accessibilityIdentifier("clinical-first-run-restore-222")
                         NavigationLink {
                             N2FirstManualWorkerView(onContinue:{
-                                // Reinspect the verified source explicitly. The
-                                // setup NavigationStack may retain its destination
-                                // after dismiss; onAppear is not a completion event.
-                                Task {await refresh()}
+                                // A navigation destination retains its creation
+                                // closure. Signal State here; the gate's task must
+                                // read the current scene/session, not that capture.
+                                sourceInspectionRevision+=1
                             })
                         } label: {
                             Label("Comenzar sin Excel · registrar primer trabajador",
