@@ -31,15 +31,31 @@ class AsyncRunnerContainer:
    try:
     value=self.lookup()
     with self._lock:
-     if value is not None:self._value=value
+     self._value=value
      self._error=None
    except (OSError,subprocess.TimeoutExpired) as error:
-    with self._lock:self._error=(type(error).__name__,str(error))
+    with self._lock:self._value=None;self._error=(type(error).__name__,str(error))
    if self._stop.wait(self.interval):return
  def snapshot(self):
   with self._lock:return self._value,self._error
  def close(self,timeout=0):
   self._stop.set();self._thread.join(timeout)
+
+def runner_container(root,bundle_id):
+ """Resolve the runner by its exact MCM identity, never by app/data contents.
+
+ Ambiguous/missing registrations fail closed. A replacement is rediscovered
+ on each poll; readiness still requires a live current coreauthd sensor event.
+ """
+ matches=[]
+ for directory in root.iterdir():
+  if not directory.is_dir() or directory.is_symlink():continue
+  metadata=directory/'.com.apple.mobile_container_manager.metadata.plist'
+  try:identity=plistlib.loads(metadata.read_bytes()).get('MCMMetadataIdentifier')
+  except (OSError,ValueError,plistlib.InvalidFileException):continue
+  if identity==bundle_id:matches.append(directory/'Documents/DANPER_BIOMETRIC_READY')
+ if len(matches)!=1:raise OSError('Expected one exact runner registration; found '+str(len(matches)))
+ return matches[0]
 
 def stream(sim):
  # Unified log buffers output when its stdout is a regular file. A private PTY
@@ -82,12 +98,14 @@ def main():
  info=plistlib.loads(runner_info.read_bytes());bundle_id=info['CFBundleIdentifier']
  assert 'interactiontests' in bundle_id.lower() and bundle_id.startswith('pe.danper.saludmovil.native.iloaderpreview.')
  report('RUNNER_BUNDLE',bundle_id)
+ # Read only this owned Simulator's container metadata. get_app_container
+ # is a synchronous CoreSimulator RPC: replay41718693853 blocked it for
+ # >50s while the real sensor was already active, beyond XCTest's20s wait.
+ # A local metadata read neither activates CoreAuthUI nor grants identity.
+ containers=Path.home()/'Library/Developer/CoreSimulator/Devices'/sim/'data/Containers/Data/Application'
  def lookup_container():
-  r=subprocess.run(['xcrun','simctl','get_app_container',sim,bundle_id,'data'],capture_output=True,text=True,timeout=30)
-  if r.returncode==0 and r.stdout.strip():
-   return Path(r.stdout.strip())/'Documents/DANPER_BIOMETRIC_READY'
-  raise OSError('Runner container query failed: '+r.stderr.strip())
- resolver=AsyncRunnerContainer(lookup_container)
+  return runner_container(containers,bundle_id)
+ resolver=AsyncRunnerContainer(lookup_container,interval=0.2)
  container=None;offset=0;pending=b'';seen=set();observed=set();last_error=None;probe_error=None;state=SensorReadiness()
  while True:
   if log.exists():
@@ -102,7 +120,7 @@ def main():
   if error!=probe_error:
    probe_error=error
    if error:report('RUNNER_CONTAINER_QUERY_ERROR',*error)
-  if active is not None and active!=container:
+  if active!=container:
    container=active
    report('RUNNER_CONTAINER_ACTIVE',str(container))
   if container is not None:

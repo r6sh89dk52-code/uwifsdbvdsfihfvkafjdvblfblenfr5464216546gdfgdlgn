@@ -89,7 +89,12 @@ struct N2ClinicalWorkspaceGateView:View {
                         .buttonStyle(DanperSecondaryButton())
                         .accessibilityIdentifier("clinical-first-run-restore-222")
                         NavigationLink {
-                            N2FirstManualWorkerView()
+                            N2FirstManualWorkerView(onContinue:{
+                                // Reinspect the verified source explicitly. The
+                                // setup NavigationStack may retain its destination
+                                // after dismiss; onAppear is not a completion event.
+                                Task {await refresh()}
+                            })
                         } label: {
                             Label("Comenzar sin Excel · registrar primer trabajador",
                                   systemImage:"person.badge.plus")

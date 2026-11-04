@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import subprocess
 import threading
+import tempfile
+import plistlib
 import unittest
 
 path=pathlib.Path(__file__).resolve().parents[2]/"glass-audit"/"simulator-ready-bridge.py"
@@ -52,7 +54,7 @@ class SensorBridgeRegressionTests(unittest.TestCase):
         finally:
             allow_second.set();resolver.close(timeout=1)
 
-    def test_query_timeout_preserves_last_known_registration(self):
+    def test_query_timeout_revokes_last_known_registration(self):
         calls=0;failed=threading.Event();hold=threading.Event()
         def lookup():
             nonlocal calls
@@ -68,7 +70,7 @@ class SensorBridgeRegressionTests(unittest.TestCase):
                 value,error=resolver.snapshot()
                 if error:break
                 threading.Event().wait(0.01)
-            self.assertEqual(value,pathlib.Path("/synthetic/current"))
+            self.assertIsNone(value)
             self.assertEqual(error[0],"TimeoutExpired")
         finally:
             hold.set();resolver.close(timeout=1)
@@ -94,3 +96,22 @@ class SensorBridgeRegressionTests(unittest.TestCase):
         state.observe("2026-10-31 05:09:23.162 coreauthd[2] [com.apple.LocalAuthentication:Server,Interactive] Mechanism event 5 MechanismPearl")
         state.observe("2026-10-31 05:09:25.000 coreauthd[2] will stop biometric operation:")
         self.assertFalse(state.permits(1))
+
+    def test_exact_metadata_registration_replacement_and_ambiguity(self):
+        bundle="pe.danper.saludmovil.native.iloaderpreview.interactiontests.xctrunner"
+        with tempfile.TemporaryDirectory() as tmp:
+            root=pathlib.Path(tmp)
+            def register(name,identity):
+                path=root/name;path.mkdir()
+                (path/'.com.apple.mobile_container_manager.metadata.plist').write_bytes(
+                    plistlib.dumps({'MCMMetadataIdentifier':identity}))
+                return path
+            register('clinical-app','pe.danper.saludmovil.native.iloaderpreview')
+            old=register('runner-old',bundle)
+            self.assertEqual(bridge.runner_container(root,bundle),old/'Documents/DANPER_BIOMETRIC_READY')
+            new=register('runner-new',bundle)
+            with self.assertRaises(OSError):bridge.runner_container(root,bundle)
+            (old/'.com.apple.mobile_container_manager.metadata.plist').unlink()
+            self.assertEqual(bridge.runner_container(root,bundle),new/'Documents/DANPER_BIOMETRIC_READY')
+            (new/'.com.apple.mobile_container_manager.metadata.plist').write_bytes(b'incomplete metadata')
+            with self.assertRaises(OSError):bridge.runner_container(root,bundle)
