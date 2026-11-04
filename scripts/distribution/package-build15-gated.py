@@ -3,10 +3,10 @@
 import hashlib,json,os,plistlib,runpy,subprocess,sys,tarfile,urllib.request,zipfile
 from pathlib import Path,PurePosixPath
 
-SOURCE='f19533fa17a2de80d76331ab0b90f225740875f6'
+SOURCE='bf58e95d8303e9af49f510659bac280821428041'
 REPO='r6sh89dk52-code/uwifsdbvdsfihfvkafjdvblfblenfr5464216546gdfgdlgn'
 BUNDLE='pe.danper.saludmovil.native.iloaderpreview'
-GATE_RUN=41892850751
+GATE_RUN=41906144017
 # Same immutable Actions run: package only after the real compile job passed.
 # SOURCE/GATE_RUN are literal, never overridden by the caller/environment.
 RELEASE_RUN=int(os.environ.get('GITHUB_RUN_ID','0'))
@@ -67,7 +67,7 @@ def current_runs():
     suites=['N2MenuInteractionTests','N2Build222ShellTests','N2GlassClinicalTests',
       'N3ClinicalJourneyTests-protected','N3ClinicalJourneyTests-demo','N2PremiumRedesignTests',
       'N2BiometricInteractionTests','N2AllergySaveInteractionTests']
-    expected={'javascript','native-build','performance','performance-v2','swift-core / swift-core','instruments','complete'}|{'ui ('+x+')' for x in suites}
+    expected={'javascript','native-compile','native-build','performance','performance-v2','swift-core / swift-core','instruments','complete'}|{'ui ('+x+')' for x in suites}
     assert len(jobs)==len(expected) and {j['name'] for j in jobs}==expected
     assert all(j['status']=='completed' and j['conclusion']=='success' for j in jobs)
 
