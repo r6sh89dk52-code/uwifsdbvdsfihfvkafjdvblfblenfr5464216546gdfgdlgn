@@ -38,7 +38,7 @@ jobs:
           path: ${{ runner.temp }}/b15-js
           retention-days: 14
   native-build:
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
@@ -61,7 +61,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$DANPER_AUDIT_OUT"
           uname -m > "$DANPER_AUDIT_OUT/runner-architecture.txt"
-          test "$(uname -m)" = x86_64
+          test "$(uname -m)" = arm64
           bash scripts/glass-audit/validate-macos.sh b15-native
           python3 scripts/performance/test-products.py seal "$DANPER_AUDIT_DERIVED_DATA/Build/Products" "$DANPER_AUDIT_OUT/TEST_PRODUCTS.json"
           tar -czf "$DANPER_AUDIT_OUT/TEST_PRODUCTS.tgz" -C "$DANPER_AUDIT_DERIVED_DATA/Build" Products
@@ -85,7 +85,7 @@ jobs:
           retention-days: 14
   ui:
     needs: native-build
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -139,7 +139,7 @@ jobs:
           retention-days: 7
   instruments:
     needs: native-build
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 35
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
