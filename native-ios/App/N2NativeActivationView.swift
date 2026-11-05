@@ -134,16 +134,18 @@ struct N2NativeActivationView:View {
         }
         .navigationTitle("Restaurar build 222")
         .danperFormChrome()
-        .fileImporter(isPresented:$choosing,allowedContentTypes:[.item],
-                      allowsMultipleSelection:false) { result in
-            switch result {
-            case .failure:
-                review=nil;sourceURL=nil;sourceName=""
-                failed=true
-                status="No se pudo seleccionar el respaldo. No se modificó la bóveda clínica."
-            case .success(let urls):
-                if let chosen=urls.first {Task {await inspectBackup(chosen)}}
-            }
+        .sheet(isPresented:$choosing) {
+            N2BackupDocumentPicker(
+                onPicked:{ url in
+                    choosing=false
+                    Task {await inspectBackup(url)}
+                },
+                onCancelled:{choosing=false},
+                onError:{ error in
+                    choosing=false
+                    failed=true
+                    status="No se pudo seleccionar el respaldo: "+error
+                })
         }
         .confirmationDialog("¿Importar TODA la copia original?",
                             isPresented:$confirming,titleVisibility:.visible) {
@@ -170,6 +172,7 @@ struct N2NativeActivationView:View {
         }
         .task {await checkDestination()}
         .onDisappear {
+            N2BackupPickerCopy.discard(sourceURL)
             password=""
             review=nil
             sourceURL=nil
@@ -195,7 +198,10 @@ struct N2NativeActivationView:View {
         review=nil
         sourceURL=nil
         status="Descifrando y auditando el respaldo en el iPhone…"
-        defer{busy=false}
+        defer{
+            busy=false
+            if sourceURL != url {N2BackupPickerCopy.discard(url)}
+        }
         do {
             let permitted=try await LAContext().evaluatePolicy(
                 .deviceOwnerAuthentication,
