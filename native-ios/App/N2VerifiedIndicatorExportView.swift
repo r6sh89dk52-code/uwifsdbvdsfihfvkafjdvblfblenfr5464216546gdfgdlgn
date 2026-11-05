@@ -210,6 +210,17 @@ struct N2VerifiedIndicatorExportView:View {
                 N2Build222StageHeading(step:3,title:"Crear archivo y compartir")
                 Text("El libro conserva las 10 hojas y las fórmulas verificadas. La exportación no modifica lotes, atenciones ni stock.")
                     .font(.caption).foregroundStyle(.secondary)
+                Button {
+                    Task {await export(asOf:true)}
+                } label:{
+                    Label(working ? "Generando…" : "Exportar Excel completo a la fecha · 10 hojas",
+                          systemImage:"square.and.arrow.up")
+                }
+                .buttonStyle(DanperPrimaryButton())
+                .disabled(!enabled)
+                .accessibilityIdentifier("indicator-export-to-date")
+                Text("Disponible sin esperar al día 8. Incluye consumos y saldos verificables hasta la fecha seleccionada. Si no existe evidencia para un stock inicial o recuento, la celda permanece sin certificar. No modifica el inventario.")
+                    .font(.footnote).foregroundStyle(.secondary)
                 DanperCheckRow(selected:$provisional) {
                     VStack(alignment:.leading,spacing:5) {
                         Text("Modo provisional").font(.subheadline.weight(.semibold))
@@ -307,14 +318,23 @@ struct N2VerifiedIndicatorExportView:View {
         }
     }
     @MainActor
-    private func export() async {
+    private func export(asOf:Bool=false) async {
         guard enabled else{return}
-        if !provisional && local(endDate)>local(Date()) {
+        let effectiveEnd=asOf ? min(local(endDate),local(Date())) : local(endDate)
+        let pendingMode=provisional || asOf
+        let effectiveIDs=asOf ? Set(inRange.filter{$0.date<=effectiveEnd}.map(\.id))
+                                .intersection(selected) : selected
+        guard local(startDate)<=effectiveEnd,!effectiveIDs.isEmpty else {
+            failed=true
+            status="No existen atenciones seleccionadas hasta la fecha actual."
+            return
+        }
+        if !pendingMode && local(endDate)>local(Date()) {
             failed=true
             status="El corte todavía no ha terminado. Genera un libro provisional a la fecha; el cierre oficial requiere un conteo posterior al día 8."
             return
         }
-        if !provisional && !local(endDate).hasSuffix("-08") {
+        if !pendingMode && !local(endDate).hasSuffix("-08") {
             failed=true
             status="El Indicador oficial consolida el corte 9–8. Para una revisión parcial del mes utiliza Modo provisional."
             return
@@ -326,8 +346,8 @@ struct N2VerifiedIndicatorExportView:View {
         do {
             let result=try await vault
                 .exportVerifiedIndicatorWorkbook(
-                    start:local(startDate),end:local(endDate),
-                    subdivision:site,ids:selected,allowPending:provisional)
+                    start:local(startDate),end:effectiveEnd,
+                    subdivision:site,ids:effectiveIDs,allowPending:pendingMode)
             cleanup()
             let dir=FileManager.default.temporaryDirectory
                 .appendingPathComponent((vault.isClinical ? "danper-n2-clinical-indicator-" :
@@ -337,14 +357,17 @@ struct N2VerifiedIndicatorExportView:View {
                 withIntermediateDirectories:true,
                 attributes:[.protectionKey:FileProtectionType.complete])
             folder=dir
-            let exportPrefix=result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_"
+            let exportPrefix=asOf ? "DANPER_INDICADOR_A_LA_FECHA_" :
+                (result.provisional ? "DANPER_PROVISIONAL_" : "DANPER_INDICADOR_")
             let siteSuffix=site=="AMBAS" ? "AMBAS_" : ""
-            let outputName="\(exportPrefix)\(siteSuffix)\(local(startDate))_\(local(endDate)).xlsx"
+            let outputName="\(exportPrefix)\(siteSuffix)\(local(startDate))_\(effectiveEnd).xlsx"
             let url=dir.appendingPathComponent(outputName)
             try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
-            let warning=result.provisional
-                ? "PROVISIONAL · \(result.pendingLines) líneas pendientes, con R vacía cuando no hay apertura acreditada. "
-                : ""
+            let warning=asOf
+                ? "Exportación al día (no es certificación de cierre futuro). "
+                : (result.provisional
+                    ? "PROVISIONAL · \(result.pendingLines) líneas pendientes, con R vacía cuando no hay apertura acreditada. "
+                    : "")
             status="\(warning)Generado: \(result.visits) atenciones / \(result.rows) filas. Materiales sin stock inicial: \(result.missingOpening); sin recuento final: \(result.missingClosingCount). Las celdas no conciliadas siguen vacías."
             share=N2IndicatorShare(file:url)
         }catch{
@@ -368,7 +391,7 @@ struct N2VerifiedIndicatorExportView:View {
         case .unverifiedDelivery:
             return "Hay una entrega física contradictoria o una corrección clínica pendiente que debe verificarse antes de exportar. Un consumo simplemente sin lote sí se admite en el PROVISIONAL con R vacía si es caja o frasco; no se inventa FEFO ni movimiento físico."
         case .invalidVisit:
-            return "Una atención tiene sede no verificada o datos obligatorios incompletos. Confirma la ubicación en Personal antes de exportar ambas sedes."
+            return "Una atención carece de sede histórica confirmada u otros datos obligatorios. Utiliza «Confirmar sede de esta atención» en la lista y vuelve a exportar."
         case .invalidPeriod:
             return "El período de fechas no es válido. Comprueba Desde y Hasta."
         case .missingSelection:
