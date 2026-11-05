@@ -28,7 +28,8 @@ jobs:
           set -euo pipefail
           npm ci --ignore-scripts --no-fund
           mkdir -p "$RUNNER_TEMP/danper-fixtures"
-          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-fixtures" >> "$GITHUB_ENV"
+          export DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-fixtures"
+          echo "DANPER_N1_FIXTURE_DIR=$DANPER_N1_FIXTURE_DIR" >> "$GITHUB_ENV"
           for generator in \
             generate-native-compat-fixtures.cjs \
             generate-n1e-clinical-fixtures.cjs \
