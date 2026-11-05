@@ -179,17 +179,30 @@ struct N2VerifiedIndicatorExportView:View {
                     )){
                         VStack(alignment:.leading,spacing:3) {
                             Text(v.workerName).font(.subheadline)
-                            Text(v.workerSite.isEmpty ? "Sede sin verificar" : v.workerSite)
+                            Text(["LA VENTUROSA","PLVENTUROSA"].contains(v.workerSite)
+                                 ? v.workerSite : "Sede sin verificar")
                                 .font(.caption2)
-                                .foregroundStyle(v.workerSite.isEmpty ? Color.orange : Color.secondary)
+                                .foregroundStyle(["LA VENTUROSA","PLVENTUROSA"].contains(v.workerSite)
+                                    ? Color.secondary : Color.orange)
                             Text(DanperDatePresentation.displayDateTime(v.date,v.time)+" · "+v.diagnosis)
                                 .font(.caption).foregroundStyle(.secondary)
                             if v.pendingPhysicalLines>0 {
-                                Label("Consumo aún sin lote conciliado: libro provisional",
+                                Label("Consumo físico pendiente de conciliación",
                                       systemImage:"exclamationmark.triangle")
                                     .font(.caption2).foregroundStyle(.orange)
                             }
                         }
+                    }
+                    if !["LA VENTUROSA","PLVENTUROSA"].contains(v.workerSite) {
+                        NavigationLink {
+                            N2ClinicalCorrectionView(visitID:v.id)
+                                .onDisappear{Task {await refreshVerifiedVisits()}}
+                        } label: {
+                            Label("Confirmar sede de esta atención",
+                                  systemImage:"mappin.and.ellipse")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                        .accessibilityIdentifier("indicator-confirm-visit-site-"+v.id)
                     }
                 }
             }
@@ -278,6 +291,20 @@ struct N2VerifiedIndicatorExportView:View {
     }
     private func selectConfirmed() {
         selected=Set(inRange.filter{$0.pendingPhysicalLines==0}.map(\.id))
+    }
+    @MainActor
+    private func refreshVerifiedVisits() async {
+        guard !layoutOnly else{return}
+        do {
+            guard let refreshed=try await vault.readHistory() else{return}
+            visits=refreshed.visits
+            selectConfirmed()
+            failed=false
+            status="Sedes actualizadas; revisa la selección antes de exportar."
+        }catch{
+            failed=true
+            status="No fue posible actualizar la lista; vuelve a entrar al indicador."
+        }
     }
     @MainActor
     private func export() async {
