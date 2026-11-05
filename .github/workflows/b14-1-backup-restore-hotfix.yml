@@ -153,7 +153,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa
           unzip -tq DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa
           shasum -a 256 DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa > SHA256.txt
-          printf '%s\n' "SHA=$(git -C '$GITHUB_WORKSPACE' rev-parse HEAD)" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
+          printf '%s\n' "SHA=$(git -C \"$GITHUB_WORKSPACE\" rev-parse HEAD)" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
       - uses: actions/upload-artifact@v4
         with:
           name: DANPER_B14_1_RESTORE_ILOADER_UNSIGNED_TESTED
