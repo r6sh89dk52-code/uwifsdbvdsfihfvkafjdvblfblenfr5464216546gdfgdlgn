@@ -221,8 +221,7 @@ struct N2SimpleRestoreView:View {
                         N2BackupPickerCopy.discard(file)
                         file=url;review=nil
                         chooseFile=false
-                        status="Respaldo seleccionado: "+url.lastPathComponent+
-                            ". Introduce la contraseña y pulsa Verificar respaldo."
+                        status="Respaldo seleccionado: \(url.lastPathComponent). Introduce la contraseña y pulsa Verificar respaldo."
                     },
                     onCancelled:{chooseFile=false},
                     onError:{ message in
