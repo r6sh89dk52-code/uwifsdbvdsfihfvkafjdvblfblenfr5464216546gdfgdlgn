@@ -215,11 +215,20 @@ struct N2SimpleRestoreView:View {
             }.padding(16)
         }.navigationTitle(kind == .clinical ? "Restaurar historial":"Recuperación completa")
             .navigationBarTitleDisplayMode(.inline).danperFormChrome()
-            .fileImporter(isPresented:$chooseFile,allowedContentTypes:[.data,.item]) {result in
-                switch result {
-                case .success(let url):file=url;review=nil;status="Archivo seleccionado. Introduce su contraseña para verificarlo."
-                case .failure(let error):status=n2SimpleMessage(error)
-                }
+            .sheet(isPresented:$chooseFile) {
+                N2BackupDocumentPicker(
+                    onPicked:{ url in
+                        N2BackupPickerCopy.discard(file)
+                        file=url;review=nil
+                        chooseFile=false
+                        status="Respaldo seleccionado: "+url.lastPathComponent+
+                            ". Introduce la contraseña y pulsa Verificar respaldo."
+                    },
+                    onCancelled:{chooseFile=false},
+                    onError:{ message in
+                        chooseFile=false
+                        status="No se pudo copiar el respaldo desde Archivos: "+message
+                    })
             }
             .confirmationDialog(kind == .clinical ? "Conservar inventario y restaurar clínica":"Recuperar en fuente vacía",
                 isPresented:$confirm,titleVisibility:.visible) {
@@ -298,6 +307,9 @@ struct N2SimpleRestoreView:View {
         identity=nil
     }
     private func clearSecrets() {
-        cycle=UUID();identity?.invalidate();identity=nil;work?.cancel();work=nil;password="";review=nil
+        cycle=UUID();identity?.invalidate();identity=nil
+        work?.cancel();work=nil;password="";review=nil
+        N2BackupPickerCopy.discard(file)
+        file=nil
     }
 }
