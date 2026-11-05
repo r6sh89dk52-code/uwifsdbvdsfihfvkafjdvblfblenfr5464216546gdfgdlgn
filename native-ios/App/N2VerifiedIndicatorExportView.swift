@@ -94,6 +94,11 @@ struct N2VerifiedIndicatorExportView:View {
         ready && !working && local(startDate)<=local(endDate) &&
         !selected.isEmpty
     }
+    private var canExportAsOf:Bool {
+        let day=min(local(endDate),local(Date()))
+        return ready && !working && local(startDate)<=day &&
+            inRange.contains(where:{$0.date<=day})
+    }
     var body:some View {
         ScrollView {
           VStack(alignment:.leading,spacing:16) {
@@ -217,9 +222,9 @@ struct N2VerifiedIndicatorExportView:View {
                           systemImage:"square.and.arrow.up")
                 }
                 .buttonStyle(DanperPrimaryButton())
-                .disabled(!enabled)
+                .disabled(!canExportAsOf)
                 .accessibilityIdentifier("indicator-export-to-date")
-                Text("Disponible sin esperar al día 8. Incluye consumos y saldos verificables hasta la fecha seleccionada. Si no existe evidencia para un stock inicial o recuento, la celda permanece sin certificar. No modifica el inventario.")
+                Text("Disponible sin esperar al día 8. Incluye automáticamente TODAS las atenciones del rango hasta la fecha actual y los saldos verificables. Sin evidencia de stock inicial o recuento, la celda queda sin certificar. No modifica el inventario.")
                     .font(.footnote).foregroundStyle(.secondary)
                 DanperCheckRow(selected:$provisional) {
                     VStack(alignment:.leading,spacing:5) {
@@ -319,11 +324,12 @@ struct N2VerifiedIndicatorExportView:View {
     }
     @MainActor
     private func export(asOf:Bool=false) async {
-        guard enabled else{return}
+        guard asOf ? canExportAsOf : enabled else{return}
         let effectiveEnd=asOf ? min(local(endDate),local(Date())) : local(endDate)
         let pendingMode=provisional || asOf
-        let effectiveIDs=asOf ? Set(inRange.filter{$0.date<=effectiveEnd}.map(\.id))
-                                .intersection(selected) : selected
+        let effectiveIDs=asOf
+            ? Set(inRange.filter{$0.date<=effectiveEnd}.map(\.id))
+            : selected
         guard local(startDate)<=effectiveEnd,!effectiveIDs.isEmpty else {
             failed=true
             status="No existen atenciones seleccionadas hasta la fecha actual."
