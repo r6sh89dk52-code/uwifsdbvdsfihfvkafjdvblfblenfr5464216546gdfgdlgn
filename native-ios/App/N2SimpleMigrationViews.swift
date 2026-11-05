@@ -246,7 +246,15 @@ struct N2SimpleRestoreView:View {
                 }
             }
             .onChange(of:password){_,_ in review=nil}
-            .onChange(of:scenePhase){_,phase in if phase == .background {clearSecrets()}}
+            .onChange(of:scenePhase){_,phase in
+                if phase == .background {
+                    // Files providers can briefly change app lifecycle.
+                    // Clear credentials but keep a local ENCRYPTED picker copy
+                    // available so users can re-enter the password.
+                    cycle=UUID();identity?.invalidate();identity=nil
+                    work?.cancel();work=nil;password="";review=nil
+                }
+            }
             .onDisappear{clearSecrets()}
     }
     private var form:some View {
