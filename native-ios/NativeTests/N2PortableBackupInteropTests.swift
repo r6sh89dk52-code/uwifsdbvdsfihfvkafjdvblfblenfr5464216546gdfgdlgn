@@ -33,7 +33,13 @@ final class N2PortableBackupInteropTests:XCTestCase {
             .appendingPathComponent("n2-portable-"+UUID().uuidString+".danperbackup")
         try encrypted.write(to:url,options:.atomic)
         defer{try? FileManager.default.removeItem(at:url)}
-        let audited=try PortableBackupInspector.audit(url:url,password:password)
+        let copied=try N2BackupPickerCopy.stage(url)
+        XCTAssertNotEqual(copied,url)
+        XCTAssertEqual(try Data(contentsOf:copied),encrypted)
+        let audited=try PortableBackupInspector.audit(url:copied,password:password)
+        N2BackupPickerCopy.discard(copied)
+        XCTAssertFalse(FileManager.default.fileExists(atPath:copied.path))
+        XCTAssertEqual(try Data(contentsOf:url),encrypted)
         XCTAssertEqual(audited.manifest.workers,1)
         XCTAssertEqual(audited.manifest.attentions,0)
         XCTAssertThrowsError(try PortableBackupInspector.audit(
