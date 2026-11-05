@@ -1,0 +1,165 @@
+name: B14.1 - Emergency backup restoration and as-of Excel (gated IPA)
+on:
+  push:
+    branches:
+      - hotfix/build14-restore-report-access-20261104
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/b14-1-backup-restore-hotfix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: danper-b14-1-rescue-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  linux-core:
+    name: Swift, regression and both Excel generators
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Dependencies and synthetic fixtures only
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          mkdir -p "$RUNNER_TEMP/danper-fixtures"
+          echo "DANPER_N1_FIXTURE_DIR=$RUNNER_TEMP/danper-fixtures" >> "$GITHUB_ENV"
+          for generator in \
+            generate-native-compat-fixtures.cjs \
+            generate-n1e-clinical-fixtures.cjs \
+            generate-n1f-lossless-fixtures.cjs \
+            generate-n1h-clinical-parity.cjs \
+            generate-n1p-excel-parity.cjs \
+            generate-n1q-reconciliation-fixtures.cjs \
+            generate-n1r-stored-xlsx-template.cjs \
+            generate-n1s-official-excel-fixtures.cjs \
+            generate-n2-approved-fixture.cjs \
+            generate-n2-nursing-parity.cjs \
+            generate-n2-stock-commands-fixtures.cjs; do
+              node "scripts/$generator"
+          done
+          node scripts/generate-n2-procedure-parity.cjs
+      - name: Swift syntax + complete Core XCTest
+        run: |
+          set -o pipefail
+          swiftc -frontend -parse native-ios/App/*.swift
+          (cd native-ios && swift test --jobs 2) 2>&1 | tee "$RUNNER_TEMP/core-tests.log"
+      - name: Both official Excel workbook regressions
+        run: |
+          set -euo pipefail
+          node scripts/test-n1r-native-xlsx.cjs
+          node scripts/test-n1s-full-native-workbooks.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B14_1_CORE_REGRESSION_LOG
+          path: ${{ runner.temp }}/core-tests.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  macos-native:
+    name: Real Xcode iPhone build + all existing Native and UI suites
+    runs-on: macos-15
+    timeout-minutes: 115
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare native resources and Xcode
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -resolvePackageDependencies -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative
+      - name: Typecheck app and build exact synthetic test hosts
+        env:
+          DANPER_DERIVED_DATA: ${{ runner.temp }}/danper-b14-1-derived
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-b14-1-audit
+        run: |
+          set -euo pipefail
+          mkdir -p "$DANPER_AUDIT_OUT"
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DANPER_DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            build-for-testing > "$DANPER_AUDIT_OUT/build.log" 2>&1 || {
+              grep -nE 'error:|fatal error:|BUILD FAILED' "$DANPER_AUDIT_OUT/build.log" | tail -n 100 || true
+              exit 1
+            }
+          echo 'PASS: native iOS app and XCTest hosts typechecked'
+      - name: Validate biometric enrollment, 26 native + all 11 UI tests
+        timeout-minutes: 85
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-b14-1-audit
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/danper-b14-1-derived
+        run: bash scripts/glass-audit/validate-macos.sh current
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B14_1_XCODE_SIMULATOR_EVIDENCE
+          path: |
+            ${{ runner.temp }}/danper-b14-1-audit/*.log
+            ${{ runner.temp }}/danper-b14-1-audit/*.txt
+            ${{ runner.temp }}/danper-b14-1-audit/*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  unsigned-ipa:
+    name: Package unsigned ARM64 iLoader IPA only after both mandatory PASS
+    needs: [linux-core, macos-native]
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Rebuild EXACT tested HEAD for device
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/b14-1-release" CODE_SIGNING_ALLOWED=NO build
+      - name: Verify update identity and release payload
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/b14-1-release/Build/Products/Release-iphoneos/DANPERNative.app"
+          test -d "$APP"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          test "$ID" = 'pe.danper.saludmovil.native.iloaderpreview'
+          test "$VERSION" = '141'
+          ARCHS=$(xcrun lipo -archs "$APP/DANPERNative")
+          test "$ARCHS" = 'arm64'
+          mkdir -p "$RUNNER_TEMP/b14-1-out/Payload"
+          ditto "$APP" "$RUNNER_TEMP/b14-1-out/Payload/DANPERNative.app"
+          cd "$RUNNER_TEMP/b14-1-out"
+          ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa
+          unzip -tq DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa
+          shasum -a 256 DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa > SHA256.txt
+          printf '%s\n' "SHA=$(git -C '$GITHUB_WORKSPACE' rev-parse HEAD)" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_B14_1_RESTORE_ILOADER_UNSIGNED_TESTED
+          path: |
+            ${{ runner.temp }}/b14-1-out/DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa
+            ${{ runner.temp }}/b14-1-out/SHA256.txt
+            ${{ runner.temp }}/b14-1-out/VERIFIED_BUILD.txt
+          retention-days: 14
+          if-no-files-found: error
