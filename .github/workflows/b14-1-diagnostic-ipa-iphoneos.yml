@@ -1,0 +1,79 @@
+name: B14.1 - Diagnostic unsigned iPhone IPA (NOT release approval)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - hotfix/build14-restore-report-access-20261104
+    paths:
+      - '.github/workflows/b14-1-diagnostic-ipa-iphoneos.yml'
+permissions:
+  contents: read
+concurrency:
+  group: danper-b14-1-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  diagnostic-iphoneos:
+    name: Compile ARM64 iPhone IPA for physical backup-picker diagnosis
+    # This does not override the release gate in b14-1-backup-restore-hotfix.yml.
+    # An Intel macOS host can cross-compile native ARM64 iphoneos binaries.
+    runs-on: macos-15-intel
+    timeout-minutes: 50
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Validate Xcode and prepare existing resources
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcodebuild -showsdks | grep -F iphoneos
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+      - name: Compile actual iPhone ARM64 Release without signing
+        run: |
+          set -euo pipefail
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/b14-1-diagnostic-release" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Verify identity and package unsigned DIAGNOSTIC IPA
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/b14-1-diagnostic-release/Build/Products/Release-iphoneos/DANPERNative.app"
+          test -d "$APP"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          MARKETING=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          ARCHS=$(xcrun lipo -archs "$APP/DANPERNative")
+          test "$ID" = 'pe.danper.saludmovil.native.iloaderpreview'
+          test "$MARKETING" = '0.4.2'
+          test "$VERSION" = '141'
+          test "$ARCHS" = 'arm64'
+          OUT="$RUNNER_TEMP/b14-1-diagnostic-out"
+          mkdir -p "$OUT/Payload"
+          ditto "$APP" "$OUT/Payload/DANPERNative.app"
+          cd "$OUT"
+          ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD141_DIAGNOSTIC_UNSIGNED.ipa
+          unzip -tq DANPER_0.4.2_BUILD141_DIAGNOSTIC_UNSIGNED.ipa
+          shasum -a 256 DANPER_0.4.2_BUILD141_DIAGNOSTIC_UNSIGNED.ipa > SHA256.txt
+          printf '%s\n' \
+            "SHA=$GITHUB_SHA" \
+            "BUNDLE_ID=$ID" \
+            "BUILD=$VERSION" \
+            "ARCH=$ARCHS" \
+            "STATUS=DIAGNOSTIC_ONLY_NOT_CLINICALLY_VALIDATED" > BUILD_INFO.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_BUILD141_DIAGNOSTIC_UNSIGNED_NOT_RELEASE
+          path: |
+            ${{ runner.temp }}/b14-1-diagnostic-out/DANPER_0.4.2_BUILD141_DIAGNOSTIC_UNSIGNED.ipa
+            ${{ runner.temp }}/b14-1-diagnostic-out/SHA256.txt
+            ${{ runner.temp }}/b14-1-diagnostic-out/BUILD_INFO.txt
+          retention-days: 14
+          if-no-files-found: error
