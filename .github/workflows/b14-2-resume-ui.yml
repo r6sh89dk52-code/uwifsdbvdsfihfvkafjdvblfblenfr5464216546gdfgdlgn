@@ -109,8 +109,6 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       DANPER_SCOPED_LABEL: ${{ matrix.label }}
       DANPER_SCOPED_EXPECTED: ${{ matrix.expected }}
-      DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-build142-remaining-ui
-      DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/danper-build142-remaining-derived
     steps:
       - uses: actions/checkout@v4
         with:
@@ -119,6 +117,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Configure isolated runner paths
+        run: |
+          echo "DANPER_AUDIT_OUT=$RUNNER_TEMP/danper-build142-remaining-ui" >> "$GITHUB_ENV"
+          echo "DANPER_AUDIT_DERIVED_DATA=$RUNNER_TEMP/danper-build142-remaining-derived" >> "$GITHUB_ENV"
       - name: Prepare only remaining UI test hosts on the original exact source SHA
         run: |
           set -euo pipefail
