@@ -298,7 +298,7 @@ public enum N2VerifiedIndicatorWorkbook {
                   items.count<=1000,
                   (subdivision=="AMBAS" ?
                     ["LA VENTUROSA","PLVENTUROSA"].contains(string(worker["site"])) :
-                    ["",subdivision].contains(string(worker["site"]))) else{
+                    string(worker["site"])==subdivision) else{
                 throw Failure.invalidVisit
             }
             let sourceSite=subdivision=="AMBAS" ? string(worker["site"]) : subdivision
@@ -458,6 +458,18 @@ public enum N2VerifiedIndicatorWorkbook {
         if N2SimpleInventory.isActive(snapshot) {
             let inventory=try N2SimpleInventory.read(snapshot)
             var summary=[String:[String:Any]](),openings=0,closings=0
+            // Only consumption belonging to THIS exported date range can
+            // affect its opening. Old visits must not block every subsequent
+            // period after the counted inventory establishes a real anchor.
+            let visitDayByID=Dictionary(uniqueKeysWithValues:visits.compactMap { visit -> (String,String)? in
+                guard let id=visit["id"] as? String,
+                      let date=visit["date"] as? String else{return nil}
+                return (id,date)
+            })
+            let historicalInRange=Set(inventory.historicalUses.filter { history in
+                guard let day=visitDayByID[history.visitID] else{return true}
+                return day>=start && day<=end
+            }.map(\.code))
             for item in catalogue {
                 let code=string(item["code"])
                 var row:[String:Any]=["code":code,"consumed":consumption[code] ?? 0,"receiptDetails":[Any]()]
@@ -465,7 +477,7 @@ public enum N2VerifiedIndicatorWorkbook {
                 let opening=events.last{N2SimpleInventory.day($0.at)<start}
                 let within=events.filter{N2SimpleInventory.day($0.at)>=start}
                 let unresolved=inventory.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
-                let historic=inventory.historicalUses.contains{$0.code==code}
+                let historic=historicalInRange.contains(code)
                 if let last=events.last,["initial","count"].contains(last.kind),N2SimpleInventory.day(last.at)==end {
                     row["count"]=last.after;closings+=1
                 }

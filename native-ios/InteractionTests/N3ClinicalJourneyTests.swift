@@ -27,15 +27,18 @@ final class N3ClinicalJourneyTests:XCTestCase {
         for _ in 0..<8 {
             let footer=app.buttons["Anterior"]
             let bottom=footer.exists && footer.isHittable ? footer.frame.minY-8:app.frame.maxY-70
+            // Each remote property read takes a fresh accessibility snapshot.
+            // Cache geometry per attempt; preserve the same visibility checks.
+            let frame=element.frame,identifier=element.identifier,type=element.elementType
             let navigation=app.navigationBars.allElementsBoundByIndex.contains {
-                $0.frame.contains(CGPoint(x:element.frame.midX,y:element.frame.midY))
+                $0.frame.contains(CGPoint(x:frame.midX,y:frame.midY))
             }
-            let fixed=navigation || element.identifier.hasPrefix("premium-tab-") || element.identifier=="premium-close-attention" || element.identifier=="attention-step-actions"
-            let textInput=element.elementType == .textField || element.elementType == .textView
+            let fixed=navigation || identifier.hasPrefix("premium-tab-") || identifier=="premium-close-attention" || identifier=="attention-step-actions"
+            let textInput=type == .textField || type == .textView
             let safeTop:CGFloat=textInput ? 170:130
-            if element.isHittable && (fixed || (element.frame.minY>safeTop && element.frame.maxY<bottom)) {break}
+            if element.isHittable && (fixed || (frame.minY>safeTop && frame.maxY<bottom)) {break}
             if app.keyboards.firstMatch.exists && hide.exists {hide.tap()}
-            else {scrollShort(in:app,up:element.frame.minY>=safeTop)}
+            else {scrollShort(in:app,up:frame.minY>=safeTop)}
         }
         XCTAssertTrue(element.isHittable,app.debugDescription);element.tap()
     }

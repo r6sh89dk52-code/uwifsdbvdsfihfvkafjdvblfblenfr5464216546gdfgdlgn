@@ -19,6 +19,9 @@ struct DANPERNativeApp: App {
     @State private var access=N2AccessSession()
     private var authenticated:Bool {access.authenticated}
     private var unlocking:Bool {access.running}
+    @State private var incomingBackup:URL?
+    @State private var incomingBackupError=false
+    @State private var importRevision=0
     @State private var authError = ""
     @State private var manualRetryAvailable = false
     @AppStorage("danper.native.onboarding.v1.finished") private var onboardingFinished = false
@@ -80,6 +83,7 @@ struct DANPERNativeApp: App {
                 } else if onboardingFinished || hasClinicalSource {
                     if authenticated || sessionStarted {
                         N2ClinicalWorkspaceGateView(authenticatedLaunch:true,sessionUnlocked:authenticated,onLock:lockAccess)
+                            .id(importRevision)
                             .opacity(authenticated && scenePhase == .active ? 1 : 0)
                             .accessibilityHidden(!authenticated || scenePhase != .active)
                             .allowsHitTesting(authenticated && scenePhase == .active)
@@ -98,6 +102,40 @@ struct DANPERNativeApp: App {
             }
             .environment(\.danperAuthenticatedSession,authenticated)
             .preferredColorScheme(.dark)
+            .onOpenURL { url in
+                do {
+                    // Only an encrypted local copy is retained before Face ID.
+                    // Never decrypt, restore or replace a vault from this event.
+                    let staged=try N2BackupPickerCopy.stage(url)
+                    N2BackupPickerCopy.discard(incomingBackup)
+                    incomingBackup=staged
+                    onboardingFinished=true
+                } catch {
+                    incomingBackupError=true
+                }
+            }
+            .sheet(isPresented:Binding(
+                get:{authenticated && incomingBackup != nil},
+                set:{shown in
+                    // A lifecycle lock must not discard the encrypted selection.
+                    if !shown,scenePhase == .active,authenticated {
+                        N2BackupPickerCopy.discard(incomingBackup);incomingBackup=nil
+                        importRevision += 1
+                    }
+                })) {
+                if let incomingBackup {
+                    N2SharedBackupImportView(file:incomingBackup)
+                        .id(incomingBackup)
+                        .opacity(scenePhase == .active ? 1:0)
+                        .allowsHitTesting(scenePhase == .active)
+                        .environment(\.n2WorkspaceVault,.clinical)
+                }
+            }
+            .alert("No se pudo recibir el respaldo",isPresented:$incomingBackupError) {
+                Button("Aceptar",role:.cancel){}
+            } message:{
+                Text("Comparte un archivo local .danperbackup de entre 100 bytes y 42 MB. El original y los datos existentes permanecen intactos.")
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background {
                     authCycle=UUID()

@@ -24,6 +24,8 @@ public struct N2CorrectionField:Sendable,Equatable {
 public struct N2CorrectionDetail:Sendable {
     public let id:String
     public let workerName:String
+    public let workerSite:String
+    public let currentRosterSite:String
     public let date:String
     public let time:String
     public let category:String
@@ -96,7 +98,8 @@ public enum N2ClinicalCorrections {
                 editableText.contains($0) || editableBools.contains($0) ||
                 $0=="standaloneProcedures" || $0=="itemProcedures" ||
                 $0=="itemClinicalQuantities" ||
-                $0=="itemHistoricalOpenings"
+                $0=="itemHistoricalOpenings" ||
+                $0=="visitWorkerSite"
               }) else{throw N2CorrectionError.invalidChanges}
         for (key,v) in changes {
             if editableText.contains(key) {
@@ -131,6 +134,16 @@ public enum N2ClinicalCorrections {
                     }
                     return item
                 }
+            }else if key=="visitWorkerSite" {
+                // Update only the dated visit. The worker's current job site
+                // can differ and is never copied into history automatically.
+                guard let site=v as? String,
+                      ["LA VENTUROSA","PLVENTUROSA"].contains(site),
+                      var worker=next["worker"] as? [String:Any],
+                      let dni=worker["dni"] as? String,dni.count==8
+                else {throw N2CorrectionError.invalidChanges}
+                worker["site"]=site
+                next["worker"]=worker
             }else if key=="itemHistoricalOpenings" {
                 guard let entries=v as? [String:Int],!entries.isEmpty,entries.count<=100,
                       let items=next["items"] as? [[String:Any]],
@@ -280,7 +293,12 @@ public enum N2ClinicalCorrections {
                 historicalOpeningEditable:eligible)
         }
         func s(_ key:String)->String{visit[key] as? String ?? ""}
+        let dni=worker["dni"] as? String ?? ""
+        let currentWorker=(obj["workers"] as? [[String:Any]])?
+            .first(where:{$0["dni"] as? String==dni})
         return N2CorrectionDetail(id:visitID,workerName:worker["name"] as? String ?? "",
+            workerSite:worker["site"] as? String ?? "",
+            currentRosterSite:currentWorker?["site"] as? String ?? "",
             date:s("date"),time:s("time"),category:s("category"),system:s("system"),
             segment:s("segment"),diagnosis:s("diagnosis"),permission:s("permission"),
             permissionTime:s("permissionTime"),responsible:s("responsible"),

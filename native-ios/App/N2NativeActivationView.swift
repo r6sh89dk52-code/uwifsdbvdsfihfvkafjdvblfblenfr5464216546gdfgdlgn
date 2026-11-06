@@ -19,6 +19,8 @@ struct N2NativeActivationView:View {
     @State private var summary:N2ProtectedStoreSummary?
     @State private var review:N2Build222BackupReview?
     @State private var sourceURL:URL?
+    // Encrypted copy survives Files picker lifecycle transitions; secrets do not.
+    @State private var pickedBackupURL:URL?
     @State private var sourceName=""
     @State private var status="Selecciona y revisa tu respaldo original de la build 222."
     @State private var failed=false
@@ -75,7 +77,19 @@ struct N2NativeActivationView:View {
                               systemImage:"doc.text.magnifyingglass")
                     }
                     .buttonStyle(DanperSecondaryButton())
-                    .disabled(!canReview)
+                    .disabled(busy || summary != nil)
+                    if pickedBackupURL != nil {
+                        Label("Respaldo cifrado seleccionado. Introduce o vuelve a introducir la contraseña y pulsa Verificar.",
+                              systemImage:"checkmark.circle").font(.footnote)
+                        Button {
+                            if let url=pickedBackupURL {Task {await inspectBackup(url)}}
+                        } label: {
+                            Label("Verificar respaldo seleccionado",systemImage:"checkmark.shield")
+                        }
+                        .buttonStyle(DanperSecondaryButton())
+                        .disabled(!canReview)
+                        .accessibilityIdentifier("verify-build222-selected-backup")
+                    }
                     if !sourceName.isEmpty {
                         Text("Copia seleccionada: "+sourceName)
                             .font(.caption).foregroundStyle(.secondary)
@@ -134,16 +148,22 @@ struct N2NativeActivationView:View {
         }
         .navigationTitle("Restaurar build 222")
         .danperFormChrome()
-        .fileImporter(isPresented:$choosing,allowedContentTypes:[.item],
-                      allowsMultipleSelection:false) { result in
-            switch result {
-            case .failure:
-                review=nil;sourceURL=nil;sourceName=""
-                failed=true
-                status="No se pudo seleccionar el respaldo. No se modificó la bóveda clínica."
-            case .success(let urls):
-                if let chosen=urls.first {Task {await inspectBackup(chosen)}}
-            }
+        .sheet(isPresented:$choosing) {
+            N2BackupDocumentPicker(
+                onPicked:{ url in
+                    choosing=false
+                    N2BackupPickerCopy.discard(pickedBackupURL)
+                    pickedBackupURL=url
+                    review=nil;sourceURL=nil;sourceName=""
+                    failed=false
+                    status="Archivo cifrado copiado y listo para verificar. Vuelve a introducir la contraseña si iOS la borró al abrir Archivos."
+                },
+                onCancelled:{choosing=false},
+                onError:{ error in
+                    choosing=false
+                    failed=true
+                    status="No se pudo seleccionar el respaldo: "+error
+                })
         }
         .confirmationDialog("¿Importar TODA la copia original?",
                             isPresented:$confirming,titleVisibility:.visible) {
@@ -170,6 +190,9 @@ struct N2NativeActivationView:View {
         }
         .task {await checkDestination()}
         .onDisappear {
+            N2BackupPickerCopy.discard(pickedBackupURL)
+            N2BackupPickerCopy.discard(sourceURL)
+            pickedBackupURL=nil
             password=""
             review=nil
             sourceURL=nil
@@ -189,13 +212,20 @@ struct N2NativeActivationView:View {
     }
 
     @MainActor private func inspectBackup(_ url:URL) async {
-        guard canReview,!busy else{return}
+        guard canReview,!busy else {
+            failed=true
+            status="No se pudo iniciar la verificación. Comprueba la contraseña, las tres confirmaciones y que DANPER esté activa."
+            return
+        }
         busy=true
         failed=false
         review=nil
         sourceURL=nil
         status="Descifrando y auditando el respaldo en el iPhone…"
-        defer{busy=false}
+        defer{
+            busy=false
+            if sourceURL != url && pickedBackupURL != url {N2BackupPickerCopy.discard(url)}
+        }
         do {
             let permitted=try await LAContext().evaluatePolicy(
                 .deviceOwnerAuthentication,
@@ -258,6 +288,8 @@ struct N2NativeActivationView:View {
                 throw BackupInspectionError.invalidSnapshot
             }
             summary=imported
+            N2BackupPickerCopy.discard(pickedBackupURL)
+            pickedBackupURL=nil
             self.review=nil
             sourceURL=nil
             sourceName=""

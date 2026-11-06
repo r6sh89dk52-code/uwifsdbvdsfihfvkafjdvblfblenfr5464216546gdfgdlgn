@@ -23,6 +23,24 @@ targets:
         type: folder
     dependencies:
       - package: DanperCore
+    info:
+      path: Generated/DANPERNative-Info.plist
+      properties:
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Respaldo cifrado DANPER
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - pe.danper.saludmovil.backup
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: pe.danper.saludmovil.backup
+            UTTypeDescription: Respaldo cifrado DANPER
+            UTTypeConformsTo:
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - danperbackup
+        LSSupportsOpeningDocumentsInPlace: NO
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview
@@ -30,7 +48,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.9"
         MARKETING_VERSION: "0.4.2"
-        CURRENT_PROJECT_VERSION: "14"
+        CURRENT_PROJECT_VERSION: "141"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDevelopmentRegion: es

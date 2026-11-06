@@ -14,6 +14,7 @@ struct N2ClinicalCorrectionView:View {
     @State private var system=""
     @State private var segment=""
     @State private var diagnosis=""
+    @State private var visitSite=""
     @State private var permission="NO"
     @State private var permissionTime=""
     @State private var responsible=""
@@ -85,6 +86,23 @@ struct N2ClinicalCorrectionView:View {
                 }
                 Text(message).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
+            }
+            if let current=detail, !saved {
+                DanperPanel("Sede de esta atención") {
+                    DanperChoiceField(
+                        title:"Lugar donde realmente fue atendido",
+                        selection:$visitSite,
+                        options:["","LA VENTUROSA","PLVENTUROSA"],
+                        labels:["":"Sin verificar",
+                                "LA VENTUROSA":"Fundo La Venturosa",
+                                "PLVENTUROSA":"Planta La Venturosa"])
+                    if ["LA VENTUROSA","PLVENTUROSA"].contains(current.currentRosterSite) {
+                        Text("Sede actual en Personal: "+current.currentRosterSite)
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Text("Confirma dónde ocurrió esta atención. No cambia el padrón, otras atenciones ni el Kardex.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             }
             if detail != nil && !saved {
                 DanperPanel("Campos clínicos rectificables") {
@@ -260,7 +278,7 @@ struct N2ClinicalCorrectionView:View {
             id+"="+(itemHistoricalR[id] ?? "")
         }.joined(separator:"|")
         let fields:[String]=[
-            category,system,segment,diagnosis,permission,permissionTime,
+            category,system,segment,diagnosis,visitSite,permission,permissionTime,
             responsible,responsibleDni,workStatus,blueBandage.description,
             returned.description,photoSent.description,procedures,reason,
             discrepancy,operatorName,procedureFingerprint,quantityFingerprint,openingFingerprint
@@ -283,6 +301,10 @@ struct N2ClinicalCorrectionView:View {
             "itemProcedures":itemProcedures
         ]
         if let detail {
+            if visitSite != detail.workerSite,
+               ["LA VENTUROSA","PLVENTUROSA"].contains(visitSite) {
+                packet["visitWorkerSite"]=visitSite
+            }
             let corrected=Dictionary(uniqueKeysWithValues:detail.medications.compactMap {
                 item -> (String,Int)? in
                 guard let typed=itemQuantities[item.id],let q=Int(typed),
@@ -351,6 +373,7 @@ struct N2ClinicalCorrectionView:View {
             system=d.system
             segment=d.segment
             diagnosis=d.diagnosis
+            visitSite=d.workerSite
             permission=d.permission
             permissionTime=d.permissionTime
             responsible=d.responsible
@@ -376,6 +399,7 @@ struct N2ClinicalCorrectionView:View {
                 system=changes["system"] as? String ?? system
                 segment=changes["segment"] as? String ?? segment
                 diagnosis=changes["diagnosis"] as? String ?? diagnosis
+                visitSite=changes["visitWorkerSite"] as? String ?? visitSite
                 permission=changes["permission"] as? String ?? permission
                 permissionTime=changes["permissionTime"] as? String ?? permissionTime
                 responsible=changes["responsible"] as? String ?? responsible

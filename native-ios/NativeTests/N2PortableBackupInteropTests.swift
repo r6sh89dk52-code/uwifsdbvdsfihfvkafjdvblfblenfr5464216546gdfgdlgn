@@ -1,6 +1,8 @@
 import XCTest
 import Foundation
 import DanperCore
+import UIKit
+import UniformTypeIdentifiers
 @testable import DANPERNative
 
 final class N2PortableBackupInteropTests:XCTestCase {
@@ -33,7 +35,13 @@ final class N2PortableBackupInteropTests:XCTestCase {
             .appendingPathComponent("n2-portable-"+UUID().uuidString+".danperbackup")
         try encrypted.write(to:url,options:.atomic)
         defer{try? FileManager.default.removeItem(at:url)}
-        let audited=try PortableBackupInspector.audit(url:url,password:password)
+        let copied=try N2BackupPickerCopy.stage(url)
+        XCTAssertNotEqual(copied,url)
+        XCTAssertEqual(try Data(contentsOf:copied),encrypted)
+        let audited=try PortableBackupInspector.audit(url:copied,password:password)
+        N2BackupPickerCopy.discard(copied)
+        XCTAssertFalse(FileManager.default.fileExists(atPath:copied.path))
+        XCTAssertEqual(try Data(contentsOf:url),encrypted)
         XCTAssertEqual(audited.manifest.workers,1)
         XCTAssertEqual(audited.manifest.attentions,0)
         XCTAssertThrowsError(try PortableBackupInspector.audit(
@@ -128,6 +136,55 @@ final class N2PortableBackupInteropTests:XCTestCase {
                        original.pendingClinicalItems)
         // The source fixture includes provisional clinical consumptions. They
         // must stay pending; no physical movement is invented by reviewing.
+    }
+    @MainActor func testPickerDelegateDeliversProtectedCopyAndReportsEmptySelection() throws {
+        let original=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString+".danperbackup")
+        let bytes=Data(repeating:65,count:120)
+        try bytes.write(to:original)
+        defer {try? FileManager.default.removeItem(at:original)}
+        var received:URL?,failure="",cancelled=false
+        let picker=N2BackupDocumentPicker(onPicked:{received=$0},
+            onCancelled:{cancelled=true},onError:{failure=$0})
+        let delegate=picker.makeCoordinator()
+        let controller=UIDocumentPickerViewController(forOpeningContentTypes:[.item],asCopy:true)
+        delegate.documentPicker(controller,didPickDocumentsAt:[original])
+        let copied=try XCTUnwrap(received)
+        defer {N2BackupPickerCopy.discard(copied)}
+        XCTAssertNotEqual(copied,original)
+        XCTAssertEqual(try Data(contentsOf:copied),bytes)
+        XCTAssertEqual(try Data(contentsOf:original),bytes)
+        delegate.documentPicker(controller,didPickDocumentsAt:[])
+        XCTAssertTrue(failure.hasPrefix("BACKUP_PICKER_EMPTY"))
+        delegate.documentPickerWasCancelled(controller)
+        XCTAssertTrue(cancelled)
+    }
+    func testSharedImportRejectsRemoteWrongExtensionSymlinkAndOversizeWithoutChangingOriginal() throws {
+        XCTAssertThrowsError(try N2BackupPickerCopy.stage(URL(string:"https://example.invalid/file.danperbackup")!))
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        defer {try? FileManager.default.removeItem(at:folder)}
+        let wrong=folder.appendingPathComponent("file.txt")
+        try Data(repeating:65,count:120).write(to:wrong)
+        XCTAssertThrowsError(try N2BackupPickerCopy.stage(wrong))
+        let link=folder.appendingPathComponent("link.danperbackup")
+        try FileManager.default.createSymbolicLink(at:link,withDestinationURL:wrong)
+        XCTAssertThrowsError(try N2BackupPickerCopy.stage(link))
+        let large=folder.appendingPathComponent("large.danperbackup")
+        FileManager.default.createFile(atPath:large.path,contents:nil)
+        let handle=try FileHandle(forWritingTo:large)
+        try handle.truncate(atOffset:UInt64(42*1024*1024+1));try handle.close()
+        XCTAssertThrowsError(try N2BackupPickerCopy.stage(large))
+        XCTAssertEqual(try Data(contentsOf:wrong).count,120)
+    }
+    func testInstalledAppRegistersBackupDocumentForFilesOpenIn() throws {
+        let info=try XCTUnwrap(Bundle.main.infoDictionary)
+        let declarations=try XCTUnwrap(info["UTExportedTypeDeclarations"] as? [[String:Any]])
+        let declaration=try XCTUnwrap(declarations.first{$0["UTTypeIdentifier"] as? String == "pe.danper.saludmovil.backup"})
+        let tags=try XCTUnwrap(declaration["UTTypeTagSpecification"] as? [String:Any])
+        XCTAssertEqual(tags["public.filename-extension"] as? [String],["danperbackup"])
+        let documents=try XCTUnwrap(info["CFBundleDocumentTypes"] as? [[String:Any]])
+        XCTAssertTrue(documents.contains{($0["LSItemContentTypes"] as? [String])?.contains("pe.danper.saludmovil.backup")==true})
+        XCTAssertEqual(UTType(filenameExtension:"danperbackup")?.identifier,"pe.danper.saludmovil.backup")
     }
     func testUnsafePasswordAndPlaintextAreRejected() throws {
         XCTAssertThrowsError(try N2NativePortableBackupMaker.createVerified(

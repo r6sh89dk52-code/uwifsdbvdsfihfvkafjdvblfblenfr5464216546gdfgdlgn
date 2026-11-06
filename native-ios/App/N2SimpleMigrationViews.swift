@@ -184,6 +184,8 @@ struct N2SimpleRestoreView:View {
     enum Kind {case clinical,complete}
     let kind:Kind
     var onRestored:()->Void={}
+    // Already staged encrypted copy from the app's Open In / Share handler.
+    var incomingFile:URL?=nil
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
@@ -215,11 +217,19 @@ struct N2SimpleRestoreView:View {
             }.padding(16)
         }.navigationTitle(kind == .clinical ? "Restaurar historial":"Recuperación completa")
             .navigationBarTitleDisplayMode(.inline).danperFormChrome()
-            .fileImporter(isPresented:$chooseFile,allowedContentTypes:[.data,.item]) {result in
-                switch result {
-                case .success(let url):file=url;review=nil;status="Archivo seleccionado. Introduce su contraseña para verificarlo."
-                case .failure(let error):status=n2SimpleMessage(error)
-                }
+            .sheet(isPresented:$chooseFile) {
+                N2BackupDocumentPicker(
+                    onPicked:{ url in
+                        N2BackupPickerCopy.discard(file)
+                        file=url;review=nil
+                        chooseFile=false
+                        status="Respaldo seleccionado: \(url.lastPathComponent). Introduce la contraseña y pulsa Verificar respaldo."
+                    },
+                    onCancelled:{chooseFile=false},
+                    onError:{ message in
+                        chooseFile=false
+                        status="No se pudo copiar el respaldo desde Archivos: "+message
+                    })
             }
             .confirmationDialog(kind == .clinical ? "Conservar inventario y restaurar clínica":"Recuperar en fuente vacía",
                 isPresented:$confirm,titleVisibility:.visible) {
@@ -228,6 +238,14 @@ struct N2SimpleRestoreView:View {
                 } message:{Text(kind == .clinical ? "No se importarán lotes, saldos FEFO ni conciliaciones pendientes anteriores. Los registros repetidos no se duplicarán; un conflicto no se sobrescribirá.":"Si ya existe una fuente, la recuperación completa se bloqueará. Para conservar inventario usa la restauración clínica selectiva.")}
             .task {
                 responsible=vault.isClinical ? N2ClinicianIdentity.name:"OPERADOR FICTICIO"
+                if let incomingFile,file == nil {
+                    do {
+                        file=try N2BackupPickerCopy.stage(incomingFile)
+                        status="Respaldo cifrado recibido desde Archivos. Introduce su contraseña y verifica el contenido."
+                    } catch {
+                        status="No se pudo preparar la copia compartida. Vuelve a compartir el archivo original."
+                    }
+                }
                 if kind == .clinical {
                     do {
                         let context=try await vault.simpleInventoryContext()
@@ -237,7 +255,15 @@ struct N2SimpleRestoreView:View {
                 }
             }
             .onChange(of:password){_,_ in review=nil}
-            .onChange(of:scenePhase){_,phase in if phase == .background {clearSecrets()}}
+            .onChange(of:scenePhase){_,phase in
+                if phase == .background {
+                    // Files providers can briefly change app lifecycle.
+                    // Clear credentials but keep a local ENCRYPTED picker copy
+                    // available so users can re-enter the password.
+                    cycle=UUID();identity?.invalidate();identity=nil
+                    work?.cancel();work=nil;password="";review=nil
+                }
+            }
             .onDisappear{clearSecrets()}
     }
     private var form:some View {
@@ -298,6 +324,9 @@ struct N2SimpleRestoreView:View {
         identity=nil
     }
     private func clearSecrets() {
-        cycle=UUID();identity?.invalidate();identity=nil;work?.cancel();work=nil;password="";review=nil
+        cycle=UUID();identity?.invalidate();identity=nil
+        work?.cancel();work=nil;password="";review=nil
+        N2BackupPickerCopy.discard(file)
+        file=nil
     }
 }
