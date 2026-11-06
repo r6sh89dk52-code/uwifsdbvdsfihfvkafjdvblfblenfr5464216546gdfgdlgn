@@ -84,21 +84,23 @@ final class N2GlassClinicalTests:XCTestCase {
             app.terminate();launch(app,localTime:time,appearance:appearance)
             assertWelcome(app,text);capture("Inicio-"+time+"-"+appearance)
         }
-        // The injected clock advances using uptime. Cross a real scheduled
-        // boundary while visible, then another during actual backgrounding.
-        app.terminate();launch(app,localTime:"11:59:45")
+        // The injected clock advances using uptime. Leave a full minute before
+        // each boundary: cold Simulator launch/AX startup can consume >15s.
+        // Cross the real scheduled boundary both while visible and in the
+        // background; keep the original before/after UI assertions intact.
+        app.terminate();launch(app,localTime:"11:59:00")
         assertWelcome(app,"Buenos días Felipe ☀️")
         let afternoon=app.staticTexts["glass-home-greeting-text"]
         let changed=XCTNSPredicateExpectation(predicate:NSPredicate(format:"label == %@","Buenas tardes Felipe 🌤️"),object:afternoon)
-        XCTAssertEqual(XCTWaiter.wait(for:[changed],timeout:25),.completed)
+        XCTAssertEqual(XCTWaiter.wait(for:[changed],timeout:85),.completed)
         capture("Inicio-cambio-tramo-visible")
-        app.terminate();launch(app,localTime:"18:59:45")
+        app.terminate();launch(app,localTime:"18:59:00")
         assertWelcome(app,"Buenas tardes Felipe 🌤️")
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(app.wait(for:.runningBackground,timeout:10))
         let elapsed=XCTestExpectation(description:"Cross injected clock boundary in background")
-        DispatchQueue.main.asyncAfter(deadline:.now()+17) {elapsed.fulfill()}
-        wait(for:[elapsed],timeout:20)
+        DispatchQueue.main.asyncAfter(deadline:.now()+85) {elapsed.fulfill()}
+        wait(for:[elapsed],timeout:95)
         app.activate()
         assertWelcome(app,"Buenas noches Felipe 🌙");capture("Inicio-primer-plano-actualizado")
         app.terminate();launch(app,large:true)
