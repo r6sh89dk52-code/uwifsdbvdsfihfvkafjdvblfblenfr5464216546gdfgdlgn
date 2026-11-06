@@ -4,6 +4,8 @@ import DanperCore
 /// First-class encrypted N2 draft tab, never uses N1g demo drafts.
 struct N2NativeDraftsDashboard:View {
     @Environment(\.n2WorkspaceVault) private var vault
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.n2WorkspaceTab) private var selectedTab
     @State private var editor:DanperAttentionRoute?
     @State private var records=[N2RecoverableDraft]()
     @State private var loadedRevision:Int?
@@ -75,6 +77,11 @@ struct N2NativeDraftsDashboard:View {
         .danperFormChrome()
         .refreshable {await load()}
         .task {await load()}
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification)) { event in
+            guard N2WorkspaceChanges.matches(event,vault),scenePhase == .active,
+                  editor==nil,(selectedTab==2 || selectedTab == -1) else{return}
+            Task {@MainActor in await load()}
+        }
         .confirmationDialog("¿Eliminar este borrador?",
             isPresented:Binding(
                 get:{selectedDeleteID != nil},

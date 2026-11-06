@@ -14,7 +14,7 @@ if test "$MODE" = replay; then
  printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
 fi
 DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != replay; then
+if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != current-native && test "$MODE" != replay; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -50,7 +50,7 @@ if test "$MODE" = resume-native; then
 fi
 # Current-branch CI: run every simulator suite from this checkout, without
 # reusing earlier evidence or packaging. Swift/Excel gates run independently.
-if test "$MODE" = current || test "$MODE" = replay; then
+if test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay; then
  git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
  git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
  xcodebuild -version > "$OUT/xcode-version.txt"
@@ -172,7 +172,7 @@ run_tests(){
 }
 if test "$MODE" != ui; then
  fresh native
- if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = replay; then
+ if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay; then
   # Compile for this actual Simulator architecture, not two unused slices.
   xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
    -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath "$DD" \
@@ -182,10 +182,11 @@ if test "$MODE" != ui; then
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  if test "$MODE" != replay; then
-  run_tests native-29 29 -only-testing:DANPERNativeTests
+  native_count=$(python3 -c 'from pathlib import Path; import re; print(sum(len(re.findall(r"\bfunc test\w+\(",p.read_text())) for p in Path("native-ios/NativeTests").glob("*.swift")))')
+  run_tests "native-$native_count" "$native_count" -only-testing:DANPERNativeTests
   git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
  fi
- if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
+ if test "$MODE" = native || test "$MODE" = current-native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
 fi
 # Discover all classes/cases from source, never an outdated handpicked subset.
 python3 - <<'PY' > "$OUT/ui-classes.tsv"

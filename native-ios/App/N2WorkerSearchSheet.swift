@@ -10,20 +10,12 @@ struct N2WorkerSearchSheet:View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var searchFocused:Bool
     @State private var query=""
+    @State private var committedQuery=""
     @State private var page=0
     private let pageSize=25
 
-    // N2NativeFormContextReader delivers workers already sorted by name.
-    // Preserve that stable order, including after filtering: sorting 9,648
-    // records every time SwiftUI reevaluates the body was unnecessary.
-    // Render only the requested page of 25 results below.
-    private var matches:[N2FormWorker] {
-        let q=query.trimmingCharacters(in:.whitespacesAndNewlines)
-        guard !q.isEmpty else {return workers}
-        return workers.filter {
-            $0.dni.contains(q) || $0.name.localizedStandardContains(q)
-        }
-    }
+    @State private var searchIndex:N2SearchIndex<N2FormWorker>?
+    @State private var matches=[N2FormWorker]()
     var body:some View {
         // Evaluate the 9k-person predicate once per render, not again
         // for the count, pagination and ForEach. Only 25 views are made.
@@ -53,7 +45,11 @@ struct N2WorkerSearchSheet:View {
                                     .accessibilityIdentifier("roster-global-search")
                             }
                         }
-                        if results.isEmpty {
+                        if committedQuery.trimmingCharacters(in:.whitespacesAndNewlines).count<2 {
+                            ContentUnavailableView("Escribe para buscar",
+                                systemImage:"magnifyingglass",
+                                description:Text("Introduce al menos dos caracteres del DNI o nombre. No se muestra el padrón completo."))
+                        } else if results.isEmpty {
                             ContentUnavailableView("No se encontraron trabajadores",
                                 systemImage:"person.crop.circle.badge.questionmark",
                                 description:Text("Revisa la búsqueda o registra a la persona manualmente."))
@@ -108,13 +104,27 @@ struct N2WorkerSearchSheet:View {
                     }
                 }.padding(16)
             }
-            .onChange(of:query) {_,_ in
-                page=0
-                withAnimation(.easeOut(duration:0.18)){
-                    proxy.scrollTo("worker-search-top",anchor:.top)
+            .task(id:query) {
+                // Do not rescan 10k people on every keystroke.
+                let requested=query
+                if requested.trimmingCharacters(in:.whitespacesAndNewlines).count<2 {
+                    committedQuery=requested;matches=[];page=0
+                    return
                 }
+                do {try await Task.sleep(for:.milliseconds(180))}
+                catch{return}
+                guard !Task.isCancelled else{return}
+                let prior=searchIndex,rows=workers
+                let prepared=await Task.detached(priority:.userInitiated) {
+                    let index=prior ?? N2SearchIndex(rows:rows,fields:{$0.dni+"\u{1f}"+$0.name})
+                    return (index,index.matches(requested))
+                }.value
+                guard !Task.isCancelled else{return}
+                searchIndex=prepared.0;matches=prepared.1
+                committedQuery=requested;page=0
             }
         }
+        .onAppear {searchFocused=true}
         .navigationTitle("Buscar en padrón")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {ToolbarItem(placement:.topBarTrailing) {

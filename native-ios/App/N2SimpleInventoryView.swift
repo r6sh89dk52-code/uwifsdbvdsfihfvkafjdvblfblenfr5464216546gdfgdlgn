@@ -194,7 +194,11 @@ struct N2SimpleProductDetail:View {
                 if !error.isEmpty {DanperErrorState(message:error,retry:{Task {await load()}})}
             }.padding(16)
         }.navigationTitle("Existencias").navigationBarTitleDisplayMode(.inline).danperFormChrome()
-            .task {await load()}.refreshable {await load()}
+            .task {await load()}
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification)) { event in
+            guard N2WorkspaceChanges.matches(event,vault) else{return}
+            Task {@MainActor in await load()}
+        }.refreshable {await load()}
             .sheet(item:$editor,onDismiss:{Task {await load()}}) {route in
                 if let context {NavigationStack {N2SimpleProductEditor(context:context,operation:route.operation,product:route.product)}}
             }

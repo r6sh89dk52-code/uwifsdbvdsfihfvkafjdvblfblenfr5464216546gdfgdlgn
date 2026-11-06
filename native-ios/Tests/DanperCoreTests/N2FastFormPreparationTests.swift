@@ -5,6 +5,90 @@ import XCTest
 /// Ensures the faster iOS new-attention bootstrap changes neither validation
 /// nor the decrypted clinical source. Uses synthetic fixture data ONLY.
 final class N2FastFormPreparationTests:XCTestCase {
+    func testAuthenticatedCorrectionContextAndOneRowRefreshMatchStrictProjection()throws {
+        let folder=try directory(),raw=try fixture("n1e-clinical-stock.json")
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:0x51,count:32))
+        _=try journal.commit(raw,expectedRevision:0)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let initial=try store.prepareClinicalCorrection(visitID:"fundo-unit")
+        XCTAssertEqual(initial.revision,1)
+        XCTAssertEqual(initial.detail.effectiveSHA256,
+            try N2ClinicalCorrections.detail(snapshot:raw,visitID:"fundo-unit").effectiveSHA256)
+        XCTAssertTrue(initial.history.isEmpty);XCTAssertNil(initial.draft)
+        let old=try N2NativeSnapshotReader.read(raw)
+        let changed=try N2ClinicalCorrections.append(snapshot:raw,eventID:UUID().uuidString,
+            visitID:"fundo-unit",changes:JSONSerialization.data(withJSONObject:[
+                "diagnosis":"DIAGNOSTICO FICTICIO ACTUALIZADO","visitWorkerSite":"PLVENTUROSA"]),
+            reason:"Rectificación clínica ficticia de prueba",operatorName:"OPERADOR FICTICIO",
+            medicationDiscrepancy:"",expectedEffectiveSHA:initial.detail.effectiveSHA256,at:1793370000000)
+        _=try journal.commit(changed,expectedRevision:1)
+        let prepared=try store.prepareClinicalCorrection(visitID:"fundo-unit")
+        XCTAssertEqual(prepared.revision,2);XCTAssertEqual(prepared.history.count,1)
+        let patched=old.applyingClinicalDetail(prepared.detail)
+        let strict=try N2NativeSnapshotReader.read(changed)
+        XCTAssertEqual(patched.visits,strict.visits)
+        XCTAssertEqual(patched.roster,old.roster)
+        XCTAssertEqual(patched.pendingClinicalLines,old.pendingClinicalLines)
+        XCTAssertEqual(patched.visits.count,old.visits.count)
+        XCTAssertEqual(try store.readIndex()?.visits,strict.visits)
+    }
+    func testAuthenticatedProjectionStillRejectsTamperedCorrectionChain()throws {
+        let folder=try directory(),raw=try fixture("n1e-clinical-stock.json")
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:0x52,count:32))
+        let detail=try N2ClinicalCorrections.detail(snapshot:raw,visitID:"fundo-unit")
+        let changed=try N2ClinicalCorrections.append(snapshot:raw,eventID:UUID().uuidString,
+            visitID:"fundo-unit",changes:JSONSerialization.data(withJSONObject:["diagnosis":"DIAGNOSTICO FICTICIO"]),
+            reason:"Rectificación ficticia para detectar alteraciones",operatorName:"OPERADOR FICTICIO",
+            medicationDiscrepancy:"",expectedEffectiveSHA:detail.effectiveSHA256,at:1793370000000)
+        var obj=try XCTUnwrap(JSONSerialization.jsonObject(with:changed) as? [String:Any])
+        var events=try XCTUnwrap(obj["clinicalCorrectionLog"] as? [[String:Any]])
+        events[0]["reason"]="Texto alterado sin recalcular la cadena";obj["clinicalCorrectionLog"]=events
+        let altered=try JSONSerialization.data(withJSONObject:obj,options:.sortedKeys)
+        _=try journal.commit(altered,expectedRevision:0)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        XCTAssertThrowsError(try store.prepareClinicalCorrection(visitID:"fundo-unit"))
+        XCTAssertThrowsError(try store.readIndex())
+    }
+    func testCountersAndRevisionBelongToOneAuthenticatedSnapshot()throws {
+        let folder=try directory(),key=Data(repeating:0x71,count:32)
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:key)
+        _=try journal.commit(fixture("n1e-clinical-stock.json"),expectedRevision:0)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let before=try store.dashboardCounters(today:"2026-10-14",weekStart:"2026-10-12")
+        let result=try XCTUnwrap(store.dashboardSnapshot(today:"2026-10-14",weekStart:"2026-10-12"))
+        XCTAssertEqual(result.revision,1)
+        XCTAssertEqual(result.today,before?.today)
+        XCTAssertEqual(result.week,before?.week)
+        XCTAssertEqual(result.month,before?.month)
+        XCTAssertEqual(result.drafts,before?.drafts)
+        XCTAssertEqual(try journal.recover()?.revision,1)
+    }
+    func testWarmHistoryCacheAuthenticatesEachReadAndInvalidatesChangedWorkers()throws {
+        let folder=try directory(),raw=try fixture("n1e-clinical-stock.json")
+        let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:0x73,count:32))
+        _=try journal.commit(raw,expectedRevision:0)
+        let store=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let first=try XCTUnwrap(store.readIndexWithRevision())
+        let warm=try XCTUnwrap(store.readIndexWithRevision())
+        XCTAssertEqual(first.model.visits,warm.model.visits)
+        XCTAssertEqual(first.revision,warm.revision)
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:raw) as? [String:Any])
+        var workers=try XCTUnwrap(root["workers"] as? [[String:Any]])
+        workers[0]["name"]="PERSONA FICTICIA RENOMBRADA"
+        root["workers"]=workers
+        let changed=try JSONSerialization.data(withJSONObject:root,options:.sortedKeys)
+        _=try journal.commit(changed,expectedRevision:1)
+        let fresh=try XCTUnwrap(store.readIndexWithRevision())
+        XCTAssertEqual(fresh.revision,2)
+        XCTAssertEqual(fresh.model.roster,try N2NativeSnapshotReader.read(changed).roster)
+        XCTAssertNotEqual(fresh.model.roster,first.model.roster)
+        // A warmed projection never licenses a tampered on-disk generation.
+        let files=try FileManager.default.contentsOfDirectory(at:folder,includingPropertiesForKeys:nil)
+        for file in files where file.lastPathComponent.hasPrefix("gen-") {
+            try Data("CORRUPT".utf8).write(to:file)
+        }
+        XCTAssertThrowsError(try store.readIndexWithRevision())
+    }
     private func fixture(_ name:String)throws->Data {
         guard let dir=ProcessInfo.processInfo.environment["DANPER_N1_FIXTURE_DIR"] else {
             throw XCTSkip("Synthetic fixtures must be generated before this test")

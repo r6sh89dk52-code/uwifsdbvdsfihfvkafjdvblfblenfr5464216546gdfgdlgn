@@ -13,6 +13,8 @@ struct N2ClinicalWorkspaceGateView:View {
     @Environment(\.danperAuthenticatedSession) private var inheritedAuthentication
     @State private var summary:N2ProtectedStoreSummary?
     @State private var checked=false
+    @State private var sourceInspectionRevision=0
+    @State private var inspectedSourceRevision=0
     @State private var busy=false
     @State private var invalidSource=false
     @State private var authorized=false
@@ -46,9 +48,13 @@ struct N2ClinicalWorkspaceGateView:View {
             }
         }
         .background(DanperBackdrop())
-        .task {if !checked {await refresh()}}
-        .onChange(of:sessionUnlocked) {_,unlocked in
-            if unlocked && summary != nil {Task {await verifyRevision()}}
+        .task(id:"\(sourceInspectionAllowed)-\(sourceInspectionRevision)") {
+            if sourceInspectionAllowed {
+                if sourceInspectionRevision != inspectedSourceRevision || !checked || invalidSource {
+                    await refresh()
+                    inspectedSourceRevision=sourceInspectionRevision
+                } else if summary != nil {await verifyRevision()}
+            }
         }
         .onChange(of:scenePhase) {_,phase in
             if phase == .background {
@@ -56,6 +62,9 @@ struct N2ClinicalWorkspaceGateView:View {
                 if !authenticatedLaunch {authorized=false}
             }
         }
+    }
+    private var sourceInspectionAllowed:Bool {
+        scenePhase == .active && (!authenticatedLaunch || sessionUnlocked)
     }
     private var initialSetup:some View {
         ScrollView {
@@ -84,7 +93,12 @@ struct N2ClinicalWorkspaceGateView:View {
                         .buttonStyle(DanperSecondaryButton())
                         .accessibilityIdentifier("clinical-first-run-restore-222")
                         NavigationLink {
-                            N2FirstManualWorkerView()
+                            N2FirstManualWorkerView(onContinue:{
+                                // A navigation destination retains its creation
+                                // closure. Signal State here; the gate's task must
+                                // read the current scene/session, not that capture.
+                                sourceInspectionRevision+=1
+                            })
                         } label: {
                             Label("Comenzar sin Excel · registrar primer trabajador",
                                   systemImage:"person.badge.plus")
@@ -100,7 +114,8 @@ struct N2ClinicalWorkspaceGateView:View {
         .danperFormChrome()
     }
     @MainActor private func refresh() async {
-        guard !busy else{return}
+        guard !busy,sourceInspectionAllowed else{return}
+        let span=N2PerformanceSpan("Clinical gate refresh");defer{span.end()}
         busy=true
         defer {busy=false;checked=true}
         do {
@@ -114,6 +129,7 @@ struct N2ClinicalWorkspaceGateView:View {
         }
     }
     @MainActor private func verifyRevision() async {
+        let span=N2PerformanceSpan("Clinical revision verification");defer{span.end()}
         do {
             _=try await N2ProtectedClinicalIOSVault.shared.currentRevision()
         }catch {
@@ -150,6 +166,8 @@ struct N2ClinicalWorkspaceRootView:View {
     @Environment(\.danperAuthenticatedSession) private var sessionAuthenticated
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.scenePhase) private var scenePhase
+    @State private var loadingHomeCounts=false
+    @State private var homeRefreshPending=false
     @State private var homeRevision:Int?
     @State private var homeDay=""
     @State private var homeCounts:DanperHomeCounts?
@@ -192,12 +210,17 @@ struct N2ClinicalWorkspaceRootView:View {
             .toolbar(.hidden,for:.tabBar)
         }
         .danperFloatingNavigation(selection:$tab)
+        .environment(\.n2WorkspaceTab,tab)
         .environment(\.colorScheme,.dark)
         .background(DanperBackdrop())
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .preferredColorScheme(.dark)
         .task(id:tab) {if tab==0 {await refreshHomeCounts()}}
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification)) { event in
+            guard N2WorkspaceChanges.matches(event,vault),sessionAuthenticated,scenePhase == .active,tab==0,!showNewAttention else{return}
+            Task {await refreshHomeCounts()}
+        }
         .onChange(of:sessionAuthenticated) {_,active in
             if active {Task {await refreshHomeCounts()}}
         }
@@ -250,12 +273,20 @@ struct N2ClinicalWorkspaceRootView:View {
     }
     @MainActor private func refreshHomeCounts() async {
         guard !layoutOnly,sessionAuthenticated else{return}
+        if loadingHomeCounts {homeRefreshPending=true;return}
+        loadingHomeCounts=true
+        defer {
+            loadingHomeCounts=false
+            if homeRefreshPending {
+                homeRefreshPending=false
+                Task {await refreshHomeCounts()}
+            }
+        }
         do {
             let period=N2HomeCalendarPeriod(now:Date())
-            let revision=try await vault.currentRevision()
-            if revision==homeRevision,homeDay==period.today,homeCounts != nil {return}
-            let counters=try await vault.dashboardCounters(today:period.today,weekStart:period.weekStart)
-            homeRevision=revision;homeDay=period.today
+            let counters=try await vault.dashboardSnapshot(today:period.today,weekStart:period.weekStart)
+            guard sessionAuthenticated,scenePhase == .active else{return}
+            homeRevision=counters?.revision;homeDay=period.today
             homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
             countError=false
         }catch {

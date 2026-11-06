@@ -19,6 +19,39 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
     private func start(_ folder:URL,_ key:Data)throws->N2EncryptedClinicalJournal {
         try N2EncryptedClinicalJournal(directory:folder,secret:key)
     }
+    func testFastAllergyWriteRecoversVerifiedRevisionWithoutChangingClinicalHistory()throws {
+        let folder=try path(),key=Data(repeating:0x68,count:32)
+        let journal=try start(folder,key),original=try input()
+        XCTAssertEqual(try journal.commit(original,expectedRevision:0),1)
+        let core=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        let rev=try core.reviewAllergiesRevision(
+            dni:"00000001",status:"known",substances:"PENICILINA",
+            at:1793370000000,expectedRevision:1)
+        XCTAssertEqual(rev,2)
+        let reopened=try start(folder,key)
+        let result=try XCTUnwrap(reopened.recover())
+        XCTAssertEqual(result.revision,2)
+        let prior=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        let next=try XCTUnwrap(JSONSerialization.jsonObject(with:result.snapshot) as? [String:Any])
+        let allergies=try XCTUnwrap(next["allergies"] as? [String:Any])
+        let allergy=try XCTUnwrap(allergies["00000001"] as? [String:Any])
+        XCTAssertEqual(allergy["status"] as? String,"known")
+        XCTAssertEqual(allergy["substances"] as? String,"PENICILINA")
+        for field in ["workers","attentions","stockLots","stockMovements"] {
+            XCTAssertEqual(
+                try JSONSerialization.data(withJSONObject:prior[field]!,
+                    options:[.sortedKeys]),
+                try JSONSerialization.data(withJSONObject:next[field]!,
+                    options:[.sortedKeys]))
+        }
+        XCTAssertThrowsError(try core.reviewAllergiesRevision(
+            dni:"00000001",status:"none",substances:"",
+            at:1793370000100,expectedRevision:1)) {
+            XCTAssertEqual($0 as? N2ProtectedStoreError,.staleRevision)
+        }
+        XCTAssertEqual(try reopened.recover()?.revision,2)
+    }
+
     func testAtomicEncryptedRevisionAndNoPlaintextFiles()throws {
         let folder=try path(),key=Data(repeating:0x44,count:32),original=try input()
         let store=try start(folder,key)
@@ -69,6 +102,12 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
         let folder=try path(),key=Data(repeating:0x11,count:32)
         let store=try start(folder,key)
         _=try store.commit(input(),expectedRevision:0)
+        let verified=try XCTUnwrap(store.recover())
+        XCTAssertEqual(verified.parity.sourceSHA256,verified.fields.sourceSHA256)
+        let auditCount=store.semanticValidationCount
+        _=try store.recover()
+        XCTAssertEqual(store.semanticValidationCount,auditCount,
+            "Identical authenticated bytes share semantic proof only inside this journal instance")
         let p=try FileManager.default.contentsOfDirectory(at:folder,
                                  includingPropertiesForKeys:nil).first {
             $0.lastPathComponent.hasPrefix("gen-")
@@ -80,6 +119,24 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
         XCTAssertThrowsError(try store.recover()) {
             XCTAssertEqual($0 as? N2EncryptedClinicalJournal.Failure,.authenticationFailed)
         }
+    }
+    func testValidationMemoDoesNotCertifyChangedBytesOrWrongKey()throws {
+        let folder=try path(),key=Data(repeating:0x31,count:32)
+        let store=try start(folder,key),raw=try input()
+        _=try store.commit(raw,expectedRevision:0)
+        let count=store.semanticValidationCount
+        let next=try N2SnapshotEditor.reviewAllergies(snapshot:raw,dni:"00000001",
+            status:"known",substances:"SUSTANCIA FICTICIA",at:1793370000000)
+        _=try store.commit(next,expectedRevision:1)
+        XCTAssertGreaterThan(store.semanticValidationCount,count)
+        let after=try XCTUnwrap(store.recover())
+        XCTAssertEqual(after.snapshot,next)
+        XCTAssertEqual(after.parity.sourceSHA256,after.fields.sourceSHA256)
+        XCTAssertThrowsError(try start(folder,Data(repeating:0x32,count:32)).recover())
+        var bad=try XCTUnwrap(JSONSerialization.jsonObject(with:next) as? [String:Any])
+        bad["allergies"]=["00000001":["status":"known","substances":7,"updatedAt":1793370000000]]
+        XCTAssertThrowsError(try store.commit(JSONSerialization.data(withJSONObject:bad),expectedRevision:2))
+        XCTAssertEqual(try store.recover()?.revision,2)
     }
     func testMissingApplicationSupportParentIsCreatedWithoutDestroyingData()throws {
         // Regression: on a fresh iPhone install, Application Support is not
@@ -122,4 +179,29 @@ final class N2EncryptedClinicalJournalTests:XCTestCase {
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath:target.path))
     }
+    func testHistoryProjectionCarriesItsOwnAuthenticatedRevision()throws {
+        let folder=try path(),key=Data(repeating:0x6a,count:32)
+        let journal=try start(folder,key)
+        let core=N2ProtectedClinicalVaultCore(testJournal:journal,directory:folder)
+        XCTAssertNil(try core.readIndexWithRevision())
+        let original=try input()
+        XCTAssertEqual(try journal.commit(original,expectedRevision:0),1)
+        let first=try XCTUnwrap(core.readIndexWithRevision())
+        XCTAssertEqual(first.revision,1)
+        XCTAssertEqual(first.model.visits.count,5)
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        var rows=try XCTUnwrap(root["attentions"] as? [[String:Any]])
+        let index=try XCTUnwrap(rows.firstIndex{$0["id"] as? String=="fundo-unit"})
+        rows[index]["diagnosis"]="DIAGNOSTICO FICTICIO ACTUALIZADO"
+        root["attentions"]=rows
+        let changed=try JSONSerialization.data(withJSONObject:root,options:.sortedKeys)
+        XCTAssertEqual(try journal.commit(changed,expectedRevision:1),2)
+        let second=try XCTUnwrap(core.readIndexWithRevision())
+        XCTAssertEqual(second.revision,2)
+        XCTAssertEqual(second.model.visits.first{$0.id=="fundo-unit"}?.diagnosis,"DIAGNOSTICO FICTICIO ACTUALIZADO")
+        XCTAssertNotEqual(first.model.visits.first{$0.id=="fundo-unit"}?.diagnosis,second.model.visits.first{$0.id=="fundo-unit"}?.diagnosis)
+        XCTAssertEqual(second.model.roster,first.model.roster)
+        XCTAssertEqual(try core.readIndex()?.visits,second.model.visits)
+    }
+
 }

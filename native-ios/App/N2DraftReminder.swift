@@ -9,11 +9,11 @@ enum N2DraftReminder {
     }
 
     static func schedule(id:String,mode:N2WorkspaceVault.Mode = .demo) async {
-        guard UUID(uuidString:id) != nil else{return}
+        guard UUID(uuidString:id) != nil,!Task.isCancelled else{return}
         let center=UNUserNotificationCenter.current()
         let settings=await center.notificationSettings()
-        guard settings.authorizationStatus == .authorized ||
-              settings.authorizationStatus == .provisional else{return}
+        guard !Task.isCancelled,(settings.authorizationStatus == .authorized ||
+              settings.authorizationStatus == .provisional) else{return}
         let notification=UNMutableNotificationContent()
         notification.title="DANPER Salud"
         notification.body="Tienes un registro pendiente por revisar."
@@ -44,7 +44,7 @@ enum N2DraftReminder {
             // Pre-routing B11 used this single legacy name for DEMO only.
             ids.append("danper.n2.pending."+id)
         }
-        UNUserNotificationCenter.current().removePendingNotificationRequests(
-            withIdentifiers:ids)
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers:ids)
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers:ids)
     }
 }

@@ -116,16 +116,29 @@ public struct N2SimpleInventoryState:Codable,Equatable,Sendable {
 /// audit; v1 always passes through the unchanged legacy physical concordance.
 public enum N2VersionedSnapshotAudit {
     public static func inspect(_ data:Data,allowEmptySynthetic:Bool=false)throws->N1eClinicalParityReport {
+        if try isVersionTwo(data) {return try N2SimpleInventory.audit(data)}
+        return try N1eLegacyClinicalAudit.inspect(data,allowEmptySynthetic:allowEmptySynthetic)
+    }
+    /// Both complete reports are generated from these bytes in this call.
+    /// V2 parity already performs the lossless field gate: return that result
+    /// rather than walking/round-tripping the full clinical tree a second time.
+    static func reports(_ data:Data,allowEmptySynthetic:Bool=false)throws
+        ->(parity:N1eClinicalParityReport,fields:N1fFieldReport) {
+        if try isVersionTwo(data) {return try N2SimpleInventory.auditReports(data)}
+        return (try N1eLegacyClinicalAudit.inspect(data,allowEmptySynthetic:allowEmptySynthetic),
+                try N1fLosslessFieldGate.inspect(data))
+    }
+    private static func isVersionTwo(_ data:Data)throws->Bool {
         guard let root=try? JSONSerialization.jsonObject(with:data) as? [String:Any] else {
             throw N2SimpleInventoryError.invalidSnapshot
         }
         if let version=root["inventorySchemaVersion"] {
             guard let n=version as? NSNumber,CFGetTypeID(n) != CFBooleanGetTypeID(),n.intValue==2,
                   n.doubleValue==2 else {throw N2SimpleInventoryError.unsupportedSchema}
-            return try N2SimpleInventory.audit(data)
+            return true
         }
         guard root["simpleInventory"] == nil else{throw N2SimpleInventoryError.unsupportedSchema}
-        return try N1eLegacyClinicalAudit.inspect(data,allowEmptySynthetic:allowEmptySynthetic)
+        return false
     }
 }
 public enum N2SimpleInventory {
@@ -195,8 +208,12 @@ public enum N2SimpleInventory {
     }
     static func key(_ visit:String,_ item:String)->String {visit+"\u{001F}"+item}
     public static func audit(_ snapshot:Data)throws->N1eClinicalParityReport {
+        try auditReports(snapshot).parity
+    }
+    static func auditReports(_ snapshot:Data)throws
+        ->(parity:N1eClinicalParityReport,fields:N1fFieldReport) {
         let root=try object(snapshot)
-        _=try N1fLosslessFieldGate.inspect(snapshot)
+        let fields=try N1fLosslessFieldGate.inspect(snapshot)
         if (try? N1BackupAdmission.preview(data:snapshot)) == nil {
             let baseKeys:Set<String>=["workers","attentions","allergies","stockLots","stockMovements",
                 "catalogMappings","deliveryIncidents","ambulatoryReconciliation","notifications"]
@@ -350,10 +367,11 @@ public enum N2SimpleInventory {
             covered[key(incident.visitID,incident.itemID)] = products[incident.code]?.mode == .presentation ? incident.resolvedR.map(Double.init) : incident.clinicalQuantity
         }
         let quantities:[Double?]=ordered.map{uses[$0] ?? covered[$0] ?? historical[$0] ?? nil}
-        return N1eClinicalParityReport(sourceSHA256:digest(snapshot),workers:workers.count,attentions:visits.count,
+        let parity=N1eClinicalParityReport(sourceSHA256:digest(snapshot),workers:workers.count,attentions:visits.count,
             savedClinicalItems:ordered.count,linkedClinicalItems:quantities.compactMap{$0}.count,
             pendingClinicalItems:s.incidents.filter{$0.resolutionEventID==nil}.count,splitDeliveries:0,
             physicalMovements:s.movements.count,stockLots:0,consumptionR:quantities)
+        return (parity,fields)
     }
 }
 

@@ -68,6 +68,7 @@ struct NativeRootView:View {
             .toolbar(.hidden,for:.tabBar)
         }
         .danperFloatingNavigation(selection:$tab)
+        .environment(\.n2WorkspaceTab,tab)
         .environment(\.colorScheme,.dark)
         .background(DanperBackdrop())
         .tint(DanperStyle.red)

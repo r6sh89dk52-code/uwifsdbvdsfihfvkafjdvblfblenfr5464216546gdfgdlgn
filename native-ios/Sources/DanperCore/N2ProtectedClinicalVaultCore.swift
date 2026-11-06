@@ -20,10 +20,21 @@ public struct N2ProtectedStoreSummary: Sendable {
     public let physicalMovements:Int
     public let pendingClinicalLines:Int
 }
+public struct N2DashboardSnapshot:Sendable {
+    public let revision:Int
+    public let today:Int
+    public let week:Int
+    public let month:Int
+    public let drafts:Int
+}
 public enum N2ProtectedStoreError:Error,Equatable {
     case unsafeSource, targetNotEmpty, absentSource, staleRevision
 }
 public final class N2ProtectedClinicalVaultCore {
+    // Session-owned, bounded and never persisted. Authentication still precedes
+    // every use; byte equality is required for reuse of a complete projection.
+    private var historyProjection:(bytes:Data,model:N2NativeReadModel)?
+
     private let journal:N2EncryptedClinicalJournal
     private let directory:URL
     public enum Namespace:Sendable {
@@ -47,10 +58,11 @@ public final class N2ProtectedClinicalVaultCore {
     }
     private func summary(_ record:N2EncryptedClinicalJournal.Recovered) throws
         -> N2ProtectedStoreSummary {
-        let a=try N2VersionedSnapshotAudit.inspect(
-            record.snapshot,
-            allowEmptySynthetic:directory.lastPathComponent=="DANPER-N2-SYNTHETIC-VAULT")
-        let b=try N1fLosslessFieldGate.inspect(record.snapshot)
+        // These reports belong to these exact authenticated bytes. Preserve
+        // the pre-existing prohibition against empty clinical activation.
+        let a = directory.lastPathComponent != "DANPER-N2-SYNTHETIC-VAULT" && N2EmptyDemoSnapshot.matches(record.snapshot)
+            ? try N2VersionedSnapshotAudit.inspect(record.snapshot) : record.parity
+        let b=record.fields
         return N2ProtectedStoreSummary(revision:record.revision,
             workers:a.workers,attentions:a.attentions,
             saved:b.saved,drafts:b.drafts,
@@ -154,8 +166,10 @@ public final class N2ProtectedClinicalVaultCore {
             throw N2ProtectedStoreError.absentSource
         }
         if N2SimpleInventory.isActive(active.snapshot) {
-            let state=try N2SimpleInventory.read(active.snapshot)
-            let audit=try N2VersionedSnapshotAudit.inspect(active.snapshot)
+            // The journal's reports belong to these exact authenticated bytes.
+            // Decode their state without repeating both full clinical audits.
+            let state=try N2SimpleInventory.state(root)
+            let audit=active.parity
             var offset=0
             for saved in visits where saved["status"] as? String=="saved" {
                 let rows=saved["items"] as? [[String:Any]] ?? []
@@ -207,6 +221,13 @@ public final class N2ProtectedClinicalVaultCore {
     /// authenticated snapshot. No plaintext or derived index is persisted.
     public func dashboardCounters(today:String,weekStart:String)throws
         ->(today:Int,week:Int,month:Int,drafts:Int)? {
+        guard let result=try dashboardSnapshot(today:today,weekStart:weekStart) else{return nil}
+        return (result.today,result.week,result.month,result.drafts)
+    }
+    /// Revision and counters from the SAME authenticated recovery. The UI must
+    /// not decrypt/audit once for currentRevision and then repeat for counters.
+    public func dashboardSnapshot(today:String,weekStart:String)throws->N2DashboardSnapshot? {
+        let span=N2PerformanceSpan("Dashboard counters");defer{span.end()}
         guard today.count==10,weekStart.count==10,weekStart<=today,
               let active=try journal.recover() else{return nil}
         guard let root=try? JSONSerialization.jsonObject(
@@ -225,7 +246,7 @@ public final class N2ProtectedClinicalVaultCore {
             if date>=weekStart && date<=today {weekCount+=1}
             if date>=monthStart && date<=today {monthCount+=1}
         }
-        return (today:todayCount,week:weekCount,month:monthCount,drafts:drafts)
+        return N2DashboardSnapshot(revision:active.revision,today:todayCount,week:weekCount,month:monthCount,drafts:drafts)
     }
     public func readDashboard()throws
         ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
@@ -233,13 +254,23 @@ public final class N2ProtectedClinicalVaultCore {
             return (history:nil,drafts:[])
         }
         return (
-            history:try N2NativeSnapshotReader.read(active.snapshot),
+            history:try N2NativeSnapshotReader.readAuthenticated(active),
             drafts:try N2NativeDraftRecovery.readVerified(active.snapshot)
         )
     }
     public func readIndex()throws->N2NativeReadModel? {
+        try readIndexWithRevision()?.model
+    }
+    /// The displayed rows and their revision belong to one authenticated
+    /// recovery; never label old history with a separately read newer revision.
+    public func readIndexWithRevision()throws->(revision:Int,model:N2NativeReadModel)? {
         guard let active=try journal.recover() else{return nil}
-        return try N2NativeSnapshotReader.read(active.snapshot)
+        if let cached=historyProjection,cached.bytes==active.snapshot {
+            return (active.revision,cached.model)
+        }
+        let model=try N2NativeSnapshotReader.readAuthenticated(active,reusing:historyProjection?.model,priorSnapshot:historyProjection?.bytes)
+        historyProjection=active.snapshot.count<=8*1024*1024 ? (active.snapshot,model):nil
+        return (active.revision,model)
     }
     public func clinicalFormContext(products:Data,nursing:Data,mappings:Data)
         throws->N2FormContext {
@@ -274,8 +305,8 @@ public final class N2ProtectedClinicalVaultCore {
         guard let active=try journal.recover() else{
             throw N2ProtectedStoreError.absentSource
         }
-        return try N2VerifiedIndicatorWorkbook.export(
-            snapshot:active.snapshot,products:products,
+        return try N2VerifiedIndicatorWorkbook.exportAuthenticated(
+            active,products:products,
             mappings:mappings,template:template,
             start:start,end:end,subdivision:subdivision,
             selectedVisitIDs:ids,allowPending:allowPending)
@@ -490,6 +521,32 @@ public final class N2ProtectedClinicalVaultCore {
             try N2SnapshotEditor.addWorker(snapshot:$0,worker:worker,at:at)
         }
     }
+    /// Fast acknowledgment for the allergy control in the clinical form.
+    /// Both journal recoveries still authenticate and validate the FULL
+    /// encrypted snapshot. This skips only the redundant summary re-audit
+    /// and expensive form-context reconstruction after a successful write.
+    /// A failed post-commit verification is never reported as saved.
+    public func reviewAllergiesRevision(dni:String,status:String,
+        substances:String,at:Int64,expectedRevision:Int)throws->Int {
+        let span=N2PerformanceSpan("Confirmed allergy save");defer{span.end()}
+        guard let active=try journal.recover() else{
+            throw N2ProtectedStoreError.absentSource
+        }
+        guard active.revision==expectedRevision else{
+            throw N2ProtectedStoreError.staleRevision
+        }
+        let next=try N2SnapshotEditor.reviewedAllergies(
+            snapshot:active.snapshot,dni:dni,status:status,
+            substances:substances,at:at)
+        guard next.bytes != active.snapshot else{return active.revision}
+        let revision=try journal.commit(next,expectedRevision:expectedRevision)
+        guard let verified=try journal.recover(),
+              verified.revision==revision,
+              verified.snapshot==next.bytes else{
+            throw N2ProtectedStoreError.unsafeSource
+        }
+        return revision
+    }
     @discardableResult
     public func reviewAllergies(dni:String,status:String,substances:String,
                                at:Int64,expectedRevision:Int)throws->N2ProtectedStoreSummary {
@@ -501,9 +558,16 @@ public final class N2ProtectedClinicalVaultCore {
     @discardableResult
     public func saveDraft(id:String,changes:Data,at:Int64,
                           expectedRevision:Int)throws->N2ProtectedStoreSummary {
-        try modify(expectedRevision:expectedRevision) {
-            try N2SnapshotEditor.upsertDraft(snapshot:$0,id:id,changes:changes,at:at)
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        guard active.revision==expectedRevision else{throw N2ProtectedStoreError.staleRevision}
+        let next=try N2SnapshotEditor.upsertedDraft(snapshot:active.snapshot,id:id,changes:changes,at:at)
+        guard next.bytes != active.snapshot else{return try summary(active)}
+        let revision=try journal.commit(next,expectedRevision:expectedRevision)
+        guard let verified=try journal.recover(),verified.revision==revision,
+              verified.snapshot==next.bytes else {
+            throw N2ProtectedStoreError.unsafeSource
         }
+        return try summary(verified)
     }
     @discardableResult
     public func removeDraft(id:String,
@@ -603,11 +667,15 @@ public final class N2ProtectedClinicalVaultCore {
         return try N2ClinicalCorrections.history(
             snapshot:active.snapshot,visitID:visitID)
     }
+    public func prepareClinicalCorrection(visitID:String)throws->N2CorrectionReadContext {
+        guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
+        return try N2ClinicalCorrections.prepareAuthenticated(active,visitID:visitID)
+    }
     public func readCorrectionDetail(visitID:String)throws->N2CorrectionDetail {
         guard let active=try journal.recover() else {
             throw N2ProtectedStoreError.absentSource
         }
-        return try N2ClinicalCorrections.detail(snapshot:active.snapshot,visitID:visitID)
+        return try N2ClinicalCorrections.detailAuthenticated(active,visitID:visitID)
     }
     @discardableResult
     public func saveClinicalCorrection(visitID:String,eventID:String,changes:Data,

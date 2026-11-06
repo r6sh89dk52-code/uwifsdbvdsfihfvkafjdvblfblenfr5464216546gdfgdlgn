@@ -15,7 +15,14 @@ internal final class N2EncryptedClinicalJournal {
     struct Recovered {
         let revision:Int
         let snapshot:Data
+        let parity:N1eClinicalParityReport
+        let fields:N1fFieldReport
     }
+    // Actor/session-owned. Two bounded COW buffers cover the current and
+    // proposed generation; the iOS adaptor clears them on background/lock.
+    // This never bypasses disk reads, receipt HMAC, AEAD or SHA verification.
+    private var validated=[N2AuditedSnapshot]()
+    private(set) var semanticValidationCount=0
     private struct Receipt:Codable,Equatable {
         let version:Int
         let id:String
@@ -154,18 +161,19 @@ internal final class N2EncryptedClinicalJournal {
         }
         return r
     }
-    private func validate(_ data:Data)throws {
-        guard data.count>0,data.count<=30*1024*1024,
-              // The only zero-record exception is the exact canonical empty
-              // snapshot. No partially empty, corrupted or imported source
-              // can bypass the existing production audit.
-              (try? N2VersionedSnapshotAudit.inspect(
-                  data,allowEmptySynthetic:N2EmptyDemoSnapshot.matches(data))) != nil,
-              (try? N1fLosslessFieldGate.inspect(data)) != nil else {
-            throw Failure.invalidSnapshot
+    @discardableResult
+    private func validate(_ data:Data)throws->N2AuditedSnapshot {
+        if let prior=validated.first(where:{$0.bytes==data}) {return prior}
+        let span=N2PerformanceSpan("Journal semantic validation");defer{span.end()}
+        guard let result=try? N2AuditedSnapshot(validating:data) else{throw Failure.invalidSnapshot}
+        semanticValidationCount+=1
+        if data.count<=8*1024*1024 {
+            if validated.count==2 {validated.removeFirst()}
+            validated.append(result)
         }
+        return result
     }
-    private func generation(_ r:Receipt)throws->Data {
+    private func generation(_ r:Receipt)throws->N2AuditedSnapshot {
         guard let encrypted=try read("gen-\(r.id).gcm") else{
             throw Failure.missingGeneration
         }
@@ -175,8 +183,7 @@ internal final class N2EncryptedClinicalJournal {
                    authenticating:aad(r.id,r.revision)),sha(plaintext)==r.payloadSHA else {
             throw Failure.authenticationFailed
         }
-        try validate(plaintext)
-        return plaintext
+        return try validate(plaintext)
     }
     private func removePending() throws {
         if fm.fileExists(atPath:file(pendingName).path) {
@@ -186,26 +193,41 @@ internal final class N2EncryptedClinicalJournal {
     /// No pending revision can supersede an active pointer after restart.
     @discardableResult
     func recover() throws -> Recovered? {
+        let span=N2PerformanceSpan("Journal authenticated recovery");defer{span.end()}
         let active=try checked(activeName)
         let pending=try checked(pendingName)
         if let active {
-            let bytes=try generation(active)
+            let proof=try generation(active)
+            let bytes=proof.bytes
             if let pending {
                 if pending != active && pending.revision <= active.revision {
                     throw Failure.corruptJournal
                 }
                 try removePending()
             }
-            return Recovered(revision:active.revision,snapshot:bytes)
+            return Recovered(revision:active.revision,snapshot:bytes,
+                             parity:proof.parity,fields:proof.fields)
         }
         if pending != nil {try removePending()}
         return nil
+    }
+    /// The editor already ran both full audits on exactly these bytes. Retain
+    /// that immutable proof for the commit; every cryptographic/file/revision
+    /// check below still executes and persistence must still be confirmed.
+    @discardableResult
+    func commit(_ next:N2AuditedSnapshot,expectedRevision:Int)throws->Int {
+        if next.bytes.count<=8*1024*1024 && !validated.contains(where:{$0.bytes==next.bytes}) {
+            if validated.count==2 {validated.removeFirst()}
+            validated.append(next)
+        }
+        return try commit(next.bytes,expectedRevision:expectedRevision)
     }
     /// Copy-on-write: encrypted generation is verified before changing the
     /// single atomic active pointer. All previous generations remain intact.
     @discardableResult
     func commit(_ next:Data,expectedRevision:Int,
                 fault:((Checkpoint)throws->Void)?=nil)throws->Int {
+        let span=N2PerformanceSpan("Journal atomic commit");defer{span.end()}
         try validate(next)
         let current=try recover()
         guard (current?.revision ?? 0) == expectedRevision,
@@ -225,7 +247,7 @@ internal final class N2EncryptedClinicalJournal {
         receipt=Receipt(version:receipt.version,id:receipt.id,
                         revision:receipt.revision,previousSHA:receipt.previousSHA,
                         payloadSHA:receipt.payloadSHA,mac:sign(receipt))
-        guard try generation(receipt)==next else{throw Failure.corruptJournal}
+        guard try generation(receipt).bytes==next else{throw Failure.corruptJournal}
         try write(pendingName,try JSONEncoder().encode(receipt))
         try fault?(.pendingJournalWritten)
         try write(activeName,try JSONEncoder().encode(receipt))

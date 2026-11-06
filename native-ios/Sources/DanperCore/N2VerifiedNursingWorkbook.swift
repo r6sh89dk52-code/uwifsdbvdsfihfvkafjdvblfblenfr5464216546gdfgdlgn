@@ -74,7 +74,8 @@ public enum N2VerifiedNursingWorkbook {
               let official=try JSONSerialization.jsonObject(with:catalog) as? [[String:Any]],official.count==98 else {
             throw Failure.incompleteOrUnreconciled
         }
-        let state=try N2SimpleInventory.read(snapshot)
+        let checked=try N2SimpleInventory.readWithHistoricalOpeningOverrides(snapshot)
+        let state=checked.state
         // A pre-count clinical record must not permanently invalidate every
         // later monthly opening. Scope historical evidence to this report.
         // Historical uses *inside* this period still require reconciliation;
@@ -84,7 +85,7 @@ public enum N2VerifiedNursingWorkbook {
             guard let id=visit["id"] as? String,let day=visit["date"] as? String else{return nil}
             return (id,day)
         })
-        let historicalOverrides=try N2SimpleInventory.historicalOpeningOverrides(snapshot)
+        let historicalOverrides=checked.overrides
         let approved=try mappings.map{try JSONSerialization.jsonObject(with:$0) as? [[String:Any]] ?? []} ?? []
         var links=[String:Set<String>]()
         for row in approved {

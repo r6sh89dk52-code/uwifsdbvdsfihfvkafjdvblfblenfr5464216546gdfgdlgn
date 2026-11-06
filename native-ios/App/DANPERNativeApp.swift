@@ -173,6 +173,7 @@ struct DANPERNativeApp: App {
     }
 
     private func lockAccess() {
+        Task {await N2ProtectedClinicalIOSVault.shared.clearSessionCaches()}
         authCycle=UUID();automaticUnlockScheduled=false;activeContext?.invalidate();activeContext=nil
         access.lock();manualRetryAvailable=true;authError=""
     }

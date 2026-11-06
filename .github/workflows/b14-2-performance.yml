@@ -1,0 +1,228 @@
+name: B14.2 - Performance and compatibility (strict release)
+on:
+  push:
+    branches:
+      - perf/build142-from-proven-build141-20261106
+    paths:
+      - 'native-ios/**'
+      - 'scripts/performance/**'
+      - 'scripts/glass-audit/**'
+      - 'docs/build142-performance/**'
+      - '.github/workflows/b14-2-performance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: danper-b14-2-performance-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  linux-core:
+    name: Swift, regression and both Excel generators
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Dependencies and synthetic fixtures only
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          mkdir -p "$RUNNER_TEMP/danper-fixtures"
+          export DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/danper-fixtures"
+          echo "DANPER_N1_FIXTURE_DIR=$DANPER_N1_FIXTURE_DIR" >> "$GITHUB_ENV"
+          for generator in \
+            generate-native-compat-fixtures.cjs \
+            generate-n1e-clinical-fixtures.cjs \
+            generate-n1f-lossless-fixtures.cjs \
+            generate-n1h-clinical-parity.cjs \
+            generate-n1p-excel-parity.cjs \
+            generate-n1q-reconciliation-fixtures.cjs \
+            generate-n1r-stored-xlsx-template.cjs \
+            generate-n1s-official-excel-fixtures.cjs \
+            generate-n2-approved-fixture.cjs \
+            generate-n2-nursing-parity.cjs \
+            generate-n2-stock-commands-fixtures.cjs; do
+              node "scripts/$generator"
+          done
+          node scripts/generate-n2-procedure-parity.cjs
+      - name: Directed index, authenticated cache and persistence regressions
+        run: |
+          set -euo pipefail
+          swift test --package-path native-ios --jobs 2 --filter 'N2(SearchIndex|FastFormPreparation|EncryptedClinicalJournal|NativeWorkerLookup)Tests'
+      - name: Swift syntax + complete Core XCTest
+        run: |
+          set -o pipefail
+          swiftc -frontend -parse native-ios/App/*.swift
+          (cd native-ios && swift test --jobs 2) 2>&1 | tee "$RUNNER_TEMP/core-tests.log"
+      - name: Both official Excel workbook regressions
+        run: |
+          set -euo pipefail
+          node scripts/test-n1r-native-xlsx.cjs
+          node scripts/test-n1s-full-native-workbooks.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B14_2_CORE_REGRESSION_LOG
+          path: ${{ runner.temp }}/core-tests.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  macos-native:
+    name: Real Xcode iPhone build + all existing Native and UI suites
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 115
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare native resources and Xcode
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -resolvePackageDependencies -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative
+      - name: Typecheck app and build exact synthetic test hosts
+        env:
+          DANPER_DERIVED_DATA: ${{ runner.temp }}/danper-b14-2-derived
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-b14-2-audit
+        run: |
+          set -euo pipefail
+          mkdir -p "$DANPER_AUDIT_OUT"
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DANPER_DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            build-for-testing > "$DANPER_AUDIT_OUT/build.log" 2>&1 || {
+              grep -nE 'error:|fatal error:|BUILD FAILED' "$DANPER_AUDIT_OUT/build.log" | tail -n 100 || true
+              exit 1
+            }
+          echo 'PASS: native iOS app and XCTest hosts typechecked'
+      - name: Validate biometric enrollment, all native + all 11 UI tests
+        timeout-minutes: 85
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-b14-2-audit
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/danper-b14-2-derived
+        run: bash scripts/glass-audit/validate-macos.sh current
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B14_2_XCODE_SIMULATOR_EVIDENCE
+          path: |
+            ${{ runner.temp }}/danper-b14-2-audit/*.log
+            ${{ runner.temp }}/danper-b14-2-audit/*.txt
+            ${{ runner.temp }}/danper-b14-2-audit/*.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  comparison:
+    name: Same-run Build 14.1 comparison and encrypted compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Generate synthetic data and record environment
+        run: |
+          set -euo pipefail
+          export DANPER_AUDIT_OUT="$RUNNER_TEMP/b142-metrics"
+          mkdir -p "$DANPER_AUDIT_OUT"
+          bash scripts/glass-audit/prepare.sh
+          echo "DANPER_N1_FIXTURE_DIR=$DANPER_AUDIT_OUT/fixtures" >> "$GITHUB_ENV"
+          swift --version > "$DANPER_AUDIT_OUT/environment.txt"
+          uname -a >> "$DANPER_AUDIT_OUT/environment.txt"
+          git rev-parse HEAD >> "$DANPER_AUDIT_OUT/environment.txt"
+      - name: Real Build 14.1 encrypted journal and portable backup compatibility
+        env:
+          DANPER_BUILD14_FIXTURE_OUT: ${{ runner.temp }}/b142-metrics/compatibility-fixtures
+        run: bash scripts/performance/compatibility.sh "$RUNNER_TEMP/b141-compat"
+      - name: Baseline and candidate, same Release workload and host
+        env:
+          DANPER_PERF_V2: '1'
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/b141-baseline" a22bd57b51881dec0278dc9a451a2a13103a7fd7
+          bash scripts/performance/run-core.sh "$RUNNER_TEMP/b141-baseline" "$RUNNER_TEMP/b142-metrics/before.json" baseline
+          bash scripts/performance/run-core.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/b142-metrics/after.json" optimized
+          python3 scripts/performance/compare.py "$RUNNER_TEMP/b142-metrics/before.json" "$RUNNER_TEMP/b142-metrics/after.json" "$RUNNER_TEMP/b142-metrics/comparison.json" > "$RUNNER_TEMP/b142-metrics/comparison.md"
+          cat "$RUNNER_TEMP/b142-metrics/comparison.md"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B14_2_SYNTHETIC_COMPARISON
+          path: |
+            ${{ runner.temp }}/b142-metrics/*.json
+            ${{ runner.temp }}/b142-metrics/*.md
+            ${{ runner.temp }}/b142-metrics/*.txt
+          retention-days: 14
+          if-no-files-found: warn
+
+  unsigned-ipa:
+    name: Package unsigned ARM64 iLoader IPA only after both mandatory PASS
+    needs: [linux-core, macos-native, comparison]
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Rebuild EXACT tested HEAD for device
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/b14-2-release" CODE_SIGNING_ALLOWED=NO build
+      - name: Verify update identity and release payload
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/b14-2-release/Build/Products/Release-iphoneos/DANPERNative.app"
+          test -d "$APP"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          MARKETING=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          test "$MARKETING" = '0.4.2'
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          test "$ID" = 'pe.danper.saludmovil.native.iloaderpreview'
+          test "$VERSION" = '142'
+          ARCHS=$(xcrun lipo -archs "$APP/DANPERNative")
+          test "$ARCHS" = 'arm64'
+          mkdir -p "$RUNNER_TEMP/b14-2-out/Payload"
+          ditto "$APP" "$RUNNER_TEMP/b14-2-out/Payload/DANPERNative.app"
+          cd "$RUNNER_TEMP/b14-2-out"
+          ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          unzip -tq DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          shasum -a 256 DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa > SHA256.txt
+          printf '%s\n' "SHA=$GITHUB_SHA" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_B14_2_RESTORE_ILOADER_UNSIGNED_TESTED
+          path: |
+            ${{ runner.temp }}/b14-2-out/DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
+            ${{ runner.temp }}/b14-2-out/SHA256.txt
+            ${{ runner.temp }}/b14-2-out/VERIFIED_BUILD.txt
+          retention-days: 14
+          if-no-files-found: error

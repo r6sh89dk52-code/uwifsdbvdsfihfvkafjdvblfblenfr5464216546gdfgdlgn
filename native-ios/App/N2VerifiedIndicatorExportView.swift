@@ -368,7 +368,7 @@ struct N2VerifiedIndicatorExportView:View {
             let siteSuffix=site=="AMBAS" ? "AMBAS_" : ""
             let outputName="\(exportPrefix)\(siteSuffix)\(local(startDate))_\(effectiveEnd).xlsx"
             let url=dir.appendingPathComponent(outputName)
-            try result.xlsx.write(to:url,options:[.atomic,.completeFileProtection])
+            try await N2WorkspaceFileIO.shared.writeProtectedExport(result.xlsx,to:url)
             let warning=asOf
                 ? "Exportación al día (no es certificación de cierre futuro). "
                 : (result.provisional

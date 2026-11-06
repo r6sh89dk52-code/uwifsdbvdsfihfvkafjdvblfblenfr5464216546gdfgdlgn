@@ -8,6 +8,7 @@ import DanperCore
 struct N2ClinicalCorrectionView:View {
     @Environment(\.n2WorkspaceVault) private var vault
     let visitID:String
+    var onVerifiedSave:((N2CorrectionDetail)->Void)?=nil
     @State private var detail:N2CorrectionDetail?
     @State private var revision:Int?
     @State private var category=""
@@ -87,24 +88,25 @@ struct N2ClinicalCorrectionView:View {
                 Text(message).font(.footnote)
                     .foregroundStyle(failed ? Color.red : Color.secondary)
             }
-            if let current=detail, !saved {
+            if let detail, !saved {
                 DanperPanel("Sede de esta atención") {
-                    DanperChoiceField(
-                        title:"Lugar donde realmente fue atendido",
+                    DanperChoiceField(title:"Lugar donde se atendió",
                         selection:$visitSite,
                         options:["","LA VENTUROSA","PLVENTUROSA"],
                         labels:["":"Sin verificar",
                                 "LA VENTUROSA":"Fundo La Venturosa",
                                 "PLVENTUROSA":"Planta La Venturosa"])
-                    if ["LA VENTUROSA","PLVENTUROSA"].contains(current.currentRosterSite) {
-                        Text("Sede actual en Personal: "+current.currentRosterSite)
+                    if ["LA VENTUROSA","PLVENTUROSA"].contains(detail.currentRosterSite) {
+                        Text("En Personal figura actualmente: \(detail.currentRosterSite). Confirma la sede donde se realizó ESTA atención; puede ser diferente.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    Text("Confirma dónde ocurrió esta atención. No cambia el padrón, otras atenciones ni el Kardex.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                    if !["LA VENTUROSA","PLVENTUROSA"].contains(detail.workerSite) {
+                        Label("Esta atención tiene la sede pendiente. Elegirla aquí permitirá clasificarla en el Indicador Ambulatorio.",systemImage:"mappin.and.ellipse")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
+                    Text("La corrección es individual: no cambia otras atenciones del trabajador ni inventario.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-            }
-            if detail != nil && !saved {
                 DanperPanel("Campos clínicos rectificables") {
                     DanperField(title:"Diagnóstico") {
                     TextField("Diagnóstico",text:$diagnosis,axis:.vertical)
@@ -139,8 +141,7 @@ struct N2ClinicalCorrectionView:View {
                     TextField("DNI del responsable",text:$responsibleDni)
                 }
                 }
-                if let detail {
-                    DanperPanel("Tratamientos y consumos de la atención") {
+                DanperPanel("Tratamientos y consumos de la atención") {
                         Text("Edita los datos de esta única atención. La apertura R=0/1 de un insumo anterior al conteo puede corregirse sin descontar otra vez las existencias actuales.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(detail.medications,id:\.id){ item in
@@ -179,7 +180,6 @@ struct N2ClinicalCorrectionView:View {
                 }
                         Text("Una corrección de cantidad no equivale a ajustar físicamente el Kardex. Se conserva el movimiento original y el Excel oficial bloqueará esta atención hasta resolver la discrepancia. Los cambios de producto o nuevas entregas requieren revisión por separado.")
                             .font(.caption).foregroundStyle(.orange)
-                    }
                 }
                 DanperPanel("Guardar cambios") {
                     Text("No tienes que escribir un motivo. Se guardará la edición de esta atención sin crear otra ni cambiar el stock físico actual.")
@@ -335,9 +335,10 @@ struct N2ClinicalCorrectionView:View {
                 do{try await Task.sleep(for:.milliseconds(650))}
                 catch{return}
             }
-            guard !Task.isCancelled else{return}
+            guard !Task.isCancelled,!saving,!saved,!suppressAutosave else{return}
             do {
-                let ctx=try await vault.clinicalFormContext()
+                let latestRevision=try await vault.currentRevision()
+                guard !Task.isCancelled,!saving,!saved,!suppressAutosave else{return}
                 let millis=max(Int64(Date().timeIntervalSince1970*1000),
                                lastDraftAt+1)
                 let raw=try JSONSerialization.data(withJSONObject:changes)
@@ -346,7 +347,8 @@ struct N2ClinicalCorrectionView:View {
                         visitID:visitID,changes:raw,reason:why,
                         operatorName:op,medicationDiscrepancy:note,
                         expectedEffectiveSHA:expected,at:millis,
-                        expectedRevision:ctx.revision)
+                        expectedRevision:latestRevision)
+                guard !Task.isCancelled,!saving,!saved,!suppressAutosave else{return}
                 lastDraftAt=millis
                 message="Rectificación en curso cifrada; aún no confirmada."
             }catch{
@@ -362,12 +364,10 @@ struct N2ClinicalCorrectionView:View {
         recovering=true
         defer{recovering=false}
         do {
-            let ctx=try await vault.clinicalFormContext()
-            let d=try await vault
-                .readCorrectionDetail(visitID:visitID)
-            history=try await vault
-                .readCorrectionHistory(visitID:visitID)
-            revision=ctx.revision
+            let prepared=try await vault.prepareClinicalCorrection(visitID:visitID)
+            let d=prepared.detail
+            history=prepared.history
+            revision=prepared.revision
             detail=d
             category=d.category
             system=d.system
@@ -391,8 +391,7 @@ struct N2ClinicalCorrectionView:View {
                 d.medications.filter(\.historicalOpeningEditable).map{
                     ($0.id,$0.historicalOpeningR.map(String.init) ?? "")
                 })
-            if let pending=try await vault
-                   .readPendingClinicalCorrection(visitID:visitID),
+            if let pending=prepared.draft,
                let changes=try? JSONSerialization.jsonObject(
                    with:pending.changes) as? [String:Any] {
                 category=changes["category"] as? String ?? category
@@ -445,10 +444,10 @@ struct N2ClinicalCorrectionView:View {
         do {
             if try await vault
                   .readPendingClinicalCorrection(visitID:visitID) != nil {
-                let ctx=try await vault.clinicalFormContext()
+                let latestRevision=try await vault.currentRevision()
                 _=try await vault
                     .deletePendingClinicalCorrection(
-                        visitID:visitID,expectedRevision:ctx.revision)
+                        visitID:visitID,expectedRevision:latestRevision)
             }
             suppressAutosave=true
             dismiss()
@@ -460,15 +459,16 @@ struct N2ClinicalCorrectionView:View {
     @MainActor
     private func confirm() async {
         guard ready,let d=detail else{return}
+        let previousDraft=draftTask
         draftTask?.cancel()
         saving=true
         failed=false
         defer{saving=false}
+        await previousDraft?.value
         do {
             let input=editPacket()
             let patch=try JSONSerialization.data(withJSONObject:input)
-            let latest=try await vault
-                .clinicalFormContext()
+            let latestRevision=try await vault.currentRevision()
             let result=try await vault
                 .saveClinicalCorrection(
                     visitID:visitID,eventID:eventID,changes:patch,
@@ -476,9 +476,15 @@ struct N2ClinicalCorrectionView:View {
                     medicationDiscrepancy:discrepancy,
                     expectedEffectiveSHA:d.effectiveSHA256,
                     at:Int64(Date().timeIntervalSince1970*1000),
-                    expectedRevision:latest.revision)
+                    expectedRevision:latestRevision)
             saved=true
             message="Rectificación verificada. Revisión cifrada \(result.revision); sin segundos descuentos de medicamentos."
+            do {
+                let verified=try await vault.readCorrectionDetail(visitID:visitID)
+                onVerifiedSave?(verified)
+            } catch {
+                message="Rectificación guardada y verificada. No se pudo actualizar la lista; vuelve a abrir el historial."
+            }
         }catch {
             failed=true
             message="No se guardó la rectificación. Puede haber cambios recientes o datos incorrectos. Reabre la historia y verifica."

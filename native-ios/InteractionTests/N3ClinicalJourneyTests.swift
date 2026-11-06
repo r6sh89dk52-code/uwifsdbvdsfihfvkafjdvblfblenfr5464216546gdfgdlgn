@@ -127,6 +127,8 @@ final class N3ClinicalJourneyTests:XCTestCase {
         let unitsBefore=stock(app,"16000182"),packagesBefore=stock(app,"16000025")
         XCTAssertTrue(unitsBefore.hasPrefix("70 "));XCTAssertTrue(packagesBefore.hasPrefix("12 "))
         capture(app,"Inventario-oscuro")
+        tap(app.buttons["premium-tab-history"],in:app)
+        XCTAssertTrue(app.navigationBars["Historial de atenciones"].waitForExistence(timeout:10))
         saveVisit(app,r:"1",units:true)
         inventory(app);XCTAssertTrue(stock(app,"16000182").hasPrefix("68 "));XCTAssertTrue(stock(app,"16000025").hasPrefix("11 "))
         saveVisit(app,r:"0",units:false)

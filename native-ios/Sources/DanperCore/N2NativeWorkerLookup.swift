@@ -16,7 +16,9 @@ public enum N2NativeWorkerLookup {
                                    limit:Int=5)->[N2FormWorker] {
         let query=text.trimmingCharacters(in:.whitespacesAndNewlines)
         guard query.count>=2,limit>0 else{return []}
-        return Array(workers.filter {
+        // Stop as soon as enough suggestions exist; do not materialize all
+        // matches across the 10k-person directory on every typed character.
+        return Array(workers.lazy.filter {
             $0.name.localizedStandardContains(query) ||
             $0.dni.localizedStandardContains(query)
         }.prefix(limit))

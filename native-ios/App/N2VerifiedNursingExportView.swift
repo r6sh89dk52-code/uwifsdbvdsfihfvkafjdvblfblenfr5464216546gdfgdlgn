@@ -199,8 +199,7 @@ struct N2VerifiedNursingExportView:View {
             let suffix=reportMode=="daily" ? "" : "_al_" + selectedPeriod.end
             let name="DANPER_KARDEX_N2_" + selectedPeriod.start + suffix + ".xlsx"
             let output=dir.appendingPathComponent(name)
-            try result.xlsx.write(to:output,
-                options:[.atomic,.completeFileProtection])
+            try await N2WorkspaceFileIO.shared.writeProtectedExport(result.xlsx,to:output)
             status="Generado: \(result.stockKnownRows) productos con historial; \(result.stockUnknownRows) sin lotes registrados (saldo 0)."
             share=N2NursingShare(file:output)
         }catch {

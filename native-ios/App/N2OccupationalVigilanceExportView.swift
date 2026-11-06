@@ -135,7 +135,7 @@ struct N2OccupationalVigilanceExportView:View {
             folder=dir
             let file=dir.appendingPathComponent(
                 "DANPER_VIGILANCIA_OSTEOMUSCULAR_\(range.start)_\(range.end).xlsx")
-            try data.xlsx.write(to:file,options:[.atomic,.completeFileProtection])
+            try await N2WorkspaceFileIO.shared.writeProtectedExport(data.xlsx,to:file)
             status="Excel generado: \(data.rows) atenciones osteomusculares." +
                 (data.skippedMissingIdentity>0
                  ? " \(data.skippedMissingIdentity) registros omitidos por DNI/nombre incompletos."
