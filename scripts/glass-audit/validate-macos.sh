@@ -180,6 +180,8 @@ if test "$MODE" != ui; then
  fi
  # Diagnose enrollment before running the remaining native/interaction cases.
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
+ # Genuine first-use feature consent; this never sends a biometric match.
+ run_tests permission-preflight 1 -only-testing:DANPERInteractionTests/N2BiometricInteractionTests/testFaceIDPermissionDoesNotAuthenticateOrExposeClinicalData
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  if test "$MODE" != replay; then
   native_count=$(python3 -c 'from pathlib import Path; import re; print(sum(len(re.findall(r"\bfunc test\w+\(",p.read_text())) for p in Path("native-ios/NativeTests").glob("*.swift")))')
@@ -211,6 +213,11 @@ while IFS=$'\t' read -r label count cls selectors; do
  if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi
  fresh "$label"
  case "$label" in
+  N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
+   run_tests "permission-$label" 1 -only-testing:DANPERInteractionTests/N2BiometricInteractionTests/testFaceIDPermissionDoesNotAuthenticateOrExposeClinicalData
+   run_tests "system-auth-$label" 1 -only-testing:DANPERNativeTests/N2ColdAuthenticationPreflightTests ;;
+ esac
+ case "$label" in
   N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo)
    if ! run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; break; fi ;;
  esac
@@ -219,7 +226,7 @@ while IFS=$'\t' read -r label count cls selectors; do
 done < "$OUT/ui-classes.tsv"
 python3 - "$OUT/ui-classes.tsv" <<'PY'
 import sys
-assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==11,'Review UI test inventory'
+assert sum(int(s.split()[1]) for s in open(sys.argv[1]))==12,'Review UI test inventory'
 PY
 test "$overall" = 0
 if test "$MODE" = replay; then

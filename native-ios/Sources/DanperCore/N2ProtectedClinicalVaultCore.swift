@@ -580,7 +580,7 @@ public final class N2ProtectedClinicalVaultCore {
     public func removeDraft(id:String,
                             expectedRevision:Int)throws->N2ProtectedStoreSummary {
         let span=N2PerformanceSpan("Confirmed draft deletion");defer{span.end()}
-        try modify(expectedRevision:expectedRevision) {
+        return try modify(expectedRevision:expectedRevision) {
             try N2SnapshotEditor.deleteDraft(snapshot:$0,id:id)
         }
     }
@@ -691,7 +691,7 @@ public final class N2ProtectedClinicalVaultCore {
         expectedEffectiveSHA:String,at:Int64,
         expectedRevision:Int)throws->N2ProtectedStoreSummary {
         let span=N2PerformanceSpan("Confirmed rectification");defer{span.end()}
-        try modify(expectedRevision:expectedRevision) {
+        return try modify(expectedRevision:expectedRevision) {
             try N2ClinicalCorrections.append(snapshot:$0,eventID:eventID,
                 visitID:visitID,changes:changes,reason:reason,
                 operatorName:operatorName,

@@ -266,6 +266,8 @@ struct N2NativeHistoryView: View {
         workerSearchIndex=indices.0;visitSearchIndex=indices.1
         workerMatches=indices.2;visitMatches=indices.3
         projection=records;committedQuery=requested
+        rosterPage=min(rosterPage,max(0,(workerMatches.count-1)/pageSize))
+        visitsPage=min(visitsPage,max(0,(visitMatches.count-1)/visitsPageSize))
         // Refreshing data preserves query, page and scroll position.
         return true
 

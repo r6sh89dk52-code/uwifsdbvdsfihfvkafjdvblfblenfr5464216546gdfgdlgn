@@ -224,7 +224,9 @@ struct N2ClinicalWorkspaceRootView:View {
             if sessionAuthenticated,scenePhase == .active,tab==0 {alertClock=now}
         }
         .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
-            guard N2WorkspaceChanges.matches(event,vault),sessionAuthenticated,scenePhase == .active,tab==0,!showNewAttention else{return}
+            guard N2WorkspaceChanges.matches(event,vault),sessionAuthenticated,scenePhase == .active,
+                  let kind=event.userInfo?["kind"] as? String,
+                  (tab==0 && !showNewAttention) || ["inventory","restore"].contains(kind) else{return}
             Task {await refreshHomeCounts()}
         }
         .onChange(of:sessionAuthenticated) {_,active in

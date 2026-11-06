@@ -50,6 +50,8 @@ jobs:
               node "scripts/$generator"
           done
           node scripts/generate-n2-procedure-parity.cjs
+      - name: Simulator readiness bridge regressions
+        run: python3 -m unittest discover -s scripts/performance/tests -v
       - name: Directed index, authenticated cache and persistence regressions
         run: |
           set -euo pipefail
@@ -122,7 +124,7 @@ jobs:
               exit 1
             }
           echo 'PASS: native iOS app and XCTest hosts typechecked'
-      - name: Validate biometric enrollment, all native + all 11 UI tests
+      - name: Validate biometric enrollment, all native + all 12 UI tests
         timeout-minutes: 85
         env:
           DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-b14-2-audit
