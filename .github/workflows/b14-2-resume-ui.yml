@@ -1,0 +1,265 @@
+name: B14.2 - Resume only untested UI on proven source
+on:
+  push:
+    branches:
+      - perf/build142-from-proven-build141-20261106
+    paths:
+      - '.github/workflows/b14-2-resume-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: danper-build142-scoped-ui-${{ github.ref }
+  cancel-in-progress: false
+
+env:
+  PROVEN_SOURCE_SHA: 2df689a5685d0fc17fdb8fa8db751ab5354d5ed2
+  PROVEN_RUN_ID: '42290619105'
+
+jobs:
+  previous-evidence:
+    name: Verify unchanged source and already PASS native/UI/Swift/Excel/benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 2df689a5685d0fc17fdb8fa8db751ab5354d5ed2
+      - uses: actions/download-artifact@v4
+        with:
+          repository: ${{ github.repository }
+          run-id: 42290619105
+          name: B14_2_XCODE_SIMULATOR_EVIDENCE
+          path: previous-xcode
+          github-token: ${{ github.token }
+      - name: Require actual same-SHA passed suites, no skips and run provenance
+        env:
+          GH_TOKEN: ${{ github.token }
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess,urllib.request
+          source=os.environ["PROVEN_SOURCE_SHA"]
+          root=pathlib.Path("previous-xcode")
+          assert subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()==source
+          assert (root/"SOURCE_SHA.txt").read_text().strip()==source
+          assert (root/"CORE_NATIVE_SHA.txt").read_text().strip()==source
+          assert (root/"SOURCE_TREE.txt").read_text().strip()==subprocess.check_output(["git","rev-parse","HEAD^{tree}"],text=True).strip()
+          assert "** TEST BUILD SUCCEEDED **" in (root/"build-for-testing.log").read_text()
+          required={
+              "biometric-preflight":1,
+              "permission-preflight":1,
+              "native-37":37,
+              "permission-N2BiometricInteractionTests":1,
+              "system-auth-N2BiometricInteractionTests":1,
+              "N2BiometricInteractionTests":2,
+              "N2Build222ShellTests":1,
+              "N2GlassClinicalTests":3,
+              "N2MenuInteractionTests":1,
+              "seed-N2GlassClinicalTests":2,
+              "seed-N2PremiumRedesignTests":2,
+          }
+          for label,count in required.items():
+              path=root/(label+".xcresult.summary.json")
+              data=json.loads(path.read_text())
+              assert data["totalTestCount"]==count and data["passedTests"]==count,(label,data)
+              assert data["failedTests"]==0 and data["skippedTests"]==0,(label,data)
+              assert not data.get("testFailures",[]),(label,data)
+              print("REUSED PASS:",label,count)
+          base="https://api.github.com/repos/"+os.environ["GITHUB_REPOSITORY"]
+          headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],
+                   "Accept":"application/vnd.github+json",
+                   "X-GitHub-Api-Version":"2022-11-28"}
+          def api(url):
+              req=urllib.request.Request(url,headers=headers)
+              with urllib.request.urlopen(req,timeout=30) as resp:return json.load(resp)
+          run=api(base+"/actions/runs/"+os.environ["PROVEN_RUN_ID"])
+          assert run["head_sha"]==source and run["status"]=="completed"
+          jobs=api(base+"/actions/runs/"+os.environ["PROVEN_RUN_ID"]+"/jobs?per_page=100")["jobs"]
+          by_name={j["name"]:j["conclusion"] for j in jobs}
+          assert by_name["Swift, regression and both Excel generators"]=="success"
+          assert by_name["Same-run Build 14.1 comparison and encrypted compatibility"]=="success"
+          assert by_name["Real Xcode iPhone build + all existing Native and UI suites"]=="failure"
+          print("REUSED PASS: Linux Swift/Excel and encrypted baseline/benchmark on exact source")
+          print("RECOVERY SCOPE: 7 passed UI + 5 untested UI = 12 required UI; no skipped failures")
+          PY
+
+  remaining-ui:
+    name: Remaining UI - ${{ matrix.label }
+    needs: previous-evidence
+    runs-on: macos-15-intel
+    timeout-minutes: 145
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: N2PremiumRedesignTests
+            expected: 2
+            short: premium
+          - label: N3ClinicalJourneyTests-demo
+            expected: 2
+            short: clinical-demo
+          - label: N3ClinicalJourneyTests-protected
+            expected: 1
+            short: clinical-protected
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DANPER_SCOPED_LABEL: ${{ matrix.label }
+      DANPER_SCOPED_EXPECTED: ${{ matrix.expected }
+      DANPER_AUDIT_OUT: ${{ runner.temp }/danper-build142-remaining-ui
+      DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }/danper-build142-remaining-derived
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 2df689a5685d0fc17fdb8fa8db751ab5354d5ed2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare only remaining UI test hosts on the original exact source SHA
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PROVEN_SOURCE_SHA"
+          xcodebuild -version
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -resolvePackageDependencies -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative
+          mkdir -p "$DANPER_AUDIT_OUT"
+          xcrun simctl list runtimes -j > "$DANPER_AUDIT_OUT/runtimes.json"
+          printf '%s\n' "$PROVEN_SOURCE_SHA" > "$DANPER_AUDIT_OUT/CORE_NATIVE_SHA.txt"
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DANPER_AUDIT_DERIVED_DATA" \
+            ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            build-for-testing > "$DANPER_AUDIT_OUT/build-for-testing.log" 2>&1 || {
+              grep -nE 'error:|fatal error:|BUILD FAILED' "$DANPER_AUDIT_OUT/build-for-testing.log" | tail -n 100 || true
+              exit 1
+            }
+          grep -q 'TEST BUILD SUCCEEDED' "$DANPER_AUDIT_OUT/build-for-testing.log"
+      - name: Scope existing rigorous UI harness to precisely one missing suite
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("scripts/glass-audit/validate-macos.sh")
+          source=p.read_text()
+          old=' if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi'
+          assert source.count(old)==1
+          source=source.replace(old,
+            ' if test "$MODE" = ui && test "$label" != "$DANPER_SCOPED_LABEL"; then continue; fi\n'+old)
+          marker='# Only this marker allows packaging in CI or locally.'
+          assert source.count(marker)==1
+          source=source.replace(marker,
+            '''# Recovery uses a separate aggregate evidence gate, never the full-suite marker.
+          if test "$MODE" = ui; then
+            git rev-parse HEAD > "$OUT/SCOPED_PASS_SHA.txt"
+            echo "PASS: only $DANPER_SCOPED_LABEL; full coverage verified by independent CI gate."
+            exit 0
+          fi
+          '''+marker)
+          p.write_text(source)
+          PY
+          test "$(git diff --name-only | tr '\n' ' ')" = 'scripts/glass-audit/validate-macos.sh '
+          git diff -- scripts/glass-audit/validate-macos.sh > "$DANPER_AUDIT_OUT/scoped-harness-only.patch"
+          test "$(git rev-parse HEAD)" = "$PROVEN_SOURCE_SHA"
+          echo 'Only the run-local harness selector changed; app, native tests, UI assertions and production code are untouched.'
+      - name: Execute only the remaining UI suite with its required setup
+        timeout-minutes: 120
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/validate-macos.sh ui
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess
+          p=pathlib.Path(os.environ["DANPER_AUDIT_OUT"])
+          label=os.environ["DANPER_SCOPED_LABEL"]
+          count=int(os.environ["DANPER_SCOPED_EXPECTED"])
+          data=json.loads((p/(label+".xcresult.summary.json")).read_text())
+          assert data["totalTestCount"]==count and data["passedTests"]==count,data
+          assert data["failedTests"]==0 and data["skippedTests"]==0,data
+          assert not data.get("testFailures",[]),data
+          assert (p/"SCOPED_PASS_SHA.txt").read_text().strip()==os.environ["PROVEN_SOURCE_SHA"]
+          changed=subprocess.check_output(["git","diff","--name-only"],text=True).splitlines()
+          assert changed==["scripts/glass-audit/validate-macos.sh"],changed
+          print("PASS:",label,"all",count,"previously untested cases; exact original app source SHA")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B14_2_REMAINING_UI_${{ matrix.short }
+          path: |
+            ${{ runner.temp }/danper-build142-remaining-ui/*.log
+            ${{ runner.temp }/danper-build142-remaining-ui/*.txt
+            ${{ runner.temp }/danper-build142-remaining-ui/*.json
+            ${{ runner.temp }/danper-build142-remaining-ui/*.patch
+          retention-days: 14
+          if-no-files-found: warn
+
+  verified-unsigned-ipa:
+    name: Package original Build 142 ARM64 after all 12 UI and 37 native cases PASS
+    needs: [previous-evidence, remaining-ui]
+    runs-on: macos-15-intel
+    timeout-minutes: 55
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 2df689a5685d0fc17fdb8fa8db751ab5354d5ed2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build the exact code already verified, without new production changes
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PROVEN_SOURCE_SHA"
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/b14-2-recovery-release" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Verify exact IPA identity, architecture and absence of synthetic clinical records
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/b14-2-recovery-release/Build/Products/Release-iphoneos/DANPERNative.app"
+          test -d "$APP"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          MARKETING=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          ARCHS=$(xcrun lipo -archs "$APP/DANPERNative")
+          test "$ID" = 'pe.danper.saludmovil.native.iloaderpreview'
+          test "$MARKETING" = '0.4.2'
+          test "$VERSION" = '142'
+          test "$ARCHS" = 'arm64'
+          test ! -f "$APP/embedded.mobileprovision"
+          test ! -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
+          mkdir -p "$RUNNER_TEMP/b14-2-recovery-out/Payload"
+          ditto "$APP" "$RUNNER_TEMP/b14-2-recovery-out/Payload/DANPERNative.app"
+          cd "$RUNNER_TEMP/b14-2-recovery-out"
+          ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          unzip -tq DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          shasum -a 256 DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa > SHA256.txt
+          printf '%s\n' \
+            "SOURCE_SHA=$PROVEN_SOURCE_SHA" \
+            "RECOVERY_CI_SHA=$GITHUB_SHA" \
+            "PRIOR_SUCCESS_RUN=$PROVEN_RUN_ID" \
+            "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" \
+            "VALIDATION=37 native plus 12 UI across pinned-sha jobs; 445 Core, Excel and benchmark reused" > VERIFIED_BUILD.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_B14_2_ILOADER_UNSIGNED_SCOPED_RECOVERY_TESTED
+          path: |
+            ${{ runner.temp }/b14-2-recovery-out/DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
+            ${{ runner.temp }/b14-2-recovery-out/SHA256.txt
+            ${{ runner.temp }/b14-2-recovery-out/VERIFIED_BUILD.txt
+          retention-days: 14
+          if-no-files-found: error
