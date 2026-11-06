@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: danper-build142-scoped-ui-${{ github.ref }
+  group: danper-build142-scoped-ui-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -30,14 +30,14 @@ jobs:
           ref: 2df689a5685d0fc17fdb8fa8db751ab5354d5ed2
       - uses: actions/download-artifact@v4
         with:
-          repository: ${{ github.repository }
+          repository: ${{ github.repository }}
           run-id: 42290619105
           name: B14_2_XCODE_SIMULATOR_EVIDENCE
           path: previous-xcode
-          github-token: ${{ github.token }
+          github-token: ${{ github.token }}
       - name: Require actual same-SHA passed suites, no skips and run provenance
         env:
-          GH_TOKEN: ${{ github.token }
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -88,7 +88,7 @@ jobs:
           PY
 
   remaining-ui:
-    name: Remaining UI - ${{ matrix.label }
+    name: Remaining UI - ${{ matrix.label }}
     needs: previous-evidence
     runs-on: macos-15-intel
     timeout-minutes: 145
@@ -107,10 +107,10 @@ jobs:
             short: clinical-protected
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-      DANPER_SCOPED_LABEL: ${{ matrix.label }
-      DANPER_SCOPED_EXPECTED: ${{ matrix.expected }
-      DANPER_AUDIT_OUT: ${{ runner.temp }/danper-build142-remaining-ui
-      DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }/danper-build142-remaining-derived
+      DANPER_SCOPED_LABEL: ${{ matrix.label }}
+      DANPER_SCOPED_EXPECTED: ${{ matrix.expected }}
+      DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-build142-remaining-ui
+      DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/danper-build142-remaining-derived
     steps:
       - uses: actions/checkout@v4
         with:
@@ -191,12 +191,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: B14_2_REMAINING_UI_${{ matrix.short }
+          name: B14_2_REMAINING_UI_${{ matrix.short }}
           path: |
-            ${{ runner.temp }/danper-build142-remaining-ui/*.log
-            ${{ runner.temp }/danper-build142-remaining-ui/*.txt
-            ${{ runner.temp }/danper-build142-remaining-ui/*.json
-            ${{ runner.temp }/danper-build142-remaining-ui/*.patch
+            ${{ runner.temp }}/danper-build142-remaining-ui/*.log
+            ${{ runner.temp }}/danper-build142-remaining-ui/*.txt
+            ${{ runner.temp }}/danper-build142-remaining-ui/*.json
+            ${{ runner.temp }}/danper-build142-remaining-ui/*.patch
           retention-days: 14
           if-no-files-found: warn
 
@@ -258,8 +258,8 @@ jobs:
         with:
           name: DANPER_B14_2_ILOADER_UNSIGNED_SCOPED_RECOVERY_TESTED
           path: |
-            ${{ runner.temp }/b14-2-recovery-out/DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
-            ${{ runner.temp }/b14-2-recovery-out/SHA256.txt
-            ${{ runner.temp }/b14-2-recovery-out/VERIFIED_BUILD.txt
+            ${{ runner.temp }}/b14-2-recovery-out/DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
+            ${{ runner.temp }}/b14-2-recovery-out/SHA256.txt
+            ${{ runner.temp }}/b14-2-recovery-out/VERIFIED_BUILD.txt
           retention-days: 14
           if-no-files-found: error
