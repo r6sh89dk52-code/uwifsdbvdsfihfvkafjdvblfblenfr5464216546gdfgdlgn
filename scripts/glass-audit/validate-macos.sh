@@ -161,6 +161,13 @@ run_tests(){
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
  python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
  xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments" || status=1
+ if test "$status" != 0; then
+  echo "SIMULATOR_SUITE_FAILED: $label; publication stays blocked"
+  # Synthetic harness state only: no snapshots, clinical data or credentials.
+  if test -f "$OUT/$label-biometric-readiness.log"; then
+   grep -E 'CLIENT_CONTEXT|SENSOR_ACTIVE|REQUEST_OBSERVED|READY_ACK|REQUEST_NOT_READABLE' "$OUT/$label-biometric-readiness.log" | tail -n 80 || true
+  fi
+ fi
  return "$status"
 }
 if test "$MODE" != ui; then
@@ -204,10 +211,10 @@ while IFS=$'\t' read -r label count cls selectors; do
  fresh "$label"
  case "$label" in
   N2GlassClinicalTests|N2PremiumRedesignTests|N3ClinicalJourneyTests-demo)
-   if ! run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; continue; fi ;;
+   if ! run_tests "seed-$label" 2 -only-testing:DANPERNativeTests/N2PremiumDemoFixtureTests -only-testing:DANPERNativeTests/N2SimpleInventoryNativeTests; then overall=1; break; fi ;;
  esac
  IFS=' ' read -r -a selection <<< "$selectors"
- if ! run_tests "$label" "$count" "${selection[@]}"; then overall=1; fi
+ if ! run_tests "$label" "$count" "${selection[@]}"; then overall=1; break; fi
 done < "$OUT/ui-classes.tsv"
 python3 - "$OUT/ui-classes.tsv" <<'PY'
 import sys
