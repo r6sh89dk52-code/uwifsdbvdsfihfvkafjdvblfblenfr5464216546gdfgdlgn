@@ -65,7 +65,9 @@ jobs:
 
   macos-native:
     name: Real Xcode iPhone build + all existing Native and UI suites
-    runs-on: macos-15
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     timeout-minutes: 115
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +121,9 @@ jobs:
   unsigned-ipa:
     name: Package unsigned ARM64 iLoader IPA only after both mandatory PASS
     needs: [linux-core, macos-native]
-    runs-on: macos-15
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
