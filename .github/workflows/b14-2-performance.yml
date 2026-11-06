@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: danper-b14-2-performance-${{ github.ref }}
+  group: danper-b14-2-performance-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   linux-core:
@@ -53,12 +53,24 @@ jobs:
       - name: Directed index, authenticated cache and persistence regressions
         run: |
           set -euo pipefail
-          swift test --package-path native-ios --jobs 2 --filter 'N2(SearchIndex|FastFormPreparation|EncryptedClinicalJournal|NativeWorkerLookup)Tests'
+          swift test --package-path native-ios --jobs 2 --filter 'N2(SearchIndex|FastFormPreparation|EncryptedClinicalJournal|NativeWorkerLookup|ClinicalAlerts)Tests'
       - name: Swift syntax + complete Core XCTest
         run: |
           set -o pipefail
+          DANPER_EXPECTED_BUILD=142 node scripts/glass-audit/identity.cjs
           swiftc -frontend -parse native-ios/App/*.swift
           (cd native-ios && swift test --jobs 2) 2>&1 | tee "$RUNNER_TEMP/core-tests.log"
+      - name: Verify complete discovered Core inventory and no skips
+        run: |
+          python3 - <<'PYCORE'
+          from pathlib import Path
+          import os,re
+          expected=sum(len(re.findall(r'\bfunc test\w+\(',p.read_text())) for p in Path('native-ios/Tests/DanperCoreTests').glob('*.swift'))
+          log=(Path(os.environ['RUNNER_TEMP'])/'core-tests.log').read_text()
+          assert re.search(r'Executed '+str(expected)+r' tests, with 0 failures',log),log[-5000:]
+          assert not re.search(r'\b[1-9]\d* tests? (?:were )?skipped',log)
+          print('PASS:',expected,'discovered Core cases, zero failures and skips')
+          PYCORE
       - name: Both official Excel workbook regressions
         run: |
           set -euo pipefail
@@ -210,12 +222,15 @@ jobs:
           test "$VERSION" = '142'
           ARCHS=$(xcrun lipo -archs "$APP/DANPERNative")
           test "$ARCHS" = 'arm64'
+          test ! -f "$APP/embedded.mobileprovision"
+          test ! -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
           mkdir -p "$RUNNER_TEMP/b14-2-out/Payload"
           ditto "$APP" "$RUNNER_TEMP/b14-2-out/Payload/DANPERNative.app"
           cd "$RUNNER_TEMP/b14-2-out"
           ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
           unzip -tq DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa
           shasum -a 256 DANPER_0.4.2_BUILD142_PERFORMANCE_ILOADER_UNSIGNED.ipa > SHA256.txt
+          cat SHA256.txt
           printf '%s\n' "SHA=$GITHUB_SHA" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
       - uses: actions/upload-artifact@v4
         with:

@@ -67,6 +67,11 @@ struct N2SimpleInventoryView:View {
         }
         .navigationTitle("Inventario").navigationBarTitleDisplayMode(.inline).danperFormChrome()
         .task {if let layoutContext {context=layoutContext;loading=false}else{await load()}}.refreshable {await load()}
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
+            guard layoutContext==nil,N2WorkspaceChanges.matches(event,vault),editor==nil,
+                  let kind=event.userInfo?["kind"] as? String,["history","inventory","restore"].contains(kind) else{return}
+            Task {await load()}
+        }
         .sheet(item:$editor,onDismiss:{Task {await load()}}) {route in
             if let context {
                 NavigationStack {N2SimpleProductEditor(context:context,operation:route.operation,
@@ -195,7 +200,7 @@ struct N2SimpleProductDetail:View {
             }.padding(16)
         }.navigationTitle("Existencias").navigationBarTitleDisplayMode(.inline).danperFormChrome()
             .task {await load()}
-        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification)) { event in
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
             guard N2WorkspaceChanges.matches(event,vault) else{return}
             Task {@MainActor in await load()}
         }.refreshable {await load()}

@@ -229,4 +229,4 @@ if test "$MODE" = replay; then
 fi
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
-echo 'PASS: current checkout, 29 native and all 11 UI cases; no failures/skips. Core/Excel results are validated separately.'
+echo 'PASS: current checkout, all discovered native and all required UI cases; no failures/skips. Core/Excel results are validated separately.'

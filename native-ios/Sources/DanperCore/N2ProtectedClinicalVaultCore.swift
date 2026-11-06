@@ -26,6 +26,7 @@ public struct N2DashboardSnapshot:Sendable {
     public let week:Int
     public let month:Int
     public let drafts:Int
+    public let alerts:[N2ClinicalAlert]
 }
 public enum N2ProtectedStoreError:Error,Equatable {
     case unsafeSource, targetNotEmpty, absentSource, staleRevision
@@ -129,6 +130,7 @@ public final class N2ProtectedClinicalVaultCore {
     /// draft/context pairing. No cache and no change to encryption or writes.
     public func prepareClinicalForm(products:Data,nursing:Data,mappings:Data)
         throws->(context:N2FormContext,drafts:[N2RecoverableDraft]) {
+        let span=N2PerformanceSpan("Prepare clinical form");defer{span.end()}
         guard let active=try journal.recover() else {
             throw N2ProtectedStoreError.absentSource
         }
@@ -235,7 +237,10 @@ public final class N2ProtectedClinicalVaultCore {
               let visits=root["attentions"] as? [[String:Any]] else {
             throw N2ProtectedStoreError.absentSource
         }
-        let drafts=try N2NativeDraftRecovery.readVerified(active.snapshot).count
+        let recoveredDrafts=try N2NativeDraftRecovery.readVerified(active.snapshot)
+        let drafts=recoveredDrafts.count
+        let products=root["inventorySchemaVersion"] as? Int == 2 ? try N2SimpleInventory.state(root).products : []
+        let alerts=N2ClinicalAlerts.plan(drafts:recoveredDrafts,products:products,now:Date())
         let monthStart=String(today.prefix(7))+"-01"
         var todayCount=0,weekCount=0,monthCount=0
         for visit in visits where visit["status"] as? String == "saved" {
@@ -246,7 +251,7 @@ public final class N2ProtectedClinicalVaultCore {
             if date>=weekStart && date<=today {weekCount+=1}
             if date>=monthStart && date<=today {monthCount+=1}
         }
-        return N2DashboardSnapshot(revision:active.revision,today:todayCount,week:weekCount,month:monthCount,drafts:drafts)
+        return N2DashboardSnapshot(revision:active.revision,today:todayCount,week:weekCount,month:monthCount,drafts:drafts,alerts:alerts)
     }
     public func readDashboard()throws
         ->(history:N2NativeReadModel?,drafts:[N2RecoverableDraft]) {
@@ -264,6 +269,7 @@ public final class N2ProtectedClinicalVaultCore {
     /// The displayed rows and their revision belong to one authenticated
     /// recovery; never label old history with a separately read newer revision.
     public func readIndexWithRevision()throws->(revision:Int,model:N2NativeReadModel)? {
+        let span=N2PerformanceSpan("Authenticated history read");defer{span.end()}
         guard let active=try journal.recover() else{return nil}
         if let cached=historyProjection,cached.bytes==active.snapshot {
             return (active.revision,cached.model)
@@ -558,6 +564,7 @@ public final class N2ProtectedClinicalVaultCore {
     @discardableResult
     public func saveDraft(id:String,changes:Data,at:Int64,
                           expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let span=N2PerformanceSpan("Confirmed draft save");defer{span.end()}
         guard let active=try journal.recover() else{throw N2ProtectedStoreError.absentSource}
         guard active.revision==expectedRevision else{throw N2ProtectedStoreError.staleRevision}
         let next=try N2SnapshotEditor.upsertedDraft(snapshot:active.snapshot,id:id,changes:changes,at:at)
@@ -572,6 +579,7 @@ public final class N2ProtectedClinicalVaultCore {
     @discardableResult
     public func removeDraft(id:String,
                             expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let span=N2PerformanceSpan("Confirmed draft deletion");defer{span.end()}
         try modify(expectedRevision:expectedRevision) {
             try N2SnapshotEditor.deleteDraft(snapshot:$0,id:id)
         }
@@ -682,6 +690,7 @@ public final class N2ProtectedClinicalVaultCore {
         reason:String,operatorName:String,medicationDiscrepancy:String,
         expectedEffectiveSHA:String,at:Int64,
         expectedRevision:Int)throws->N2ProtectedStoreSummary {
+        let span=N2PerformanceSpan("Confirmed rectification");defer{span.end()}
         try modify(expectedRevision:expectedRevision) {
             try N2ClinicalCorrections.append(snapshot:$0,eventID:eventID,
                 visitID:visitID,changes:changes,reason:reason,
@@ -693,6 +702,7 @@ public final class N2ProtectedClinicalVaultCore {
     public func saveAttention(_ visit:Data,approvedCatalog:Data,at:Int64,
                               expectedRevision:Int)throws
         -> N2ProtectedStoreSummary {
+        let span=N2PerformanceSpan("Confirmed attention save");defer{span.end()}
         let actor=N2AtomicClinicalCoordinator(journal:journal)
         _=try actor.save(visit:visit,approvedCatalog:approvedCatalog,
                          at:at,expectedRevision:expectedRevision)

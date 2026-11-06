@@ -184,11 +184,11 @@ struct N2NativeHistoryView: View {
                     do {try await Task.sleep(for:.milliseconds(140))}
                     catch{return}
                     guard !Task.isCancelled else{return}
-                    let requested=query,w=workerSearchIndex,v=visitSearchIndex
+                    let requested=query,w=workerSearchIndex,v=visitSearchIndex,generation=searchGeneration
                     let result=await Task.detached(priority:.userInitiated) {
                         (w?.matches(requested) ?? [],v?.matches(requested,minimumLength:0) ?? [])
                     }.value
-                    guard !Task.isCancelled else{return}
+                    guard !Task.isCancelled,generation==searchGeneration,requested==query else{return}
                     workerMatches=result.0;visitMatches=result.1
                     committedQuery=requested
                     rosterPage=0
@@ -215,7 +215,7 @@ struct N2NativeHistoryView: View {
         .task(id:"\(historyActive)-\(refreshTrigger)") {
             if historyActive {await load()}
         }
-        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification)) { event in
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
             guard N2WorkspaceChanges.matches(event,vault),historyActive,
                   let kind=event.userInfo?["kind"] as? String,
                   ["history","workers","restore"].contains(kind) else{return}
@@ -261,7 +261,8 @@ struct N2NativeHistoryView: View {
             let v=directory ? nil : N2SearchIndex(rows:visits,fields:{[$0.workerDNI,$0.workerName,$0.diagnosis,$0.date].joined(separator:"\u{1f}")})
             return (w,v,w?.matches(requested) ?? [],v?.matches(requested,minimumLength:0) ?? [])
         }.value
-        guard !Task.isCancelled,requested==query,token.map({$0==loadGeneration}) ?? true else{return false}
+        guard historyActive,!Task.isCancelled,requested==query,token.map({$0==loadGeneration}) ?? true else{return false}
+        searchGeneration=UUID()
         workerSearchIndex=indices.0;visitSearchIndex=indices.1
         workerMatches=indices.2;visitMatches=indices.3
         projection=records;committedQuery=requested

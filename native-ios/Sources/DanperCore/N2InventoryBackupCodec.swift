@@ -59,6 +59,7 @@ public enum N2InventoryBackupCodec {
         return d
     }
     public static func verify(archive:Data,password:String)throws->N2VerifiedInventoryBackup {
+        let span=N2PerformanceSpan("Encrypted backup verification");defer{span.end()}
         guard (100...42*1024*1024).contains(archive.count),
               let e=try? JSONDecoder().decode(Envelope.self,from:archive),
               e.format=="DANPER-SALUD-PORTABLE-BACKUP",[1,2].contains(e.version),
@@ -96,6 +97,7 @@ public enum N2InventoryBackupCodec {
             sourceSHA256:try N2SimpleInventory.fingerprint(raw),schemaVersion:e.version,report:report,snapshot:raw)
     }
     public static func createVerified(snapshot:Data,password:String,domain:N2InventoryBackupDomain = .unspecified)throws->Data {
+        let span=N2PerformanceSpan("Encrypted backup export");defer{span.end()}
         _=try N2VersionedSnapshotAudit.reports(snapshot,allowEmptySynthetic:true)
         let version=N2SimpleInventory.isActive(snapshot) ? 2:1
         let plain=try N2SimpleInventory.bytes(["schema":version,"sourceDomain":domain.rawValue,

@@ -5,11 +5,14 @@ import DanperCore
 struct N2NativeDraftsDashboard:View {
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.danperAuthenticatedSession) private var authenticated
     @Environment(\.n2WorkspaceTab) private var selectedTab
     @State private var editor:DanperAttentionRoute?
     @State private var records=[N2RecoverableDraft]()
     @State private var loadedRevision:Int?
     @State private var loading=true
+    @State private var reading=false
+    @State private var refreshPending=false
     @State private var failed=false
     @State private var message="Cargando borradores…"
     @State private var selectedDeleteID:String?
@@ -76,8 +79,10 @@ struct N2NativeDraftsDashboard:View {
         .navigationTitle("Borradores")
         .danperFormChrome()
         .refreshable {await load()}
-        .task {await load()}
-        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification)) { event in
+        .task(id:"\(selectedTab)-\(scenePhase)-\(authenticated)") {
+            if selectedTab==2 || selectedTab == -1 {await load()}
+        }
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
             guard N2WorkspaceChanges.matches(event,vault),scenePhase == .active,
                   editor==nil,(selectedTab==2 || selectedTab == -1) else{return}
             Task {@MainActor in await load()}
@@ -112,6 +117,7 @@ struct N2NativeDraftsDashboard:View {
         records.removeAll(where:{$0.id==id})
         defer{
             deletingID=nil
+            if refreshPending {refreshPending=false;Task {await load()}}
             #if DEBUG
             print("[DANPER-PERF] drafts.delete_total_ms=\(Int((ProcessInfo.processInfo.systemUptime-started)*1000))")
             #endif
@@ -147,7 +153,13 @@ struct N2NativeDraftsDashboard:View {
 
     @MainActor
     private func load() async {
-        guard deletingID==nil else{return}
+        guard scenePhase == .active,(!vault.isClinical || authenticated) else{return}
+        if deletingID != nil || reading {refreshPending=true;return}
+        reading=true
+        defer {
+            reading=false
+            if refreshPending {refreshPending=false;Task {await load()}}
+        }
         #if DEBUG
         let started=ProcessInfo.processInfo.systemUptime
         #endif
@@ -162,10 +174,11 @@ struct N2NativeDraftsDashboard:View {
         }
         do {
             let latest=try await vault.readDraftsWithRevision()
+            guard scenePhase == .active,(!vault.isClinical || authenticated),!Task.isCancelled else{return}
             records=latest.drafts
             loadedRevision=latest.revision
             failed=false
-            message="Borradores recuperables: \(records.count). Desliza para actualizar."
+            message="Borradores recuperables: \(records.count). Se actualizan automáticamente."
         }catch{
             records=[]
             loadedRevision=nil

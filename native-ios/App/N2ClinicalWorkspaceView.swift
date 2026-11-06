@@ -168,6 +168,9 @@ struct N2ClinicalWorkspaceRootView:View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var loadingHomeCounts=false
     @State private var homeRefreshPending=false
+    @State private var clinicalAlerts=[N2ClinicalAlert]()
+    @State private var notificationError=false
+    @State private var alertClock=Date()
     @State private var homeRevision:Int?
     @State private var homeDay=""
     @State private var homeCounts:DanperHomeCounts?
@@ -217,7 +220,10 @@ struct N2ClinicalWorkspaceRootView:View {
         .environment(\.locale,Locale(identifier:"es_PE"))
         .preferredColorScheme(.dark)
         .task(id:tab) {if tab==0 {await refreshHomeCounts()}}
-        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification)) { event in
+        .onReceive(Timer.publish(every:30,on:.main,in:.common).autoconnect()) { now in
+            if sessionAuthenticated,scenePhase == .active,tab==0 {alertClock=now}
+        }
+        .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
             guard N2WorkspaceChanges.matches(event,vault),sessionAuthenticated,scenePhase == .active,tab==0,!showNewAttention else{return}
             Task {await refreshHomeCounts()}
         }
@@ -239,6 +245,11 @@ struct N2ClinicalWorkspaceRootView:View {
             else if phase == .active {Task {await refreshHomeCounts()}}
         }
     }
+    private var actionableAlerts:[N2ClinicalAlert] {
+        let now=Int64(alertClock.timeIntervalSince1970*1000)
+        let expired=Set(clinicalAlerts.filter{$0.kind == .expiryDay && $0.dueAt<=now}.map(\.sourceID))
+        return clinicalAlerts.filter {$0.dueAt<=now && !($0.kind == .expiryWarning && expired.contains($0.sourceID))}
+    }
     private var home:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:12) {
@@ -249,6 +260,27 @@ struct N2ClinicalWorkspaceRootView:View {
                     DanperErrorState(message:"No se pudieron actualizar las cifras.",retry:{Task {await refreshHomeCounts()}})
                 } else if homeCounts==nil {
                     DanperLoadingState(title:"Actualizando cifras…")
+                }
+                if !clinicalAlerts.isEmpty {
+                    DanperPanel("Alertas y avisos · \(actionableAlerts.count)") {
+                        ForEach(actionableAlerts.prefix(8)) { alert in
+                            Label(alert.detail,systemImage:alert.kind == .draft ? "doc.badge.clock":"exclamationmark.triangle")
+                                .font(.footnote)
+                        }
+                        NavigationLink("Ver todas las alertas") {
+                            List(clinicalAlerts) { alert in
+                                VStack(alignment:.leading,spacing:4) {
+                                    Text(alert.detail)
+                                    Text(alert.dueAt<=Int64(alertClock.timeIntervalSince1970*1000) ? "Pendiente de revisar":"Aviso programable")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }.navigationTitle("Alertas")
+                        }
+                        if notificationError {
+                            Text("No se pudieron programar algunos avisos locales. Las alertas siguen disponibles aquí.")
+                                .font(.caption).foregroundStyle(.orange)
+                        }
+                    }
                 }
                 HStack {
                     Text("Herramientas").font(.title2.weight(.bold))
@@ -288,7 +320,11 @@ struct N2ClinicalWorkspaceRootView:View {
             guard sessionAuthenticated,scenePhase == .active else{return}
             homeRevision=counters?.revision;homeDay=period.today
             homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
+            alertClock=Date()
+            clinicalAlerts=counters?.alerts ?? []
             countError=false
+            do {try await N2InventoryAlertNotifications.shared.reconcile(clinicalAlerts,mode:vault.mode);notificationError=false}
+            catch {notificationError=true}
         }catch {
             homeCounts=nil;countError=true
         }

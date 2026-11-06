@@ -59,6 +59,7 @@ final class N2PerformanceAuditTests:XCTestCase {
         let context=try store().clinicalFormContext(products:products,nursing:catalog,mappings:mappings)
         XCTAssertEqual(context.workers.count,9_648)
         let physicalV2=ProcessInfo.processInfo.environment["DANPER_PERF_V2"]=="1"
+        var inventoryProductCount=0
         var physicalBeforeBytes:Data?
         var measuredSnapshotBytes=source.count
         let stateEncoder=JSONEncoder();stateEncoder.outputFormatting = .sortedKeys
@@ -76,7 +77,9 @@ final class N2PerformanceAuditTests:XCTestCase {
             revision=try store().activateSimpleInventory(backup:backup,
                 request:N2SimpleActivation(id:"3E380B51-8D4D-4A18-AD00-A4E28A4D5266",at:1_793_370_000_000,
                     operatorName:"OPERADOR FICTICIO V2",confirmed:true,backupAvailable:true,
-                    initialProducts:[physicalProduct("16000182",70),physicalProduct("16000025",12)]),
+                    initialProducts:try context.products.clinical.map { item in
+                        try physicalProduct(item.code,item.code=="16000182" ? 70 : item.code=="16000025" ? 12:20)
+                    }),
                 catalog:context.products,expectedRevision:revision).revision
             for (kind,quantity,id,time) in [(N2SimpleInventoryCommand.Operation.receipt,10.0,"V2-PERF-RECEIPT",Int64(1_793_370_000_010)),
                                            (N2SimpleInventoryCommand.Operation.outflow,2.0,"V2-PERF-OUTFLOW",Int64(1_793_370_000_020))] {
@@ -91,6 +94,7 @@ final class N2PerformanceAuditTests:XCTestCase {
             let physical=try N2SimpleInventory.read(initialV2.snapshot)
             XCTAssertEqual(physical.products.first{$0.code=="16000182"}?.quantity,78)
             root=try XCTUnwrap(JSONSerialization.jsonObject(with:initialV2.snapshot) as? [String:Any])
+            inventoryProductCount=physical.products.count
             physicalBeforeBytes=try stateEncoder.encode(physical)
             measuredSnapshotBytes=initialV2.snapshot.count
         }
@@ -123,6 +127,22 @@ final class N2PerformanceAuditTests:XCTestCase {
             let patch=try JSONSerialization.data(withJSONObject:["diagnosis":"BORRADOR FICTICIO","worker":workers[0],"date":"2026-10-30","time":"09:00","items":[[String:Any]]()])
             revision=try store().saveDraft(id:"PERF-DRAFT",changes:patch,at:1_793_370_100_000+Int64(revision),expectedRevision:revision).revision
         }
+        let saveContext=try store().clinicalFormContext(products:products,nursing:catalog,mappings:mappings)
+        try measure("attention_confirmed_encrypted_save",3) {
+            var form=N2NativeFormDraft()
+            form.dni="00009648";form.date="2026-10-30";form.time="09:00"
+            form.category="ENFERMEDAD";form.system="RESPIRATORIO"
+            form.diagnosis="DIAGNOSTICO FICTICIO DE RENDIMIENTO";form.procedures=["OBSERVACION"]
+            form.responsible="OPERADOR FICTICIO";form.responsibleDni="00000001"
+            let visit=try form.makeSavedVisit(context:saveContext)
+            revision=try store().saveAttentionWithoutLegacyInventory(visit,approvedCatalog:mappings,
+                at:1_793_370_200_000+Int64(revision),expectedRevision:revision).revision
+        }
+        try measure("draft_delete_and_confirmed_persistence",3) {
+            revision=try store().removeDraft(id:"PERF-DRAFT",expectedRevision:revision).revision
+            let patch=try JSONSerialization.data(withJSONObject:["diagnosis":"BORRADOR FICTICIO","worker":workers[0],"date":"2026-10-30","time":"09:00","items":[[String:Any]]()])
+            revision=try store().saveDraft(id:"PERF-DRAFT",changes:patch,at:1_793_370_300_000+Int64(revision),expectedRevision:revision).revision
+        }
         try measure("form_prepare_9648") {
             XCTAssertEqual(try store().prepareClinicalForm(products:products,nursing:catalog,mappings:mappings).context.workers.count,9_648)
         }
@@ -144,6 +164,13 @@ final class N2PerformanceAuditTests:XCTestCase {
             _=try store().readCorrectionHistory(visitID:"fundo-unit")
             _=try store().readPendingClinicalCorrection(visitID:"fundo-unit")
             #endif
+        }
+        try measure("rectification_read_write_verified",3) {
+            let detail=try store().readCorrectionDetail(visitID:"fundo-unit")
+            revision=try store().saveClinicalCorrection(visitID:"fundo-unit",eventID:UUID().uuidString,
+                changes:JSONSerialization.data(withJSONObject:["diagnosis":"RECTIFICACION FICTICIA \(revision)"]),
+                reason:"Medición sintética sin cambios físicos",operatorName:"OPERADOR FICTICIO",medicationDiscrepancy:"",
+                expectedEffectiveSHA:detail.effectiveSHA256,at:1_793_370_400_000+Int64(revision),expectedRevision:revision).revision
         }
         try measure("dispensing_readonly_refresh",3) {
             #if !DANPER_PERF_OPTIMIZED
@@ -218,7 +245,7 @@ final class N2PerformanceAuditTests:XCTestCase {
         let indexMetric:Any=NSNull()
         #endif
         let report:[String:Any]=["searchIndexBuild_ms":indexMetric,"storeLifecycle":lifecycle,"workers":9_648,"initialVisits":visits.count,"snapshotBytes":measuredSnapshotBytes,
-            "inventorySchemaVersion":physicalV2 ? 2:1,"physicalBalancePreserved":physicalBeforeBytes != nil,
+            "inventoryProducts":inventoryProductCount,"inventorySchemaVersion":physicalV2 ? 2:1,"physicalBalancePreserved":physicalBeforeBytes != nil,
             "physicalQuantity":physicalV2 ? 78:0,"indicatorExportMeasured":!physicalV2,
             "configuration":"SwiftPM Release; x86_64 Linux; fictitious v\(physicalV2 ? 2:1) snapshot; same fabricated dataset; no UI/device latency claim",
             "host":ProcessInfo.processInfo.operatingSystemVersionString,"actions":results]

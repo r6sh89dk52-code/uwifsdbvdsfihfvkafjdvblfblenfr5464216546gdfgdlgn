@@ -16,3 +16,8 @@ export DANPER_COMPAT_CONSUMER_SHA
 DANPER_COMPAT_CONSUMER_SHA=$(git -C "$ROOT" rev-parse HEAD)
 swift test --package-path "$ROOT/native-ios" -c release --jobs 2 \
   --filter N2Build14ForwardCompatibilityTests
+
+# Run the original 14.1 codec and validators against files written by 14.2.
+cp "$ROOT/scripts/performance/N2Build142BackwardCompatibilityTests.swift" "$BASE/native-ios/Tests/DanperCoreTests/"
+swift test --package-path "$BASE/native-ios" -c release --jobs 2 \
+  --filter N2Build142BackwardCompatibilityTests

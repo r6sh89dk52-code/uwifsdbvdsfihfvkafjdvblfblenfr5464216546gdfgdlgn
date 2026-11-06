@@ -22,6 +22,7 @@ enum N2DraftReminder {
             identifier:identifier(id:id,mode:mode),
             content:notification,
             trigger:UNTimeIntervalNotificationTrigger(timeInterval:3600,repeats:false))
+        center.removeDeliveredNotifications(withIdentifiers:[identifier(id:id,mode:mode)])
         try? await center.add(request)
     }
 

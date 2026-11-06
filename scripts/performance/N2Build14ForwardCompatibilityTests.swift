@@ -48,6 +48,8 @@ final class N2Build14ForwardCompatibilityTests:XCTestCase {
             .medications.first{$0.id=="box-2"}?.historicalOpeningR,0)
         let fresh=try N2InventoryBackupCodec.createVerified(snapshot:after.snapshot,password:password,domain:.demo)
         XCTAssertEqual(try N2InventoryBackupCodec.verify(archive:fresh,password:password).snapshot,after.snapshot)
+        try fresh.write(to:source.appendingPathComponent("build142-fictional.danperbackup"))
+        try after.snapshot.write(to:source.appendingPathComponent("build142-expected-snapshot.json"))
         let result:[String:Any]=["sourceSHA":try XCTUnwrap(env["DANPER_COMPAT_CONSUMER_SHA"]),
             "producerSHA":"a22bd57b51881dec0278dc9a451a2a13103a7fd7","tests":1,"failures":0,
             "build14JournalRead":true,"build14BackupRead":true,"stockUnchanged":true,

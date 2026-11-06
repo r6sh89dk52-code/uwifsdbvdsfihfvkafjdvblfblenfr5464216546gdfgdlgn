@@ -6,6 +6,7 @@ import DanperCore
 actor N2WorkspaceFileIO {
     static let shared=N2WorkspaceFileIO()
     func readBackup(_ url:URL)throws->Data {
+        let span=N2PerformanceSpan("Backup file read");defer{span.end()}
         let scoped=url.startAccessingSecurityScopedResource()
         defer {if scoped {url.stopAccessingSecurityScopedResource()}}
         let info=try url.resourceValues(forKeys:[.isRegularFileKey,.isSymbolicLinkKey,.fileSizeKey])
@@ -16,6 +17,7 @@ actor N2WorkspaceFileIO {
         return try Data(contentsOf:url)
     }
     func writeProtectedExport(_ data:Data,to url:URL)throws {
+        let span=N2PerformanceSpan("Protected export write");defer{span.end()}
         try data.write(to:url,options:[.atomic,.completeFileProtection])
     }
 }
