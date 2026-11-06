@@ -78,7 +78,7 @@ actor N2InventoryAlertNotifications {
             if deliveredIDs.contains(id) {continue}
             if let existing=pending.first(where:{$0.identifier==id}) {
                 if alert.kind != .draft {continue}
-                if let due=existing.trigger?.nextTriggerDate(),
+                if let due=(existing.trigger as? UNTimeIntervalNotificationTrigger)?.nextTriggerDate(),
                    abs(due.timeIntervalSince1970-Double(alert.dueAt)/1000)<2 {continue}
             }
             let content=UNMutableNotificationContent();content.title="DANPER Salud"

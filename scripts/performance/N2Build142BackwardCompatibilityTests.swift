@@ -12,7 +12,7 @@ final class N2Build142BackwardCompatibilityTests:XCTestCase {
         XCTAssertEqual(verified.snapshot,expected);XCTAssertEqual(verified.schemaVersion,2)
         _=try N2VersionedSnapshotAudit.inspect(verified.snapshot)
         _=try N1fLosslessFieldGate.inspect(verified.snapshot)
-        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent("danper-n2-synthetic-build142-backward-"+UUID().uuidString)
         defer {try? FileManager.default.removeItem(at:folder)}
         let journal=try N2EncryptedClinicalJournal(directory:folder,secret:Data(repeating:0x42,count:32))
         XCTAssertEqual(try journal.commit(verified.snapshot,expectedRevision:0),1)
