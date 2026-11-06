@@ -298,7 +298,7 @@ public enum N2VerifiedIndicatorWorkbook {
                   items.count<=1000,
                   (subdivision=="AMBAS" ?
                     ["LA VENTUROSA","PLVENTUROSA"].contains(string(worker["site"])) :
-                    ["",subdivision].contains(string(worker["site"]))) else{
+                    string(worker["site"])==subdivision) else{
                 throw Failure.invalidVisit
             }
             let sourceSite=subdivision=="AMBAS" ? string(worker["site"]) : subdivision
