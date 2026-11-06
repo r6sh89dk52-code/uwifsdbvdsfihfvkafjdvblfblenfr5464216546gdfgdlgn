@@ -184,6 +184,8 @@ struct N2SimpleRestoreView:View {
     enum Kind {case clinical,complete}
     let kind:Kind
     var onRestored:()->Void={}
+    // Already staged encrypted copy from the app's Open In / Share handler.
+    var incomingFile:URL?=nil
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
@@ -236,6 +238,14 @@ struct N2SimpleRestoreView:View {
                 } message:{Text(kind == .clinical ? "No se importarán lotes, saldos FEFO ni conciliaciones pendientes anteriores. Los registros repetidos no se duplicarán; un conflicto no se sobrescribirá.":"Si ya existe una fuente, la recuperación completa se bloqueará. Para conservar inventario usa la restauración clínica selectiva.")}
             .task {
                 responsible=vault.isClinical ? N2ClinicianIdentity.name:"OPERADOR FICTICIO"
+                if let incomingFile,file == nil {
+                    do {
+                        file=try N2BackupPickerCopy.stage(incomingFile)
+                        status="Respaldo cifrado recibido desde Archivos. Introduce su contraseña y verifica el contenido."
+                    } catch {
+                        status="No se pudo preparar la copia compartida. Vuelve a compartir el archivo original."
+                    }
+                }
                 if kind == .clinical {
                     do {
                         let context=try await vault.simpleInventoryContext()

@@ -23,6 +23,24 @@ targets:
         type: folder
     dependencies:
       - package: DanperCore
+    info:
+      path: Generated/DANPERNative-Info.plist
+      properties:
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Respaldo cifrado DANPER
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - pe.danper.saludmovil.backup
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: pe.danper.saludmovil.backup
+            UTTypeDescription: Respaldo cifrado DANPER
+            UTTypeConformsTo:
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - danperbackup
+        LSSupportsOpeningDocumentsInPlace: NO
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pe.danper.saludmovil.native.iloaderpreview

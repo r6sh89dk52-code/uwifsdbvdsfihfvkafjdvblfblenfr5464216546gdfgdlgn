@@ -224,7 +224,7 @@ struct N2NativeActivationView:View {
         status="Descifrando y auditando el respaldo en el iPhone…"
         defer{
             busy=false
-            if sourceURL != url {N2BackupPickerCopy.discard(url)}
+            if sourceURL != url && pickedBackupURL != url {N2BackupPickerCopy.discard(url)}
         }
         do {
             let permitted=try await LAContext().evaluatePolicy(

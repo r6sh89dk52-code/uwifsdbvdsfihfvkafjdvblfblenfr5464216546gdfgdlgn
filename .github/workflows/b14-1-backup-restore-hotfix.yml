@@ -99,7 +99,7 @@ jobs:
               exit 1
             }
           echo 'PASS: native iOS app and XCTest hosts typechecked'
-      - name: Validate biometric enrollment, 26 native + all 11 UI tests
+      - name: Validate biometric enrollment, 29 native + all 11 UI tests
         timeout-minutes: 85
         env:
           DANPER_AUDIT_OUT: ${{ runner.temp }}/danper-b14-1-audit
@@ -143,6 +143,8 @@ jobs:
           APP="$RUNNER_TEMP/b14-1-release/Build/Products/Release-iphoneos/DANPERNative.app"
           test -d "$APP"
           ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          MARKETING=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          test "$MARKETING" = '0.4.2'
           VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
           test "$ID" = 'pe.danper.saludmovil.native.iloaderpreview'
           test "$VERSION" = '141'
@@ -154,7 +156,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa
           unzip -tq DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa
           shasum -a 256 DANPER_0.4.2_BUILD141_RESTORE_ILOADER_UNSIGNED.ipa > SHA256.txt
-          printf '%s\n' "SHA=$(git -C \"$GITHUB_WORKSPACE\" rev-parse HEAD)" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
+          printf '%s\n' "SHA=$GITHUB_SHA" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
       - uses: actions/upload-artifact@v4
         with:
           name: DANPER_B14_1_RESTORE_ILOADER_UNSIGNED_TESTED

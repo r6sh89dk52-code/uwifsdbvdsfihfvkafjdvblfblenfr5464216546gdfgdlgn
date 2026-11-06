@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
+import OSLog
 
 /// Copy an encrypted backup from any iOS Files provider into a short-lived,
 /// protected local file. In-place security-scoped URLs from a provider are not
@@ -19,14 +20,19 @@ enum N2BackupPickerCopy {
         }
     }
     private static let prefix="DANPER_RESTORE_PICKED_"
+    private static let log=Logger(subsystem:"pe.danper.saludmovil.backup",category:"import")
     static func stage(_ input:URL)throws->URL {
         guard input.pathExtension.lowercased()=="danperbackup" else {
             throw Failure.unsupportedFile
         }
+        guard input.isFileURL else {throw Failure.unsupportedFile}
         let scoped=input.startAccessingSecurityScopedResource()
         defer {if scoped {input.stopAccessingSecurityScopedResource()}}
         let values=try input.resourceValues(forKeys:[.isRegularFileKey,.isSymbolicLinkKey,.fileSizeKey])
-        guard values.isSymbolicLink != true else {throw Failure.invalidFile}
+        guard values.isRegularFile != false,values.isSymbolicLink != true,
+              values.fileSize.map({(100...42*1024*1024).contains($0)}) ?? true else {
+            throw Failure.invalidFile
+        }
         // Some Files providers omit fileSize until materialized. Reading the
         // provider's copy verifies it before making it the active selection.
         let bytes=try Data(contentsOf:input,options:.mappedIfSafe)
@@ -34,6 +40,7 @@ enum N2BackupPickerCopy {
         let destination=FileManager.default.temporaryDirectory
             .appendingPathComponent(prefix+UUID().uuidString+".danperbackup")
         try bytes.write(to:destination,options:[.atomic,.completeFileProtection])
+        log.info("BACKUP_IMPORT_STAGED")
         return destination
     }
     static func discard(_ url:URL?) {
@@ -76,11 +83,11 @@ struct N2BackupDocumentPicker:UIViewControllerRepresentable {
         func documentPicker(_ controller:UIDocumentPickerViewController,
                             didPickDocumentsAt urls:[URL]) {
             guard let url=urls.first else {
-                onError("No se recibió ningún archivo del selector.")
+                onError("BACKUP_PICKER_EMPTY: No se recibió ningún archivo del selector.")
                 return
             }
             do {onPicked(try N2BackupPickerCopy.stage(url))}
-            catch {onError(error.localizedDescription)}
+            catch {onError("BACKUP_PICKER_COPY_FAILED: No se pudo copiar el archivo. Comprueba que sea un .danperbackup local válido y vuelve a intentarlo.")}
         }
         func documentPickerWasCancelled(_ controller:UIDocumentPickerViewController) {
             onCancelled()

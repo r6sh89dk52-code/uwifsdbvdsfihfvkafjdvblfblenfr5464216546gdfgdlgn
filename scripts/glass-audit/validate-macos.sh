@@ -141,7 +141,10 @@ PYINSTALL
  done
 }
 run_tests(){
- local label="$1" expected="$2" status=0 stream='' bridge=''; shift 2
+ local label="$1" expected="$2" status=0 stream='' bridge='' allowance=600; shift 2
+ # This journey performs two complete visits and persistence checks. The last
+ # run was still progressing at 600s, with both saves already successful.
+ if test "$label" = N3ClinicalJourneyTests-demo; then allowance=900; fi
  echo "PHASE: $label — $expected required tests; no skips"
  prepare_test_installation || return $?
  case "$label" in
@@ -152,7 +155,7 @@ run_tests(){
  xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
   -derivedDataPath "$DD" -parallel-testing-enabled NO -test-timeouts-enabled YES \
-  -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 -resultBundlePath "$OUT/$label.xcresult" \
+  -default-test-execution-time-allowance "$allowance" -maximum-test-execution-time-allowance "$allowance" -resultBundlePath "$OUT/$label.xcresult" \
   ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
  if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
@@ -172,7 +175,7 @@ if test "$MODE" != ui; then
  run_tests biometric-preflight 1 -only-testing:DANPERNativeTests/N2BiometricEnvironmentTests
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  if test "$MODE" != replay; then
-  run_tests native-26 26 -only-testing:DANPERNativeTests
+  run_tests native-29 29 -only-testing:DANPERNativeTests
   git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
  fi
  if test "$MODE" = native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
@@ -218,4 +221,4 @@ if test "$MODE" = replay; then
 fi
 # Only this marker allows packaging in CI or locally.
 git rev-parse HEAD > "$OUT/VALIDATED_SHA.txt"
-echo 'PASS: current checkout, 26 native and all 11 UI cases; no failures/skips. Core/Excel results are validated separately.'
+echo 'PASS: current checkout, 29 native and all 11 UI cases; no failures/skips. Core/Excel results are validated separately.'
