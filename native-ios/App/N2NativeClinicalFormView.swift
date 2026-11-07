@@ -154,6 +154,7 @@ struct N2NativeClinicalFormView:View {
     }
     private func selectWorker(_ worker:N2FormWorker) {
         dniLookupTask?.cancel()
+        if form.dni != worker.dni {form.visitSite=""}
         form.dni=worker.dni
         workerDNIInput=worker.dni
         workerNameInput=worker.name
@@ -673,9 +674,20 @@ struct N2NativeClinicalFormView:View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.green)
                     VStack(alignment:.leading,spacing:12) {
-                        LabeledContent("Sede",
-                            value:worker.site=="PLVENTUROSA"
-                                  ? "Planta La Venturosa" : "Fundo La Venturosa")
+                        DanperChoiceField(
+                            title:"Sede de esta atención",
+                            selection:Binding(
+                                get:{form.visitSite.isEmpty ? worker.site : form.visitSite},
+                                set:{form.visitSite=$0}
+                            ),
+                            options:["","LA VENTUROSA","PLVENTUROSA"],
+                            labels:["":"Seleccionar sede","LA VENTUROSA":"Fundo La Venturosa",
+                                    "PLVENTUROSA":"Planta La Venturosa"],
+                            highlighted:highlightedField=="worker-site"
+                        )
+                        .accessibilityIdentifier("attention-visit-site")
+                        Text("La sede pertenece a esta atención. El tópico y el Kardex son únicos para Fundo y Planta.")
+                            .font(.caption).foregroundStyle(.secondary)
                         LabeledContent("Área",
                             value:worker.area.isEmpty ? "No consignada" : worker.area)
                         LabeledContent("Labor",
@@ -1118,6 +1130,7 @@ struct N2NativeClinicalFormView:View {
         case "treatment-items": destination=2;field="treatment-medications"
         case "treatment-selection": destination=2;field="treatment-procedures"
         case "treatment-site": destination=2;field="treatment-site"
+        case "worker-site": destination=0;field="worker-site"
         case "treatment-photo": destination=2;field="treatment-photo"
         case "result-permission-time": destination=3;field="result-permission-time"
         default:destination=step;field="validation-top"
