@@ -737,8 +737,21 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertNotNil(row.range(of:cell+content,options:.regularExpression),row,file:file,line:line)
     }
     func testOctoberIndicatorEstimatesInitialFromLaterCountAndArchivedUse()throws {
-        let raw=try indicatorInventory(on:"2026-11-07",products:[product(quantity:100)],source:source())
-        let parts=try octoberIndicator(raw,ids:["fundo-unit","planta-open","planta-tablet-carton"])
+        let original=try source()
+        let ids:Set<String>=["fundo-unit","planta-open","planta-tablet-carton"]
+        let incomplete=try indicatorInventory(on:"2026-11-07",products:[product(quantity:100)],source:original)
+        let unknown=try stockRow(octoberIndicator(incomplete,ids:ids),code:"16000182")
+        assertStock(unknown,column:"D",value:nil)
+        assertStock(unknown,column:"F",value:17)
+        XCTAssertTrue(unknown.contains("Inicial no verificado"))
+
+        var fixture=try object(original)
+        let visits=try XCTUnwrap(fixture["attentions"] as? [[String:Any]])
+        // The original fixture also contains an unverified delivery of
+        // 1,000 units. Exclude it only in this separate, complete fixture.
+        fixture["attentions"]=visits.filter { $0["id"] as? String != "pending-stock" }
+        let raw=try indicatorInventory(on:"2026-11-07",products:[product(quantity:100)],source:bytes(fixture))
+        let parts=try octoberIndicator(raw,ids:ids)
         let row=try stockRow(parts,code:"16000182")
         assertStock(row,column:"D",value:117)
         assertStock(row,column:"E",value:nil)

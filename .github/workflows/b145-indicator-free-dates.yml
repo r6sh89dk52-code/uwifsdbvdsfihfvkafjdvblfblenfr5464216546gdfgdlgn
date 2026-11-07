@@ -33,6 +33,12 @@ jobs:
           name: DANPER_B144_INDICATOR_STOCK_ILOADER_UNSIGNED_TESTED
           path: previous-build
           github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 42391382629
+          name: B145_INDICATOR_EVIDENCE_attempt_1
+          path: previous-targeted
+          github-token: ${{ github.token }}
       - name: Check the baseline and changes outside the exporter
         env:
           GH_TOKEN: ${{ github.token }}
@@ -80,36 +86,74 @@ jobs:
           export DANPER_AUDIT_OUT="$RUNNER_TEMP/b145-fixtures"
           python3 -u scripts/glass-audit/run-bounded.py 350 "Generate synthetic fixtures" bash scripts/glass-audit/prepare.sh
           echo "DANPER_N1_FIXTURE_DIR=$DANPER_AUDIT_OUT/fixtures" >> "$GITHUB_ENV"
-      - name: Run and verify only affected Swift tests
+      - name: Recheck corrected synthetic case and combine unchanged PASS evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
         timeout-minutes: 24
         run: |
           set -euo pipefail
           swift --version
-          python3 -u scripts/glass-audit/run-bounded.py 1320 "Compile Core and run affected Excel tests" \
-            swift test --package-path native-ios --jobs 2 --filter "$INDICATOR_TESTS" 2>&1 | tee "$RUNNER_TEMP/b145-evidence/indicator.log"
+          python3 -u scripts/glass-audit/run-bounded.py 1320 "Compile Core and recheck historical estimate" \
+            swift test --package-path native-ios --jobs 2 \
+              --filter 'N2SimpleInventoryTests/testOctoberIndicatorEstimatesInitialFromLaterCountAndArchivedUse' \
+            2>&1 | tee "$RUNNER_TEMP/b145-evidence/indicator.log"
           python3 - <<'PY'
-          import json, os, pathlib, re
+          import json, os, pathlib, re, subprocess, urllib.request
           folder = pathlib.Path(os.environ["RUNNER_TEMP"],"b145-evidence")
+          prior = "65ab6c754964cfdbe8b91ffe2fd2c897db936e23"
+          path = "native-ios/Tests/DanperCoreTests/N2SimpleInventoryTests.swift"
+          workflow = ".github/workflows/b145-indicator-free-dates.yml"
+          subprocess.run(["git","diff","--exit-code",prior,"HEAD","--",".",
+                          ":(exclude)"+path,":(exclude)"+workflow],check=True)
+          retry = "testOctoberIndicatorEstimatesInitialFromLaterCountAndArchivedUse"
+          case = "N2SimpleInventoryTests/"+retry
+          def without_retry(source):
+              a = source.index("    func "+retry+"(")
+              b = source.index("\n    func ",a+1)
+              return source[:a]+source[b:]
+          old = subprocess.check_output(["git","show",prior+":"+path],text=True)
+          assert without_retry(old) == without_retry(pathlib.Path(path).read_text())
+          url = "https://api.github.com/repos/"+os.environ["GITHUB_REPOSITORY"]+"/actions/runs/42391382629"
+          headers = {"Authorization":"Bearer "+os.environ["GH_TOKEN"]}
+          def api(url):
+              with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=30) as response:
+                  return json.load(response)
+          run=api(url)
+          assert run["head_sha"]==prior and run["conclusion"]=="failure"
+          artifacts=api(url+"/artifacts")["artifacts"]
+          assert any(a["id"]==13582315106 and a["workflow_run"]["head_sha"]==prior and not a["expired"] for a in artifacts)
+          old_proof=json.loads(pathlib.Path("previous-targeted/BASELINE.json").read_text())
+          assert old_proof["candidateSHA"]==prior
           pattern = re.compile(os.environ["INDICATOR_TESTS"])
           expected = set()
-          for path in pathlib.Path("native-ios/Tests/DanperCoreTests").glob("*.swift"):
-              for case in re.findall(r"\bfunc (test\w+)\(",path.read_text()):
-                  name = path.stem+"/"+case
+          for file in pathlib.Path("native-ios/Tests/DanperCoreTests").glob("*.swift"):
+              for method in re.findall(r"\bfunc (test\w+)\(",file.read_text()):
+                  name = file.stem+"/"+method
                   if pattern.search(name):
                       expected.add(name)
-          log = (folder/"indicator.log").read_text()
-          passed = re.findall(r"Test Case '-\[(?:DanperCoreTests\.)?(\w+) (test\w+)\]' passed",log)
-          if not passed:
-              passed = re.findall(r"Test Case '(\w+)\.(test\w+)' passed",log)
-          actual = {suite+"/"+case for suite,case in passed}
-          assert actual == expected and len(passed) == len(expected), (sorted(expected-actual),sorted(actual-expected))
-          assert len([case for case in actual if "/testOctoberIndicator" in case]) == 8
-          assert not re.search(r"Test Case .* skipped|\b[1-9]\d* tests? (?:were )?skipped",log)
-          assert re.search(r"Executed "+str(len(expected))+r" tests, with 0 failures",log), log[-3000:]
-          proof = json.loads((folder/"BASELINE.json").read_text())
-          proof.update(tests=sorted(actual),passed=len(actual),failures=0,skipped=0)
+          def cases(log, status):
+              found=re.findall(r"Test Case '-\[(?:DanperCoreTests\.)?(\w+) (test\w+)\]' "+status,log)
+              if not found:
+                  found=re.findall(r"Test Case '(\w+)\.(test\w+)' "+status,log)
+              actual={suite+"/"+method for suite,method in found}
+              assert len(actual)==len(found)
+              return actual
+          old_log=pathlib.Path("previous-targeted/indicator.log").read_text()
+          log=(folder/"indicator.log").read_text()
+          previous=cases(old_log,"passed")
+          assert previous==expected-{case} and cases(old_log,"failed")=={case}
+          assert cases(log,"passed")=={case} and not cases(log,"failed")
+          for trace in (log,old_log):
+              assert not re.search(r"Test Case .* skipped|\b[1-9]\d* tests? (?:were )?skipped",trace)
+          assert re.search(r"Executed 1 tests?, with 0 failures",log),log[-3000:]
+          assert len([name for name in expected if "/testOctoberIndicator" in name])==8
+          proof=json.loads((folder/"BASELINE.json").read_text())
+          proof.update(tests=sorted(expected),passed=len(expected),failures=0,skipped=0,
+                       reusedAffectedRun=42391382629,reusedAffectedSHA=prior,reusedAffectedCases=sorted(previous),
+                       rechecked=case)
           (folder/"TEST_EVIDENCE.json").write_text(json.dumps(proof,indent=2))
-          print(f"PASS: {len(actual)} affected cases, including eight October/November stock regressions")
+          print(f"PASS: {len(previous)} unchanged cases plus the corrected synthetic regression")
+
           PY
       - uses: actions/upload-artifact@v4
         if: always()
