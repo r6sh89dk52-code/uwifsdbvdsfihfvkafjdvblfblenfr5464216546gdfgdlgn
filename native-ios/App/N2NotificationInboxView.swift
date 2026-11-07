@@ -22,6 +22,31 @@ enum N2NotificationInboxPreferences {
     }
 }
 
+/// Present one expiry row per product. The Core planner intentionally keeps
+/// separate 30-day and expiration-day events for iOS scheduling; displaying
+/// both together makes one medicine look duplicated in the in-app inbox.
+/// Never merge draft alerts or inventory events, and never mutate their IDs.
+enum N2NotificationInboxPresentation {
+    static func uniqueExpiry(_ alerts:[N2ClinicalAlert],now:Date)->[N2ClinicalAlert] {
+        let instant=Int64(now.timeIntervalSince1970*1000)
+        let warnings=Set(alerts.filter{$0.kind == .expiryWarning}.map(\.sourceID))
+        let expired=Set(alerts.filter{$0.kind == .expiryDay && $0.dueAt<=instant}.map(\.sourceID))
+        var shown=Set<String>()
+        return alerts.filter { alert in
+            switch alert.kind {
+            case .expiryWarning:
+                guard !expired.contains(alert.sourceID) else{return false}
+                return shown.insert(alert.sourceID).inserted
+            case .expiryDay:
+                guard alert.dueAt<=instant || !warnings.contains(alert.sourceID) else{return false}
+                return shown.insert(alert.sourceID).inserted
+            case .draft,.outOfStock:
+                return true
+            }
+        }
+    }
+}
+
 /// The inbox only presents authenticated derived alerts. Dismissing an alert
 /// never deletes the draft, clinical source, pharmacy count or a due date.
 struct N2NotificationInboxView:View {
@@ -51,7 +76,8 @@ struct N2NotificationInboxView:View {
     @Environment(\.dismiss) private var close
     @State private var filter=Filter.all
     private var visible:[N2ClinicalAlert] {
-        alerts.filter{filter.includes($0.kind)}
+        N2NotificationInboxPresentation.uniqueExpiry(alerts,now:now)
+            .filter{filter.includes($0.kind)}
             .sorted{($0.dueAt,$0.id)<($1.dueAt,$1.id)}
     }
     var body:some View {

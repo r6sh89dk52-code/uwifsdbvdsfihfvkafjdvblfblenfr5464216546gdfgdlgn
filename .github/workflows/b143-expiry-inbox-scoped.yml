@@ -1,0 +1,87 @@
+name: DANPER 14.3 - Scoped unique expiry inbox hotfix
+on:
+  push:
+    branches:
+      - fix/b143-unique-expiry-inbox-20261107
+    paths:
+      - native-ios/App/N2NotificationInboxView.swift
+      - native-ios/NativeTests/N2NotificationInboxPreferencesTests.swift
+      - .github/workflows/b143-expiry-inbox-scoped.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scoped-native-inbox:
+    name: Build iOS app and test only inbox preferences and expiry presentation
+    runs-on: macos-15-intel
+    timeout-minutes: 55
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare synthetic fixtures and app project
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+      - name: Compile app and native test host
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/inbox-hotfix-build" \
+            ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            build-for-testing > "$RUNNER_TEMP/inbox-hotfix-build.log" 2>&1 || {
+              grep -nE 'error:|fatal error:|BUILD FAILED' "$RUNNER_TEMP/inbox-hotfix-build.log" | tail -n 80 || true
+              exit 1
+            }
+          echo "PASS: complete iOS app and test hosts compile"
+      - name: Run only 5 relevant native XCTest cases
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c 'import json,sys; a=[x["identifier"] for x in json.load(sys.stdin)["runtimes"] if x.get("isAvailable") and x["identifier"].startswith("com.apple.CoreSimulator.SimRuntime.iOS-")]; assert a; print(a[-1])')
+          SIM_ID=$(xcrun simctl create DANPER-INBOX-SCOPED com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
+          cleanup(){ xcrun simctl shutdown "$SIM_ID" || true; xcrun simctl delete "$SIM_ID" || true; }
+          trap cleanup EXIT
+          echo "Simulator: $SIM_ID"
+          xcrun simctl boot "$SIM_ID"
+          xcrun simctl bootstatus "$SIM_ID" -b
+          echo "Running N2NotificationInboxPreferencesTests (2) and N2NotificationInboxPresentationTests (3)"
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 120 \
+            -derivedDataPath "$RUNNER_TEMP/inbox-hotfix-build" \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            -maximum-test-execution-time-allowance 120 \
+            -resultBundlePath "$RUNNER_TEMP/inbox-hotfix.xcresult" \
+            -only-testing:DANPERNativeTests/N2NotificationInboxPreferencesTests \
+            -only-testing:DANPERNativeTests/N2NotificationInboxPresentationTests \
+            ASSETCATALOG_COMPILER_APPICON_NAME="" test-without-building \
+            > "$RUNNER_TEMP/inbox-hotfix-test.log" 2>&1 || {
+              tail -n 120 "$RUNNER_TEMP/inbox-hotfix-test.log" || true
+              exit 1
+            }
+          python3 scripts/glass-audit/check-xcresult.py "$RUNNER_TEMP/inbox-hotfix.xcresult" 5
+          echo "PASS: five scoped native tests, no failed or skipped cases"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B143_SCOPED_EXPIRY_INBOX_DIAGNOSTICS
+          path: |
+            ${{ runner.temp }}/inbox-hotfix-build.log
+            ${{ runner.temp }}/inbox-hotfix-test.log
+            ${{ runner.temp }}/inbox-hotfix.xcresult.summary.json
+          if-no-files-found: ignore
+          retention-days: 7
