@@ -1,0 +1,96 @@
+name: DANPER 14.3 - Focused regression of inbox, visit site and RESU
+on:
+  push:
+    branches: [feat/build143-notifications-site-stock-20261106]
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/b143-focused-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-and-excel:
+    name: Native Swift Core, site, opening and both Excel workbooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare synthetic data only
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          mkdir -p "$RUNNER_TEMP/b143-fixtures"
+          export DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/b143-fixtures"
+          echo "DANPER_N1_FIXTURE_DIR=$DANPER_N1_FIXTURE_DIR" >> "$GITHUB_ENV"
+          for generator in generate-native-compat-fixtures.cjs generate-n1e-clinical-fixtures.cjs generate-n1f-lossless-fixtures.cjs generate-n1h-clinical-parity.cjs generate-n1p-excel-parity.cjs generate-n1q-reconciliation-fixtures.cjs generate-n1r-stored-xlsx-template.cjs generate-n1s-official-excel-fixtures.cjs generate-n2-approved-fixture.cjs generate-n2-nursing-parity.cjs generate-n2-stock-commands-fixtures.cjs; do
+            node "scripts/$generator"
+          done
+          node scripts/generate-n2-procedure-parity.cjs
+      - name: Parse all iOS app Swift sources without changing native code
+        run: swiftc -frontend -parse native-ios/App/*.swift
+      - name: Targeted new site and RESU regression tests
+        run: |
+          set -euo pipefail
+          (cd native-ios && swift test --jobs 2 --filter 'N2NativeClinicalFormTests.testEncounterSiteIsCapturedPerVisitAndDoesNotCreateASecondPharmacy')
+          (cd native-ios && swift test --jobs 2 --filter 'N2SimpleInventoryTests.testAmbulatoryOpeningSurvivesPhysicalCountWithinSamePeriod')
+      - name: Complete DanperCore regression suite
+        run: |
+          set -o pipefail
+          (cd native-ios && swift test --jobs 2) 2>&1 | tee "$RUNNER_TEMP/b143-core-tests.log"
+      - name: Existing both Excel workbooks unaffected
+        run: |
+          node scripts/test-n1r-native-xlsx.cjs
+          node scripts/test-n1s-full-native-workbooks.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B143_FOCUSED_CORE_EVIDENCE
+          path: ${{ runner.temp }}/b143-core-tests.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  ios-typecheck:
+    name: Xcode iPhone simulator compile and UI typecheck only
+    runs-on: macos-15-intel
+    timeout-minutes: 55
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Prepare synthetic project resources
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+      - name: Check complete real iOS app and native/UI XCTest hosts
+        run: |
+          set -euo pipefail
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/b143-typecheck" \
+            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            build-for-testing > "$RUNNER_TEMP/b143-xcode.log" 2>&1 || {
+              grep -nE 'error:|fatal error:|BUILD FAILED' "$RUNNER_TEMP/b143-xcode.log" | tail -n 90 || true
+              exit 1
+            }
+          echo 'PASS: Full iOS app and test hosts compile on Xcode'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B143_XCODE_TYPECHECK_EVIDENCE
+          path: ${{ runner.temp }}/b143-xcode.log
+          retention-days: 7
+          if-no-files-found: ignore
