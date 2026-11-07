@@ -407,7 +407,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
              "age":N2WorkerAge.years(birthDate:$0.birthDate,on:date)
                  .map(String.init) ?? $0.age,
              "birthDate":$0.birthDate,
-             "ubigeo":$0.ubigeo,"site":$0.site]
+             "ubigeo":$0.ubigeo,"site":visitSite.isEmpty ? $0.site : visitSite]
         } ?? [:]
         let itemRows:[[String:Any]]=items.map { med in
             var row:[String:Any]=[
@@ -440,7 +440,6 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             "worker":workerRaw,"items":itemRows,"nativeDraftStep":max(0,min(3,stage)),
             "date":date,"time":time,"category":category,
             "dispensingSite":dispensingSite,
-            "visitSite":visitSite,
             "system":system,"segment":segment,"diagnosis":diagnosis,
             "permission":permission,"permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
