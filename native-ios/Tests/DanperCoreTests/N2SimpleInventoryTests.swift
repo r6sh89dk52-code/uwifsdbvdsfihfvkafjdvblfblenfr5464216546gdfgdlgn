@@ -680,4 +680,30 @@ final class N2SimpleInventoryTests:XCTestCase {
         XCTAssertEqual(cut.currentStock,70);XCTAssertEqual(try N2SimpleInventory.read(restored).products.first?.quantity,70)
     }
 
+    func testAmbulatoryOpeningSurvivesPhysicalCountWithinSamePeriod() throws {
+        let old=try source(empty:true)
+        var raw=try active(source:old)
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,
+            visit:visit(raw,id:"PERIOD-AFTER-ANCHOR",quantity:2,day:"2026-12-10"),
+            at:at("2026-12-10")).snapshot
+        raw=try N2SimpleInventory.apply(command(.count,quantity:68,
+            time:at("2026-12-16")),to:raw,catalog:catalog())
+        let physicalBefore=try N2SimpleInventory.read(raw)
+        let plan=try object(fixture("n1s-indicator-plan.json"))
+        let result=try N2VerifiedIndicatorWorkbook.export(snapshot:raw,
+            products:JSONSerialization.data(withJSONObject:plan["catalog"]!),
+            mappings:fixture("n2-reviewed-approved.json"),
+            template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-12-09",end:"2026-12-16",
+            subdivision:"LA VENTUROSA",
+            selectedVisitIDs:["PERIOD-AFTER-ANCHOR"],allowPending:true)
+        XCTAssertEqual(result.visits,1)
+        XCTAssertLessThanOrEqual(result.missingOpening,430,
+            "Later physical stocktake must not erase an already audited opening")
+        XCTAssertGreaterThan(result.missingOpening,0,
+            "Unrecorded products must remain unverified")
+        XCTAssertEqual(try N2SimpleInventory.read(raw),physicalBefore,
+            "Excel reconstruction must never change shared physical inventory")
+    }
+
 }
