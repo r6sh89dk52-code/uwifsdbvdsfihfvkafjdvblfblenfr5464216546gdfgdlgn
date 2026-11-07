@@ -518,8 +518,7 @@ public enum N2VerifiedIndicatorWorkbook {
                     if !unresolved && !historic {
                         let outflows=within.filter{$0.kind=="outflow"}
                             .reduce(0.0){$0-$1.delta}
-                        let calculated=opening.after+
-                            receipts.reduce(0.0){$0+$1.delta}-outflows
+                        let calculated = opening.after + receipts.reduce(0.0){$0+$1.delta} - outflows
                         if calculated>=0,calculated.isFinite {
                             row["closing"]=calculated
                             if let count=row["count"] as? Double {
