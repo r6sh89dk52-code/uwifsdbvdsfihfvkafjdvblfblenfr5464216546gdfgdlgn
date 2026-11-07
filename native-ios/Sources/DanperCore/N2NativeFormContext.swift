@@ -267,6 +267,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
     public var date:String=""
     public var time:String=""
     public var dispensingSite:String=""
+    /// Encounter site, independent of the one shared pharmacy/Kardex.
+    public var visitSite:String=""
     public var category:String=""
     public var system:String=""
     public var segment:String=""
@@ -367,13 +369,17 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             }
             lines.append(row)
         }
+        let site=visitSite.isEmpty ? worker.site : visitSite
+        guard ["LA VENTUROSA","PLVENTUROSA"].contains(site) else {
+            throw N2FormError.invalidVisit
+        }
         let workerRaw:[String:Any]=[
             "dni":worker.dni,"name":worker.name,"area":worker.area,
             "labor":worker.labor,"sex":worker.sex,
             "age":N2WorkerAge.years(birthDate:worker.birthDate,on:date)
                 .map(String.init) ?? worker.age,
             "birthDate":worker.birthDate,
-            "ubigeo":worker.ubigeo,"site":worker.site
+            "ubigeo":worker.ubigeo,"site":site
         ]
         let hasWound=(procedures + items.map(\.procedure)).contains{
             $0.contains("HERIDA") || $0.contains("SUTUR")
@@ -434,6 +440,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             "worker":workerRaw,"items":itemRows,"nativeDraftStep":max(0,min(3,stage)),
             "date":date,"time":time,"category":category,
             "dispensingSite":dispensingSite,
+            "visitSite":visitSite,
             "system":system,"segment":segment,"diagnosis":diagnosis,
             "permission":permission,"permissionTime":permissionTime,
             "blueBandage":blueBandage,"returned":returned,
