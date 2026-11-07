@@ -1,0 +1,304 @@
+name: DANPER 14.3 - Focused regression of inbox, visit site and RESU
+on:
+  push:
+    branches: [feat/build143-notifications-site-stock-20261106]
+    paths:
+      - 'native-ios/**'
+      - '.github/workflows/b143-focused-validation.yml'
+      - 'scripts/glass-audit/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: danper-b143-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proven-core:
+    name: Reuse unchanged 447 Core, Excel and 43 native cases
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 42321376725
+          name: B143_FOCUSED_CORE_EVIDENCE
+          path: previous-core
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 42325346839
+          name: B143_XCODE_TYPECHECK_EVIDENCE
+          path: previous-native
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 42328875375
+          pattern: B143_UI_*
+          path: previous-ui
+          github-token: ${{ github.token }}
+      - name: Match source inputs and actual successful run, never reuse changed logic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYREUSE'
+          import json,os,pathlib,re,subprocess,urllib.request
+          base='0ff668a4670f3f244658029ba8aaced22d431ef6'
+          paths=['native-ios/Sources','native-ios/Tests','native-ios/Package.swift','native-ios/Package.resolved','src','scripts/*.cjs','scripts/*.ts','package.json','package-lock.json']
+          subprocess.run(['git','diff','--exit-code',base,'HEAD','--']+paths,check=True)
+          log=pathlib.Path('previous-core/b143-core-tests.log').read_text()
+          assert re.search(r'Executed 447 tests, with 0 failures',log)
+          assert not re.search(r'\b[1-9]\d* tests? (?:were )?skipped',log)
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/42321376725'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}
+          def api(url):
+              with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=30) as response:return json.load(response)
+          run=api(url)
+          assert run['head_sha']==base and run['status']=='completed' and run['conclusion']=='success'
+          jobs=api(url+'/jobs?per_page=100')['jobs']
+          assert any(j['name']=='Native Swift Core, site, opening and both Excel workbooks' and j['conclusion']=='success' for j in jobs)
+          proof={'reusedRun':42321376725,'reusedSHA':base,'candidateSHA':os.environ['GITHUB_SHA'],'coreTests':447,'failures':0,'unchangedInputs':paths,'officialExcel':'reused PASS','nativeAndUI':'requires fresh execution'}
+          native='66b43e2ce5eb4adc2ba55c3ca3bf7d6e941634b9'
+          native_inputs=['native-ios/App','native-ios/NativeTests','native-ios/Sources','native-ios/Tests','native-ios/project.yml','native-ios/Package.swift','native-ios/Package.resolved','src','scripts/*.cjs','scripts/*.ts','package.json','package-lock.json']
+          subprocess.run(['git','diff','--exit-code',native,'HEAD','--']+native_inputs,check=True)
+          evidence=pathlib.Path('previous-native/b143-audit')
+          assert (evidence/'SOURCE_SHA.txt').read_text().strip()==native
+          assert (evidence/'CORE_NATIVE_SHA.txt').read_text().strip()==native
+          for label,count in [('presentation-native',6),('native-existing',37)]:
+              data=json.loads((evidence/(label+'.xcresult.summary.json')).read_text())
+              assert data['totalTestCount']==data['passedTests']==count,data
+              assert data['failedTests']==data['skippedTests']==0 and not data.get('testFailures'),data
+          prior=api('https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/42325346839')
+          assert prior['head_sha']==native and prior['status']=='completed' and prior['conclusion']=='failure'
+          system=(evidence/'N2BiometricInteractionTests-system.log').read_text()
+          assert 'UI activation timed out after 5 seconds' in system
+          proof.update(reusedNativeRun=42325346839,reusedNativeSHA=native,nativeTests=43,nativeFailures=0,unchangedNativeInputs=native_inputs,nativeAndUI='43 native reused; complete UI execution required',uiPriorFailure='CoreAuthUI system -1000 activation watchdog; no sensor for second policy')
+          ui_sha='5d59bee8b7ed5139fadd5882948a8874d1a106ef'
+          # Freeze the entire input tree, including test selectors and fixture
+          # generators. Only the workflow and Premium watchdog may differ.
+          subprocess.run(['git','diff','--exit-code',ui_sha,'HEAD','--','.',
+                          ':(exclude).github/workflows/b143-focused-validation.yml',
+                          ':(exclude)scripts/glass-audit/validate-macos.sh',
+                          ':(exclude)scripts/glass-audit/run-bounded.py'],check=True)
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/42328875375'
+          prior_ui=api(url)
+          assert prior_ui['head_sha']==ui_sha and prior_ui['status']=='completed'
+          ui_jobs={job['name']:job for job in api(url+'/jobs?per_page=100')['jobs']}
+          assert ui_jobs['Reuse unchanged 447 Core, Excel and 43 native cases']['conclusion']=='success'
+          expected_ui={
+              'N2BiometricInteractionTests':(128270550516,1,13557492828),
+              'N2Build222ShellTests':(128270550420,1,13556812509),
+              'N2GlassClinicalTests':(128270550527,3,13558110565),
+              'N2MenuInteractionTests':(128270550546,1,13558381851),
+              'N3ClinicalJourneyTests-demo':(128270550471,2,13557785608),
+              'N3ClinicalJourneyTests-protected':(128270550490,1,13557013151),
+          }
+          artifacts={a['name']:a for a in api(url+'/artifacts?per_page=100')['artifacts']}
+          ui_proof={}
+          def verify_summary(path,count):
+              summary=json.loads(path.read_text())
+              assert summary['passedTests']==summary['totalTestCount']==count,summary
+              assert summary['failedTests']==summary['skippedTests']==0 and not summary.get('testFailures'),summary
+              return summary
+          for label,(job_id,count,artifact_id) in expected_ui.items():
+              job=ui_jobs['Required UI - '+label]
+              assert job['id']==job_id and job['head_sha']==ui_sha and job['conclusion']=='success'
+              name='B143_UI_'+label
+              artifact=artifacts[name]
+              assert artifact['id']==artifact_id and not artifact['expired']
+              assert artifact['workflow_run']['head_sha']==ui_sha and artifact['workflow_run']['id']==42328875375
+              folder=pathlib.Path('previous-ui',name,'b143-audit')
+              assert (folder/'SOURCE_SHA.txt').read_text().strip()==ui_sha
+              assert (folder/'SCOPED_UI_PASS_SHA.txt').read_text().strip()==ui_sha
+              summaries={label:verify_summary(folder/(label+'.xcresult.summary.json'),count)}
+              if label=='N2BiometricInteractionTests':
+                  consent='permission-'+label
+                  summaries[consent]=verify_summary(folder/(consent+'.xcresult.summary.json'),1)
+              ui_proof[label]={'jobId':job_id,'artifactId':artifact_id,'summaries':summaries}
+          assert sum(s['passedTests'] for e in ui_proof.values() for s in e['summaries'].values())==10
+          proof.update(reusedUIRun=42328875375,reusedUISHA=ui_sha,reusedUITests=10,
+                       reusedUI=ui_proof,pendingUI='N2PremiumRedesignTests')
+          print('PASS: six successful UI jobs, ten cases, same app, test and dependency inputs')
+          pathlib.Path('CORE_REUSE.json').write_text(json.dumps(proof,indent=2))
+          print('PASS: unchanged 447 Core cases, site/opening regressions and both official Excel workbooks; no repeated suite')
+          PYREUSE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: B143_CORE_REUSE_PROOF
+          path: CORE_REUSE.json
+          retention-days: 14
+
+  ios-typecheck:
+    name: Required UI - N2PremiumRedesignTests
+    needs: proven-core
+    runs-on: macos-15
+    timeout-minutes: 85
+    outputs:
+      evidence: ${{ steps.evidence-name.outputs.name }}
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: B143_CORE_REUSE_PROOF
+          path: reuse-proof
+      - name: Prepare synthetic project resources
+        run: |
+          set -euo pipefail
+          DANPER_EXPECTED_BUILD=143 node scripts/glass-audit/identity.cjs
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+      - name: Check complete real iOS app and native/UI XCTest hosts
+        run: |
+          set -euo pipefail
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/b143-typecheck" \
+            ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            build-for-testing > "$RUNNER_TEMP/b143-xcode.log" 2>&1 || {
+              grep -nE 'error:|fatal error:|BUILD FAILED' "$RUNNER_TEMP/b143-xcode.log" | tail -n 90 || true
+              exit 1
+            }
+          echo 'PASS: Full iOS app and test hosts compile on Xcode'
+      - name: Required scoped UI suite, with genuine authentication setup
+        timeout-minutes: 65
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b143-audit
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b143-typecheck
+          DANPER_UI_LABEL: N2PremiumRedesignTests
+          DANPER_REUSE_PROOF: ${{ github.workspace }}/reuse-proof/CORE_REUSE.json
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/validate-macos.sh resume-ui
+          python3 - <<'PYUI'
+          import json,os,pathlib
+          folder=pathlib.Path(os.environ['DANPER_AUDIT_OUT'])
+          label=os.environ['DANPER_UI_LABEL']
+          for suite in ('seed-'+label,label):
+              assert (folder/(suite+'.xcresult')).is_dir(),suite
+              proof=json.loads((folder/(suite+'.xcresult.summary.json')).read_text())
+              assert proof['passedTests']==proof['totalTestCount']==2,proof
+              assert proof['failedTests']==proof['skippedTests']==0 and not proof.get('testFailures'),proof
+          assert (folder/'SOURCE_SHA.txt').read_text().strip()==os.environ['GITHUB_SHA']
+          assert (folder/'SCOPED_UI_PASS_SHA.txt').read_text().strip()==os.environ['GITHUB_SHA']
+          print('PASS: two seed and two Premium UI cases with original assertions')
+          PYUI
+      - id: evidence-name
+        if: always()
+        run: echo "name=B143_UI_N2PremiumRedesignTests_attempt_$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ steps.evidence-name.outputs.name }}
+          path: |
+            ${{ runner.temp }}/b143-xcode.log
+            ${{ runner.temp }}/b143-audit/*.log
+            ${{ runner.temp }}/b143-audit/*.txt
+            ${{ runner.temp }}/b143-audit/*.json
+            ${{ runner.temp }}/b143-audit/*.xcresult
+          retention-days: 7
+          if-no-files-found: ignore
+
+  unsigned-ipa:
+    name: Package unsigned ARM64 iLoader IPA after all verified gates
+    needs: [proven-core, ios-typecheck]
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: B143_CORE_REUSE_PROOF
+          path: reuse-proof
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.ios-typecheck.outputs.evidence }}
+          path: premium-proof
+      - name: Bind all required results to the release commit
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b143-out"
+          python3 - <<'PYGATE'
+          import json,os,pathlib
+          sha=os.environ['GITHUB_SHA']
+          proof=json.loads(pathlib.Path('reuse-proof/CORE_REUSE.json').read_text())
+          assert proof['candidateSHA']==sha and proof['coreTests']==447 and proof['failures']==0
+          assert proof['officialExcel']=='reused PASS' and proof['nativeTests']==43 and proof['nativeFailures']==0
+          assert proof['reusedUITests']==10 and len(proof['reusedUI'])==6
+          folder=pathlib.Path('premium-proof/b143-audit')
+          for marker in ('SOURCE_SHA.txt','SCOPED_UI_PASS_SHA.txt'):
+              assert (folder/marker).read_text().strip()==sha
+          premium={}
+          for suite in ('seed-N2PremiumRedesignTests','N2PremiumRedesignTests'):
+              result=json.loads((folder/(suite+'.xcresult.summary.json')).read_text())
+              assert result['passedTests']==result['totalTestCount']==2
+              assert result['failedTests']==result['skippedTests']==0 and not result.get('testFailures')
+              premium[suite]=result
+          proof.update(premium=premium,uiTests=12,uiFailures=0,uiSkipped=0,runId=os.environ['GITHUB_RUN_ID'])
+          pathlib.Path(os.environ['RUNNER_TEMP'],'b143-out','TEST_EVIDENCE.json').write_text(json.dumps(proof,indent=2))
+          PYGATE
+      - name: Rebuild EXACT tested HEAD for device
+        run: |
+          set -euo pipefail
+          DANPER_EXPECTED_BUILD=143 node scripts/glass-audit/identity.cjs
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/b143-release" CODE_SIGNING_ALLOWED=NO build
+      - name: Verify update identity and release payload
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/b143-release/Build/Products/Release-iphoneos/DANPERNative.app"
+          test -d "$APP"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          MARKETING=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          test "$MARKETING" = '0.4.2'
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          test "$ID" = 'pe.danper.saludmovil.native.iloaderpreview'
+          test "$VERSION" = '143'
+          ARCHS=$(xcrun lipo -archs "$APP/DANPERNative")
+          test "$ARCHS" = 'arm64'
+          test ! -f "$APP/embedded.mobileprovision"
+          test ! -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
+          mkdir -p "$RUNNER_TEMP/b143-out/Payload"
+          ditto "$APP" "$RUNNER_TEMP/b143-out/Payload/DANPERNative.app"
+          cd "$RUNNER_TEMP/b143-out"
+          ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          unzip -tq DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          shasum -a 256 DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa > SHA256.txt
+          cat SHA256.txt
+          printf '%s\n' "SHA=$GITHUB_SHA" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_B143_NOTIFICATIONS_ILOADER_UNSIGNED_TESTED
+          path: |
+            ${{ runner.temp }}/b143-out/DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa
+            ${{ runner.temp }}/b143-out/SHA256.txt
+            ${{ runner.temp }}/b143-out/VERIFIED_BUILD.txt
+            ${{ runner.temp }}/b143-out/TEST_EVIDENCE.json
+          retention-days: 14
+          if-no-files-found: error

@@ -8,6 +8,7 @@ public enum N2ClinicalFormOptions {
     public static let messages:[String:String]=[
         "worker-dni":"Selecciona un trabajador con DNI válido.",
         "worker-name":"Selecciona un trabajador con nombres completos.",
+        "worker-site":"Selecciona Fundo o Planta para esta atención.",
         "clinical-date":"Selecciona una fecha válida.",
         "clinical-time":"Indica la hora en formato HH:mm.",
         "clinical-category":"Selecciona el tipo de atención.",
@@ -33,6 +34,13 @@ extension N2NativeFormDraft {
             workerInRoster:worker != nil,rosterException:false,
             allergiesReviewed:allergy?.reviewed ?? false,
             allergyStatus:allergy?.status ?? "unknown",allergySubstances:allergy?.substances ?? "")
-        return N1hClinicalValidator.invalidFields(step:step,form:input,context:validation)
+        var issues=N1hClinicalValidator.invalidFields(step:step,form:input,context:validation)
+        if step==0,worker != nil {
+            let selected=visitSite.isEmpty ? (worker?.site ?? "") : visitSite
+            if !["LA VENTUROSA","PLVENTUROSA"].contains(selected) {
+                issues.append("worker-site")
+            }
+        }
+        return issues
     }
 }

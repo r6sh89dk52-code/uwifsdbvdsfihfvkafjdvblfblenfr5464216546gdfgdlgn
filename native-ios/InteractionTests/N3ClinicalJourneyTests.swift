@@ -196,6 +196,31 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertTrue(app.buttons["premium-tab-home"].waitForExistence(timeout:15),app.debugDescription)
         XCTAssertFalse(app.buttons["clinical-first-run-manual-worker"].exists)
         capture(app,"Fuente-protegida-tras-relanzar")
+        XCTAssertFalse(app.staticTexts["Preparando DANPER…"].exists)
+        tap(app.buttons["clinical-home-new-attention"],in:app)
+        enter(app.textFields["attention-worker-dni"],"00000031",in:app)
+        XCTAssertTrue(app.staticTexts["Borrador protegido · autoguardado activo"].waitForExistence(timeout:20),
+            "El aviso solo se prueba después de persistir el borrador cifrado: "+app.debugDescription)
+        tap(app.buttons["premium-close-attention"],in:app)
+        let bell=app.buttons["brand-header-notifications"]
+        XCTAssertTrue(bell.isHittable);bell.tap()
+        let draftsFilter=app.buttons["notification-filter-Borradores"]
+        XCTAssertTrue(draftsFilter.waitForExistence(timeout:10))
+        XCTAssertTrue(draftsFilter.isHittable);draftsFilter.tap()
+        let dismissNotice=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","notification-dismiss-")).firstMatch
+        XCTAssertTrue(dismissNotice.waitForExistence(timeout:10),app.debugDescription)
+        tap(dismissNotice,in:app)
+        let restore=app.buttons["Restaurar descartadas"]
+        XCTAssertTrue(restore.waitForExistence(timeout:10))
+        XCTAssertFalse(dismissNotice.exists,"Descartar solo oculta el aviso en la bandeja")
+        tap(restore,in:app)
+        XCTAssertTrue(dismissNotice.waitForExistence(timeout:10))
+        capture(app,"Campanita-aviso-restaurado")
+        tap(app.buttons["notification-close"],in:app)
+        tap(app.buttons["premium-tab-drafts"],in:app)
+        XCTAssertTrue(app.staticTexts["PERSONAL AUTORIZADO DE PRUEBA N3"].firstMatch.waitForExistence(timeout:10),
+            "Descartar y restaurar avisos debe conservar el borrador clínico: "+app.debugDescription)
+
     }
 
 }

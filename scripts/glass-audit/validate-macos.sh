@@ -13,8 +13,23 @@ if test "$MODE" = replay; then
  esac
  printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
 fi
+# Enable the watchdog for the pending Premium run only. Existing scoped
+# results used the unchanged paths for their suites.
+bounded(){
+ local seconds="$1" label="$2"; shift 2
+ if test "$MODE" = resume-ui && test "${DANPER_UI_LABEL:-}" = N2PremiumRedesignTests; then
+  python3 -u scripts/glass-audit/run-bounded.py "$seconds" "$label" "$@" \
+    2> >(tee -a "$OUT/command-progress.log" >&2)
+ else
+  "$@"
+ fi
+}
+simctl(){
+ local seconds="$1"; shift
+ bounded "$seconds" "simctl $1" xcrun simctl "$@"
+}
 DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != current-native && test "$MODE" != replay; then
+if test "$MODE" != resume-ui && test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != current-native && test "$MODE" != replay; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -50,16 +65,27 @@ if test "$MODE" = resume-native; then
 fi
 # Current-branch CI: run every simulator suite from this checkout, without
 # reusing earlier evidence or packaging. Swift/Excel gates run independently.
-if test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay; then
+if test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay || test "$MODE" = resume-ui; then
  git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
  git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
  xcodebuild -version > "$OUT/xcode-version.txt"
- xcrun simctl list runtimes -j > "$OUT/runtimes.json"
+ simctl 60 list runtimes -j > "$OUT/runtimes.json"
 fi
 if test "$MODE" = scoped-native; then test "$(cat "$OUT/BUILD_SUCCESS_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 if test "$MODE" = ui; then test "$(cat "$OUT/CORE_NATIVE_SHA.txt")" = "$(git rev-parse HEAD)"; fi
+if test "$MODE" = resume-ui; then
+ : "${DANPER_UI_LABEL:?Select an explicit UI suite}"
+ : "${DANPER_REUSE_PROOF:?Provide the independently verified native reuse proof}"
+ python3 - "$DANPER_REUSE_PROOF" <<'PYPROOF'
+import json,os,subprocess,sys
+proof=json.load(open(sys.argv[1]))
+assert proof['candidateSHA']==subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert proof['nativeTests']==43 and proof['nativeFailures']==0
+assert proof['reusedNativeRun']==42325346839
+PYPROOF
+fi
 # Never pick or erase an existing user's simulator.
-SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
+SDK_VERSION=$(bounded 45 simulator-sdk xcrun --sdk iphonesimulator --show-sdk-version)
 RUNTIME=$(python3 - "$OUT/runtimes.json" "$SDK_VERSION" <<'PY'
 import json,sys
 r=[x for x in json.load(open(sys.argv[1]))['runtimes'] if x.get('isAvailable') and x['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-')]
@@ -71,96 +97,135 @@ PY
 )
 SIM_ID=''
 INSTALL_RECOVERY_SIM=''
-cleanup(){ if test -n "$SIM_ID"; then xcrun simctl shutdown "$SIM_ID" || true; xcrun simctl delete "$SIM_ID" || true; fi; }
-trap cleanup EXIT
+cleanup(){
+ if test -n "$SIM_ID"; then
+  simctl 45 shutdown "$SIM_ID" || true
+  simctl 45 delete "$SIM_ID" || true
+ fi
+}
+finish(){
+ local status=$?
+ if test "$status" != 0 && test -n "$SIM_ID" && test "$MODE" = resume-ui &&
+    test "${DANPER_UI_LABEL:-}" = N2PremiumRedesignTests; then
+  simctl 35 spawn "$SIM_ID" log show --last 3m --style compact \
+   --predicate 'process == "installd" OR process == "installcoordinationd" OR process == "testmanagerd"' \
+   > "$OUT/simulator-failure.log" || true
+ fi
+ cleanup
+}
+trap finish EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 fresh(){
  cleanup
- SIM_ID=$(xcrun simctl create "DANPER-SYNTHETIC-$1" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
+ SIM_ID=$(simctl 60 create "DANPER-SYNTHETIC-$1" com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$RUNTIME")
  echo "$1 $SIM_ID" >> "$OUT/isolated-simulators.txt"
- xcrun simctl boot "$SIM_ID"
- xcrun simctl bootstatus "$SIM_ID" -b
- xcrun simctl ui "$SIM_ID" appearance dark
- xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLanguages -array es
- xcrun simctl spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
- bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1
- defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
- bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1
+ simctl 90 boot "$SIM_ID"
+ simctl 480 bootstatus "$SIM_ID" -b
+ # Premium explicitly requests dark/light on each XCUIApplication launch.
+ # Avoid the redundant global appearance RPC, which stalled after boot.
+ if test "$MODE" != resume-ui || test "$1" != N2PremiumRedesignTests; then
+  simctl 45 ui "$SIM_ID" appearance dark
+ fi
+ simctl 90 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLanguages -array es
+ simctl 90 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
+ bounded 120 enrollment bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log"
+ bounded 30 keyboard defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
+ bounded 120 auth-ui-preparation bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log"
 }
 # Install explicitly before XCTest asks Xcode to launch its runner. New CI
 # images can fail in Xcode's placeholder/delta installer before any test runs.
 # Only the just-created synthetic device is eligible; install errors stay fatal.
 prepare_test_installation(){
- xcrun simctl list devices -j | python3 -c 'import json,sys
+ simctl 60 list devices -j | python3 -c 'import json,sys
 rows=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["udid"]==sys.argv[1]]
 assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswith("DANPER-SYNTHETIC-")' "$SIM_ID" || return 1
- local app bundle executable attempt status
- for app in "$DD/Build/Products/Debug-iphonesimulator/DANPERNative.app" \
-            "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app"; do
+ local app bundle executable attempt status recovery diagnostics placeholder
+ local -a apps=("$DD/Build/Products/Debug-iphonesimulator/DANPERNative.app")
+ if test "$1" != seed-N2PremiumRedesignTests; then
+  apps+=("$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app")
+ fi
+ for app in "${apps[@]}"; do
   test -d "$app" || return 1
   bundle=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist") || return 1
-  if ! xcrun simctl get_app_container "$SIM_ID" "$bundle" app >/dev/null 2>&1; then
+  status=0
+  simctl 60 get_app_container "$SIM_ID" "$bundle" app >> "$OUT/simulator-installation.log" || status=$?
+  if test "$status" = 124 || test "$status" -ge 128; then return "$status"; fi
+  if test "$status" != 0; then
    # Check the actual signed Simulator binary before diagnosing its installer.
-   codesign --verify --deep --strict "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
-   codesign --display --entitlements - "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
+   bounded 60 verify-signature codesign --verify --deep --strict "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
+   bounded 60 inspect-entitlements codesign --display --entitlements - "$app" >> "$OUT/simulator-signatures.log" 2>&1 || return 1
    executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist") || return 1
-   xcrun lipo -archs "$app/$executable" >> "$OUT/simulator-signatures.log" || return 1
+   bounded 45 inspect-architecture xcrun lipo -archs "$app/$executable" >> "$OUT/simulator-signatures.log" || return 1
    attempt="$OUT/install-$SIM_ID-$bundle.log"
    status=0
-   xcrun simctl install "$SIM_ID" "$app" > "$attempt" 2>&1 || status=$?
+   simctl 150 install "$SIM_ID" "$app" > "$attempt" 2>&1 || status=$?
    cat "$attempt" >> "$OUT/simulator-installation.log"
    if test "$status" != 0; then
-    # Recover one known, pre-test InstallCoordination failure. Never retry an
-    # XCTest assertion, erase data, alter entitlements, or inject authentication.
-    if test "$INSTALL_RECOVERY_SIM" = "$SIM_ID" ||
-       ! grep -q 'domain=IXErrorDomain, code=2' "$attempt" ||
-       ! grep -q 'Failed to create promise' "$attempt"; then
-     cat "$attempt"; return "$status"
+    # Recover only known pre-test InstallCoordination races on this
+    # owned Simulator. Preserve the first failure and retry at most once.
+    if test "$INSTALL_RECOVERY_SIM" = "$SIM_ID"; then return "$status"; fi
+    if grep -q 'domain=IXErrorDomain, code=2' "$attempt" &&
+       grep -q 'Failed to create promise' "$attempt"; then
+     recovery=reboot
+    elif test "$MODE" = resume-ui && test "${DANPER_UI_LABEL:-}" = N2PremiumRedesignTests &&
+         grep -q 'domain=IXErrorDomain, code=3' "$attempt" &&
+         grep -q 'Failed to locate promise' "$attempt"; then
+     recovery=orphaned
+    else
+     return "$status"
     fi
     INSTALL_RECOVERY_SIM="$SIM_ID"
-    echo "RECOVERY: reboot owned synthetic Simulator after recorded IXErrorDomain code=2" | tee -a "$OUT/simulator-installation.log"
-    python3 - "$SIM_ID" "$OUT/installer-system-$SIM_ID.log" <<'PYINSTALL'
-import subprocess,sys
-try:
- p=subprocess.run(['xcrun','simctl','spawn',sys.argv[1],'log','show','--last','3m','--style','compact',
-  '--predicate','process == "installd" OR process == "installcoordinationd"'],capture_output=True,text=True,timeout=30)
- open(sys.argv[2],'w').write(p.stdout+p.stderr)
-except subprocess.TimeoutExpired:
- open(sys.argv[2],'w').write('Installer diagnostic collection timed out; original install error preserved.\n')
-PYINSTALL
-    xcrun simctl shutdown "$SIM_ID" || return 1
-    xcrun simctl boot "$SIM_ID" || return 1
-    xcrun simctl bootstatus "$SIM_ID" -b || return 1
-    bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1 || return 1
-    bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1 || return 1
-    xcrun simctl install "$SIM_ID" "$app" >> "$OUT/simulator-installation.log" 2>&1 || {
+    diagnostics="$OUT/installer-system-$SIM_ID.log"
+    simctl 45 spawn "$SIM_ID" log show --last 3m --style compact \
+     --predicate 'process == "installd" OR process == "installcoordinationd"' > "$diagnostics" || true
+    if test "$recovery" = orphaned; then
+     placeholder=$(sed -nE 's/.*Placeholder did not exist for UUID ([A-Fa-f0-9-]{36}).*/\1/p' "$attempt" | head -n 1)
+     if test -z "$placeholder" ||
+        ! grep -F "$placeholder" "$diagnostics" | grep '_DoFirstRunCleanup' | grep -Fq 'Promise orphaned'; then
+      echo "No matching orphaned placeholder in installcoordinationd; retain original failure"
+      return "$status"
+     fi
+     echo "RECOVERY: retry install once after confirmed first-run cleanup of $placeholder"
+    else
+     echo "RECOVERY: reboot owned synthetic Simulator after recorded IXErrorDomain code=2"
+     simctl 45 shutdown "$SIM_ID" || return 1
+     simctl 90 boot "$SIM_ID" || return 1
+     simctl 480 bootstatus "$SIM_ID" -b || return 1
+     bounded 120 enrollment bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1 || return 1
+     bounded 120 auth-ui-preparation bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1 || return 1
+    fi
+    simctl 150 install "$SIM_ID" "$app" >> "$OUT/simulator-installation.log" 2>&1 || {
      cat "$OUT/simulator-installation.log"; return 1;
     }
    fi
   fi
-  xcrun simctl get_app_container "$SIM_ID" "$bundle" app >> "$OUT/simulator-installation.log" || return 1
+  simctl 60 get_app_container "$SIM_ID" "$bundle" app >> "$OUT/simulator-installation.log" || return 1
  done
 }
 run_tests(){
- local label="$1" expected="$2" status=0 stream='' bridge='' allowance=600; shift 2
+ local label="$1" expected="$2" status=0 stream='' bridge='' allowance=600 deadline=1650; shift 2
  # This journey performs two complete visits and persistence checks. The last
  # run was still progressing at 600s, with both saves already successful.
  if test "$label" = N3ClinicalJourneyTests-demo; then allowance=900; fi
  echo "PHASE: $label — $expected required tests; no skips"
- prepare_test_installation || return $?
+ if test "$label" = seed-N2PremiumRedesignTests; then deadline=1000; fi
+ prepare_test_installation "$label" || return $?
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
    python3 -u scripts/glass-audit/simulator-ready-bridge.py --stream "$SIM_ID" > "$OUT/$label-system.log" 2>&1 & stream=$!
    python3 -u scripts/glass-audit/simulator-ready-bridge.py "$SIM_ID" "$OUT/$label-system.log" "$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app/Info.plist" > "$OUT/$label-biometric-readiness.log" 2>&1 & bridge=$! ;;
  esac
- xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
+ bounded "$deadline" "$label XCTest" xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative -configuration Debug \
   -sdk iphonesimulator -destination "platform=iOS Simulator,id=$SIM_ID" -destination-timeout 180 \
   -derivedDataPath "$DD" -parallel-testing-enabled NO -test-timeouts-enabled YES \
   -default-test-execution-time-allowance "$allowance" -maximum-test-execution-time-allowance "$allowance" -resultBundlePath "$OUT/$label.xcresult" \
   ASSETCATALOG_COMPILER_APPICON_NAME="" "$@" test-without-building > "$OUT/$label.log" 2>&1 || status=$?
  if test -n "$bridge"; then kill "$bridge" 2>/dev/null || true; wait "$bridge" 2>/dev/null || true; fi
  if test -n "$stream"; then kill "$stream" 2>/dev/null || true; wait "$stream" 2>/dev/null || true; fi
- python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
- xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments" || status=1
+ if test "$status" != 0; then tail -n 75 "$OUT/$label.log" || true; fi
+ bounded 90 "$label result summary" python3 scripts/glass-audit/check-xcresult.py "$OUT/$label.xcresult" "$expected" || status=1
+ bounded 120 "$label attachments" xcrun xcresulttool export attachments --path "$OUT/$label.xcresult" --output-path "$OUT/$label-attachments" || status=1
  if test "$status" != 0; then
   echo "SIMULATOR_SUITE_FAILED: $label; publication stays blocked"
   # Synthetic harness state only: no snapshots, clinical data or credentials.
@@ -170,7 +235,7 @@ run_tests(){
  fi
  return "$status"
 }
-if test "$MODE" != ui; then
+if test "$MODE" != ui && test "$MODE" != resume-ui; then
  fresh native
  if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay; then
   # Compile for this actual Simulator architecture, not two unused slices.
@@ -185,7 +250,21 @@ if test "$MODE" != ui; then
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  if test "$MODE" != replay; then
   native_count=$(python3 -c 'from pathlib import Path; import re; print(sum(len(re.findall(r"\bfunc test\w+\(",p.read_text())) for p in Path("native-ios/NativeTests").glob("*.swift")))')
-  run_tests "native-$native_count" "$native_count" -only-testing:DANPERNativeTests
+  if test "${DANPER_PRESENTATION_FOCUS:-0}" = 1; then
+   run_tests presentation-native 6 -only-testing:DANPERNativeTests/N2RefreshDemandTests -only-testing:DANPERNativeTests/N2NotificationInboxPreferencesTests
+   native_selectors=()
+   while IFS= read -r cls; do native_selectors+=("-only-testing:DANPERNativeTests/$cls"); done < <(python3 - <<'PYNATIVE'
+from pathlib import Path
+import re
+for path in sorted(Path('native-ios/NativeTests').glob('*.swift')):
+ for name in re.findall(r'final\s+class\s+(\w+)\s*:\s*XCTestCase',path.read_text()):
+  if name not in ['N2RefreshDemandTests','N2NotificationInboxPreferencesTests']:print(name)
+PYNATIVE
+)
+   run_tests native-existing "$((native_count-6))" "${native_selectors[@]}"
+  else
+   run_tests "native-$native_count" "$native_count" -only-testing:DANPERNativeTests
+  fi
   git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
  fi
  if test "$MODE" = native || test "$MODE" = current-native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi
@@ -211,6 +290,13 @@ PY
 overall=0
 while IFS=$'\t' read -r label count cls selectors; do
  if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi
+ if test "$MODE" = resume-ui && test "$label" != "$DANPER_UI_LABEL"; then continue; fi
+ if test "$MODE" = resume-ui && test "$label" = N2BiometricInteractionTests; then
+  # The permission-only case still runs below as real first-use setup. The
+  # original failing cancel/retry/foreground assertions run without changes.
+  count=1
+  selectors='-only-testing:DANPERInteractionTests/N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground'
+ fi
  fresh "$label"
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
@@ -232,6 +318,12 @@ test "$overall" = 0
 if test "$MODE" = replay; then
  git rev-parse HEAD > "$OUT/REPLAY_PASS_SHA.txt"
  echo "PASS: replay $DANPER_REPLAY_LABEL only; combined coverage must be verified before packaging."
+ exit 0
+fi
+if test "$MODE" = resume-ui; then
+ grep -q "^$DANPER_UI_LABEL" "$OUT/ui-classes.tsv"
+ git rev-parse HEAD > "$OUT/SCOPED_UI_PASS_SHA.txt"
+ echo "PASS: scoped $DANPER_UI_LABEL; publication requires the complete independent aggregate gate."
  exit 0
 fi
 # Only this marker allows packaging in CI or locally.

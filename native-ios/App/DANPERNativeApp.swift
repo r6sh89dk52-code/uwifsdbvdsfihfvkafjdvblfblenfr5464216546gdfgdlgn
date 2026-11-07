@@ -77,9 +77,15 @@ struct DANPERNativeApp: App {
                     DanperAccessView(unlocking:false,canRetry:false,error:"",onUnlock:{})
                     #endif
                 } else if !sourceResolved {
-                    DanperLoadingState(title:"Preparando DANPER…")
-                        .frame(maxWidth:.infinity,maxHeight:.infinity)
-                        .background(DanperBackdrop())
+                    // Returning users see the real access layout immediately.
+                    // It is deliberately inert until vault inspection finishes;
+                    // no authentication or clinical data is exposed early.
+                    if onboardingFinished {
+                        DanperAccessView(unlocking:false,canRetry:false,error:"",onUnlock:{})
+                            .allowsHitTesting(false)
+                    } else {
+                        DanperBackdrop().ignoresSafeArea()
+                    }
                 } else if onboardingFinished || hasClinicalSource {
                     if authenticated || sessionStarted {
                         N2ClinicalWorkspaceGateView(authenticatedLaunch:true,sessionUnlocked:authenticated,onLock:lockAccess)

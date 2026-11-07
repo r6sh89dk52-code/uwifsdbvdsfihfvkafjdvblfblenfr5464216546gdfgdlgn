@@ -25,8 +25,10 @@ struct N2ClinicalWorkspaceGateView:View {
     var body:some View {
         Group {
             if !checked {
-                DanperLoadingState(title:"Preparando DANPER…")
-                    .frame(maxWidth:.infinity,maxHeight:.infinity)
+                // Protect data until verified, but never flash a second startup label.
+                DanperAccessView(unlocking:false,canRetry:false,error:"",onUnlock:{})
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                     .accessibilityIdentifier("clinical-source-loading")
             } else if invalidSource {
                 DanperErrorState(message:message,retry:{Task {await refresh()}})
@@ -166,9 +168,12 @@ struct N2ClinicalWorkspaceRootView:View {
     @Environment(\.danperAuthenticatedSession) private var sessionAuthenticated
     @Environment(\.n2WorkspaceVault) private var vault
     @Environment(\.scenePhase) private var scenePhase
-    @State private var loadingHomeCounts=false
-    @State private var homeRefreshPending=false
+    @State private var refreshDemand=N2RefreshDemand()
+    @State private var notificationTask:Task<Void,Never>?
+    @State private var notificationCycle=UUID()
     @State private var clinicalAlerts=[N2ClinicalAlert]()
+    @State private var dismissedAlertIDs=Set<String>()
+    @State private var showNotificationInbox=false
     @State private var notificationError=false
     @State private var alertClock=Date()
     @State private var homeRevision:Int?
@@ -184,7 +189,8 @@ struct N2ClinicalWorkspaceRootView:View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body:some View {
         VStack(spacing:0) {
-            DanperBrandHeader {tab=3}
+            DanperBrandHeader(onSettings:{tab=3},
+                onNotifications:{showNotificationInbox=true},notificationCount:actionableAlerts.count)
             TabView(selection:$tab) {
                 NavigationStack {home.toolbar(.hidden,for:.tabBar)}
                     .toolbar(.hidden,for:.tabBar)
@@ -219,7 +225,12 @@ struct N2ClinicalWorkspaceRootView:View {
         .tint(DanperStyle.red)
         .environment(\.locale,Locale(identifier:"es_PE"))
         .preferredColorScheme(.dark)
-        .task(id:tab) {if tab==0 {await refreshHomeCounts()}}
+        .task(id:tab) {
+            if tab==0 {
+                dismissedAlertIDs=N2NotificationInboxPreferences.read(vault.mode)
+                await refreshHomeCounts()
+            }
+        }
         .onReceive(Timer.publish(every:30,on:.main,in:.common).autoconnect()) { now in
             if sessionAuthenticated,scenePhase == .active,tab==0 {alertClock=now}
         }
@@ -227,14 +238,35 @@ struct N2ClinicalWorkspaceRootView:View {
             guard N2WorkspaceChanges.matches(event,vault),sessionAuthenticated,scenePhase == .active,
                   let kind=event.userInfo?["kind"] as? String,
                   (tab==0 && !showNewAttention) || ["inventory","restore"].contains(kind) else{return}
-            Task {await refreshHomeCounts()}
+            guard let revision=event.userInfo?["revision"] as? Int else{return}
+            Task {await refreshHomeCounts(cause:.verifiedWrite(revision))}
         }
         .onChange(of:sessionAuthenticated) {_,active in
             if active {Task {await refreshHomeCounts()}}
         }
+        .sheet(isPresented:$showNotificationInbox) {
+            N2NotificationInboxView(
+                alerts:clinicalAlerts.filter{!dismissedAlertIDs.contains($0.id)},
+                now:alertClock,dismissedCount:dismissedAlertIDs.count,
+                schedulerFailed:notificationError,
+                onDismiss:{ alert in
+                    dismissedAlertIDs=N2NotificationInboxPreferences.dismiss(alert.id,mode:vault.mode)
+                    let visible=clinicalAlerts.filter{!dismissedAlertIDs.contains($0.id)}
+                    scheduleNotifications(visible)
+                },
+                onRestore:{
+                    dismissedAlertIDs=N2NotificationInboxPreferences.restore(vault.mode)
+                    scheduleNotifications(clinicalAlerts)
+                },
+                onOpenDrafts:{
+                    showNotificationInbox=false
+                    tab=2
+                })
+                .environment(\.n2WorkspaceVault,vault)
+        }
         .sheet(isPresented:$showNewAttention,onDismiss:{
             registeredDNI=nil
-            Task {await refreshHomeCounts()}
+            Task {await refreshHomeCounts(cause:.manual)}
         }) {
             DanperAttentionEditor(initialWorkerDNI:registeredDNI)
 
@@ -243,14 +275,17 @@ struct N2ClinicalWorkspaceRootView:View {
         .accessibilityHidden(scenePhase != .active)
         .allowsHitTesting(scenePhase == .active)
         .onChange(of:scenePhase) {_,phase in
-            if phase == .background {showNewAttention=false}
+            if phase == .background {
+                showNewAttention=false
+                notificationTask?.cancel();notificationCycle=UUID()
+            }
             else if phase == .active {Task {await refreshHomeCounts()}}
         }
     }
     private var actionableAlerts:[N2ClinicalAlert] {
         let now=Int64(alertClock.timeIntervalSince1970*1000)
         let expired=Set(clinicalAlerts.filter{$0.kind == .expiryDay && $0.dueAt<=now}.map(\.sourceID))
-        return clinicalAlerts.filter {$0.dueAt<=now && !($0.kind == .expiryWarning && expired.contains($0.sourceID))}
+        return clinicalAlerts.filter {$0.dueAt<=now && !dismissedAlertIDs.contains($0.id) && !($0.kind == .expiryWarning && expired.contains($0.sourceID))}
     }
     private var home:some View {
         ScrollView {
@@ -259,30 +294,9 @@ struct N2ClinicalWorkspaceRootView:View {
                 DanperNewAttentionCard {showNewAttention=true}
                 DanperHomeMetricRow(counts:homeCounts)
                 if countError {
-                    DanperErrorState(message:"No se pudieron actualizar las cifras.",retry:{Task {await refreshHomeCounts()}})
+                    DanperErrorState(message:"No se pudieron actualizar las cifras.",retry:{Task {await refreshHomeCounts(cause:.manual)}})
                 } else if homeCounts==nil {
                     DanperLoadingState(title:"Actualizando cifras…")
-                }
-                if !clinicalAlerts.isEmpty {
-                    DanperPanel("Alertas y avisos · \(actionableAlerts.count)") {
-                        ForEach(actionableAlerts.prefix(8)) { alert in
-                            Label(alert.detail,systemImage:alert.kind == .draft ? "doc.badge.clock":"exclamationmark.triangle")
-                                .font(.footnote)
-                        }
-                        NavigationLink("Ver todas las alertas") {
-                            List(clinicalAlerts) { alert in
-                                VStack(alignment:.leading,spacing:4) {
-                                    Text(alert.detail)
-                                    Text(alert.dueAt<=Int64(alertClock.timeIntervalSince1970*1000) ? "Pendiente de revisar":"Aviso programable")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }.navigationTitle("Alertas")
-                        }
-                        if notificationError {
-                            Text("No se pudieron programar algunos avisos locales. Las alertas siguen disponibles aquí.")
-                                .font(.caption).foregroundStyle(.orange)
-                        }
-                    }
                 }
                 HStack {
                     Text("Herramientas").font(.title2.weight(.bold))
@@ -303,16 +317,15 @@ struct N2ClinicalWorkspaceRootView:View {
         }
         .navigationTitle("Inicio").toolbar(.hidden,for:.navigationBar)
         .background(DanperBackdrop())
-        .refreshable {await refreshHomeCounts()}
+        .refreshable {await refreshHomeCounts(cause:.manual)}
     }
-    @MainActor private func refreshHomeCounts() async {
-        guard !layoutOnly,sessionAuthenticated else{return}
-        if loadingHomeCounts {homeRefreshPending=true;return}
-        loadingHomeCounts=true
+    @MainActor private func refreshHomeCounts(cause:N2RefreshDemand.Cause = .lifecycle) async {
+        guard !layoutOnly,sessionAuthenticated,scenePhase == .active else{return}
+        guard refreshDemand.begin(cause) else{return}
+        let span=N2PerformanceSpan("Home authenticated refresh");defer{span.end()}
+        var observedRevision:Int?
         defer {
-            loadingHomeCounts=false
-            if homeRefreshPending {
-                homeRefreshPending=false
+            if refreshDemand.finish(observedRevision:observedRevision) {
                 Task {await refreshHomeCounts()}
             }
         }
@@ -320,15 +333,33 @@ struct N2ClinicalWorkspaceRootView:View {
             let period=N2HomeCalendarPeriod(now:Date())
             let counters=try await vault.dashboardSnapshot(today:period.today,weekStart:period.weekStart)
             guard sessionAuthenticated,scenePhase == .active else{return}
+            observedRevision=counters?.revision
+            if let revision=observedRevision,!refreshDemand.canPublish(revision) {return}
             homeRevision=counters?.revision;homeDay=period.today
             homeCounts=counters.map{DanperHomeCounts(today:$0.today,week:$0.week,month:$0.month)}
             alertClock=Date()
             clinicalAlerts=counters?.alerts ?? []
+            dismissedAlertIDs=N2NotificationInboxPreferences.read(vault.mode)
             countError=false
-            do {try await N2InventoryAlertNotifications.shared.reconcile(clinicalAlerts,mode:vault.mode);notificationError=false}
-            catch {notificationError=true}
+            scheduleNotifications(clinicalAlerts.filter{!dismissedAlertIDs.contains($0.id)})
         }catch {
+            guard sessionAuthenticated,scenePhase == .active else{return}
             homeCounts=nil;countError=true
+        }
+    }
+    @MainActor private func scheduleNotifications(_ alerts:[N2ClinicalAlert]) {
+        notificationTask?.cancel()
+        let cycle=UUID();notificationCycle=cycle
+        let mode=vault.mode
+        notificationTask=Task { @MainActor in
+            do {
+                try await N2InventoryAlertNotifications.shared.reconcile(alerts,mode:mode)
+                guard !Task.isCancelled,cycle==notificationCycle else{return}
+                notificationError=false
+            } catch {
+                guard !Task.isCancelled,cycle==notificationCycle else{return}
+                notificationError=true
+            }
         }
     }
     private func homeTile<Destination:View>(_ title:String,_ subtitle:String,symbol:String,

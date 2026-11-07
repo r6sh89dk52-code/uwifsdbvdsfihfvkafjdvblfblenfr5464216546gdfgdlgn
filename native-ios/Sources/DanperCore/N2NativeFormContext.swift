@@ -267,6 +267,8 @@ public struct N2NativeFormDraft:Equatable,Sendable {
     public var date:String=""
     public var time:String=""
     public var dispensingSite:String=""
+    /// Encounter site, independent of the one shared pharmacy/Kardex.
+    public var visitSite:String=""
     public var category:String=""
     public var system:String=""
     public var segment:String=""
@@ -367,13 +369,17 @@ public struct N2NativeFormDraft:Equatable,Sendable {
             }
             lines.append(row)
         }
+        let site=visitSite.isEmpty ? worker.site : visitSite
+        guard ["LA VENTUROSA","PLVENTUROSA"].contains(site) else {
+            throw N2FormError.invalidVisit
+        }
         let workerRaw:[String:Any]=[
             "dni":worker.dni,"name":worker.name,"area":worker.area,
             "labor":worker.labor,"sex":worker.sex,
             "age":N2WorkerAge.years(birthDate:worker.birthDate,on:date)
                 .map(String.init) ?? worker.age,
             "birthDate":worker.birthDate,
-            "ubigeo":worker.ubigeo,"site":worker.site
+            "ubigeo":worker.ubigeo,"site":site
         ]
         let hasWound=(procedures + items.map(\.procedure)).contains{
             $0.contains("HERIDA") || $0.contains("SUTUR")
@@ -401,7 +407,7 @@ public struct N2NativeFormDraft:Equatable,Sendable {
              "age":N2WorkerAge.years(birthDate:$0.birthDate,on:date)
                  .map(String.init) ?? $0.age,
              "birthDate":$0.birthDate,
-             "ubigeo":$0.ubigeo,"site":$0.site]
+             "ubigeo":$0.ubigeo,"site":visitSite.isEmpty ? $0.site : visitSite]
         } ?? [:]
         let itemRows:[[String:Any]]=items.map { med in
             var row:[String:Any]=[

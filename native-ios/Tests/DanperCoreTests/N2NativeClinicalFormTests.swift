@@ -250,5 +250,24 @@ final class N2NativeClinicalFormTests:XCTestCase {
         XCTAssertEqual(try N1eLegacyClinicalAudit.inspect(outcome.snapshot).attentions,
                        try N1eLegacyClinicalAudit.inspect(updated).attentions+1)
     }
+    func testEncounterSiteIsCapturedPerVisitAndDoesNotCreateASecondPharmacy() throws {
+        var (draft,context)=try form(with:false)
+        let worker=try XCTUnwrap(context.workers.first{$0.dni==draft.dni})
+        let otherSite=worker.site=="LA VENTUROSA" ? "PLVENTUROSA":"LA VENTUROSA"
+        draft.visitSite=otherSite
+        let saved=try draft.makeSavedVisit(context:context)
+        let visit=try XCTUnwrap(JSONSerialization.jsonObject(with:saved) as? [String:Any])
+        let snapshot=try XCTUnwrap(visit["worker"] as? [String:Any])
+        XCTAssertEqual(snapshot["site"] as? String,otherSite)
+        XCTAssertEqual(visit["dispensingSite"] as? String,"")
+        XCTAssertEqual(context.workers.first{$0.dni==draft.dni}?.site,worker.site,
+                       "A single encounter must not rewrite the roster or inventory")
+        let source=try self.source("n1e-clinical-stock.json")
+        let patched=try N2SnapshotEditor.upsertDraft(snapshot:source,id:draft.id,
+            changes:draft.makeDraftPatch(context:context),at:at())
+        let recovered=try XCTUnwrap(N2NativeDraftRecovery.read(patched).first{$0.id==draft.id})
+        XCTAssertEqual(recovered.form.visitSite,otherSite)
+    }
+
 }
 
