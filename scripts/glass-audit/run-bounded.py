@@ -14,17 +14,29 @@ def main():
     print(f"START {label} (limit {seconds}s): {shlex.join(command)}", file=sys.stderr, flush=True)
     process = subprocess.Popen(command, start_new_session=True)
 
-    def terminate_group():
+    def signal_group(signum):
         try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            return
-        time.sleep(3)
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(process.pid, signum)
         except ProcessLookupError:
             pass
-        process.wait()
+        except PermissionError as error:
+            # macOS services may retain the group after the command exits.
+            # Only signal the direct child if group signalling is denied.
+            print(f"Cannot signal process group {process.pid}: {error}", file=sys.stderr, flush=True)
+            try:
+                process.send_signal(signum)
+            except PermissionError as child_error:
+                print(f"Cannot signal child {process.pid}: {child_error}", file=sys.stderr, flush=True)
+
+    def terminate_group():
+        signal_group(signal.SIGTERM)
+        time.sleep(3)
+        signal_group(signal.SIGKILL)
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            print(f"Child {process.pid} did not exit; simulator cleanup will follow",
+                  file=sys.stderr, flush=True)
 
     def interrupted(signum, _frame):
         terminate_group()
@@ -45,7 +57,8 @@ def main():
             for row in rows.splitlines()[1:]:
                 fields = row.split(maxsplit=5)
                 if len(fields) == 6 and (fields[2] == str(process.pid) or any(
-                    name in fields[5] for name in ("CoreSimulator", "testmanagerd", "xctest", "xcodebuild", "installd")
+                    name in os.path.basename(fields[5])
+                    for name in ("CoreSimulator", "testmanagerd", "xctest", "xcodebuild", "installd")
                 )):
                     print(row, file=sys.stderr, flush=True)
         except (OSError, subprocess.SubprocessError) as error:

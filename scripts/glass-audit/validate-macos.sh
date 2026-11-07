@@ -122,7 +122,11 @@ fresh(){
  echo "$1 $SIM_ID" >> "$OUT/isolated-simulators.txt"
  simctl 90 boot "$SIM_ID"
  simctl 480 bootstatus "$SIM_ID" -b
- simctl 45 ui "$SIM_ID" appearance dark
+ # Premium explicitly requests dark/light on each XCUIApplication launch.
+ # Avoid the redundant global appearance RPC, which stalled after boot.
+ if test "$MODE" != resume-ui || test "$1" != N2PremiumRedesignTests; then
+  simctl 45 ui "$SIM_ID" appearance dark
+ fi
  simctl 45 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLanguages -array es
  simctl 45 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
  bounded 120 enrollment bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log"
