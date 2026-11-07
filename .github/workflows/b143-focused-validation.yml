@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   proven-core:
-    name: Reuse unchanged 447 Core and official Excel evidence
+    name: Reuse unchanged 447 Core, Excel and 43 native cases
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -30,6 +30,12 @@ jobs:
           run-id: 42321376725
           name: B143_FOCUSED_CORE_EVIDENCE
           path: previous-core
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 42325346839
+          name: B143_XCODE_TYPECHECK_EVIDENCE
+          path: previous-native
           github-token: ${{ github.token }}
       - name: Match source inputs and actual successful run, never reuse changed logic
         env:
@@ -53,6 +59,21 @@ jobs:
           jobs=api(url+'/jobs?per_page=100')['jobs']
           assert any(j['name']=='Native Swift Core, site, opening and both Excel workbooks' and j['conclusion']=='success' for j in jobs)
           proof={'reusedRun':42321376725,'reusedSHA':base,'candidateSHA':os.environ['GITHUB_SHA'],'coreTests':447,'failures':0,'unchangedInputs':paths,'officialExcel':'reused PASS','nativeAndUI':'requires fresh execution'}
+          native='66b43e2ce5eb4adc2ba55c3ca3bf7d6e941634b9'
+          native_inputs=['native-ios/App','native-ios/NativeTests','native-ios/Sources','native-ios/Tests','native-ios/project.yml','native-ios/Package.swift','native-ios/Package.resolved','src','scripts/*.cjs','scripts/*.ts','package.json','package-lock.json']
+          subprocess.run(['git','diff','--exit-code',native,'HEAD','--']+native_inputs,check=True)
+          evidence=pathlib.Path('previous-native/b143-audit')
+          assert (evidence/'SOURCE_SHA.txt').read_text().strip()==native
+          assert (evidence/'CORE_NATIVE_SHA.txt').read_text().strip()==native
+          for label,count in [('presentation-native',6),('native-existing',37)]:
+              data=json.loads((evidence/(label+'.xcresult.summary.json')).read_text())
+              assert data['totalTestCount']==data['passedTests']==count,data
+              assert data['failedTests']==data['skippedTests']==0 and not data.get('testFailures'),data
+          prior=api('https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/42325346839')
+          assert prior['head_sha']==native and prior['status']=='completed' and prior['conclusion']=='failure'
+          system=(evidence/'N2BiometricInteractionTests-system.log').read_text()
+          assert 'UI activation timed out after 5 seconds' in system
+          proof.update(reusedNativeRun=42325346839,reusedNativeSHA=native,nativeTests=43,nativeFailures=0,unchangedNativeInputs=native_inputs,nativeAndUI='43 native reused; complete UI execution required',uiPriorFailure='CoreAuthUI system -1000 activation watchdog; no sensor for second policy')
           pathlib.Path('CORE_REUSE.json').write_text(json.dumps(proof,indent=2))
           print('PASS: unchanged 447 Core cases, site/opening regressions and both official Excel workbooks; no repeated suite')
           PYREUSE
@@ -63,8 +84,26 @@ jobs:
           retention-days: 14
 
   ios-typecheck:
-    name: Fresh Xcode, targeted presentation tests and all native/UI
+    name: Required UI - ${{ matrix.label }}
     needs: proven-core
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: N2BiometricInteractionTests
+            count: 1
+          - label: N2Build222ShellTests
+            count: 1
+          - label: N2GlassClinicalTests
+            count: 3
+          - label: N2MenuInteractionTests
+            count: 1
+          - label: N2PremiumRedesignTests
+            count: 2
+          - label: N3ClinicalJourneyTests-demo
+            count: 2
+          - label: N3ClinicalJourneyTests-protected
+            count: 1
     runs-on: macos-15-intel
     timeout-minutes: 140
     env:
@@ -75,6 +114,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: B143_CORE_REUSE_PROOF
+          path: reuse-proof
       - name: Prepare synthetic project resources
         run: |
           set -euo pipefail
@@ -90,23 +133,40 @@ jobs:
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/b143-typecheck" \
-            CODE_SIGNING_ALLOWED=NO ASSETCATALOG_COMPILER_APPICON_NAME="" \
+            ASSETCATALOG_COMPILER_APPICON_NAME="" \
             build-for-testing > "$RUNNER_TEMP/b143-xcode.log" 2>&1 || {
               grep -nE 'error:|fatal error:|BUILD FAILED' "$RUNNER_TEMP/b143-xcode.log" | tail -n 90 || true
               exit 1
             }
           echo 'PASS: Full iOS app and test hosts compile on Xcode'
-      - name: Directed presentation tests, remaining native cases and required UI
+      - name: Required scoped UI suite, with genuine authentication setup
         timeout-minutes: 120
         env:
           DANPER_AUDIT_OUT: ${{ runner.temp }}/b143-audit
           DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b143-typecheck
-          DANPER_PRESENTATION_FOCUS: '1'
-        run: bash scripts/glass-audit/validate-macos.sh current
+          DANPER_UI_LABEL: ${{ matrix.label }}
+          DANPER_REUSE_PROOF: ${{ github.workspace }}/reuse-proof/CORE_REUSE.json
+        run: |
+          set -euo pipefail
+          bash scripts/glass-audit/validate-macos.sh resume-ui
+          python3 - <<'PYUI'
+          import json,os,pathlib
+          folder=pathlib.Path(os.environ['DANPER_AUDIT_OUT'])
+          label=os.environ['DANPER_UI_LABEL']
+          expected=int('${{ matrix.count }}')
+          proof=json.loads((folder/(label+'.xcresult.summary.json')).read_text())
+          assert proof['passedTests']==proof['totalTestCount']==expected
+          assert proof['failedTests']==proof['skippedTests']==0 and not proof.get('testFailures')
+          assert (folder/'SCOPED_UI_PASS_SHA.txt').read_text().strip()==os.environ['GITHUB_SHA']
+          if label=='N2BiometricInteractionTests':
+              consent=json.loads((folder/('permission-'+label+'.xcresult.summary.json')).read_text())
+              assert consent['passedTests']==consent['totalTestCount']==1 and consent['failedTests']==consent['skippedTests']==0
+          print('PASS: required scoped UI; original assertions retained')
+          PYUI
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: B143_XCODE_TYPECHECK_EVIDENCE
+          name: B143_UI_${{ matrix.label }}
           path: |
             ${{ runner.temp }}/b143-xcode.log
             ${{ runner.temp }}/b143-audit/*.log

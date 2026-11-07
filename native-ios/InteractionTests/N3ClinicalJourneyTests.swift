@@ -202,10 +202,11 @@ final class N3ClinicalJourneyTests:XCTestCase {
         XCTAssertTrue(app.staticTexts["Borrador protegido · autoguardado activo"].waitForExistence(timeout:20),
             "El aviso solo se prueba después de persistir el borrador cifrado: "+app.debugDescription)
         tap(app.buttons["premium-close-attention"],in:app)
-        tap(app.buttons["brand-header-notifications"],in:app)
+        let bell=app.buttons["brand-header-notifications"]
+        XCTAssertTrue(bell.isHittable);bell.tap()
         let draftsFilter=app.buttons["notification-filter-Borradores"]
         XCTAssertTrue(draftsFilter.waitForExistence(timeout:10))
-        tap(draftsFilter,in:app)
+        XCTAssertTrue(draftsFilter.isHittable);draftsFilter.tap()
         let dismissNotice=app.buttons.matching(NSPredicate(format:"identifier BEGINSWITH %@","notification-dismiss-")).firstMatch
         XCTAssertTrue(dismissNotice.waitForExistence(timeout:10),app.debugDescription)
         tap(dismissNotice,in:app)

@@ -9,3 +9,8 @@ New deterministic native cases exercise a 20-request lifecycle burst (one read a
 Performance evidence is a reduction in redundant read requests, not a measured iPhone latency claim. Instruments signpost `Home authenticated refresh` covers the real operation. Physical startup smoothness, absence of visible flashes and scroll behavior need an iPhone retest. Occupational follow-up notifications still require verified source data; no dates or records are invented. Stock-opening and encounter-site code remain exactly the approved base.
 
 Candidate under validation; no IPA is approved until the required new checks and ARM64 packaging pass.
+
+
+Run `42325346839`, application SHA `66b43e2ce5eb4adc2ba55c3ca3bf7d6e941634b9`: Xcode compilation PASS, six new native cases PASS, all 37 existing native cases PASS, genuine cancellation preflight PASS. Biometric UI had one PASS/one FAIL; the actual OS log reports LocalAuthentication `-1000`, “UI activation timed out after 5 seconds” for the second policy. No corresponding sensor started; readiness correctly refused to invent success. Remaining UI did not execute and IPA packaging stayed blocked.
+
+Recovery keeps the same App/Core/native sources byte for byte, verifies the 43 native results and reuses the 447/Excel proof. Required UI suites execute independently using the existing scoped-harness pattern. Face ID assertions and deadlines remain intact; its permission-only case runs as actual setup and its cancel/retry/foreground case must pass. Every other original UI case remains mandatory. The new inbox interaction uses direct hittable header/filter buttons instead of the form's scrolling helper, which assumes controls below the fixed header. No clinical code is modified by recovery.

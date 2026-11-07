@@ -14,7 +14,7 @@ if test "$MODE" = replay; then
  printf '%s\n' "$DANPER_REPLAY_LABEL" > "$OUT/REPLAY_LABEL.txt"
 fi
 DD="${DANPER_AUDIT_DERIVED_DATA:-$OUT/DerivedData}"
-if test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != current-native && test "$MODE" != replay; then
+if test "$MODE" != resume-ui && test "$MODE" != ui && test "$MODE" != resume-native && test "$MODE" != scoped-native && test "$MODE" != current && test "$MODE" != current-native && test "$MODE" != replay; then
 export DANPER_N1_FIXTURE_DIR="$OUT/fixtures"
 for cmd in node swift xcodegen xcodebuild; do command -v "$cmd" >/dev/null; done
 git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
@@ -50,7 +50,7 @@ if test "$MODE" = resume-native; then
 fi
 # Current-branch CI: run every simulator suite from this checkout, without
 # reusing earlier evidence or packaging. Swift/Excel gates run independently.
-if test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay; then
+if test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay || test "$MODE" = resume-ui; then
  git rev-parse HEAD > "$OUT/SOURCE_SHA.txt"
  git rev-parse HEAD^{tree} > "$OUT/SOURCE_TREE.txt"
  xcodebuild -version > "$OUT/xcode-version.txt"
@@ -58,6 +58,17 @@ if test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = rep
 fi
 if test "$MODE" = scoped-native; then test "$(cat "$OUT/BUILD_SUCCESS_SHA.txt")" = "$(git rev-parse HEAD)"; fi
 if test "$MODE" = ui; then test "$(cat "$OUT/CORE_NATIVE_SHA.txt")" = "$(git rev-parse HEAD)"; fi
+if test "$MODE" = resume-ui; then
+ : "${DANPER_UI_LABEL:?Select an explicit UI suite}"
+ : "${DANPER_REUSE_PROOF:?Provide the independently verified native reuse proof}"
+ python3 - "$DANPER_REUSE_PROOF" <<'PYPROOF'
+import json,os,subprocess,sys
+proof=json.load(open(sys.argv[1]))
+assert proof['candidateSHA']==subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert proof['nativeTests']==43 and proof['nativeFailures']==0
+assert proof['reusedNativeRun']==42325346839
+PYPROOF
+fi
 # Never pick or erase an existing user's simulator.
 SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
 RUNTIME=$(python3 - "$OUT/runtimes.json" "$SDK_VERSION" <<'PY'
@@ -170,7 +181,7 @@ run_tests(){
  fi
  return "$status"
 }
-if test "$MODE" != ui; then
+if test "$MODE" != ui && test "$MODE" != resume-ui; then
  fresh native
  if test "$MODE" = resume-native || test "$MODE" = current || test "$MODE" = current-native || test "$MODE" = replay; then
   # Compile for this actual Simulator architecture, not two unused slices.
@@ -225,6 +236,13 @@ PY
 overall=0
 while IFS=$'\t' read -r label count cls selectors; do
  if test "$MODE" = replay && test "$label" != "$DANPER_REPLAY_LABEL"; then continue; fi
+ if test "$MODE" = resume-ui && test "$label" != "$DANPER_UI_LABEL"; then continue; fi
+ if test "$MODE" = resume-ui && test "$label" = N2BiometricInteractionTests; then
+  # The permission-only case still runs below as real first-use setup. The
+  # original failing cancel/retry/foreground assertions run without changes.
+  count=1
+  selectors='-only-testing:DANPERInteractionTests/N2BiometricInteractionTests/testAutomaticBiometryCancellationRetryAndForeground'
+ fi
  fresh "$label"
  case "$label" in
   N2BiometricInteractionTests|N3ClinicalJourneyTests-protected)
@@ -246,6 +264,12 @@ test "$overall" = 0
 if test "$MODE" = replay; then
  git rev-parse HEAD > "$OUT/REPLAY_PASS_SHA.txt"
  echo "PASS: replay $DANPER_REPLAY_LABEL only; combined coverage must be verified before packaging."
+ exit 0
+fi
+if test "$MODE" = resume-ui; then
+ grep -q "^$DANPER_UI_LABEL" "$OUT/ui-classes.tsv"
+ git rev-parse HEAD > "$OUT/SCOPED_UI_PASS_SHA.txt"
+ echo "PASS: scoped $DANPER_UI_LABEL; publication requires the complete independent aggregate gate."
  exit 0
 fi
 # Only this marker allows packaging in CI or locally.
