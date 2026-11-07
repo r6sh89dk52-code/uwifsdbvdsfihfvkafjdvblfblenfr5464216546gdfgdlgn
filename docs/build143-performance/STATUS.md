@@ -1,0 +1,11 @@
+# Post-14.2 focused presentation performance
+
+Base: `0ff668a4670f3f244658029ba8aaced22d431ef6`, approved run `42321376725`. Its 447 Core cases, individual encounter site/opening regressions and both official Excel comparisons remain applicable only while all corresponding Swift/Node inputs match byte for byte. The workflow enforces that diff and retrieves the real successful run and test log. No Core, crypto, clinical schema or Excel code is changed here.
+
+Changes: coalesce concurrent Home lifecycle requests without a redundant second encrypted read; a verified write ahead of an in-flight result suppresses that stale result and requests a new authenticated read. Explicit manual refresh remains. Notification dismissal/restoration now reports scheduling failure and rejects stale task completions. The inbox computes its filtered/sorted list once per body evaluation and has an explicit Close action. Source verification keeps the inert access screen visible until the authorized workspace is ready, eliminating the intermediate empty backdrop; no data is shown before authorization. Version metadata advances to 143, with the same Bundle ID.
+
+New deterministic native cases exercise a 20-request lifecycle burst (one read admitted), concurrent writes, already-included revisions, manual refresh/failure, and device-local dismissal persistence/mode isolation. The protected UI journey now persists a synthetic draft, opens the bell, dismisses/restores its notice and verifies the draft remains. Original Face ID, clinical, inventory, restoration and UI assertions remain required.
+
+Performance evidence is a reduction in redundant read requests, not a measured iPhone latency claim. Instruments signpost `Home authenticated refresh` covers the real operation. Physical startup smoothness, absence of visible flashes and scroll behavior need an iPhone retest. Occupational follow-up notifications still require verified source data; no dates or records are invented. Stock-opening and encounter-site code remain exactly the approved base.
+
+Candidate under validation; no IPA is approved until the required new checks and ARM64 packaging pass.

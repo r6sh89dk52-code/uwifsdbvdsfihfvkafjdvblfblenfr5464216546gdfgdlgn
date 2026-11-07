@@ -9,56 +9,59 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  swift-and-excel:
-    name: Native Swift Core, site, opening and both Excel workbooks
+  proven-core:
+    name: Reuse unchanged 447 Core and official Excel evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-      - name: Prepare synthetic data only
-        run: |
-          set -euo pipefail
-          npm ci --ignore-scripts --no-fund
-          mkdir -p "$RUNNER_TEMP/b143-fixtures"
-          export DANPER_N1_FIXTURE_DIR="$RUNNER_TEMP/b143-fixtures"
-          echo "DANPER_N1_FIXTURE_DIR=$DANPER_N1_FIXTURE_DIR" >> "$GITHUB_ENV"
-          for generator in generate-native-compat-fixtures.cjs generate-n1e-clinical-fixtures.cjs generate-n1f-lossless-fixtures.cjs generate-n1h-clinical-parity.cjs generate-n1p-excel-parity.cjs generate-n1q-reconciliation-fixtures.cjs generate-n1r-stored-xlsx-template.cjs generate-n1s-official-excel-fixtures.cjs generate-n2-approved-fixture.cjs generate-n2-nursing-parity.cjs generate-n2-stock-commands-fixtures.cjs; do
-            node "scripts/$generator"
-          done
-          node scripts/generate-n2-procedure-parity.cjs
-      - name: Parse all iOS app Swift sources without changing native code
-        run: swiftc -frontend -parse native-ios/App/*.swift
-      - name: Targeted new site and RESU regression tests
-        run: |
-          set -euo pipefail
-          (cd native-ios && swift test --jobs 2 --filter 'N2NativeClinicalFormTests.testEncounterSiteIsCapturedPerVisitAndDoesNotCreateASecondPharmacy')
-          (cd native-ios && swift test --jobs 2 --filter 'N2SimpleInventoryTests.testAmbulatoryOpeningSurvivesPhysicalCountWithinSamePeriod')
-      - name: Complete DanperCore regression suite
-        run: |
-          set -o pipefail
-          (cd native-ios && swift test --jobs 2) 2>&1 | tee "$RUNNER_TEMP/b143-core-tests.log"
-      - name: Existing both Excel workbooks unaffected
-        run: |
-          node scripts/test-n1r-native-xlsx.cjs
-          node scripts/test-n1s-full-native-workbooks.cjs
-      - uses: actions/upload-artifact@v4
-        if: always()
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
         with:
+          run-id: 42321376725
           name: B143_FOCUSED_CORE_EVIDENCE
-          path: ${{ runner.temp }}/b143-core-tests.log
-          retention-days: 7
-          if-no-files-found: ignore
+          path: previous-core
+          github-token: ${{ github.token }}
+      - name: Match source inputs and actual successful run, never reuse changed logic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYREUSE'
+          import json,os,pathlib,re,subprocess,urllib.request
+          base='0ff668a4670f3f244658029ba8aaced22d431ef6'
+          paths=['native-ios/Sources','native-ios/Tests','native-ios/Package.swift','native-ios/Package.resolved','src','scripts/*.cjs','scripts/*.ts','package.json','package-lock.json']
+          subprocess.run(['git','diff','--exit-code',base,'HEAD','--']+paths,check=True)
+          log=pathlib.Path('previous-core/b143-core-tests.log').read_text()
+          assert re.search(r'Executed 447 tests, with 0 failures',log)
+          assert not re.search(r'\b[1-9]\d* tests? (?:were )?skipped',log)
+          url='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/42321376725'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}
+          def api(url):
+              with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=30) as response:return json.load(response)
+          run=api(url)
+          assert run['head_sha']==base and run['status']=='completed' and run['conclusion']=='success'
+          jobs=api(url+'/jobs?per_page=100')['jobs']
+          assert any(j['name']=='Native Swift Core, site, opening and both Excel workbooks' and j['conclusion']=='success' for j in jobs)
+          proof={'reusedRun':42321376725,'reusedSHA':base,'candidateSHA':os.environ['GITHUB_SHA'],'coreTests':447,'failures':0,'unchangedInputs':paths,'officialExcel':'reused PASS','nativeAndUI':'requires fresh execution'}
+          pathlib.Path('CORE_REUSE.json').write_text(json.dumps(proof,indent=2))
+          print('PASS: unchanged 447 Core cases, site/opening regressions and both official Excel workbooks; no repeated suite')
+          PYREUSE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: B143_CORE_REUSE_PROOF
+          path: CORE_REUSE.json
+          retention-days: 14
 
   ios-typecheck:
-    name: Xcode iPhone simulator compile and UI typecheck only
+    name: Fresh Xcode, targeted presentation tests and all native/UI
+    needs: proven-core
     runs-on: macos-15-intel
-    timeout-minutes: 55
+    timeout-minutes: 140
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
@@ -87,10 +90,77 @@ jobs:
               exit 1
             }
           echo 'PASS: Full iOS app and test hosts compile on Xcode'
+      - name: Directed presentation tests, remaining native cases and required UI
+        timeout-minutes: 120
+        env:
+          DANPER_AUDIT_OUT: ${{ runner.temp }}/b143-audit
+          DANPER_AUDIT_DERIVED_DATA: ${{ runner.temp }}/b143-typecheck
+          DANPER_PRESENTATION_FOCUS: '1'
+        run: bash scripts/glass-audit/validate-macos.sh current
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: B143_XCODE_TYPECHECK_EVIDENCE
-          path: ${{ runner.temp }}/b143-xcode.log
+          path: |
+            ${{ runner.temp }}/b143-xcode.log
+            ${{ runner.temp }}/b143-audit/*.log
+            ${{ runner.temp }}/b143-audit/*.txt
+            ${{ runner.temp }}/b143-audit/*.json
           retention-days: 7
           if-no-files-found: ignore
+
+  unsigned-ipa:
+    name: Package unsigned ARM64 iLoader IPA only after reused Core and fresh native/UI PASS
+    needs: [proven-core, ios-typecheck]
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Rebuild EXACT tested HEAD for device
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+          xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/b143-release" CODE_SIGNING_ALLOWED=NO build
+      - name: Verify update identity and release payload
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/b143-release/Build/Products/Release-iphoneos/DANPERNative.app"
+          test -d "$APP"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          MARKETING=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          test "$MARKETING" = '0.4.2'
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          test "$ID" = 'pe.danper.saludmovil.native.iloaderpreview'
+          test "$VERSION" = '143'
+          ARCHS=$(xcrun lipo -archs "$APP/DANPERNative")
+          test "$ARCHS" = 'arm64'
+          test ! -f "$APP/embedded.mobileprovision"
+          test ! -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
+          mkdir -p "$RUNNER_TEMP/b143-out/Payload"
+          ditto "$APP" "$RUNNER_TEMP/b143-out/Payload/DANPERNative.app"
+          cd "$RUNNER_TEMP/b143-out"
+          ditto -c -k --sequesterRsrc --keepParent Payload DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          unzip -tq DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa
+          shasum -a 256 DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa > SHA256.txt
+          cat SHA256.txt
+          printf '%s\n' "SHA=$GITHUB_SHA" "BUNDLE_ID=$ID" "BUILD=$VERSION" "ARCH=$ARCHS" > VERIFIED_BUILD.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_B143_NOTIFICATIONS_ILOADER_UNSIGNED_TESTED
+          path: |
+            ${{ runner.temp }}/b143-out/DANPER_0.4.2_BUILD143_NOTIFICATIONS_PERFORMANCE_ILOADER_UNSIGNED.ipa
+            ${{ runner.temp }}/b143-out/SHA256.txt
+            ${{ runner.temp }}/b143-out/VERIFIED_BUILD.txt
+          retention-days: 14
+          if-no-files-found: error

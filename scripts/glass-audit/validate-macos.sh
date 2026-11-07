@@ -185,7 +185,21 @@ if test "$MODE" != ui; then
  # All original 21 cases + exhaustive catalog + genuine Face ID availability.
  if test "$MODE" != replay; then
   native_count=$(python3 -c 'from pathlib import Path; import re; print(sum(len(re.findall(r"\bfunc test\w+\(",p.read_text())) for p in Path("native-ios/NativeTests").glob("*.swift")))')
-  run_tests "native-$native_count" "$native_count" -only-testing:DANPERNativeTests
+  if test "${DANPER_PRESENTATION_FOCUS:-0}" = 1; then
+   run_tests presentation-native 6 -only-testing:DANPERNativeTests/N2RefreshDemandTests -only-testing:DANPERNativeTests/N2NotificationInboxPreferencesTests
+   native_selectors=()
+   while IFS= read -r cls; do native_selectors+=("-only-testing:DANPERNativeTests/$cls"); done < <(python3 - <<'PYNATIVE'
+from pathlib import Path
+import re
+for path in sorted(Path('native-ios/NativeTests').glob('*.swift')):
+ for name in re.findall(r'final\s+class\s+(\w+)\s*:\s*XCTestCase',path.read_text()):
+  if name not in ['N2RefreshDemandTests','N2NotificationInboxPreferencesTests']:print(name)
+PYNATIVE
+)
+   run_tests native-existing "$((native_count-6))" "${native_selectors[@]}"
+  else
+   run_tests "native-$native_count" "$native_count" -only-testing:DANPERNativeTests
+  fi
   git rev-parse HEAD > "$OUT/CORE_NATIVE_SHA.txt"
  fi
  if test "$MODE" = native || test "$MODE" = current-native || test "$MODE" = resume-native || test "$MODE" = scoped-native; then exit 0; fi

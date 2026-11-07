@@ -7,17 +7,17 @@ enum N2NotificationInboxPreferences {
     private static func key(_ mode:N2WorkspaceVault.Mode)->String {
         "danper.n2."+mode.rawValue+".dismissed-alerts.v1"
     }
-    static func read(_ mode:N2WorkspaceVault.Mode)->Set<String> {
-        Set(UserDefaults.standard.stringArray(forKey:key(mode)) ?? [])
+    static func read(_ mode:N2WorkspaceVault.Mode,defaults:UserDefaults = .standard)->Set<String> {
+        Set(defaults.stringArray(forKey:key(mode)) ?? [])
     }
-    static func dismiss(_ id:String,mode:N2WorkspaceVault.Mode)->Set<String> {
-        var saved=read(mode)
+    static func dismiss(_ id:String,mode:N2WorkspaceVault.Mode,defaults:UserDefaults = .standard)->Set<String> {
+        var saved=read(mode,defaults:defaults)
         saved.insert(id)
-        UserDefaults.standard.set(saved.sorted(),forKey:key(mode))
+        defaults.set(saved.sorted(),forKey:key(mode))
         return saved
     }
-    static func restore(_ mode:N2WorkspaceVault.Mode)->Set<String> {
-        UserDefaults.standard.removeObject(forKey:key(mode))
+    static func restore(_ mode:N2WorkspaceVault.Mode,defaults:UserDefaults = .standard)->Set<String> {
+        defaults.removeObject(forKey:key(mode))
         return []
     }
 }
@@ -48,12 +48,14 @@ struct N2NotificationInboxView:View {
             }
         }
     }
+    @Environment(\.dismiss) private var close
     @State private var filter=Filter.all
     private var visible:[N2ClinicalAlert] {
         alerts.filter{filter.includes($0.kind)}
             .sorted{($0.dueAt,$0.id)<($1.dueAt,$1.id)}
     }
     var body:some View {
+        let rows=visible
         NavigationStack {
             VStack(spacing:0) {
                 ScrollView(.horizontal) {
@@ -78,21 +80,21 @@ struct N2NotificationInboxView:View {
                     Text("Algunos avisos de iOS no pudieron programarse. Los avisos dentro de DANPER siguen disponibles.")
                         .font(.footnote).foregroundStyle(.orange).padding(.horizontal,16)
                 }
-                if visible.isEmpty {
+                if rows.isEmpty {
                     ContentUnavailableView("No hay avisos",
                         systemImage:"bell.slash",
                         description:Text("No tienes notificaciones en esta categoría."))
                         .frame(maxWidth:.infinity,maxHeight:.infinity)
                 } else {
                     List {
-                        ForEach(visible) { alert in
+                        ForEach(rows) { alert in
                             VStack(alignment:.leading,spacing:9) {
                                 Label(alert.detail,systemImage:symbol(alert.kind))
                                     .font(.subheadline)
                                     .foregroundStyle(.primary)
                                 HStack {
                                     Text(alert.dueAt<=Int64(now.timeIntervalSince1970*1000)
-                                         ? "Pendiente de revisar" : "Programado")
+                                         ? "Pendiente de revisar" : "Próximo aviso")
                                         .font(.caption).foregroundStyle(.secondary)
                                     Spacer()
                                     if alert.kind == .draft {
@@ -123,6 +125,10 @@ struct N2NotificationInboxView:View {
             .navigationTitle("Notificaciones")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement:.topBarLeading) {
+                    Button("Cerrar") {close()}
+                        .accessibilityIdentifier("notification-close")
+                }
                 if dismissedCount>0 {
                     ToolbarItem(placement:.topBarTrailing) {
                         Button("Restaurar descartadas",action:onRestore)
