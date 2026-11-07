@@ -5,11 +5,16 @@ on:
     paths:
       - 'native-ios/**'
       - '.github/workflows/b143-focused-validation.yml'
+      - 'scripts/glass-audit/**'
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
+
+concurrency:
+  group: danper-b143-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   proven-core:
@@ -73,6 +78,7 @@ jobs:
       - name: Prepare synthetic project resources
         run: |
           set -euo pipefail
+          DANPER_EXPECTED_BUILD=143 node scripts/glass-audit/identity.cjs
           npm ci --ignore-scripts --no-fund
           if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
           node scripts/prepare-n1s-ios-demo-resources.cjs
@@ -125,6 +131,7 @@ jobs:
       - name: Rebuild EXACT tested HEAD for device
         run: |
           set -euo pipefail
+          DANPER_EXPECTED_BUILD=143 node scripts/glass-audit/identity.cjs
           npm ci --ignore-scripts --no-fund
           if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
           node scripts/prepare-n1s-ios-demo-resources.cjs

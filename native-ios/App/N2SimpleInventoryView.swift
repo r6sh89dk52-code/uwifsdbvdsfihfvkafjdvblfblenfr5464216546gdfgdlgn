@@ -40,6 +40,9 @@ struct N2SimpleInventoryView:View {
     var layoutContext:N2SimpleInventoryContext?=nil
     var initialOperation:String?=nil
     @Environment(\.n2WorkspaceVault) private var vault
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.danperAuthenticatedSession) private var authenticated
+    @State private var refreshDemand=N2RefreshDemand()
     @State private var context:N2SimpleInventoryContext?
     @State private var loading=true
     @State private var error=""
@@ -66,13 +69,14 @@ struct N2SimpleInventoryView:View {
             if let context,context.state != nil {inventoryControls(context)}
         }
         .navigationTitle("Inventario").navigationBarTitleDisplayMode(.inline).danperFormChrome()
-        .task {if let layoutContext {context=layoutContext;loading=false}else{await load()}}.refreshable {await load()}
+        .task(id:"\(scenePhase)-\(authenticated)") {if let layoutContext {context=layoutContext;loading=false}else{await load()}}.refreshable {await load(cause:.manual)}
         .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
             guard layoutContext==nil,N2WorkspaceChanges.matches(event,vault),editor==nil,
                   let kind=event.userInfo?["kind"] as? String,["history","inventory","restore"].contains(kind) else{return}
-            Task {await load()}
+            guard let revision=event.userInfo?["revision"] as? Int else{return}
+            Task {await load(cause:.verifiedWrite(revision))}
         }
-        .sheet(item:$editor,onDismiss:{Task {await load()}}) {route in
+        .sheet(item:$editor,onDismiss:{Task {await load(cause:.manual)}}) {route in
             if let context {
                 NavigationStack {N2SimpleProductEditor(context:context,operation:route.operation,
                     product:route.product,incident:route.incident)}
@@ -80,6 +84,7 @@ struct N2SimpleInventoryView:View {
         }
     }
     @ViewBuilder private func inventory(_ context:N2SimpleInventoryContext,_ state:N2SimpleInventoryState)->some View {
+        let products=N2InventoryPresentation.products(state.products,catalog:context.catalog,filter:filter,query:query)
         DanperPanel {
             Label("Inventario compartido",systemImage:"shippingbox.fill").font(.title3.bold())
             Text("Fundo y Planta La Venturosa · una existencia por producto y presentación.")
@@ -91,13 +96,13 @@ struct N2SimpleInventoryView:View {
             .buttonStyle(DanperPrimaryButton()).accessibilityIdentifier("simple-register-product")
         if state.products.isEmpty {Text("Registra el primer conteo físico. Sin conteo no se presume una existencia comprobada.").foregroundStyle(.secondary)}
         LazyVStack(spacing:12) {
-            ForEach(N2InventoryPresentation.products(state.products,catalog:context.catalog,filter:filter,query:query)) {p in
+            ForEach(products) {p in
                 NavigationLink {
                     N2SimpleProductDetail(code:p.code)
                 } label:{N2GlassInventoryRow(product:p,catalog:context.catalog)}.buttonStyle(.plain).accessibilityIdentifier("simple-product-"+p.code)
             }
         }
-        if N2InventoryPresentation.products(state.products,catalog:context.catalog,filter:filter,query:query).isEmpty && !state.products.isEmpty {
+        if products.isEmpty && !state.products.isEmpty {
             DanperEmptyState(title:"No hay productos con estos filtros",symbol:"magnifyingglass")
         }
         if state.products.contains(where:{N2InventoryPresentation.category(code:$0.code,catalog:context.catalog)==nil}) {
@@ -151,10 +156,20 @@ struct N2SimpleInventoryView:View {
             }
         }
     }
-    @MainActor private func load() async {
-        loading=true;defer{loading=false}
+    @MainActor private func load(cause:N2RefreshDemand.Cause = .lifecycle) async {
+        guard layoutContext==nil,scenePhase == .active,(!vault.isClinical || authenticated),refreshDemand.begin(cause) else{return}
+        var observedRevision:Int?
+        loading=true
+        let span=N2PerformanceSpan("Inventory authenticated refresh");defer{span.end()}
+        defer {
+            loading=false
+            if refreshDemand.finish(observedRevision:observedRevision) {Task {await load()}}
+        }
         do {
-            let result=try await vault.simpleInventoryContext();context=result;error=""
+            let result=try await vault.simpleInventoryContext()
+            observedRevision=result.revision
+            guard scenePhase == .active,(!vault.isClinical || authenticated),refreshDemand.canPublish(result.revision) else{return}
+            context=result;error=""
             if result.state != nil,!presentedInitialOperation,initialOperation=="lot" {
                 presentedInitialOperation=true;editor=N2SimpleEditorRoute(operation:.register)
             }
@@ -165,6 +180,9 @@ struct N2SimpleInventoryView:View {
 struct N2SimpleProductDetail:View {
     let code:String
     @Environment(\.n2WorkspaceVault) private var vault
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.danperAuthenticatedSession) private var authenticated
+    @State private var refreshDemand=N2RefreshDemand()
     @State private var context:N2SimpleInventoryContext?
     @State private var editor:N2SimpleEditorRoute?
     @State private var error=""
@@ -199,12 +217,14 @@ struct N2SimpleProductDetail:View {
                 if !error.isEmpty {DanperErrorState(message:error,retry:{Task {await load()}})}
             }.padding(16)
         }.navigationTitle("Existencias").navigationBarTitleDisplayMode(.inline).danperFormChrome()
-            .task {await load()}
+            .task(id:"\(scenePhase)-\(authenticated)") {await load()}
         .onReceive(NotificationCenter.default.publisher(for:N2WorkspaceChanges.notification).receive(on:RunLoop.main)) { event in
-            guard N2WorkspaceChanges.matches(event,vault) else{return}
-            Task {@MainActor in await load()}
-        }.refreshable {await load()}
-            .sheet(item:$editor,onDismiss:{Task {await load()}}) {route in
+            guard N2WorkspaceChanges.matches(event,vault),editor==nil,
+                  let kind=event.userInfo?["kind"] as? String,["history","inventory","restore"].contains(kind),
+                  let revision=event.userInfo?["revision"] as? Int else{return}
+            Task {@MainActor in await load(cause:.verifiedWrite(revision))}
+        }.refreshable {await load(cause:.manual)}
+            .sheet(item:$editor,onDismiss:{Task {await load(cause:.manual)}}) {route in
                 if let context {NavigationStack {N2SimpleProductEditor(context:context,operation:route.operation,product:route.product)}}
             }
     }
@@ -228,8 +248,17 @@ struct N2SimpleProductDetail:View {
             Button("Actualizar vencimiento") {editor=N2SimpleEditorRoute(operation:.expiry,product:p)}.accessibilityIdentifier("simple-expiry")
         }
     }
-    @MainActor private func load() async {
-        do {context=try await vault.simpleInventoryContext();error=""}catch{self.error=n2SimpleMessage(error)}
+    @MainActor private func load(cause:N2RefreshDemand.Cause = .lifecycle) async {
+        guard scenePhase == .active,(!vault.isClinical || authenticated),refreshDemand.begin(cause) else{return}
+        var observedRevision:Int?
+        let span=N2PerformanceSpan("Product authenticated refresh");defer{span.end()}
+        defer {if refreshDemand.finish(observedRevision:observedRevision) {Task {await load()}}}
+        do {
+            let result=try await vault.simpleInventoryContext()
+            observedRevision=result.revision
+            guard scenePhase == .active,(!vault.isClinical || authenticated),refreshDemand.canPublish(result.revision) else{return}
+            context=result;error=""
+        }catch{self.error=n2SimpleMessage(error)}
     }
 }
 
