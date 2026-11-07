@@ -346,7 +346,41 @@ internal enum N1sFullExcelWriter {
         return xml.replacingOccurrences(of:"</workbook>",
             with:"<calcPr calcMode=\"auto\" fullCalcOnLoad=\"1\" forceFullCalc=\"1\"/></workbook>")
     }
-    static func exportIndicator(base:Data,manifest:Data) throws -> N1sExcelResult {
+    private static func appendStockObservation(_ stock:N2IndicatorStockObservation,
+                                               start:String,end:String,to xml:String)throws -> String {
+        let rows=try matches(#"<row\b[^>]*\br="(\d+)""#,in:xml)
+        let last=rows.compactMap { match -> Int? in
+            guard let range=Range(match.range(at:1),in:xml) else {return nil}
+            return Int(xml[range])
+        }.max() ?? 0
+        // Sheet 6's official table, styles, and conditional formatting stay
+        // untouched. Column F is reserved for its duplicate-value rule.
+        let header:[[Any?]]=[
+            ["EXISTENCIAS · INVENTARIO ÚNICO (FUNDO Y PLANTA)"],
+            ["Período: "+(try formattedPeriod(start,end))+" · Referencia actual: "+stock.reference+" (hora de Lima)"],
+            ["El cierre histórico y la existencia actual son saldos distintos. Vacío significa que no hay evidencia suficiente."],
+            ["Código","Producto","Unidad","Stock inicial","Cierre al "+end,nil,"Stock actual",nil,nil,
+             "Último mov. (Lima)","Estado actual",nil,"Evidencia del cierre"]
+        ]
+        let values=header+stock.rows.map { row -> [Any?] in
+            [row.code,row.name,row.unit,row.opening,row.closing,nil,row.current,nil,nil,
+             row.lastMovement,row.current == nil ? "Sin conteo registrado" : "Existencia registrada en Kardex",
+             nil,row.closingStatus]
+        }
+        let appended=try values.enumerated().map { offset,fields in
+            let row=last+2+offset
+            let cells=try fields.enumerated().map { index,value in
+                try xmlCell(column(index)+String(row),value)
+            }.joined()
+            return "<row r=\"\(row)\">"+cells+"</row>"
+        }.joined()
+        let data=try replaceExactly("</sheetData>",in:xml,with:appended+"</sheetData>")
+        return try replaceExactly(#"<dimension ref="A1:M\d+"/>"#,in:data,
+            with:"<dimension ref=\"A1:M\(last+1+values.count)\"/>")
+    }
+
+    static func exportIndicator(base:Data,manifest:Data,
+                                stockObservation:N2IndicatorStockObservation?=nil) throws -> N1sExcelResult {
         guard manifest.count<4_000_000,
               let root=try? JSONSerialization.jsonObject(with:manifest) as? [String:Any],
               let catalog=root["catalog"] as? [[String:Any]],catalog.count==432,
@@ -405,6 +439,15 @@ internal enum N1sFullExcelWriter {
             }.joined()
             xml=xml.replacingOccurrences(of:"</sheetData>",with:rows+"</sheetData>")
             archive[index]=N1rStoredEntry(name:archive[index].name,data:Data(xml.utf8))
+        }
+        if let stockObservation {
+            let path="xl/worksheets/sheet6.xml"
+            guard let index=archive.firstIndex(where:{$0.name==path}),
+                  let xml=String(data:archive[index].data,encoding:.utf8) else {
+                throw N1sExcelError.invalidTemplate
+            }
+            let updated=try appendStockObservation(stockObservation,start:start,end:end,to:xml)
+            archive[index]=N1rStoredEntry(name:path,data:Data(updated.utf8))
         }
         guard let stylesIndex=archive.firstIndex(where:{$0.name=="xl/styles.xml"}),
               let stylesXML=String(data:archive[stylesIndex].data,encoding:.utf8)

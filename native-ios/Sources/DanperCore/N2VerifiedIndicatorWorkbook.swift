@@ -141,19 +141,27 @@ public enum N2VerifiedIndicatorWorkbook {
     public static func export(snapshot:Data,products:Data,mappings:Data,
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
+        try export(snapshot:snapshot,products:products,mappings:mappings,template:template,
+            start:start,end:end,subdivision:subdivision,selectedVisitIDs:selectedVisitIDs,
+            allowPending:allowPending,observedAt:Date())
+    }
+    static func export(snapshot:Data,products:Data,mappings:Data,
+        template:Data,start:String,end:String,subdivision:String,
+        selectedVisitIDs:Set<String>,allowPending:Bool=false,observedAt:Date)throws->Result {
         try build(snapshot:snapshot,products:products,mappings:mappings,template:template,
-            start:start,end:end,subdivision:subdivision,selectedVisitIDs:selectedVisitIDs,allowPending:allowPending)
+            start:start,end:end,subdivision:subdivision,selectedVisitIDs:selectedVisitIDs,
+            allowPending:allowPending,observedAt:observedAt)
     }
     static func exportAuthenticated(_ record:N2EncryptedClinicalJournal.Recovered,products:Data,mappings:Data,
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>,allowPending:Bool=false)throws->Result {
         try build(snapshot:record.snapshot,products:products,mappings:mappings,template:template,
             start:start,end:end,subdivision:subdivision,selectedVisitIDs:selectedVisitIDs,
-            allowPending:allowPending,authenticated:record)
+            allowPending:allowPending,observedAt:Date(),authenticated:record)
     }
     private static func build(snapshot:Data,products:Data,mappings:Data,
         template:Data,start:String,end:String,subdivision:String,
-        selectedVisitIDs:Set<String>,allowPending:Bool,authenticated:N2EncryptedClinicalJournal.Recovered?=nil)throws->Result {
+        selectedVisitIDs:Set<String>,allowPending:Bool,observedAt:Date,authenticated:N2EncryptedClinicalJournal.Recovered?=nil)throws->Result {
         try period(start,end)
         guard ["LA VENTUROSA","PLVENTUROSA","AMBAS"].contains(subdivision) else{
             throw Failure.ambiguousSite
@@ -534,7 +542,11 @@ public enum N2VerifiedIndicatorWorkbook {
             let manifest:[String:Any]=["schema":1,"catalog":catalogue,"byCode":summary,
                 "reviewed":!provisional,"provisional":provisional,"start":start,"end":end,
                 "subdivision":subdivision,"rows":output.count,"plan":["lines":output],"pendingNotes":pendingNotes]
-            let built=try N1sFullExcelWriter.exportIndicator(base:template,manifest:JSONSerialization.data(withJSONObject:manifest))
+            let observation=N2IndicatorStockObservation.make(
+                inventory:inventory,catalogue:catalogue,openings:summary,visitDayByID:visitDayByID,
+                end:end,observedAt:observedAt)
+            let built=try N1sFullExcelWriter.exportIndicator(base:template,
+                manifest:JSONSerialization.data(withJSONObject:manifest),stockObservation:observation)
             guard built.sheetCount==10,built.writtenRows==output.count else{throw Failure.invalidWorkbook}
             return Result(xlsx:built.xlsx,provisional:provisional,pendingLines:pendingLines,rows:output.count,
                 visits:selected.count,missingOpening:432-openings,missingClosingCount:432-closings)

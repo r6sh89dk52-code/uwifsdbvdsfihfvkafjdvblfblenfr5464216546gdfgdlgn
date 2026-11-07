@@ -1,0 +1,203 @@
+name: DANPER 14.4 - Indicator stock and unsigned iLoader IPA
+on:
+  push:
+    branches: [fix/b144-indicator-closing-stock-20261107]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: danper-b144-indicator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  indicator:
+    name: Validate affected Indicator cases and 14.3 scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      INDICATOR_TESTS: 'N2SimpleInventoryTests/test(OctoberIndicator|Ambulatory|OfficialExportsNever|UnknownHistoricalOpening)|N2RealIndicatorWorkbookTests|N1sCombinedOfficialExcelTests/test(Indicator|RESU|WriterAllows|Ingresos|Unreviewed|MissingOrFalse|NoInventedMaterial)|N2IncidentExportScopeTests|N2ParityDeliveryAndProvisionalTests|N3DeclaredContainerTests/test(MandatoryOneZero|PendingContainer)'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 42374320353
+          name: DANPER_B143_NOTIFICATIONS_ILOADER_UNSIGNED_TESTED
+          path: previous-build
+          github-token: ${{ github.token }}
+      - name: Check the baseline and changes outside the exporter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/b144-evidence"
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, urllib.request
+          base = "b385364bf6fd8b7e7efa3fdb5b994c37f69c4f10"
+          scope = {
+              ".github/workflows/b144-indicator-stock.yml",
+              "native-ios/App/N2VerifiedIndicatorExportView.swift",
+              "native-ios/Sources/DanperCore/N1sFullExcelWriter.swift",
+              "native-ios/Sources/DanperCore/N2IndicatorStockObservation.swift",
+              "native-ios/Sources/DanperCore/N2VerifiedIndicatorWorkbook.swift",
+              "native-ios/Tests/DanperCoreTests/N2SimpleInventoryTests.swift",
+              "native-ios/project.yml",
+          }
+          changed = set(subprocess.check_output(["git","diff","--name-only",base,"HEAD"],text=True).splitlines())
+          assert changed <= scope, changed - scope
+          project = "native-ios/project.yml"
+          old = subprocess.check_output(["git","show",base+":"+project],text=True)
+          assert pathlib.Path(project).read_text() == old.replace('CURRENT_PROJECT_VERSION: "143"', 'CURRENT_PROJECT_VERSION: "144"')
+          url = "https://api.github.com/repos/"+os.environ["GITHUB_REPOSITORY"]+"/actions/runs/42374320353"
+          request = urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"]})
+          with urllib.request.urlopen(request,timeout=30) as response:
+              run = json.load(response)
+          assert run["head_sha"] == base and run["conclusion"] == "success"
+          evidence = json.loads(pathlib.Path("previous-build/TEST_EVIDENCE.json").read_text())
+          assert evidence["candidateSHA"] == base and evidence["uiTests"] == 12
+          assert evidence["coreTests"] == 447 and evidence["nativeTests"] == 43
+          assert evidence["failures"] == evidence["nativeFailures"] == evidence["uiFailures"] == evidence["uiSkipped"] == 0
+          proof = {"candidateSHA":os.environ["GITHUB_SHA"],"baselineRun":42374320353,"baselineSHA":base,
+                   "changed":sorted(changed),"baselineScope":"Prior results apply to unchanged areas only; the Indicator is tested below."}
+          pathlib.Path(os.environ["RUNNER_TEMP"],"b144-evidence","BASELINE.json").write_text(json.dumps(proof,indent=2))
+          print("PASS: authenticated baseline run; no changes outside the Indicator and build metadata")
+          PY
+          DANPER_EXPECTED_BUILD=144 node scripts/glass-audit/identity.cjs
+      - name: Generate synthetic Excel and clinical fixtures
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          export DANPER_AUDIT_OUT="$RUNNER_TEMP/b144-fixtures"
+          python3 -u scripts/glass-audit/run-bounded.py 350 "Generate synthetic fixtures" bash scripts/glass-audit/prepare.sh
+          echo "DANPER_N1_FIXTURE_DIR=$DANPER_AUDIT_OUT/fixtures" >> "$GITHUB_ENV"
+      - name: Run and verify only affected Swift tests
+        timeout-minutes: 24
+        run: |
+          set -euo pipefail
+          swift --version
+          python3 -u scripts/glass-audit/run-bounded.py 1320 "Compile Core and run affected Excel tests" \
+            swift test --package-path native-ios --jobs 2 --filter "$INDICATOR_TESTS" 2>&1 | tee "$RUNNER_TEMP/b144-evidence/indicator.log"
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          folder = pathlib.Path(os.environ["RUNNER_TEMP"],"b144-evidence")
+          pattern = re.compile(os.environ["INDICATOR_TESTS"])
+          expected = set()
+          for path in pathlib.Path("native-ios/Tests/DanperCoreTests").glob("*.swift"):
+              for case in re.findall(r"\bfunc (test\w+)\(",path.read_text()):
+                  name = path.stem+"/"+case
+                  if pattern.search(name):
+                      expected.add(name)
+          log = (folder/"indicator.log").read_text()
+          passed = re.findall(r"Test Case '-\[(?:DanperCoreTests\.)?(\w+) (test\w+)\]' passed",log)
+          if not passed:
+              passed = re.findall(r"Test Case '(\w+)\.(test\w+)' passed",log)
+          actual = {suite+"/"+case for suite,case in passed}
+          assert actual == expected and len(passed) == len(expected), (sorted(expected-actual),sorted(actual-expected))
+          assert len([case for case in actual if "/testOctoberIndicator" in case]) == 5
+          assert not re.search(r"Test Case .* skipped|\b[1-9]\d* tests? (?:were )?skipped",log)
+          assert re.search(r"Executed "+str(len(expected))+r" tests, with 0 failures",log), log[-3000:]
+          proof = json.loads((folder/"BASELINE.json").read_text())
+          proof.update(tests=sorted(actual),passed=len(actual),failures=0,skipped=0)
+          (folder/"TEST_EVIDENCE.json").write_text(json.dumps(proof,indent=2))
+          print(f"PASS: {len(actual)} affected cases, including five October/November stock regressions")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B144_INDICATOR_EVIDENCE_attempt_${{ github.run_attempt }}
+          path: ${{ runner.temp }}/b144-evidence
+          retention-days: 14
+          if-no-files-found: error
+    outputs:
+      evidence: B144_INDICATOR_EVIDENCE_attempt_${{ github.run_attempt }}
+
+  ipa:
+    name: Compile tested HEAD and publish unsigned ARM64 IPA
+    needs: indicator
+    runs-on: macos-15-intel
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.indicator.outputs.evidence }}
+          path: verified
+      - name: Verify tests and prepare Release resources
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          proof=json.loads(pathlib.Path("verified/TEST_EVIDENCE.json").read_text())
+          assert proof["candidateSHA"] == os.environ["GITHUB_SHA"] and proof["passed"] >= 5
+          assert proof["failures"] == proof["skipped"] == 0
+          PY
+          DANPER_EXPECTED_BUILD=144 node scripts/glass-audit/identity.cjs
+          npm ci --ignore-scripts --no-fund
+          if ! command -v xcodegen >/dev/null 2>&1; then brew install xcodegen; fi
+          node scripts/prepare-n1s-ios-demo-resources.cjs
+          (cd native-ios && bash scripts/make-app-icon.sh && xcodegen generate --spec project.yml)
+      - name: Build Release for iphoneos without signing
+        timeout-minutes: 22
+        run: |
+          set -euo pipefail
+          python3 -u scripts/glass-audit/run-bounded.py 1200 "Xcode Release iphoneos ARM64" \
+            xcodebuild -project native-ios/DANPERNative.xcodeproj -scheme DANPERNative \
+              -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+              -derivedDataPath "$RUNNER_TEMP/b144-release" ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build \
+              2>&1 | tee "$RUNNER_TEMP/b144-release.log"
+      - name: Verify executable, archive, and SHA256
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/b144-release/Build/Products/Release-iphoneos/DANPERNative.app"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist")
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")
+          ARCH=$(xcrun lipo -archs "$APP/DANPERNative")
+          test "$ID" = pe.danper.saludmovil.native.iloaderpreview
+          test "$VERSION" = 0.4.2
+          test "$BUILD" = 144
+          test "$ARCH" = arm64
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleSupportedPlatforms:0' "$APP/Info.plist")" = iPhoneOS
+          test ! -e "$APP/embedded.mobileprovision"
+          test ! -d "$APP/_CodeSignature"
+          test ! -f "$APP/N1sDemoResources/n2-synthetic-clinical.json"
+          OUT="$RUNNER_TEMP/b144-out"
+          mkdir -p "$OUT/Payload"
+          ditto "$APP" "$OUT/Payload/DANPERNative.app"
+          cp verified/TEST_EVIDENCE.json "$OUT/"
+          cd "$OUT"
+          IPA=DANPER_0.4.2_BUILD144_INDICATOR_STOCK_ILOADER_UNSIGNED.ipa
+          ditto -c -k --sequesterRsrc --keepParent Payload "$IPA"
+          unzip -tq "$IPA"
+          shasum -a 256 "$IPA" | tee SHA256.txt
+          printf '%s\n' "SHA=$GITHUB_SHA" "BUNDLE_ID=$ID" "VERSION=$VERSION" "BUILD=$BUILD" "ARCH=$ARCH" "PLATFORM=iphoneos" "SIGNING=disabled" > VERIFIED_BUILD.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: B144_XCODE_RELEASE_LOG_attempt_${{ github.run_attempt }}
+          path: ${{ runner.temp }}/b144-release.log
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DANPER_B144_INDICATOR_STOCK_ILOADER_UNSIGNED_TESTED
+          path: |
+            ${{ runner.temp }}/b144-out/*.ipa
+            ${{ runner.temp }}/b144-out/*.txt
+            ${{ runner.temp }}/b144-out/TEST_EVIDENCE.json
+          retention-days: 14
+          if-no-files-found: error

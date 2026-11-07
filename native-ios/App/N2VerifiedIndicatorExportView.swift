@@ -213,7 +213,7 @@ struct N2VerifiedIndicatorExportView:View {
             }
             DanperPanel {
                 N2Build222StageHeading(step:3,title:"Crear archivo y compartir")
-                Text("El libro conserva las 10 hojas y las fórmulas verificadas. La exportación no modifica lotes, atenciones ni stock.")
+                Text("El libro conserva las 10 hojas. En inventario único, consulta los saldos al corte y las existencias actuales en JUSTIFICACIONES.")
                     .font(.caption).foregroundStyle(.secondary)
                 Button {
                     Task {await export(asOf:true)}

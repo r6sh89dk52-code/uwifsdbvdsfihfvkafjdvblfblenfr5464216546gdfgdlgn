@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationXML)
+import FoundationXML
+#endif
 import XCTest
 @testable import DanperCore
 
@@ -704,6 +707,118 @@ final class N2SimpleInventoryTests:XCTestCase {
             "Unrecorded products must remain unverified")
         XCTAssertEqual(try N2SimpleInventory.read(raw),physicalBefore,
             "Excel reconstruction must never change shared physical inventory")
+    }
+
+    private func indicatorInventory(on day:String,products:[N2SimpleProduct],source raw:Data)throws->Data {
+        try N2SimpleInventory.activate(snapshot:raw,backup:proof(raw),request:N2SimpleActivation(
+            id:regimeID,at:at(day),operatorName:"OPERADOR FICTICIO",confirmed:true,backupAvailable:true,
+            initialProducts:products),catalog:catalog())
+    }
+    private func octoberIndicator(_ raw:Data,ids:Set<String>)throws->[String:Data] {
+        let plan=try object(fixture("n1s-indicator-plan.json"))
+        let before=try N2SimpleInventory.read(raw)
+        let book=try N2VerifiedIndicatorWorkbook.export(snapshot:raw,
+            products:JSONSerialization.data(withJSONObject:plan["catalog"]!),
+            mappings:fixture("n2-reviewed-approved.json"),template:fixture("n1s-indicator-template-store.zip"),
+            start:"2026-10-09",end:"2026-11-05",subdivision:"AMBAS",selectedVisitIDs:ids,
+            allowPending:true,observedAt:Date(timeIntervalSince1970:Double(at("2026-11-07","21:00:00"))/1000))
+        XCTAssertEqual(try N2SimpleInventory.read(raw),before)
+        return Dictionary(uniqueKeysWithValues:try N1rStoredZip.unpack(book.xlsx).map {($0.name,$0.data)})
+    }
+    private func stockRow(_ parts:[String:Data],code:String)throws->String {
+        let sheet=String(decoding:try XCTUnwrap(parts["xl/worksheets/sheet6.xml"]),as:UTF8.self)
+        return try XCTUnwrap(sheet.components(separatedBy:"</row>").first{$0.contains(">\(code)</t>")})
+    }
+    private func assertStock(_ row:String,column:String,value:Int?,file:StaticString=#filePath,line:UInt=#line) {
+        let cell="<c r=\"\(column)[0-9]+\""
+        let content=value.map {"><v>\($0)</v></c>"} ?? "/>"
+        XCTAssertNotNil(row.range(of:cell+content,options:.regularExpression),row,file:file,line:line)
+    }
+    func testOctoberIndicatorShowsCurrentStockWithoutInventingHistoricalBalance()throws {
+        let raw=try indicatorInventory(on:"2026-11-07",products:[product(quantity:100)],source:source())
+        let parts=try octoberIndicator(raw,ids:["fundo-unit","planta-open"])
+        let row=try stockRow(parts,code:"16000182")
+        assertStock(row,column:"D",value:nil)
+        assertStock(row,column:"E",value:nil)
+        assertStock(row,column:"G",value:100)
+        XCTAssertTrue(row.contains("Existencia registrada en Kardex"))
+        XCTAssertTrue(row.contains("NO VERIFICADO · sin ancla al corte"))
+        let notes=String(decoding:try XCTUnwrap(parts["xl/worksheets/sheet6.xml"]),as:UTF8.self)
+        XCTAssertTrue(notes.contains("09/10/2026 AL 05/11/2026"))
+        XCTAssertTrue(notes.contains("2026-11-07 16:00:00 (hora de Lima)"))
+    }
+    func testOctoberIndicatorReversesVerifiedMovementsAfterTheCut()throws {
+        let old=try source(empty:true)
+        var raw=try indicatorInventory(on:"2026-10-20",products:[product(quantity:107)],source:old)
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,
+            visit:visit(raw,quantity:2,day:"2026-11-05"),at:at("2026-11-05")).snapshot
+        raw=try N2SimpleInventory.apply(command(.outflow,quantity:5,time:at("2026-11-06")),to:raw,catalog:catalog())
+        raw=try N2SimpleInventory.apply(command(.count,quantity:100,time:at("2026-11-07")),to:raw,catalog:catalog())
+        let parts=try octoberIndicator(raw,ids:["SIMPLE-FICTICIO"])
+        let row=try stockRow(parts,code:"16000182")
+        assertStock(row,column:"D",value:nil)
+        assertStock(row,column:"E",value:105)
+        assertStock(row,column:"G",value:100)
+        XCTAssertTrue(row.contains("Verificado por recuento posterior"))
+        let uses=String(decoding:try XCTUnwrap(parts["xl/worksheets/sheet5.xml"]),as:UTF8.self)
+        XCTAssertNotNil(uses.range(of:#"<c r="R2"[^>]*><v>2</v></c>"#,options:.regularExpression))
+        let actual=String(decoding:try XCTUnwrap(parts["xl/worksheets/sheet2.xml"]),as:UTF8.self)
+        let official=try XCTUnwrap(actual.components(separatedBy:"</row>").first{$0.contains(">16000182</t>")})
+        XCTAssertNotNil(official.range(of:#"<c r="D\d+"[^>]*/>"#,options:.regularExpression))
+    }
+    func testOctoberIndicatorRejectsRetrospectiveClosingWithARecordedGap()throws {
+        var raw=try indicatorInventory(on:"2026-10-20",products:[product(quantity:107)],source:source(empty:true))
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,
+            visit:visit(raw,quantity:2,day:"2026-11-05"),at:at("2026-11-05")).snapshot
+        // The five units were never documented as a movement. The count
+        // corrects current stock, but cannot date the difference.
+        raw=try N2SimpleInventory.apply(command(.count,quantity:100,time:at("2026-11-07")),to:raw,catalog:catalog())
+        let row=try stockRow(octoberIndicator(raw,ids:["SIMPLE-FICTICIO"]),code:"16000182")
+        assertStock(row,column:"E",value:nil)
+        assertStock(row,column:"G",value:100)
+        XCTAssertTrue(row.contains("recuento posterior sin continuidad acreditada"))
+    }
+    func testOctoberIndicatorKeepsSingleInventoryAndVerifiedZeroForBothSites()throws {
+        let p=try product("16000025",quantity:1)
+        var raw=try indicatorInventory(on:"2026-10-20",products:[p,product(quantity:0)],source:source(empty:true))
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,
+            visit:visit(raw,id:"FUNDO-R1",code:p.code,r:1,day:"2026-11-03"),at:at("2026-11-03")).snapshot
+        var plant=try object(visit(raw,id:"PLANTA-R0",code:p.code,r:0,day:"2026-11-04"))
+        var worker=try XCTUnwrap(plant["worker"] as? [String:Any])
+        worker["site"]="PLVENTUROSA"
+        plant["worker"]=worker
+        raw=try N2SimpleInventory.saveVisit(snapshot:raw,visit:bytes(plant),at:at("2026-11-04")).snapshot
+        let parts=try octoberIndicator(raw,ids:["FUNDO-R1","PLANTA-R0"])
+        let row=try stockRow(parts,code:p.code)
+        assertStock(row,column:"E",value:0)
+        assertStock(row,column:"G",value:0)
+        let notCounted=try stockRow(parts,code:"16000013")
+        assertStock(notCounted,column:"G",value:nil)
+        XCTAssertTrue(notCounted.contains("Sin conteo registrado"))
+        let uses=String(decoding:try XCTUnwrap(parts["xl/worksheets/sheet5.xml"]),as:UTF8.self)
+        XCTAssertTrue(uses.contains("PLVENTUROSA"));XCTAssertTrue(uses.contains("LA VENTUROSA"))
+        XCTAssertNotNil(uses.range(of:#"<c r="R2"[^>]*><v>1</v></c>"#,options:.regularExpression))
+        XCTAssertNotNil(uses.range(of:#"<c r="R3"[^>]*><v>0</v></c>"#,options:.regularExpression))
+    }
+    func testOctoberIndicatorStockSectionPreservesTenSheetsCatalogueAndOfficialFormulas()throws {
+        let raw=try indicatorInventory(on:"2026-11-07",products:[product(quantity:100)],source:source())
+        let parts=try octoberIndicator(raw,ids:["fundo-unit","planta-open"])
+        let expectedSheets=["BD MATERIALES","CONTEO","INGRESOS","RESU","CONSUMOS",
+            "JUSTIFICACIONES","GUIA","@subuo","BASE TRU","@uo"]
+        let workbook=String(decoding:try XCTUnwrap(parts["xl/workbook.xml"]),as:UTF8.self)
+        XCTAssertEqual(workbook.components(separatedBy:"<sheet ").count-1,10)
+        for name in expectedSheets {XCTAssertTrue(workbook.contains("name=\"\(name)\""))}
+        XCTAssertEqual(parts.keys.filter{$0.hasPrefix("xl/tables/table")}.count,19)
+        let summary=String(decoding:try XCTUnwrap(parts["xl/worksheets/sheet4.xml"]),as:UTF8.self)
+        XCTAssertTrue(summary.contains("SUM(D3:E3)-F3"))
+        XCTAssertTrue(summary.contains("SUMIF(TB_CONSUMOS"))
+        let notes=String(decoding:try XCTUnwrap(parts["xl/worksheets/sheet6.xml"]),as:UTF8.self)
+        XCTAssertEqual(notes.components(separatedBy:"Existencia registrada en Kardex").count-1,1)
+        XCTAssertEqual(notes.components(separatedBy:"Sin conteo registrado").count-1,431)
+        XCTAssertTrue(notes.contains("F1:F1048576"))
+        for (name,xml) in parts where name.hasSuffix(".xml") || name.hasSuffix(".rels") {
+            XCTAssertTrue(XMLParser(data:xml).parse(),name)
+        }
     }
 
 }
