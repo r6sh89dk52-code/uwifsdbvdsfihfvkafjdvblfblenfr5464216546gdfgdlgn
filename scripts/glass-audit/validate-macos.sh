@@ -127,8 +127,8 @@ fresh(){
  if test "$MODE" != resume-ui || test "$1" != N2PremiumRedesignTests; then
   simctl 45 ui "$SIM_ID" appearance dark
  fi
- simctl 45 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLanguages -array es
- simctl 45 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
+ simctl 90 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLanguages -array es
+ simctl 90 spawn "$SIM_ID" defaults write .GlobalPreferences AppleLocale es_PE
  bounded 120 enrollment bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log"
  bounded 30 keyboard defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
  bounded 120 auth-ui-preparation bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log"

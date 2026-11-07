@@ -138,7 +138,7 @@ jobs:
   ios-typecheck:
     name: Required UI - N2PremiumRedesignTests
     needs: proven-core
-    runs-on: macos-15-intel
+    runs-on: macos-15
     timeout-minutes: 85
     outputs:
       evidence: ${{ steps.evidence-name.outputs.name }}
