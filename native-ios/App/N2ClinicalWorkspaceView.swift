@@ -25,8 +25,8 @@ struct N2ClinicalWorkspaceGateView:View {
     var body:some View {
         Group {
             if !checked {
-                DanperLoadingState(title:"Preparando DANPER…")
-                    .frame(maxWidth:.infinity,maxHeight:.infinity)
+                // Protect data until verified, but never flash a second startup label.
+                DanperBackdrop().ignoresSafeArea()
                     .accessibilityIdentifier("clinical-source-loading")
             } else if invalidSource {
                 DanperErrorState(message:message,retry:{Task {await refresh()}})
