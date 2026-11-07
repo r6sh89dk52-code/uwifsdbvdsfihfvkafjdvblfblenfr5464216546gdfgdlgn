@@ -163,10 +163,12 @@ public enum N2VerifiedIndicatorWorkbook {
         template:Data,start:String,end:String,subdivision:String,
         selectedVisitIDs:Set<String>,allowPending:Bool,observedAt:Date,authenticated:N2EncryptedClinicalJournal.Recovered?=nil)throws->Result {
         try period(start,end)
+        let isSimple = N2SimpleInventory.isActive(snapshot)
+        let dates = N2IndicatorStockObservation.Period(start:start,end:end,observedAt:observedAt)
         guard ["LA VENTUROSA","PLVENTUROSA","AMBAS"].contains(subdivision) else{
             throw Failure.ambiguousSite
         }
-        guard !selectedVisitIDs.isEmpty else{throw Failure.missingSelection}
+        guard allowPending || isSimple || !selectedVisitIDs.isEmpty else{throw Failure.missingSelection}
         // Source quantities remain tied to the original FEFO movements.
         // Any disputed medication/dose is barred from the official workbook.
         let projection=try authenticated.map{try N2ClinicalCorrections.authenticatedProjection($0)}
@@ -285,9 +287,13 @@ public enum N2VerifiedIndicatorWorkbook {
         guard selected.count==selectedVisitIDs.count else{
             throw Failure.missingSelection
         }
-        selected=selected.filter{string($0["date"])>=start &&
-                                 string($0["date"])<=end}
-        guard !selected.isEmpty,selected.count<=10_000 else{
+        selected=selected.filter { visit in
+            let day=string(visit["date"])
+            guard day>=start && day<=end else {return false}
+            guard day==dates.day(dates.observed) else {return true}
+            return dates.visitTime(day:day,time:string(visit["time"])).map { $0<=dates.observed } ?? true
+        }
+        guard (allowPending || isSimple || !selected.isEmpty),selected.count<=10_000 else{
             throw Failure.missingSelection
         }
         selected.sort {v,w in
@@ -480,73 +486,33 @@ public enum N2VerifiedIndicatorWorkbook {
         }
         guard output.count<=10_000 else{throw Failure.invalidVisit}
 
-        if N2SimpleInventory.isActive(snapshot) {
+        if isSimple {
             let inventory=try N2SimpleInventory.read(snapshot)
-            var summary=[String:[String:Any]](),openings=0,closings=0
-            // Only consumption belonging to THIS exported date range can
-            // affect its opening. Old visits must not block every subsequent
-            // period after the counted inventory establishes a real anchor.
-            let visitDayByID=Dictionary(uniqueKeysWithValues:visits.compactMap { visit -> (String,String)? in
+            let visitTimes=Dictionary(uniqueKeysWithValues:visits.compactMap { visit -> (String,Int64)? in
                 guard let id=visit["id"] as? String,
-                      let date=visit["date"] as? String else{return nil}
-                return (id,date)
+                      let at=dates.visitTime(day:string(visit["date"]),time:string(visit["time"])) else {return nil}
+                return (id,at)
             })
-            let historicalInRange=Set(inventory.historicalUses.filter { history in
-                guard let day=visitDayByID[history.visitID] else{return true}
-                return day>=start && day<=end
-            }.map(\.code))
+            let stock=N2IndicatorStockObservation.make(inventory:inventory,period:dates,visitTimes:visitTimes)
+            var summary=[String:[String:Any]](),openings=0,closings=0
             for item in catalogue {
-                let code=string(item["code"])
-                var row:[String:Any]=["code":code,"consumed":consumption[code] ?? 0,"receiptDetails":[Any]()]
-                let events=inventory.movements.filter{$0.code==code && N2SimpleInventory.day($0.at)<=end}
-                let opening=events.last{N2SimpleInventory.day($0.at)<start}
-                let within=events.filter{N2SimpleInventory.day($0.at)>=start}
-                let unresolved=inventory.incidents.contains{$0.code==code && $0.resolutionEventID==nil && N2SimpleInventory.day($0.clinicalAt)>=start && N2SimpleInventory.day($0.clinicalAt)<=end}
-                let historic=historicalInRange.contains(code)
-                if let last=events.last,["initial","count"].contains(last.kind),N2SimpleInventory.day(last.at)==end {
-                    row["count"]=last.after;closings+=1
+                let code=string(item["code"]), row=stock[code]
+                var material:[String:Any]=["code":code,"receiptDetails":row?.receipts ?? []]
+                if let registered=consumption[code] {
+                    material["consumed"]=registered
+                } else if row?.completeCoverage == true {
+                    material["consumed"]=0
                 }
-                // The last audited movement BEFORE the period is an exact
-                // opening anchor. A later stocktake does not erase this proof:
-                // prior logic silently blanked the opening whenever a count
-                // occurred within the selected period.
-                if let opening,!within.contains(where:{$0.kind=="initial"}) {
-                    row["opening"]=opening.after;openings+=1
-                    let receipts=within.filter{$0.kind=="receipt"}
-                    let grouped=Dictionary(grouping:receipts,by:{N2SimpleInventory.day($0.at)})
-                    guard grouped.count<=4 else{throw Failure.invalidReconciliation}
-                    row["receiptDetails"]=grouped.keys.sorted().map {day in
-                        ["quantity":grouped[day]!.reduce(0){$0+$1.delta},
-                         "date":day,"document":"KARDEX CONSOLIDADO"] as [String:Any]
-                    }
-                    row["verifiedIncome"]=receipts.reduce(0){$0+$1.delta}
-                    // Separate calculated closing from actual physical count.
-                    // An intervening count may record a discrepancy, not a
-                    // magically reconciled zero. No unsupported consumption R.
-                    if !unresolved && !historic {
-                        let outflows=within.filter{$0.kind=="outflow"}
-                            .reduce(0.0){$0-$1.delta}
-                        let calculated = opening.after + receipts.reduce(0.0){$0+$1.delta} - outflows
-                        if calculated>=0,calculated.isFinite {
-                            row["closing"]=calculated
-                            if let count=row["count"] as? Double {
-                                row["difference"]=calculated-count
-                            }
-                        }
-                    }
-                }
-                summary[code]=row
+                if row?.opening?.estimated == false {openings+=1}
+                if row?.closing?.estimated == false {closings+=1}
+                summary[code]=material
             }
-            let allSavedIDs=Set(visits.filter{string($0["status"])=="saved" && string($0["date"])>=start && string($0["date"])<=end}.map{string($0["id"])})
-            let provisional=allowPending || pendingLines>0 || openings<432 || closings<432 || subdivision != "AMBAS" || selectedVisitIDs != allSavedIDs
+            let provisional=pendingLines>0 || openings<432 || closings<432 || subdivision != "AMBAS"
             let manifest:[String:Any]=["schema":1,"catalog":catalogue,"byCode":summary,
                 "reviewed":!provisional,"provisional":provisional,"start":start,"end":end,
                 "subdivision":subdivision,"rows":output.count,"plan":["lines":output],"pendingNotes":pendingNotes]
-            let observation=N2IndicatorStockObservation.make(
-                inventory:inventory,catalogue:catalogue,openings:summary,visitDayByID:visitDayByID,
-                end:end,observedAt:observedAt)
             let built=try N1sFullExcelWriter.exportIndicator(base:template,
-                manifest:JSONSerialization.data(withJSONObject:manifest),stockObservation:observation)
+                manifest:JSONSerialization.data(withJSONObject:manifest),periodStock:stock)
             guard built.sheetCount==10,built.writtenRows==output.count else{throw Failure.invalidWorkbook}
             return Result(xlsx:built.xlsx,provisional:provisional,pendingLines:pendingLines,rows:output.count,
                 visits:selected.count,missingOpening:432-openings,missingClosingCount:432-closings)

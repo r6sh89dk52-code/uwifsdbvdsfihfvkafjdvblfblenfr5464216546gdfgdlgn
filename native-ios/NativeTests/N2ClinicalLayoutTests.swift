@@ -113,7 +113,7 @@ import DanperCore
             },name:"Atencion-guardada-\(dark ? "oscuro" : "claro")",dark:dark)
             let model=try N2NativeSnapshotReader.read(resource("n2-synthetic-clinical"))
             try await capture(NavigationStack {
-                N2VerifiedIndicatorExportView(layoutVisits:model.visits,selectionOnly:true)
+                N2VerifiedIndicatorExportView(layoutVisits:model.visits)
             },name:"Exportacion-\(dark ? "oscuro" : "claro")",dark:dark)
         }
         try await capture(NavigationStack {

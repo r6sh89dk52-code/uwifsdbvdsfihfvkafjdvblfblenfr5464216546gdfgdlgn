@@ -177,7 +177,8 @@ internal enum N1sFullExcelWriter {
     private static func sheetData(_ xml:String,headerRows:Int,rows:[[Any?]],
                                   width:Int,reviewed:Bool,sheet:Int,
                                   dateStyle:Int,cachedConsumption:[Int:Double]=[:],
-                                  reconciledValues:[Int:[String:Double]]=[:]) throws -> String {
+                                  reconciledValues:[Int:[String:Double]]=[:],
+                                  usesTemporalStock:Bool=false) throws -> String {
         var preserved=""
         for index in 1...headerRows {preserved += try existingRow(xml,index)}
         let prototype=try existingRow(xml,headerRows+1)
@@ -196,6 +197,11 @@ internal enum N1sFullExcelWriter {
                 let formulaText: String?
                 if sheet==5 && (col==2 || col==3) {
                     formulaText=organization(col,row)
+                }else if usesTemporalStock && sheet==4 &&
+                    (["E","G","I"].contains(label) || (label=="F" && cachedConsumption[row]==nil)) {
+                    // These cells have independent ledger evidence. In
+                    // particular, G does not depend on D or on Excel recalculation.
+                    formulaText=nil
                 }else {
                     formulaText=formula(sheet,label,row,reviewed:reviewed,
                         verifiedIncome:sheet==4 ? reconciledValues[row]?["E"].map{Int($0)} : nil)
@@ -346,41 +352,8 @@ internal enum N1sFullExcelWriter {
         return xml.replacingOccurrences(of:"</workbook>",
             with:"<calcPr calcMode=\"auto\" fullCalcOnLoad=\"1\" forceFullCalc=\"1\"/></workbook>")
     }
-    private static func appendStockObservation(_ stock:N2IndicatorStockObservation,
-                                               start:String,end:String,to xml:String)throws -> String {
-        let rows=try matches(#"<row\b[^>]*\br="(\d+)""#,in:xml)
-        let last=rows.compactMap { match -> Int? in
-            guard let range=Range(match.range(at:1),in:xml) else {return nil}
-            return Int(xml[range])
-        }.max() ?? 0
-        // Sheet 6's official table, styles, and conditional formatting stay
-        // untouched. Column F is reserved for its duplicate-value rule.
-        let header:[[Any?]]=[
-            ["EXISTENCIAS · INVENTARIO ÚNICO (FUNDO Y PLANTA)"],
-            ["Período: "+(try formattedPeriod(start,end))+" · Referencia actual: "+stock.reference+" (hora de Lima)"],
-            ["El cierre histórico y la existencia actual son saldos distintos. Vacío significa que no hay evidencia suficiente."],
-            ["Código","Producto","Unidad","Stock inicial","Cierre al "+end,nil,"Stock actual",nil,nil,
-             "Último mov. (Lima)","Estado actual",nil,"Evidencia del cierre"]
-        ]
-        let values=header+stock.rows.map { row -> [Any?] in
-            [row.code,row.name,row.unit,row.opening,row.closing,nil,row.current,nil,nil,
-             row.lastMovement,row.current == nil ? "Sin conteo registrado" : "Existencia registrada en Kardex",
-             nil,row.closingStatus]
-        }
-        let appended=try values.enumerated().map { offset,fields in
-            let row=last+2+offset
-            let cells=try fields.enumerated().map { index,value in
-                try xmlCell(column(index)+String(row),value)
-            }.joined()
-            return "<row r=\"\(row)\">"+cells+"</row>"
-        }.joined()
-        let data=try replaceExactly("</sheetData>",in:xml,with:appended+"</sheetData>")
-        return try replaceExactly(#"<dimension ref="A1:M\d+"/>"#,in:data,
-            with:"<dimension ref=\"A1:M\(last+1+values.count)\"/>")
-    }
-
     static func exportIndicator(base:Data,manifest:Data,
-                                stockObservation:N2IndicatorStockObservation?=nil) throws -> N1sExcelResult {
+                                periodStock:[String:N2IndicatorStockObservation.Row]?=nil) throws -> N1sExcelResult {
         guard manifest.count<4_000_000,
               let root=try? JSONSerialization.jsonObject(with:manifest) as? [String:Any],
               let catalog=root["catalog"] as? [[String:Any]],catalog.count==432,
@@ -440,15 +413,6 @@ internal enum N1sFullExcelWriter {
             xml=xml.replacingOccurrences(of:"</sheetData>",with:rows+"</sheetData>")
             archive[index]=N1rStoredEntry(name:archive[index].name,data:Data(xml.utf8))
         }
-        if let stockObservation {
-            let path="xl/worksheets/sheet6.xml"
-            guard let index=archive.firstIndex(where:{$0.name==path}),
-                  let xml=String(data:archive[index].data,encoding:.utf8) else {
-                throw N1sExcelError.invalidTemplate
-            }
-            let updated=try appendStockObservation(stockObservation,start:start,end:end,to:xml)
-            archive[index]=N1rStoredEntry(name:path,data:Data(updated.utf8))
-        }
         guard let stylesIndex=archive.firstIndex(where:{$0.name=="xl/styles.xml"}),
               let stylesXML=String(data:archive[stylesIndex].data,encoding:.utf8)
         else{throw N1sExcelError.invalidTemplate}
@@ -478,21 +442,28 @@ internal enum N1sFullExcelWriter {
             guard let code=string(product["code"]),!code.isEmpty,
                   let name=string(product["name"]),let unit=string(product["unit"]),
                   let material=reconciliation[code] else {throw N1sExcelError.invalidMaterial}
-            let count=material["count"],opening=material["opening"],
+            let stock=periodStock?[code]
+            let count:Any?=periodStock == nil ? material["count"] : stock?.count
+            let opening:Any?=periodStock == nil ? material["opening"] : stock?.opening?.quantity
+            let
                 entries=material["receiptDetails"] as? [[String:Any]] ?? []
             guard entries.count<=4 else {throw N1sExcelError.invalidMaterial}
             let lineCount:[Any?]=[code,name,unit,count,nil,nil,nil,nil]
             var income:[Any?]=Array(repeating:nil,count:25)
             income[0]=code;income[1]=name;income[2]=unit
             for (i,event) in entries.enumerated() {
-                guard let qty=int(event["quantity"]),
-                      let date=string(event["date"]),
+                let quantity = periodStock == nil ? int(event["quantity"]).map(Double.init) : number(event["quantity"])
+                guard let qty=quantity,qty>=0,
                       let document=string(event["document"]),document.count>=3 else {
                     throw N1sExcelError.invalidMaterial
                 }
                 let col=7+i*4
                 income[col]=qty
-                income[col+1]=try numericDate(date)
+                if let date=string(event["date"]) {
+                    income[col+1]=try numericDate(date)
+                } else if periodStock == nil {
+                    throw N1sExcelError.invalidMaterial
+                }
                 if let expiry=string(event["expires"]),!expiry.isEmpty {
                     income[col+2]=try numericDate(expiry)
                 }
@@ -501,6 +472,20 @@ internal enum N1sFullExcelWriter {
             // Unreviewed has blank X (not zero), but verified review enables formula X.
             var summary:[Any?]=Array(repeating:nil,count:13)
             summary[0]=code;summary[1]=name;summary[2]=unit;summary[3]=opening
+            if periodStock != nil {
+                summary[4]=stock?.income
+                summary[6]=stock?.closing?.quantity
+                summary[8]=stock?.difference
+                var note=stock?.note ?? "Stock no verificado"
+                if let stock, let initial=stock.opening, let final=stock.closing,
+                   !initial.estimated, !final.estimated,
+                   let received=stock.income,let consumed=number(material["consumed"]),
+                   N2SimpleInventory.round(initial.quantity+received-consumed) != final.quantity {
+                    if !note.isEmpty {note+=" · "}
+                    note+="Saldo según movimientos y ajustes del Kardex"
+                }
+                summary[12]=note
+            }
             sheetRows[2,default:[]].append(lineCount)
             sheetRows[3,default:[]].append(income)
             sheetRows[4,default:[]].append(summary)
@@ -514,12 +499,16 @@ internal enum N1sFullExcelWriter {
         var cachedConsumption=[Int:Double]()
         var reconciledValues=[Int:[String:Double]]()
         for (index,product) in catalog.enumerated() {
-            guard let code=string(product["code"]),
-                  let material=reconciliation[code],
-                  let consumed=int(material["consumed"]) else {
+            guard let code=string(product["code"]),let material=reconciliation[code] else {
                 throw N1sExcelError.invalidMaterial
             }
             let row=index+3
+            if let periodStock {
+                if let consumed=int(material["consumed"]) {cachedConsumption[row]=Double(consumed)}
+                if let count=periodStock[code]?.count {reconciledValues[row]=["H":count]}
+                continue
+            }
+            guard let consumed=int(material["consumed"]) else {throw N1sExcelError.invalidMaterial}
             cachedConsumption[row]=Double(consumed)
             // Only a trusted physical snapshot from the joint cut may
             // populate E/G/H/I. The receipt amount includes VERIFIED zero
@@ -557,7 +546,8 @@ internal enum N1sFullExcelWriter {
                                           width:width,reviewed:formulasWritten,sheet:no,
                                           dateStyle:peruDateStyle,
                                           cachedConsumption:no==4 ? cachedConsumption : [:],
-                                          reconciledValues:no==4 ? reconciledValues : [:])
+                                          reconciledValues:no==4 ? reconciledValues : [:],
+                                          usesTemporalStock:periodStock != nil)
                 let completed:String
                 if no==3 {
                     completed=try expirySemaphore(rebuilt)
