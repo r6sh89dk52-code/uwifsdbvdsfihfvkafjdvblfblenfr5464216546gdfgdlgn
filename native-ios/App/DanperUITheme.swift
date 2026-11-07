@@ -44,6 +44,8 @@ enum DanperStyle {
 /// wordmark is a bundled asset, never recreated with a system font.
 struct DanperBrandHeader:View {
     let onSettings:()->Void
+    var onNotifications:(()->Void)?=nil
+    var notificationCount:Int=0
     // The bundled 316px square includes a pure-red background. Derive alpha
     // from the green channel: zero for that red and full for white lettering.
     // This reuses the authentic brand lettering without exporting/editing PNGs.
@@ -72,8 +74,31 @@ struct DanperBrandHeader:View {
                 .foregroundStyle(.white)
                 .fixedSize(horizontal:true,vertical:false)
             Spacer(minLength:3)
-            Image(systemName:"bell").font(.system(size:19,weight:.medium))
-                .foregroundStyle(.white.opacity(0.85)).accessibilityHidden(true)
+            if let onNotifications {
+                Button(action:onNotifications) {
+                    Image(systemName:notificationCount>0 ? "bell.badge.fill":"bell")
+                        .font(.system(size:19,weight:.medium))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .frame(width:40,height:44)
+                        .overlay(alignment:.topTrailing) {
+                            if notificationCount>0 {
+                                Text(String(min(99,notificationCount)))
+                                    .font(.system(size:10,weight:.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal,4).frame(minWidth:16,minHeight:16)
+                                    .background(DanperStyle.red,in:Capsule())
+                                    .offset(x:2,y:2)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Notificaciones")
+                .accessibilityValue("\(notificationCount) avisos pendientes")
+                .accessibilityIdentifier("brand-header-notifications")
+            } else {
+                Image(systemName:"bell").font(.system(size:19,weight:.medium))
+                    .foregroundStyle(.white.opacity(0.85)).accessibilityHidden(true)
+            }
             Button(action:onSettings) {
                 Image(systemName:"gearshape")
                     .font(.system(size:18,weight:.medium))
