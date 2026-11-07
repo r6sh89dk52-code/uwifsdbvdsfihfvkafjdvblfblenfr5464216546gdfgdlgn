@@ -140,7 +140,7 @@ prepare_test_installation(){
  simctl 60 list devices -j | python3 -c 'import json,sys
 rows=[d for group in json.load(sys.stdin)["devices"].values() for d in group if d["udid"]==sys.argv[1]]
 assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswith("DANPER-SYNTHETIC-")' "$SIM_ID" || return 1
- local app bundle executable attempt status
+ local app bundle executable attempt status recovery diagnostics placeholder
  local -a apps=("$DD/Build/Products/Debug-iphonesimulator/DANPERNative.app")
  if test "$1" != seed-N2PremiumRedesignTests; then
   apps+=("$DD/Build/Products/Debug-iphonesimulator/DANPERInteractionTests-Runner.app")
@@ -162,29 +162,39 @@ assert len(rows)==1 and rows[0]["state"]=="Booted" and rows[0]["name"].startswit
    simctl 150 install "$SIM_ID" "$app" > "$attempt" 2>&1 || status=$?
    cat "$attempt" >> "$OUT/simulator-installation.log"
    if test "$status" != 0; then
-    # Recover one known, pre-test InstallCoordination failure. Never retry an
-    # XCTest assertion, erase data, alter entitlements, or inject authentication.
-    if test "$INSTALL_RECOVERY_SIM" = "$SIM_ID" ||
-       ! grep -q 'domain=IXErrorDomain, code=2' "$attempt" ||
-       ! grep -q 'Failed to create promise' "$attempt"; then
-     cat "$attempt"; return "$status"
+    # Recover only known pre-test InstallCoordination races on this
+    # owned Simulator. Preserve the first failure and retry at most once.
+    if test "$INSTALL_RECOVERY_SIM" = "$SIM_ID"; then return "$status"; fi
+    if grep -q 'domain=IXErrorDomain, code=2' "$attempt" &&
+       grep -q 'Failed to create promise' "$attempt"; then
+     recovery=reboot
+    elif test "$MODE" = resume-ui && test "${DANPER_UI_LABEL:-}" = N2PremiumRedesignTests &&
+         grep -q 'domain=IXErrorDomain, code=3' "$attempt" &&
+         grep -q 'Failed to locate promise' "$attempt"; then
+     recovery=orphaned
+    else
+     return "$status"
     fi
     INSTALL_RECOVERY_SIM="$SIM_ID"
-    echo "RECOVERY: reboot owned synthetic Simulator after recorded IXErrorDomain code=2" | tee -a "$OUT/simulator-installation.log"
-    python3 - "$SIM_ID" "$OUT/installer-system-$SIM_ID.log" <<'PYINSTALL'
-import subprocess,sys
-try:
- p=subprocess.run(['xcrun','simctl','spawn',sys.argv[1],'log','show','--last','3m','--style','compact',
-  '--predicate','process == "installd" OR process == "installcoordinationd"'],capture_output=True,text=True,timeout=30)
- open(sys.argv[2],'w').write(p.stdout+p.stderr)
-except subprocess.TimeoutExpired:
- open(sys.argv[2],'w').write('Installer diagnostic collection timed out; original install error preserved.\n')
-PYINSTALL
-    simctl 45 shutdown "$SIM_ID" || return 1
-    simctl 90 boot "$SIM_ID" || return 1
-    simctl 480 bootstatus "$SIM_ID" -b || return 1
-    bounded 120 enrollment bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1 || return 1
-    bounded 120 auth-ui-preparation bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1 || return 1
+    diagnostics="$OUT/installer-system-$SIM_ID.log"
+    simctl 45 spawn "$SIM_ID" log show --last 3m --style compact \
+     --predicate 'process == "installd" OR process == "installcoordinationd"' > "$diagnostics" || true
+    if test "$recovery" = orphaned; then
+     placeholder=$(sed -nE 's/.*Placeholder did not exist for UUID ([A-Fa-f0-9-]{36}).*/\1/p' "$attempt" | head -n 1)
+     if test -z "$placeholder" ||
+        ! grep -F "$placeholder" "$diagnostics" | grep '_DoFirstRunCleanup' | grep -Fq 'Promise orphaned'; then
+      echo "No matching orphaned placeholder in installcoordinationd; retain original failure"
+      return "$status"
+     fi
+     echo "RECOVERY: retry install once after confirmed first-run cleanup of $placeholder"
+    else
+     echo "RECOVERY: reboot owned synthetic Simulator after recorded IXErrorDomain code=2"
+     simctl 45 shutdown "$SIM_ID" || return 1
+     simctl 90 boot "$SIM_ID" || return 1
+     simctl 480 bootstatus "$SIM_ID" -b || return 1
+     bounded 120 enrollment bash scripts/glass-audit/enroll-simulator.sh "$SIM_ID" >> "$OUT/enrollment.log" 2>&1 || return 1
+     bounded 120 auth-ui-preparation bash scripts/glass-audit/prepare-auth-ui.sh "$SIM_ID" >> "$OUT/auth-ui-preparation.log" 2>&1 || return 1
+    fi
     simctl 150 install "$SIM_ID" "$app" >> "$OUT/simulator-installation.log" 2>&1 || {
      cat "$OUT/simulator-installation.log"; return 1;
     }
