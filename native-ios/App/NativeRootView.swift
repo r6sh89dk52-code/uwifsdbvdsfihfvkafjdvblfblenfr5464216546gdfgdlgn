@@ -35,7 +35,7 @@ struct NativeRootView:View {
     private var isReady:Bool { summary != nil || layoutOnly }
     var body:some View {
         VStack(spacing:0) {
-            DanperBrandHeader {tab=3}
+            DanperBrandHeader(onSettings:{tab=3})
             TabView(selection:$tab) {
                 NavigationStack {home.toolbar(.hidden,for:.tabBar)}
                     .toolbar(.hidden,for:.tabBar)
