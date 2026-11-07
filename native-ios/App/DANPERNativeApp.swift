@@ -77,9 +77,9 @@ struct DANPERNativeApp: App {
                     DanperAccessView(unlocking:false,canRetry:false,error:"",onUnlock:{})
                     #endif
                 } else if !sourceResolved {
-                    DanperLoadingState(title:"Preparando DANPER…")
-                        .frame(maxWidth:.infinity,maxHeight:.infinity)
-                        .background(DanperBackdrop())
+                    // Keep the launch canvas visually stable while inspecting the vault.
+                    // The transient “Preparando…” label caused a visible flash on real iPhone.
+                    DanperBackdrop().ignoresSafeArea()
                 } else if onboardingFinished || hasClinicalSource {
                     if authenticated || sessionStarted {
                         N2ClinicalWorkspaceGateView(authenticatedLaunch:true,sessionUnlocked:authenticated,onLock:lockAccess)
