@@ -498,15 +498,35 @@ public enum N2VerifiedIndicatorWorkbook {
                 if let last=events.last,["initial","count"].contains(last.kind),N2SimpleInventory.day(last.at)==end {
                     row["count"]=last.after;closings+=1
                 }
-                if let opening,!unresolved,!historic,within.allSatisfy({$0.kind != "initial" && $0.kind != "count"}) {
+                // The last audited movement BEFORE the period is an exact
+                // opening anchor. A later stocktake does not erase this proof:
+                // prior logic silently blanked the opening whenever a count
+                // occurred within the selected period.
+                if let opening,!within.contains(where:{$0.kind=="initial"}) {
                     row["opening"]=opening.after;openings+=1
                     let receipts=within.filter{$0.kind=="receipt"}
-                    // The official workbook has four receipt slots. Aggregate same-day verified entries without discarding amounts.
                     let grouped=Dictionary(grouping:receipts,by:{N2SimpleInventory.day($0.at)})
                     guard grouped.count<=4 else{throw Failure.invalidReconciliation}
-                    row["receiptDetails"]=grouped.keys.sorted().map {day in ["quantity":grouped[day]!.reduce(0){$0+$1.delta},"date":day,"document":"KARDEX CONSOLIDADO"] as [String:Any]}
+                    row["receiptDetails"]=grouped.keys.sorted().map {day in
+                        ["quantity":grouped[day]!.reduce(0){$0+$1.delta},
+                         "date":day,"document":"KARDEX CONSOLIDADO"] as [String:Any]
+                    }
                     row["verifiedIncome"]=receipts.reduce(0){$0+$1.delta}
-                    row["closing"]=events.last?.after;row["difference"]=0
+                    // Separate calculated closing from actual physical count.
+                    // An intervening count may record a discrepancy, not a
+                    // magically reconciled zero. No unsupported consumption R.
+                    if !unresolved && !historic {
+                        let outflows=within.filter{$0.kind=="outflow"}
+                            .reduce(0.0){$0-$1.delta}
+                        let calculated=opening.after+
+                            receipts.reduce(0.0){$0+$1.delta}-outflows
+                        if calculated>=0,calculated.isFinite {
+                            row["closing"]=calculated
+                            if let count=row["count"] as? Double {
+                                row["difference"]=calculated-count
+                            }
+                        }
+                    }
                 }
                 summary[code]=row
             }
